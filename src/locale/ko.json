@@ -4057,5 +4057,13 @@
 	"canvas.panel.settingsNotReady": "설정을 불러오는 중이에요. 잠시 후 다시 보내주세요",
 	"canvas.panel.loading": "불러오는 중…",
 	"canvas.composer.perTurn": "1턴당 포인트",
+	"canvas.panel.personaMode": "페르소나 적용 범위",
+	"canvas.panel.personaModeNameOnly": "호칭만 사용",
+	"canvas.panel.personaModeGlobal": "공통 페르소나",
+	"canvas.panel.personaModeCustom": "이 카드만",
+	"canvas.panel.personaModeNameOnlyHint": "AI에게 호칭만 알려 줍니다. 성별과 자기소개는 보내지 않습니다.",
+	"canvas.panel.personaModeGlobalHint": "모든 카드가 같은 페르소나를 공유합니다. 한 번 고치면 어디서나 반영됩니다.",
+	"canvas.panel.personaModeCustomHint": "이 카드에서만 쓰고 다른 카드에는 영향이 없습니다.",
+	"canvas.panel.personaNickNameHint": "비워 두면 닉네임을 사용합니다: {name}",
 	"canvas.panel.personaAdvanced": "고급"
 }

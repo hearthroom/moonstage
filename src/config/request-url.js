@@ -45,6 +45,9 @@ export const requestUrl = {
 	// **送出那一輪讀的是這一份**，寫進外觀偏好不會生效。
 	playerRoleSettings: `${V1}/player/role-settings`,
 	playerRoleSettingsSave: `${V1}/player/role-settings/save`,
+	// 全局人設（帳號層級）：所有卡共用的稱呼／性別／自我介紹。每張卡用哪一檔在 role-settings 的 personaMode。
+	playerPersona: `${V1}/player/persona`,
+	playerPersonaSave: `${V1}/player/persona/save`,
 	// 深入準備（Agent 模式）與劇情摘要偏好
 	playerAgentMode: `${V1}/player/agent-mode`,
 	playerCompactPreference: `${V1}/player/compact-preference`,
