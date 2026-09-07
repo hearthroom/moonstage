@@ -351,7 +351,8 @@ import {
   findStableBoundary, getStreamCacheEntry, setStreamCacheEntry, clearStreamCache
 } from '@/utils/rich-text-renderer.js';
 import { applyDisplayRules, hasCrossLineRule } from '@/utils/display-rule-engine.js'
-import { createAuthorAssetRuntime } from '@/utils/author-asset-mount.js'
+import { createAuthorAssetRuntime, CONTAINER_ATTR as AUTHOR_CONTAINER_ATTR } from '@/utils/author-asset-mount.js'
+import { createAuthorScope } from '@/utils/author-asset-scope.js'
 import { needsKaiFallback, ensureKaiFallback, applyFontMode } from './canvas-font-fallback'
 import { getAuthorDraftStore } from '@/common/author-draft-store'
 import { draftToAuthorAsset, draftDisplayName, type AuthorDraft } from '@/common/author-draft'
@@ -2236,6 +2237,12 @@ const hasAuthorAsset = computed(() => activeAuthorAsset.value.rules.length > 0);
 const AUTHOR_LAYER_Z_INDEX = { under: 12, over: 30, cover: 1000 };
 
 let authorAssetRuntime = null;
+// 作者範圍：這張卡的程式碼（掛載腳本、訊息裡的 <script>/<style>、訂閱回呼、inline handler）
+// 跑出來的計時器、監聽、塞到頁面根部的節點，全記在這裡，離場時一併收掉。容器只管容器裡
+// 的東西，作者往 body 直接掛的 HUD、每秒重畫的 interval 都不在容器裡——沒有它，離開這
+// 張卡之後那些東西會留在下一頁上。晚建：訊息腳本可能比資產先到。
+let authorScope = null;
+let authorScopeClosed = false;
 let authorColumnObserver = null;
 let authorFixedNodeObserver = null;
 let authorFixedNodeHoistLayer = null;
@@ -2291,6 +2298,19 @@ function buildAuthorAssetHost() {
   };
 }
 
+// 把宿主橋接的每個方法包成「在作者範圍外執行」。沒有範圍時原樣返回。
+function hostOutsideAuthorScope(host, scope) {
+  if (!scope || !host) return host;
+  const wrapped = {};
+  Object.keys(host).forEach((key) => {
+    const value = host[key];
+    wrapped[key] = typeof value === 'function'
+      ? function () { return scope.suspend(value, this, arguments); }
+      : value;
+  });
+  return wrapped;
+}
+
 function savePlayerPreference(payload) {
   try {
     _this.http.post(_this.requestUrl.playerPreferenceSave, { data: payload, showLoading: false });
@@ -2320,6 +2340,20 @@ async function loadAuthorAsset(targetRoleId) {
 
 // 把一份作者資產套到畫布上。伺服器回的與本機草稿轉出來的是同一個形狀，
 // 所以兩條路在這裡會合；之後的規則、掛載、沉浸模式都不知道資產從哪來。
+// 頁面活著的期間只有一份；離場收掉之後不再建（收尾後才到的 nextTick 不該再注入東西）。
+function ensureAuthorScope() {
+  if (authorScopeClosed || typeof document === 'undefined') return null;
+  if (!authorScope || authorScope.isDisposed()) {
+    authorScope = createAuthorScope({
+      doc: document,
+      win: window,
+      isAuthorRoot: (el) => !!(el.hasAttribute && el.hasAttribute(AUTHOR_CONTAINER_ATTR)),
+      isOwnNode: (node) => !!(node.hasAttribute && node.hasAttribute(AUTHOR_CONTAINER_ATTR)),
+    });
+  }
+  return authorScope;
+}
+
 function applyAuthorAsset(asset) {
   try {
     const res = { data: asset };
@@ -2328,16 +2362,20 @@ function applyAuthorAsset(asset) {
     applyImmersiveMode(res.data.pageMode === 'immersive');
     if (!activeAuthorAsset.value.rules.length && !res.data.mountTrigger) return;
 
+    const scope = ensureAuthorScope();
     authorAssetRuntime = createAuthorAssetRuntime({
       doc: document,
       layerZIndex: AUTHOR_LAYER_Z_INDEX,
+      runAuthorCode: scope ? (fn) => scope.run(fn) : undefined,
       // 作者容器內的真實點擊登記為一次使用者手勢，讓作者按鈕呼叫的 send() 過得了關。
       // 只是放寬手勢來源，不會自己送出任何東西——作者沒呼叫 send() 就什麼都不會發生。
       // lunaIntent 這時還沒建好，所以晚綁：點擊發生時才取。
       onUserGesture: () => { if (lunaIntent) lunaIntent.noteUserGesture(); },
     });
     lunaIntent = createLunaIntentApi({
-      host: buildAuthorAssetHost(),
+      // 宿主替作者做的事（送出、改背景、捲動……）退出作者範圍跑：那些是宿主的副作用，
+      // 離場時不能跟著作者的東西一起被清掉。
+      host: hostOutsideAuthorScope(buildAuthorAssetHost(), scope),
       runtime: authorAssetRuntime,
     });
     window.luna = lunaIntent.api;
@@ -2593,6 +2631,12 @@ function disposeAuthorAsset() {
   authorAssetRuntime = null;
   lunaIntent = null;
   if (typeof window !== 'undefined' && window.luna) { try { delete window.luna; } catch (e) { window.luna = undefined; } }
+  // 範圍最後收：執行期 dispose 時作者的 dispose 回呼還可能開計時器、動節點，要一起算進去
+  authorScopeClosed = true;
+  if (authorScope) {
+    try { authorScope.dispose(); } catch (e) { /* 收尾不得拋錯 */ }
+    authorScope = null;
+  }
   setActiveAuthorAsset(null);
 }
 
@@ -3110,13 +3154,19 @@ function activateMessageScripts(item: any, html: string) {
   nextTick(() => {
     const messageEl = document.querySelector(`#msg-${item.id} .content`);
     if (!messageEl) return;
+    // 頁面已經在收尾就不再注入：塞進去的東西沒有人收
+    const scope = ensureAuthorScope();
+    if (!scope) return;
     const scriptTags = messageEl.innerHTML.match(/<script[^>]*>[\s\S]*?<\/script>/gi);
     if (scriptTags) {
       scriptTags.forEach((scriptTag) => {
         const scriptContent = scriptTag.replace(/<script[^>]*>|<\/script>/gi, '');
         const newScript = document.createElement('script');
         newScript.textContent = scriptContent;
-        document.head.appendChild(newScript);
+        // 放進 head 的那一刻腳本就執行了：跑在作者範圍裡，它開的計時器與塞的節點才收得掉；
+        // 這個 script 節點本身也記帳，離場時從 head 拿掉。
+        scope.adopt(newScript);
+        scope.run(() => { document.head.appendChild(newScript); });
       });
     }
     // <style> 連同屬性一起搬：作者的主題切換靠 `style[id^="…"]` 找到自己的樣式塊再
@@ -3134,6 +3184,7 @@ function activateMessageScripts(item: any, html: string) {
           if (existing) existing.remove();
         }
         newStyle.textContent = styleContent;
+        scope.adopt(newStyle);
         document.head.appendChild(newStyle);
       });
     }

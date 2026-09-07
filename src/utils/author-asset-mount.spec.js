@@ -96,6 +96,32 @@ describe('author asset mount', () => {
     })
   })
 
+  describe('作者程式碼的包裝', () => {
+    it('掛載腳本與訂閱回呼都經過 runAuthorCode', () => {
+      let wrapped = 0
+      const rt = createAuthorAssetRuntime({
+        doc: document,
+        layerZIndex: LAYER_Z_INDEX.desktop,
+        runAuthorCode: (fn) => { wrapped++; return fn() },
+      })
+      rt.mount({ mountLayer: 'over', html: '<script>window.__authorRan = (window.__authorRan || 0) + 1</script>' })
+      expect(wrapped).toBe(1)
+      let seen = false
+      rt.subscribe('message:done', () => { seen = true })
+      rt.emit('message:done', {})
+      expect(wrapped).toBe(2)
+      expect(seen).toBe(true)
+    })
+
+    it('沒給 runAuthorCode 時行為不變', () => {
+      const rt = makeRuntime()
+      let seen = false
+      rt.subscribe('message:done', () => { seen = true })
+      expect(rt.emit('message:done', {})).toBe(1)
+      expect(seen).toBe(true)
+    })
+  })
+
   describe('離開即還原', () => {
     it('dispose 卸掉全部容器', () => {
       const rt = makeRuntime()
