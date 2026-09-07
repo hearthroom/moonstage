@@ -61,6 +61,12 @@ describe('彈層的標準外框', () => {
     expect(w.find('.edit-scope .btn-scope .add-btn').text()).toBe('添加')
   })
 
+  it('手機也是置中的對話框，不是底部 sheet（owner 2026-09-07）', () => {
+    expect(css).toMatch(/\.u-popup \{[^}]*align-items: center;[^}]*\}/)
+    expect(css).not.toMatch(/\.u-popup \{[^}]*align-items: flex-end/)
+    expect(css).not.toMatch(/\.u-popup__content \{[^}]*border-top-left-radius/)
+  })
+
   it('這一節放在 layer 的最後：同特異度靠順序蓋過各片自己的規則', () => {
     const memoryAt = css.indexOf('/* ── AI 筆記／永久記憶')
     const mobileAt = css.indexOf('/* ── 手機')
