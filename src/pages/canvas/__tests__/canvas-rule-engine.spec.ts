@@ -95,3 +95,20 @@ describe('順序', () => {
     expect(out.html).toBe('c')
   })
 })
+
+describe('{{user}} 換成誰', () => {
+  it('人設稱呼 → 作者取的名字 → 暱稱 → 兜底；作者填「你」這種佔位當沒填', async () => {
+    const { resolvePlayerName, isPlayerNamePlaceholder } = await import('../canvas-rule-engine')
+    expect(resolvePlayerName({ personaName: '小明', cardUserName: '桐人', nickName: '阿強', fallback: '你' })).toBe('小明')
+    expect(resolvePlayerName({ personaName: '', cardUserName: '桐人', nickName: '阿強', fallback: '你' })).toBe('桐人')
+    expect(resolvePlayerName({ personaName: '', cardUserName: '你', nickName: '阿強', fallback: '你' })).toBe('阿強')
+    expect(resolvePlayerName({ personaName: '', cardUserName: ' User ', nickName: '', fallback: 'You' })).toBe('You')
+    expect(isPlayerNamePlaceholder('玩家')).toBe(true)
+    expect(isPlayerNamePlaceholder('桐人')).toBe(false)
+  })
+
+  it('巨集不分大小寫、大括號裡有空白也認', async () => {
+    const { substituteMacros } = await import('../canvas-rule-engine')
+    expect(substituteMacros('{{USER}}／{{ char }}／{{random:A::B}}', { user: '阿強', char: '沈栀语' })).toBe('阿強／沈栀语／{{random:A::B}}')
+  })
+})

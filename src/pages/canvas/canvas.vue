@@ -371,7 +371,7 @@ import CanvasIntro from './components/canvas-intro.vue'
 import CanvasMessage from './components/canvas-message.vue'
 import CanvasComposer from './components/canvas-composer.vue'
 import CanvasMessageMenu from './components/canvas-message-menu.vue'
-import { applyTavernRules } from './canvas-rule-engine'
+import { applyTavernRules, resolvePlayerName } from './canvas-rule-engine'
 import { scopeCardHtml, normalizeCardFormat, type CardFormat } from './canvas-style-scope'
 import { stripUnknownTags, wrapDialogue } from './canvas-platform-defaults'
 import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue } from './canvas-greetings'
@@ -7677,8 +7677,14 @@ const introText = computed(() => {
 
 function userDisplayName(): string {
   const info: any = unref(userInfo) || {}
-  // 只用暱稱；userName 是登入帳號（例如 test-01），不該當聊天裡的署名。沒有暱稱就叫「你」。
-  return info.nickName || t('canvas.you')
+  // {{user}} 換成誰，跟伺服器替換開場白時同一條鏈：人設稱呼 → 作者取的玩家名（「你」這種佔位不算）
+  // → 帳號暱稱 → 「你」。帳號的 userName 是登入帳號（例如 test-01），不在鏈裡。
+  return resolvePlayerName({
+    personaName: formData.userName,
+    cardUserName: roleView.value.userName,
+    nickName: info.nickName,
+    fallback: t('canvas.you'),
+  })
 }
 
 const messageLabels = computed(() => ({
