@@ -353,7 +353,6 @@ import {
 import { applyDisplayRules, hasCrossLineRule } from '@/utils/display-rule-engine.js'
 import { createAuthorAssetRuntime, CONTAINER_ATTR as AUTHOR_CONTAINER_ATTR } from '@/utils/author-asset-mount.js'
 import { createAuthorScope } from '@/utils/author-asset-scope.js'
-import { claimPageColorScheme } from '@/utils/page-color-scheme.js'
 import { needsKaiFallback, ensureKaiFallback, applyFontMode } from './canvas-font-fallback'
 import { getAuthorDraftStore } from '@/common/author-draft-store'
 import { draftToAuthorAsset, draftDisplayName, type AuthorDraft } from '@/common/author-draft'
@@ -7422,9 +7421,6 @@ function consumePendingUserDefineRefresh() {
 
 onShow(() => {
   //监听页面显示，页面每次出现在屏幕上都触发
-  // 這一頁的外觀歸卡片作者管：向瀏覽器聲明「自己處理深淺色」，手機瀏覽器的強制深色才不會
-  // 把作者做的白底反轉掉。只掛在這一頁，被子頁蓋住或離開就撤，其他頁面照舊跟著系統走。
-  if (!releasePageColorScheme) releasePageColorScheme = claimPageColorScheme();
   // 從子頁返回：把 onHide 收起來的作者容器放回來（節點與訂閱都還在，不重跑腳本）。
   setAuthorAssetPageVisible(true);
 
@@ -7447,7 +7443,6 @@ onShow(() => {
 
 onHide(() => {
   //监听页面隐藏
-  releasePageColorSchemeClaim();
   // 先收作者容器：子頁疊上來之前把它藏起來，否則覆蓋層會蓋在子頁上。
   setAuthorAssetPageVisible(false);
   // 保存滚动位置
@@ -7474,7 +7469,6 @@ onUnload(() => {
   // 卡片往 <body> / <html> 加的 class 帶著它的 !important。不還原的話玩家會
   // 帶著上一張卡的美化走到別的頁面去，而他完全看不出那是哪來的。
   restoreDocumentOnLeave();
-  releasePageColorSchemeClaim();
   // 清理 onMounted 註冊的事件監聽，避免泄漏
   // 移除键盘快捷键监听
   // #ifdef H5
@@ -9493,15 +9487,6 @@ function onStageScroll(event: Event) {
 // 上一張卡的美化走到別的頁面去，而他完全看不出那是哪來的。
 function restoreDocumentOnLeave() {
   restoreBodySnapshot(typeof document !== 'undefined' ? document : null, enterBodySnapshot)
-}
-
-// onShow 掛、onHide／onUnload 撤；撤是冪等的，兩個鉤子先後都來也不會撤到別人的。
-let releasePageColorScheme = null
-function releasePageColorSchemeClaim() {
-  if (!releasePageColorScheme) return
-  const release = releasePageColorScheme
-  releasePageColorScheme = null
-  try { release() } catch (e) { /* 收尾不得拋錯 */ }
 }
 
 
