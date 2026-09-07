@@ -43,16 +43,48 @@ export interface MacroContext {
 
 const NAMED_GROUP = /\(\?<([A-Za-z_$][\w$]*)>/g
 
-/** 展開 {{user}} / {{char}}（含首字大寫變體）。認不得的巨集原樣留著。 */
+/** 展開 {{user}} / {{char}}。大小寫、大括號內的空白都認；認不得的巨集原樣留著。 */
 export function substituteMacros(text: string, macros: MacroContext): string {
   if (!text) return text
   const user = macros.user || ''
   const char = macros.char || ''
   return text
-    .replace(/\{\{user\}\}/g, user)
-    .replace(/\{\{User\}\}/g, user)
-    .replace(/\{\{char\}\}/g, char)
-    .replace(/\{\{Char\}\}/g, char)
+    .replace(/\{\{\s*user\s*\}\}/gi, user)
+    .replace(/\{\{\s*char\s*\}\}/gi, char)
+}
+
+/**
+ * 作者沒真的取名時常見的填法：透過開放 API 建的卡「玩家名」預設就是「你」。
+ * 這些不是名字，拿去替換 {{user}} 只會讓玩家看到「你」而不是自己。跟伺服器那份清單一致。
+ */
+const PLAYER_NAME_PLACEHOLDERS = new Set([
+  '你', '您', '玩家', '用户', '用戶', '使用者',
+  'user', 'you', 'player', '{{user}}',
+  'ユーザー', 'あなた', '유저', '사용자', '당신',
+])
+
+export function isPlayerNamePlaceholder(name: string | null | undefined): boolean {
+  return PLAYER_NAME_PLACEHOLDERS.has(String(name || '').trim().toLowerCase())
+}
+
+/**
+ * {{user}} 要換成誰。跟伺服器替換開場白與提示詞時同一條鏈：
+ * 人設稱呼 → 作者取的玩家名（佔位不算）→ 帳號暱稱 → 兜底（呼叫端給「你」的翻譯）。
+ * 三處一致，玩家在開場白、AI 回覆與正則美化裡看到的才是同一個名字。
+ */
+export function resolvePlayerName(input: {
+  personaName?: string | null
+  cardUserName?: string | null
+  nickName?: string | null
+  fallback: string
+}): string {
+  const persona = String(input.personaName || '').trim()
+  if (persona) return persona
+  const card = String(input.cardUserName || '').trim()
+  if (card && !isPlayerNamePlaceholder(card)) return card
+  const nick = String(input.nickName || '').trim()
+  if (nick) return nick
+  return input.fallback
 }
 
 /**
