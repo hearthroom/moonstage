@@ -122,7 +122,7 @@ describe('只送動到的欄位', () => {
 
   it('這一頁只認這幾個欄位', () => {
     expect(ROLE_SETTING_KEYS).toEqual([
-      'userName', 'userSex', 'userDefine', 'selectModel', 'context', 'thinkingDepth',
+      'personaMode', 'userName', 'userSex', 'userDefine', 'selectModel', 'context', 'thinkingDepth',
       'sandboxLevel', 'jailbreak',
     ])
   })
@@ -131,5 +131,25 @@ describe('只送動到的欄位', () => {
     const changed = diffRoleSettings(snapshot, { context: '5' } as any)
     expect(changed).toEqual({ context: 5 })
     expect(typeof (changed as any).context).toBe('number')
+  })
+})
+
+describe('人設三檔', () => {
+  it('伺服器回的 personaMode 照讀；不認得的值當 global', async () => {
+    const { readRoleSettings, asPersonaMode } = await import('../canvas-role-settings')
+    expect(readRoleSettings({ personaMode: 'name_only' }).personaMode).toBe('name_only')
+    expect(readRoleSettings({}).personaMode).toBe('')
+    expect(asPersonaMode('')).toBe('global')
+    expect(asPersonaMode('weird')).toBe('global')
+    expect(asPersonaMode('custom')).toBe('custom')
+  })
+
+  it('只改稱呼也把模式一起送：伺服器對「有人設欄位、沒說模式」會推定成單獨設置', async () => {
+    const { buildRoleSettingsSavePayload } = await import('../canvas-role-settings')
+    const snapshot = { personaMode: 'name_only', userName: '', userSex: '', userDefine: '', selectModel: 'm', context: 1, thinkingDepth: '', sandboxLevel: '', jailbreak: '' }
+    const next = { ...snapshot, userName: '小明' }
+    expect(buildRoleSettingsSavePayload('r1', snapshot, next)).toEqual({ roleId: 'r1', userName: '小明', personaMode: 'name_only' })
+    // 只改虛構框架：不碰人設，模式也不送
+    expect(buildRoleSettingsSavePayload('r1', snapshot, { ...snapshot, sandboxLevel: 'deep' })).toEqual({ roleId: 'r1', sandboxLevel: 'deep' })
   })
 })

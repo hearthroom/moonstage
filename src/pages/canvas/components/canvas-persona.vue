@@ -13,46 +13,71 @@
       </div>
     </div>
 
+    <!--
+      人設三檔（對齊 MMD）：僅使用稱呼／全局人設／單獨設置。
+      「全局」編輯的是帳號那一份，改了到處生效；「單獨」只動這張卡；「僅稱呼」只留名字。
+      每一檔底下寫一句「它會怎樣」——這是三個不同的儲存位置，玩家看不到後面的差別。
+    -->
+    <div class="card mode-box">
+      <div class="label">{{ labels.modeLabel }}</div>
+      <div class="radio-group">
+        <div
+          v-for="option in modeOptions"
+          :key="option.value"
+          class="mode-item"
+          :class="{ selected: option.value === draft.personaMode }"
+          role="radio"
+          tabindex="0"
+          :aria-checked="option.value === draft.personaMode ? 'true' : 'false'"
+          @click="draft.personaMode = option.value"
+          @keydown.enter.prevent="draft.personaMode = option.value"
+        >{{ option.label }}</div>
+      </div>
+      <div class="mode-hint">{{ modeHint }}</div>
+    </div>
+
     <div class="card input-wrapper">
       <div class="label">{{ labels.nameLabel }}</div>
       <CanvasInput
         el-class="input-dark"
-        :value="draft.userName"
+        :value="persona.userName"
         :maxlength="nameMaxLength"
         :placeholder="labels.namePlaceholder"
-        @input="draft.userName = $event"
+        @input="persona.userName = $event"
       />
-      <div class="char-count">{{ draft.userName.length }}/{{ nameMaxLength }}</div>
+      <div class="char-count">{{ persona.userName.length }}/{{ nameMaxLength }}</div>
+      <!-- 沒填稱呼時 AI 會用暱稱叫玩家——講出來，別讓他猜「空著會怎樣」。 -->
+      <div v-if="labels.nickNameHint && !persona.userName" class="nick-hint">{{ labels.nickNameHint }}</div>
     </div>
 
-    <!-- 性別是三選一，不是自由填：它進提示詞時是一個固定的詞。 -->
-    <div class="card gender-box">
+    <!-- 性別是三選一，不是自由填：它進提示詞時是一個固定的詞。僅稱呼那一檔不帶它，就不畫。 -->
+    <div v-if="draft.personaMode !== 'name_only'" class="card gender-box">
       <div class="label">{{ labels.sexLabel }}</div>
       <div class="radio-group">
         <div
           v-for="option in sexOptions"
           :key="option.value"
           class="gender-item"
-          :class="{ selected: option.value === draft.userSex }"
+          :class="{ selected: option.value === persona.userSex }"
           role="radio"
           tabindex="0"
-          :aria-checked="option.value === draft.userSex ? 'true' : 'false'"
+          :aria-checked="option.value === persona.userSex ? 'true' : 'false'"
           @click="pickSex(option.value)"
           @keydown.enter.prevent="pickSex(option.value)"
         >{{ option.label }}</div>
       </div>
     </div>
 
-    <div class="card textarea-wrapper">
+    <div v-if="draft.personaMode !== 'name_only'" class="card textarea-wrapper">
       <div class="label">{{ labels.defineLabel }}</div>
       <CanvasTextField
         el-class="textarea-dark"
-        :value="draft.userDefine"
+        :value="persona.userDefine"
         :maxlength="defineMaxLength"
         :placeholder="labels.definePlaceholder"
-        @input="draft.userDefine = $event"
+        @input="persona.userDefine = $event"
       />
-      <div class="char-count">{{ draft.userDefine.length }}/{{ defineMaxLength }}</div>
+      <div class="char-count">{{ persona.userDefine.length }}/{{ defineMaxLength }}</div>
     </div>
 
     <!--
@@ -135,8 +160,17 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { CanvasInput, CanvasTextField } from './canvas-field'
+import { asPersonaMode, type PersonaMode } from '../canvas-role-settings'
+
+interface PersonaFields { userName: string; userSex: string; userDefine: string }
 
 const props = withDefaults(defineProps<{
+  /** name_only / global / custom */
+  personaMode?: string
+  /** 帳號層級那份人設（全局人設）；「全局」那一檔編輯的是它 */
+  globalPersona?: Partial<PersonaFields> | null
+  /** 帳號暱稱；稱呼沒填時 AI 會用它 */
+  nickName?: string
   userName?: string
   userSex?: string
   userDefine?: string
@@ -157,6 +191,14 @@ const props = withDefaults(defineProps<{
     title: string
     cancel: string
     save: string
+    modeLabel: string
+    modeNameOnly: string
+    modeGlobal: string
+    modeCustom: string
+    modeNameOnlyHint: string
+    modeGlobalHint: string
+    modeCustomHint: string
+    nickNameHint: string
     nameLabel: string
     namePlaceholder: string
     sexLabel: string
@@ -170,6 +212,7 @@ const props = withDefaults(defineProps<{
     jailbreakReset: string
   }
 }>(), {
+  personaMode: '', globalPersona: null, nickName: '',
   userName: '', userSex: '', userDefine: '', sandboxLevel: '', jailbreak: '',
   defaultJailbreak: '',
   sexOptions: () => [],
@@ -181,6 +224,8 @@ const props = withDefaults(defineProps<{
   error: '',
   labels: () => ({
     title: '', cancel: 'Cancel', save: 'Save',
+    modeLabel: '', modeNameOnly: '', modeGlobal: '', modeCustom: '',
+    modeNameOnlyHint: '', modeGlobalHint: '', modeCustomHint: '', nickNameHint: '',
     nameLabel: '', namePlaceholder: '', sexLabel: '',
     defineLabel: '', definePlaceholder: '',
     sandboxLabel: '', sandboxDesc: '',
@@ -190,6 +235,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'save', value: {
+    personaMode: PersonaMode
     userName: string; userSex: string; userDefine: string
     sandboxLevel: string; jailbreak: string
   }): void
@@ -199,25 +245,50 @@ const emit = defineEmits<{
 /*
   編輯的是草稿，不是直接寫回去。玩家改到一半關掉彈層時，伺服器上那份設定
   一個字都不該動——他沒有按儲存。
+
+  兩份草稿：這張卡自己的（draft），跟帳號那份全局人設（globalDraft）。切到「全局」時
+  三個欄位接到 globalDraft 上，其餘兩檔接到 draft；切來切去各自的內容都還在。
 */
 const draft = reactive({
+  personaMode: asPersonaMode(props.personaMode) as PersonaMode,
   userName: props.userName,
   userSex: props.userSex,
   userDefine: props.userDefine,
   sandboxLevel: props.sandboxLevel,
   jailbreak: props.jailbreak,
 })
+const globalDraft = reactive<PersonaFields>({
+  userName: String(props.globalPersona?.userName || ''),
+  userSex: String(props.globalPersona?.userSex || ''),
+  userDefine: String(props.globalPersona?.userDefine || ''),
+})
+
+/** 目前那一檔正在編輯的三個欄位落在哪份草稿上。 */
+const persona = computed<PersonaFields>(() => (draft.personaMode === 'global' ? globalDraft : draft))
 
 const advancedOpen = ref(false)
 
-watch(() => [props.userName, props.userSex, props.userDefine,
-             props.sandboxLevel, props.jailbreak].join(' '), () => {
+watch(() => [props.personaMode, props.userName, props.userSex, props.userDefine,
+             props.sandboxLevel, props.jailbreak].join(' '), () => {
+  draft.personaMode = asPersonaMode(props.personaMode)
   draft.userName = props.userName
   draft.userSex = props.userSex
   draft.userDefine = props.userDefine
   draft.sandboxLevel = props.sandboxLevel
   draft.jailbreak = props.jailbreak
 })
+watch(() => props.globalPersona, (gp) => {
+  globalDraft.userName = String(gp?.userName || '')
+  globalDraft.userSex = String(gp?.userSex || '')
+  globalDraft.userDefine = String(gp?.userDefine || '')
+}, { deep: true })
+
+const modeOptions = computed(() => [
+  { value: 'name_only' as PersonaMode, label: props.labels.modeNameOnly, hint: props.labels.modeNameOnlyHint },
+  { value: 'global' as PersonaMode, label: props.labels.modeGlobal, hint: props.labels.modeGlobalHint },
+  { value: 'custom' as PersonaMode, label: props.labels.modeCustom, hint: props.labels.modeCustomHint },
+])
+const modeHint = computed(() => modeOptions.value.find((o) => o.value === draft.personaMode)?.hint || '')
 
 /*
   沒設過就標在「標準」上。這裡跟性別不一樣：性別沒設過是一個真的狀態（AI 就不
@@ -233,15 +304,16 @@ const sandboxHint = computed(() => {
 function pickSex(value: string) {
   // 再點一次同一顆＝取消。沒設過性別是一個真的狀態（伺服器上就是空字串），
   // 選了之後沒有退路的話，玩家就再也回不到那個狀態。
-  draft.userSex = draft.userSex === value ? '' : value
+  persona.value.userSex = persona.value.userSex === value ? '' : value
 }
 
 function onSave() {
   if (props.saving) return
   emit('save', {
-    userName: draft.userName,
-    userSex: draft.userSex,
-    userDefine: draft.userDefine,
+    personaMode: draft.personaMode,
+    userName: persona.value.userName,
+    userSex: persona.value.userSex,
+    userDefine: persona.value.userDefine,
     sandboxLevel: draft.sandboxLevel,
     jailbreak: draft.jailbreak,
   })

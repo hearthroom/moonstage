@@ -4057,5 +4057,13 @@
 	"canvas.panel.settingsNotReady": "設定を読み込み中です。もう一度送信してください",
 	"canvas.panel.loading": "読み込み中…",
 	"canvas.composer.perTurn": "1 ターンあたりのポイント",
+	"canvas.panel.personaMode": "人物設定の適用範囲",
+	"canvas.panel.personaModeNameOnly": "呼び名のみ",
+	"canvas.panel.personaModeGlobal": "共通の人物設定",
+	"canvas.panel.personaModeCustom": "このカードだけ",
+	"canvas.panel.personaModeNameOnlyHint": "AI に呼び名だけを伝えます。性別や自己紹介は送りません。",
+	"canvas.panel.personaModeGlobalHint": "すべてのカードで同じ人物設定を共有します。一度直せばどこでも反映されます。",
+	"canvas.panel.personaModeCustomHint": "このカードだけで使い、他のカードには影響しません。",
+	"canvas.panel.personaNickNameHint": "未入力ならニックネームを使います：{name}",
 	"canvas.panel.personaAdvanced": "詳細設定"
 }

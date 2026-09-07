@@ -15,6 +15,7 @@
 
 /** 伺服器認得、而這一頁真的會動到的欄位。 */
 export const ROLE_SETTING_KEYS = [
+  'personaMode',
   'userName',
   'userSex',
   'userDefine',
@@ -28,6 +29,8 @@ export const ROLE_SETTING_KEYS = [
 export type RoleSettingKey = (typeof ROLE_SETTING_KEYS)[number]
 
 export interface RoleSettings {
+  /** 人設三檔：name_only / global / custom。'' ＝伺服器還沒回，畫面上先當 global */
+  personaMode: string
   userName: string
   userSex: string
   userDefine: string
@@ -48,6 +51,7 @@ export interface RoleSettings {
  * 就把那個猜測寫死了。
  */
 export const ROLE_SETTINGS_DEFAULTS: RoleSettings = {
+  personaMode: '',
   userName: '',
   userSex: '',
   userDefine: '',
@@ -63,6 +67,15 @@ export const USER_SEX_VALUES = ['man', 'women', 'other'] as const
 
 /** 虛構框架由弱到強。順序就是畫面上的順序——它是一條強度軸，不是一組並列選項。 */
 export const SANDBOX_LEVELS = ['light', 'standard', 'immersive', 'deep'] as const
+
+/** 人設三檔（對齊 MMD）：僅使用稱呼／全局人設／單獨設置。順序就是畫面上的順序。 */
+export const PERSONA_MODES = ['name_only', 'global', 'custom'] as const
+export type PersonaMode = (typeof PERSONA_MODES)[number]
+export const DEFAULT_PERSONA_MODE: PersonaMode = 'global'
+export function asPersonaMode(value: unknown): PersonaMode {
+  const v = asText(value)
+  return (PERSONA_MODES as readonly string[]).includes(v) ? (v as PersonaMode) : DEFAULT_PERSONA_MODE
+}
 
 function asText(value: unknown): string {
   if (value === undefined || value === null) return ''
@@ -80,6 +93,7 @@ function asContext(value: unknown): number {
 export function readRoleSettings(raw: any): RoleSettings {
   const src = raw && typeof raw === 'object' ? raw : {}
   return {
+    personaMode: asText(src.personaMode),
     userName: asText(src.userName),
     userSex: asText(src.userSex),
     userDefine: asText(src.userDefine),
@@ -132,5 +146,11 @@ export function buildRoleSettingsSavePayload(
   if (!roleId) return null
   const changed = diffRoleSettings(snapshot, next)
   if (!changed) return null
+  // 只要動到人設三欄，就把模式一起帶上：伺服器對「有人設欄位、沒說模式」的舊客戶端會推定成
+  // 「單獨設置」，玩家在「僅使用稱呼」下改個稱呼就會被誤判成換了模式。
+  if (!('personaMode' in changed) && ('userName' in changed || 'userSex' in changed || 'userDefine' in changed)) {
+    const mode = asText(next?.personaMode)
+    if (mode) (changed as any).personaMode = mode
+  }
   return { roleId, ...changed }
 }

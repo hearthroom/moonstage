@@ -161,6 +161,9 @@
     <CanvasPopup :open="panel.sheet === 'persona'" :title="t('canvas.panel.persona')"
                  :close-label="t('main.cancel')" @close="closeCanvasSheet">
       <CanvasPersona
+        :persona-mode="asPersonaMode(formData.personaMode)"
+        :global-persona="globalPersona"
+        :nick-name="playerNickName"
         :user-name="formData.userName"
         :user-sex="formData.userSex"
         :user-define="formData.userDefine"
@@ -419,6 +422,7 @@ import {
   ROLE_SETTINGS_DEFAULTS, readRoleSettings, buildRoleSettingsSavePayload,
   type RoleSettings,
 } from './canvas-role-settings'
+import { asPersonaMode } from './canvas-role-settings'
 
 
 // V1.1: 引入 WebSocket 心跳管理和 SSE 解析工具
@@ -7673,8 +7677,10 @@ function userDisplayName(): string {
   const info: any = unref(userInfo) || {}
   // {{user}} 換成誰，跟伺服器替換開場白時同一條鏈：人設稱呼 → 作者取的玩家名（「你」這種佔位不算）
   // → 帳號暱稱 → 「你」。帳號的 userName 是登入帳號（例如 test-01），不在鏈裡。
+  // 人設三檔：用全局那份時名字來自全局人設，其餘兩檔用這張卡填的稱呼。
+  const personaName = asPersonaMode(formData.personaMode) === 'global' ? globalPersona.value.userName : formData.userName
   return resolvePlayerName({
-    personaName: formData.userName,
+    personaName,
     cardUserName: roleView.value.userName,
     nickName: info.nickName,
     fallback: t('canvas.you'),
@@ -8221,6 +8227,7 @@ let roleSettingsInFlight: Promise<void> | null = null
 
 function currentRoleSettings(): RoleSettings {
   return {
+    personaMode: formData.personaMode || '',
     userName: formData.userName || '',
     userSex: formData.userSex || '',
     userDefine: formData.userDefine || '',
@@ -8245,6 +8252,10 @@ async function loadRoleSettings() {
     const settings = readRoleSettings(res.data)
     roleSettingsSnapshot = { ...settings }
     Object.assign(formData, settings)
+    // 全局人設與暱稱跟這張卡的設定一起回來：人設彈層要能顯示「全局那份」與「沒填會用哪個名字」。
+    const gp = (res.data.globalPersona && typeof res.data.globalPersona === 'object') ? res.data.globalPersona : {}
+    globalPersona.value = { userName: String(gp.userName || ''), userSex: String(gp.userSex || ''), userDefine: String(gp.userDefine || '') }
+    playerNickName.value = String(res.data.nickName || '')
     formData.selectModelName = String(res.data.selectModelName || '') || settings.selectModel
     defaultJailbreak.value = String(res.data.defaultJailbreak || '')
     roleSettingsReady.value = true
@@ -8295,6 +8306,35 @@ async function persistRoleSettings() {
 // 不要換成一句「儲存失敗」：玩家改不了他看不見的東西。
 const personaSaving = ref(false)
 const personaError = ref('')
+/** 帳號層級那份人設（全局人設）；跟這張卡的設定一起載入。 */
+const globalPersona = ref({ userName: '', userSex: '', userDefine: '' })
+/** 帳號暱稱：「僅使用稱呼」沒填時 AI 會用它叫玩家，彈層要講出來。 */
+const playerNickName = ref('')
+
+// 只送動到的欄位。伺服器那端每個欄位都是指標：沒送＝不動。
+async function persistGlobalPersona(next: { userName: string; userSex: string; userDefine: string }): Promise<string> {
+  const before = globalPersona.value
+  const changed: Record<string, string> = {}
+  for (const key of ['userName', 'userSex', 'userDefine'] as const) {
+    if ((before[key] || '') !== (next[key] || '')) changed[key] = next[key] || ''
+  }
+  if (!Object.keys(changed).length) return ''
+  try {
+    const res = await _this.http.post(_this.requestUrl.playerPersonaSave, {
+      header: { 'content-type': 'application/json' },
+      data: changed,
+      showLoading: false,
+    })
+    if (res.statusCode !== 200) {
+      // 稱呼與自我介紹會過內容審核，被擋下時伺服器講的是原因——原樣講給玩家聽。
+      return String((res.data && (res.data.error || res.data.message)) || t('main.save_failed'))
+    }
+    globalPersona.value = { ...before, ...changed }
+    return ''
+  } catch (e) {
+    return t('main.save_failed')
+  }
+}
 
 const personaSexOptions = computed(() => [
   { value: 'man', label: t('create.roleSex_man') },
@@ -8315,6 +8355,14 @@ const personaLabels = computed(() => ({
   title: t('canvas.panel.persona'),
   cancel: t('main.cancel'),
   save: t('main.sure'),
+  modeLabel: t('canvas.panel.personaMode'),
+  modeNameOnly: t('canvas.panel.personaModeNameOnly'),
+  modeGlobal: t('canvas.panel.personaModeGlobal'),
+  modeCustom: t('canvas.panel.personaModeCustom'),
+  modeNameOnlyHint: t('canvas.panel.personaModeNameOnlyHint'),
+  modeGlobalHint: t('canvas.panel.personaModeGlobalHint'),
+  modeCustomHint: t('canvas.panel.personaModeCustomHint'),
+  nickNameHint: playerNickName.value ? t('canvas.panel.personaNickNameHint', { name: playerNickName.value }) : '',
   nameLabel: t('canvas.panel.personaName'),
   namePlaceholder: t('canvas.panel.personaNamePlaceholder'),
   sexLabel: t('canvas.panel.personaSex'),
@@ -8339,12 +8387,32 @@ async function onSavePersona(value: any) {
   personaSaving.value = true
   personaError.value = ''
   const before = {
+    personaMode: formData.personaMode,
     userName: formData.userName, userSex: formData.userSex, userDefine: formData.userDefine,
     sandboxLevel: formData.sandboxLevel, jailbreak: formData.jailbreak,
   }
-  formData.userName = String(value?.userName || '')
-  formData.userSex = String(value?.userSex || '')
-  formData.userDefine = String(value?.userDefine || '')
+  const mode = asPersonaMode(value?.personaMode)
+  const persona = {
+    userName: String(value?.userName || ''), userSex: String(value?.userSex || ''), userDefine: String(value?.userDefine || ''),
+  }
+  if (mode === 'global') {
+    // 全局那份先存（審核在那邊擋）；這張卡只記「用全局的」，卡片自己那三欄不動。
+    const reason = await persistGlobalPersona(persona)
+    if (reason) {
+      personaSaving.value = false
+      personaError.value = reason
+      return
+    }
+    formData.personaMode = 'global'
+  } else if (mode === 'name_only') {
+    formData.personaMode = 'name_only'
+    formData.userName = persona.userName
+  } else {
+    formData.personaMode = 'custom'
+    formData.userName = persona.userName
+    formData.userSex = persona.userSex
+    formData.userDefine = persona.userDefine
+  }
   formData.sandboxLevel = String(value?.sandboxLevel || '')
   formData.jailbreak = String(value?.jailbreak || '')
   const ok = await persistRoleSettings()
