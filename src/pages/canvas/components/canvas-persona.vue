@@ -5,7 +5,7 @@
 
     節點名照 MMD（`.role-setting`，作者的卡對 `.role-setting .card.textarea-wrapper`
     與 `.role-setting .input-wrapper .input-dark` 寫了外觀），標題列沿用 MMD 那一頁的
-    `.header-scope > .header-box`；取消／保存兩顆鍵搬到了底部的 `.bottom`，名字不變。
+    `.header-scope > .header-box`；取消／保存兩顆鍵搬到了底部的動作列（`.role-setting__actions`），兩顆鍵的名字不變。
   -->
     <div class="header-scope">
       <div class="header-box">
@@ -141,9 +141,10 @@
          彈層蓋在系統提示之上，提示會被藏在後面看不到。 -->
     <div class="role-setting-error" :hidden="!error">{{ error }}</div>
 
-    <!-- 取消／保存放底部動作列，跟這一頁其他彈層同一個位置。節點名（.icon-back／.complete-btn）
-         照 MMD，作者對它們寫的外觀照舊生效。 -->
-    <div class="bottom">
+    <!-- 取消／保存放底部動作列，跟這一頁其他彈層同一個位置。兩顆鍵的節點名（.icon-back／.complete-btn）
+         照 MMD，作者對它們寫的外觀照舊生效；動作列本身不叫 .bottom——那是 MMD 頁面底欄的名字，
+         作者替底欄寫的黑底會整條打到這裡（owner 2026-09-07 截圖）。 -->
+    <div class="role-setting__actions">
       <div class="icon-back" role="button" tabindex="0"
            :aria-label="labels.cancel"
            @click="$emit('close')"
