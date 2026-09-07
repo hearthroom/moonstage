@@ -174,6 +174,23 @@
   overflow: visible;
 }
 
+/*
+  游標跟提示字沒對齊（owner 2026-09-07 手機截圖：游標在「說點什麼」左下方一行）。
+
+  同一份相容基底樣式表給 `.uni-textarea textarea` 寫了 `width:96%; padding:18rpx 2%;
+  line-height:1.6; font-size:28rpx; height:150rpx`。提示字是絕對定位在 (0,0) 的另一個節點、
+  字級行高跟著容器；輸入框卻被這條推開 9px／2%、字級行高也不同，游標與字就落在
+  另一個位置。這條也不在 layer 裡，一樣在層外用更高的特異性蓋回去，讓輸入框跟提示字
+  用同一組字級、行高、零內距。
+*/
+.canvas-root .uni-textarea textarea {
+  width: 100%;
+  height: auto;
+  padding: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+
 /* 不能寫成 `textarea.uni-textarea-textarea`：uni-app 的編譯器會把選擇器裡的 textarea
    元素名改寫成它自己的 <uni-textarea> 標籤，出來的規則對不到真的 <textarea>（實測 2026-09-06）。
    只用 class 疊特異性。 */
