@@ -74,6 +74,8 @@ function isKnownLayer(layer) {
  * @param {HTMLElement} [options.root]    容器掛載點，預設 doc.body
  * @param {Function} [options.onUserGesture] 容器內發生真實點擊時通知呼叫端
  * @param {Function} [options.isTrustedEvent] 判定是否為真實使用者事件；預設讀 isTrusted
+ * @param {Function} [options.runAuthorCode] 執行作者程式碼時的包裝 `(fn) => fn()`；呼叫端用它把
+ *   掛載腳本與訂閱回呼跑在作者範圍（author-asset-scope.js）裡，離場時才收得乾淨
  */
 function createAuthorAssetRuntime(options) {
   const config = options || {}
@@ -81,6 +83,9 @@ function createAuthorAssetRuntime(options) {
   const layerZIndex = config.layerZIndex || {}
   const root = config.root || (doc && doc.body)
   const onUserGesture = typeof config.onUserGesture === 'function' ? config.onUserGesture : null
+  const runAuthorCode = typeof config.runAuthorCode === 'function'
+    ? config.runAuthorCode
+    : function (fn) { return fn() }
   // 「這是不是真的使用者點的」判定。真實環境一律用瀏覽器的 isTrusted——那正是瀏覽器
   // 對這個問題的答案。開成可注入只為了測試：jsdom 的 isTrusted 是不可重新定義的
   // 唯讀屬性，不注入就測不到「有登記」那一半。
@@ -161,7 +166,8 @@ function createAuthorAssetRuntime(options) {
       }
       fresh.text = old.text
       try {
-        old.parentNode.replaceChild(fresh, old)
+        // 換節點的那一刻腳本就執行了：包在作者範圍裡，它往頁面根部塞的東西才記得到帳上
+        runAuthorCode(function () { old.parentNode.replaceChild(fresh, old) })
       } catch (e) {
         // 作者腳本自己拋錯不能把掛載流程一起帶走
       }
@@ -208,7 +214,9 @@ function createAuthorAssetRuntime(options) {
     let delivered = 0
     for (let i = 0; i < list.length; i++) {
       try {
-        list[i](payload)
+        // 訂閱回呼是作者的程式碼，同樣跑在作者範圍裡
+        const handler = list[i]
+        runAuthorCode(function () { handler(payload) })
         delivered++
       } catch (e) {
         // 吞掉但不靜默：交給呼叫端的 onError 決定要不要記錄。
