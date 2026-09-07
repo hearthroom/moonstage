@@ -1456,13 +1456,18 @@
      停止鍵仍然浮在最上面按得到——這是 I-2 的產品邊界，不是層級偏好。
   */
 
+  /*
+     每一個彈層都是置中的對話框，手機也是（owner 2026-09-07：手機不要底部 sheet）。
+     四邊留 16px，讓遮罩在四周都看得到——玩家知道這是浮在對話上的一層，不是換頁。
+  */
   .u-popup {
     position: fixed;
     inset: 0;
     z-index: 50;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: center;
+    padding: 16px;
   }
 
   .u-popup[hidden] {
@@ -1480,7 +1485,7 @@
 
      它們是彈出的面板，不是頁面。跟著對話欄寬（現在最寬 1200px）走的話，一份
      只有幾格的表單會被拉成一整片，而同一個東西在桌機與手機上長成兩種樣子，
-     玩家要學兩次。手機的滿寬規則在下面的斷點裡。
+     玩家要學兩次。手機上是同一個對話框，只是兩側各留 16px。
   */
   .u-popup__content {
     position: relative;
@@ -1490,10 +1495,11 @@
     flex-direction: column;
     overflow: hidden;
     padding: 16px;
-    border-top-left-radius: var(--lt-canvas-sheet-radius);
-    border-top-right-radius: var(--lt-canvas-sheet-radius);
+    border-radius: var(--lt-canvas-sheet-radius);
     background: var(--lt-canvas-sheet-bg);
     color: var(--lt-canvas-sheet-fg);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--lt-canvas-sheet-line);
+    animation: lt-canvas-dialog-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   /*
@@ -2466,7 +2472,7 @@
 
   /* ── 桌機彈層：置中的對話框 ───────────────────────────────────── */
   /*
-     手機上每個彈層都是從底部升起的 sheet，那是對的。桌機上同一個 sheet 貼在
+     手機上每個彈層曾是從底部升起的 sheet（2026-09-07 起手機也置中，見上面的殼）。桌機上同一個 sheet 貼在
      一千四百像素寬的視窗底邊、只有 560px 寬、內容一屏看不完，玩家要在一條窄縫裡
      捲（owner 2026-09-06 截圖）。桌機改成置中的對話框：寬度按內容定（表單 640、
      模型選單 1080、手帳 760、歷史 720、確認 440），高度上限 86vh，四角圓角，
@@ -2478,7 +2484,6 @@
   */
   @media (min-width: 769px) {
     .u-popup {
-      align-items: center;
       padding: 24px;
     }
 
@@ -2486,9 +2491,6 @@
       width: min(640px, calc(100vw - 48px));
       max-height: min(86vh, 920px);
       padding: 20px 24px 24px;
-      border-radius: var(--lt-canvas-sheet-radius);
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--lt-canvas-sheet-line);
-      animation: lt-canvas-dialog-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
     }
 
     /* 寬度按內容：清單型的要寬，確認型的要窄。用 :has 認裡面那一片，殼本身不加名字。 */
@@ -2643,14 +2645,14 @@
     }
   }
 
+  /* 只動位置與縮放，不動透明度：分頁被瀏覽器節流時動畫會停在半路，半透明的對話框
+     會讓底下卡片的字透上來（2026-09-06 截圖）；位移停在半路只是差幾個像素。 */
   @keyframes lt-canvas-dialog-in {
     from {
-      opacity: 0;
       transform: translateY(12px) scale(0.98);
     }
 
     to {
-      opacity: 1;
       transform: none;
     }
   }
@@ -4446,8 +4448,10 @@
       padding: 10px 10px calc(20px + var(--lt-canvas-composer-overhang, 0px));
     }
 
+    /* 置中的對話框：上下各留得到遮罩，內距比桌機緊 */
     .u-popup__content {
-      max-height: 88vh;
+      max-height: 84vh;
+      padding: 16px;
     }
 
     /*
@@ -4659,8 +4663,15 @@
     padding-top: 16px;
   }
 
+  /* 用戶人設整片會捲，動作列釘在捲動區底部：填好表單不必再捲到最下面找「確定」。 */
   .role-setting .bottom {
-    padding-top: 4px;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    margin-top: auto;
+    padding-top: 12px;
+    padding-bottom: 2px;
+    background: var(--lt-canvas-sheet-bg);
   }
 
   .confirm-bottom .btn-gap {
