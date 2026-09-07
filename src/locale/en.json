@@ -4057,5 +4057,13 @@
 	"canvas.panel.settingsNotReady": "Still loading your settings — send again in a moment",
 	"canvas.panel.loading": "Loading…",
 	"canvas.composer.perTurn": "Credits per turn",
+	"canvas.panel.personaMode": "Persona source",
+	"canvas.panel.personaModeNameOnly": "Name only",
+	"canvas.panel.personaModeGlobal": "Global persona",
+	"canvas.panel.personaModeCustom": "This card only",
+	"canvas.panel.personaModeNameOnlyHint": "Only tells the AI what to call you; no gender or bio.",
+	"canvas.panel.personaModeGlobalHint": "One persona shared by every card. Edit once, applies everywhere.",
+	"canvas.panel.personaModeCustomHint": "Used on this card only. Other cards are unaffected.",
+	"canvas.panel.personaNickNameHint": "Leave blank to use your nickname: {name}",
 	"canvas.panel.personaAdvanced": "Advanced"
 }
