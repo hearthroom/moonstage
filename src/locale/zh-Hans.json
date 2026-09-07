@@ -4057,5 +4057,13 @@
 	"canvas.panel.settingsNotReady": "设置还在读，再发一次就好",
 	"canvas.panel.loading": "读取中⋯",
 	"canvas.composer.perTurn": "每轮点数",
+	"canvas.panel.personaMode": "人设来源",
+	"canvas.panel.personaModeNameOnly": "仅使用称呼",
+	"canvas.panel.personaModeGlobal": "全局人设",
+	"canvas.panel.personaModeCustom": "单独设置",
+	"canvas.panel.personaModeNameOnlyHint": "只告诉 AI 怎么叫你，不带性别与自我介绍。",
+	"canvas.panel.personaModeGlobalHint": "所有卡片共用同一份人设，改一次到处生效。",
+	"canvas.panel.personaModeCustomHint": "只在这张卡用，不影响其他卡片。",
+	"canvas.panel.personaNickNameHint": "没填就用你的昵称：{name}",
 	"canvas.panel.personaAdvanced": "进阶"
 }
