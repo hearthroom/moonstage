@@ -305,7 +305,7 @@
 <script lang="ts" setup>
 import { cfImageDesktop } from "@/utils/image-transform.js"
 
-import {computed, h, onMounted, reactive, ref, unref, getCurrentInstance, nextTick, watch} from 'vue';
+import {computed, h, onMounted, onUnmounted, reactive, ref, unref, getCurrentInstance, nextTick, watch} from 'vue';
 import {
   onLoad,
   onShow,
@@ -386,7 +386,7 @@ import { convertVisibleHtml, convertPlainText, createDisplayScriptConverter, dir
 // 早一步轉就會把它們轉壞（見 canvas-display-script.ts 檔頭與設計 §3.3.5）。
 const displayScript = createDisplayScriptConverter(directionForLocale(stageHost.locale.get()))
 import CanvasPrologue from './components/canvas-prologue.vue'
-import { captureBodySnapshot, restoreBodySnapshot } from './canvas-body-snapshot'
+import { captureBodySnapshot, restoreBodySnapshot, sweepForeignNodes } from './canvas-body-snapshot'
 import CanvasPopup from './components/canvas-popup.vue'
 import CanvasModelPanel from './components/canvas-model-panel.vue'
 import { computeCardThemeVars, CARD_THEME_VAR_NAMES } from './canvas-card-theme'
@@ -9556,6 +9556,13 @@ function onStageScroll(event: Event) {
 function restoreDocumentOnLeave() {
   restoreBodySnapshot(typeof document !== 'undefined' ? document : null, enterBodySnapshot)
 }
+
+// 最後的兜底掃除：作者範圍記不到的路徑（Promise、Observer 回呼）塞進 body／html／head 的節點，
+// 等 Vue 把子元件都卸完再掃，Teleport 出去的彈層才不會被我們先動手。
+onUnmounted(() => {
+  const swept = sweepForeignNodes(typeof document !== 'undefined' ? document : null, enterBodySnapshot)
+  if (swept.removed > 0) console.info('[canvas] 離開對話頁時清掉卡片殘留節點', swept)
+})
 
 
 const composerLabels = computed(() => ({

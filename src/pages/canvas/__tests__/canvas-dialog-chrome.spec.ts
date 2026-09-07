@@ -31,7 +31,7 @@ describe('彈層的標準外框', () => {
     expect(css).not.toMatch(/:has\([^)]*\) \.u-popup__content__close/)
   })
 
-  it('用戶人設的取消／保存在底部的 .bottom，標題列只剩標題', () => {
+  it('用戶人設的取消／保存在底部的動作列（不叫 .bottom，免得吃到作者替底欄寫的樣式），標題列只剩標題', () => {
     const w = mount(CanvasPersona, {
       props: {
         labels: {
@@ -44,8 +44,9 @@ describe('彈層的標準外框', () => {
     })
     expect(w.find('.header-scope .header-box .page-title').exists()).toBe(true)
     expect(w.find('.header-scope .complete-btn').exists()).toBe(false)
-    expect(w.find('.bottom .icon-back').exists()).toBe(true)
-    expect(w.find('.bottom .complete-btn').exists()).toBe(true)
+    expect(w.find('.role-setting__actions .icon-back').exists()).toBe(true)
+    expect(w.find('.bottom').exists()).toBe(false)
+    expect(w.find('.role-setting__actions .complete-btn').exists()).toBe(true)
   })
 
   it('長期指令的「添加」跟輸入區同一區、在底部', () => {

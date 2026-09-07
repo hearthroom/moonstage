@@ -3088,6 +3088,15 @@
   .role-setting .icon-back {
     color: var(--lt-canvas-muted);
   }
+  .role-setting__actions {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    padding-top: 4px;
+    background: transparent;
+  }
 
   .role-setting .complete-btn {
     background: var(--lt-canvas-accent-bg);
