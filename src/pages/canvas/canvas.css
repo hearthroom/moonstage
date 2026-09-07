@@ -818,19 +818,78 @@
 
   /* ── 角色介紹 ─────────────────────────────────────────────────── */
 
+  /*
+     預設三行，點一下展開。收行套在裡面的 .intro-text，不套在有內距的氣泡本體——
+     -webkit-line-clamp 套在有內距的盒子上，被裁掉的下一行會從下內距露出半截
+     （owner 2026-09-07 手機截圖）。右下角一顆小圓底的箭頭是展開狀態；三行內
+     放得下的介紹沒有箭頭。
+  */
   .avatar-body .intro-body {
+    position: relative;
     font-size: 13px;
+    line-height: 1.5;
     color: var(--lt-canvas-muted);
     cursor: pointer;
+  }
+
+  /* 點一下（滑鼠、觸控）不畫焦點框；鍵盤走到這裡才畫。 */
+  .avatar-body .intro-body:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  .avatar-body .intro-body:focus-visible {
+    outline: 2px solid var(--lt-canvas-accent);
+    outline-offset: 2px;
+  }
+
+  .avatar-body .intro-text {
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
 
-  .avatar-body .intro-body.is-open {
+  /* 收起且有被裁時，最後一行右側讓位給箭頭 */
+  .avatar-body .intro-body.is-clamped .intro-text {
+    padding-right: 28px;
+  }
+
+  .avatar-body .intro-body.is-open .intro-text {
     -webkit-line-clamp: unset;
     display: block;
+    padding-right: 28px;
+  }
+
+  .avatar-body .intro-toggle {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 9999px;
+    background: var(--lt-canvas-sheet-item-bg, color-mix(in srgb, currentColor 8%, transparent));
+    color: var(--lt-canvas-muted);
+    transition: transform 150ms ease, background 150ms ease;
+  }
+
+  .avatar-body .intro-toggle[hidden] {
+    display: none;
+  }
+
+  .avatar-body .intro-toggle svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .avatar-body .intro-body:hover .intro-toggle {
+    background: var(--lt-canvas-sheet-item-bg-hover, color-mix(in srgb, currentColor 12%, transparent));
+  }
+
+  .avatar-body .intro-body.is-open .intro-toggle {
+    transform: rotate(180deg);
   }
 
   .avatar-body .select-box,
