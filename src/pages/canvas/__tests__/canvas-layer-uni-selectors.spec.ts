@@ -18,3 +18,11 @@ describe('@layer 內的 uni-* 元素選擇器', () => {
     expect(hits.length, `layer 內的 uni-* 元素選擇器：${hits.map(h => h.trim()).join(', ')}`).toBeLessThanOrEqual(4)
   })
 })
+
+describe('輸入框跟提示字對齊', () => {
+  it('層外把相容基底的 textarea 內距／字級／行高蓋回去（游標才會壓在提示字上）', () => {
+    const css = readFileSync(resolve(__dirname, '../canvas.css'), 'utf8')
+    const outside = css.slice(0, css.indexOf('@layer lt-base'))
+    expect(outside).toMatch(/\.canvas-root \.uni-textarea textarea \{[^}]*padding: 0;[^}]*font-size: inherit;[^}]*line-height: inherit;/)
+  })
+})
