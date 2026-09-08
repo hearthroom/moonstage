@@ -1,5 +1,5 @@
 <template>
-  <div class="u-popup" :class="{ 'is-open': open }" :data-open="open ? 'on' : 'off'" :hidden="!open">
+  <div ref="root" class="u-popup" popover="manual" :class="{ 'is-open': open }" :data-open="open ? 'on' : 'off'" :hidden="!open">
   <!--
     底部抽屜的殼。這一頁的每一個彈層都走這一份——不開新頁面：卡片的 CSS 只作用在
     這一頁，換頁等於卡片的裝修整個消失，而玩家會以為是壞了。
@@ -7,6 +7,10 @@
     節點名照 MMD 的 uView 彈層（`.u-popup` > 遮罩 + `.u-popup__content`），
     作者的卡對 `.u-popup__content` 寫了圓角、底色與內距，殼換名字那些規則就全落空。
     真正的內容由呼叫端放進 slot：那才是作者認得的 `.xxx-scope`。
+
+    popover="manual"：開著的時候進瀏覽器 top layer，卡片再大的 z-index 也蓋不到它
+    （見 canvas-top-layer.ts）。manual 是為了不讓瀏覽器自己因為點外面／ESC 把它關掉——
+    關閉仍由這裡的遮罩與 ESC 處理，狀態才不會跟 `open` 脫鉤。
   -->
     <div
       class="u-mask u-popup__mask"
@@ -40,7 +44,8 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, watch } from 'vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { leaveTopLayer, raiseStopAboveDialogs, raiseToTopLayer } from '../canvas-top-layer'
 
 /*
   ESC 掛在 document 上，不是掛在殼自己身上。掛在自己身上要焦點落在裡面才收得到，
@@ -76,7 +81,15 @@ function unbind() {
   document.removeEventListener('keydown', onKeydown)
 }
 
-watch(() => props.open, (open) => { if (open) bind(); else unbind() }, { immediate: true })
+const root = ref<HTMLElement | null>(null)
 
-onBeforeUnmount(unbind)
+watch(() => props.open, (open) => {
+  if (open) bind(); else unbind()
+  // 等 hidden 拿掉、節點真的顯示了再進 top layer；display:none 的元素 showPopover 會丟錯
+  nextTick(() => {
+    if (open) { raiseToTopLayer(root.value); raiseStopAboveDialogs() } else leaveTopLayer(root.value)
+  })
+}, { immediate: true })
+
+onBeforeUnmount(() => { unbind(); leaveTopLayer(root.value) })
 </script>
