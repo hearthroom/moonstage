@@ -102,7 +102,12 @@
     上面重定義的 --lt-canvas-fg 傳不進去，模型選單整片字色仍是 :root 的淺灰
     （2026-09-05 全頁盤點：日間亮色彈層上淺灰字、白色透明底）。這裡一併重定義。
   */
-  --lt-canvas-sheet-fg: currentColor;
+  /*
+    MMD 的卡片把彈層字色寫在 --primary-font-color（底色在 --background-color，多半還加 !important）。
+    卡片塗了深底卻沒地方說字色，站台亮色模式下就是深字壓深底、整片看不見（2026-09-08 模型設定截圖）。
+    先認卡片的，沒有才用 currentColor。
+  */
+  --lt-canvas-sheet-fg: var(--primary-font-color, currentColor);
   --lt-canvas-panel-fg: currentColor;
   /* 蓋在清單上的第二層（排序提示、高消費確認）：沒有卡片的區塊底色就用字色調一個不透明感 */
   --lt-canvas-sheet-pop-bg: var(--lt-canvas-block-bg, color-mix(in srgb, currentColor 8%, transparent));
@@ -1612,7 +1617,8 @@
     overflow: hidden;
     padding: 16px;
     border-radius: var(--lt-canvas-sheet-radius);
-    background: var(--lt-canvas-sheet-bg);
+    /* 底色同樣先認卡片的 --background-color（跟上面字色那條配對），沒有才用站台的 sheet 底色 */
+    background: var(--background-color, var(--lt-canvas-sheet-bg));
     color: var(--lt-canvas-sheet-fg);
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--lt-canvas-sheet-line);
     animation: lt-canvas-dialog-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
