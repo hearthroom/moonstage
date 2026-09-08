@@ -58,7 +58,8 @@ describe('彈層裡的變數全部從當下的字色調', () => {
     const css = readFileSync(resolve(__dirname, '../canvas.css'), 'utf8')
     const start = css.indexOf('.u-popup__content {')
     const block = css.slice(start, css.indexOf('}', start))
-    for (const v of ['--lt-canvas-sheet-fg: currentColor', '--lt-canvas-panel-fg: currentColor', '--lt-canvas-panel-item-bg: color-mix(in srgb, currentColor', '--lt-canvas-placeholder-color: color-mix(in srgb, currentColor']) {
+    // sheet-fg 先認 MMD 卡片的 --primary-font-color（見 canvas-popup-mmd-colors.spec），沒有才是 currentColor
+    for (const v of ['--lt-canvas-sheet-fg: var(--primary-font-color, currentColor)', '--lt-canvas-panel-fg: currentColor', '--lt-canvas-panel-item-bg: color-mix(in srgb, currentColor', '--lt-canvas-placeholder-color: color-mix(in srgb, currentColor']) {
       expect(block, v).toContain(v)
     }
   })
