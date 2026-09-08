@@ -5,11 +5,15 @@
       作者的卡片會寫 `.kg .chat-bottom{…}`，也有卡片整塊藏掉底部自己畫一套；
       停止鍵若住在裡面就會跟著消失，而生成中沒有停止鍵是不能接受的（I-2）。
       它的可用性規則寫在 @layer 外，見 canvas.css 檔頭。
+      生成中它也進 top layer（popover）：系統彈層現在住在 top layer，z-index 60 在那裡不算數，
+      彈層打開時會把它重新抬到最上面（canvas-top-layer.ts）。
     -->
     <div
       id="mes_stop"
+      ref="stopEl"
       class="lt-stop"
       data-lt="stop"
+      popover="manual"
       :hidden="!generating"
       role="button"
       tabindex="0"
@@ -294,6 +298,7 @@ import { attachDragScroll } from '../canvas-drag-scroll'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CanvasTextarea from './canvas-textarea'
 import CanvasSendIcon from './canvas-send-icon.vue'
+import { leaveTopLayer, raiseToTopLayer } from '../canvas-top-layer'
 
 const props = withDefaults(defineProps<{
   value: string
@@ -339,6 +344,12 @@ const emit = defineEmits<{
   (e: 'focus'): void
   (e: 'blur'): void
 }>()
+
+const stopEl = ref<HTMLElement | null>(null)
+watch(() => props.generating, (on) => {
+  nextTick(() => { if (on) raiseToTopLayer(stopEl.value); else leaveTopLayer(stopEl.value) })
+}, { immediate: true })
+onBeforeUnmount(() => leaveTopLayer(stopEl.value))
 
 const textareaEl = ref<any>(null)
 const composing = ref(false)

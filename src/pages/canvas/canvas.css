@@ -27,8 +27,10 @@
 
 #mes_stop {
   position: fixed;
-  right: 16px;
-  bottom: 96px;
+  /* 它是 popover（生成中進 top layer）：瀏覽器預設會把 popover 置中、給邊框與底色，這裡全部壓回去 */
+  inset: auto 16px 96px auto;
+  margin: 0;
+  overflow: visible;
   z-index: 60;
   display: inline-flex;
   align-items: center;
@@ -1574,6 +1576,14 @@
     align-items: center;
     justify-content: center;
     padding: 16px;
+    /* 開著時是 top layer 裡的 popover：瀏覽器預設會把它縮成置中小框、加邊框與底色，這裡壓回整頁遮罩 */
+    margin: 0;
+    width: auto;
+    height: auto;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    overflow: visible;
   }
 
   .u-popup[hidden] {
