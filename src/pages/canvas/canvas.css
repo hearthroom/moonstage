@@ -368,9 +368,17 @@
     position: relative;
     flex: 1 1 auto;
     min-height: 0;
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
+    /*
+      裁切方式照 MMD：對方綁的是 `url(…) center center / auto 100%`，簡寫沒指定
+      repeat，所以 repeat 留在初始值——寬螢幕上那張圖橫向鋪滿（owner 的 MMD 截圖
+      裡角色圖重複三次就是這個）。
+
+      我們原本是 cover + no-repeat：貼滿並裁掉兩側，同一張卡兩邊看到的構圖不一樣，
+      而卡片的美化是照對方那個構圖調的。
+    */
+    background-size: auto 100%;
+    background-position: center center;
+    background-repeat: repeat;
   }
 
   .scroll-view {
