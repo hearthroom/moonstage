@@ -989,6 +989,10 @@
 
   .shortcut-btn {
     display: inline-flex;
+    /* MMD 給它釘死 height:1.75rem 且 border-box，所以卡片寫的 padding 被吸收進這個
+       高度。我們沒有高度時，同一份 padding 會把鍵往外撐（實測 27px → 38px）。 */
+    height: 28px;
+    box-sizing: border-box;
     align-items: center;
     gap: 4px;
     padding: 4px 12px;
@@ -999,6 +1003,25 @@
     white-space: nowrap;
     cursor: pointer;
   }
+
+  /* 圖示尺寸照 MMD 的 .8125rem；淡一階，文字才是主角 */
+  .shortcut-btn .sb-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 13px;
+    height: 13px;
+    opacity: 0.9;
+  }
+
+  .shortcut-btn .sb-icon uni-image,
+  .shortcut-btn .sb-icon uni-image > div {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
 
   /*
      輸入區這一列：幫答｜輸入欄位｜＋。
@@ -1122,9 +1145,19 @@
     padding: 10px;
   }
 
+  /*
+    MMD 的 .chat-input-scope 是橫的（輸入框與送出鍵並排），我們是直的（工具列／
+    輸入框／底列疊三層）。同一個節點名、不同的軸：卡片寫在它身上的
+    `align-items:center` 在對方是垂直置中，落到我們的縱向容器上變成水平置中，
+    這三排就被縮成內容寬度擠在正中間（owner 2026-09-10 截圖）。
+
+    自己宣告撐滿。子元素的 align-self 贏得過父層的 align-items——兩者是不同元素上
+    的不同屬性，layer 不介入。作者真想改，對這幾排寫 align-self 仍然蓋得掉。
+  */
   .chat-input-toolbar {
     display: flex;
     align-items: center;
+    align-self: stretch;
     gap: 8px;
     margin-bottom: 6px;
   }
@@ -1197,10 +1230,12 @@
     height: 0;
   }
 
+  /* 同上：兩排都要自己撐滿，否則卡片的 align-items:center 會把它們擠到正中間 */
   .chat-input-collapsed-row,
   .chat-input-bottom-row {
     display: flex;
     align-items: center;
+    align-self: stretch;
     justify-content: space-between;
     gap: 8px;
     min-height: 36px;
