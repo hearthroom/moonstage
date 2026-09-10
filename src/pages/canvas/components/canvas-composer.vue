@@ -284,7 +284,7 @@
         >
           <!-- 圖示槽照 MMD（.item-icon > uni-image），作者對它畫邊框與底色；槽裡放我們的線條圖，
                stroke 走 currentColor 跟著卡片文字色。先前槽是空的，美化完就是一排空框。 -->
-          <span class="item-icon"><component :is="'uni-image'" v-html="panelIconSvg(item.key)"></component></span>
+          <span class="item-icon"><component :is="'uni-image'" v-html="panelIconMarkup(item.key)"></component></span>
           <span class="item-title">{{ item.label }}</span>
         </div>
       </div>
@@ -293,7 +293,7 @@
 </template>
 
 <script setup lang="ts">
-import { panelIconSvg } from '../canvas-panel-icons'
+import { panelIconMarkup } from '../canvas-panel-icons'
 import { attachDragScroll } from '../canvas-drag-scroll'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CanvasTextarea from './canvas-textarea'

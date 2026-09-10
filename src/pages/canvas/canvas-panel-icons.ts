@@ -39,7 +39,27 @@ const FALLBACK = '<circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6
 
 export function panelIconSvg(key: string): string {
   const body = ICONS[String(key || '')] || FALLBACK
-  return `<svg viewBox="0 0 24 24" ${STROKE} aria-hidden="true" focusable="false">${body}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" ${STROKE.replace('currentColor', INK)} aria-hidden="true" focusable="false">${body}</svg>`
+}
+
+/*
+  圖示的節點形狀照 MMD：`uni-image` 裡一個帶 background-image 的 div。
+
+  為什麼不是 inline svg——卡片對圖示換色的寫法全站統一是
+  `.item-icon div{filter:var(--icon-filter)}`（同一份美化也這樣寫 .icon-back、
+  .header-meun、.btn-icon、.edit-icon）。那是給「一張單色圖」用的手法：
+  brightness(0) 壓成黑、invert 拉成白、再 hue-rotate 染色。沒有 div 就一條都
+  不命中，美化過的面板只剩一排空色塊（owner 2026-09-10 截圖）。
+
+  因此描邊色不能再用 currentColor：background-image 裡的 svg 拿不到宿主的
+  color。給一個固定的淺色，換色交給卡片的 filter——這正是 MMD 的模型。
+*/
+const INK = '#e8eaed'
+
+export function panelIconMarkup(key: string): string {
+  const svg = panelIconSvg(key)
+  const uri = `data:image/svg+xml,${encodeURIComponent(svg)}`
+  return `<div style="background-image:url(&quot;${uri}&quot;);background-repeat:no-repeat;background-position:center;background-size:contain;width:100%;height:100%"></div>`
 }
 
 export function hasPanelIcon(key: string): boolean {
