@@ -8,7 +8,11 @@
     每個區塊的節點名是作者手上那張卡打得到的名字（見 canvas-dom-contract.ts）。
     我們自己的 class 不做承諾，data-lt 做。
   -->
-  <div class="canvas-root chat" :class="{ 'is-touch': isTouchDevice, 'lt-format-mmd': cardFormat === 'mmd' }">
+  <div
+    class="canvas-root chat"
+    :class="{ 'is-touch': isTouchDevice, 'lt-format-mmd': cardFormat === 'mmd' }"
+    :data-lt-author-owns="authorOwnedRegions || null"
+  >
     <CanvasHeader
       :role-name="convertPlainText(roleView.roleName || '', displayScript)"
       :avatar="cfImage(roleView.roleAvatar, 'avatarMedium')"
@@ -375,6 +379,8 @@ import CanvasComposer from './components/canvas-composer.vue'
 import CanvasMessageMenu from './components/canvas-message-menu.vue'
 import { applyTavernRules, resolvePlayerName } from './canvas-rule-engine'
 import { scopeCardHtml, normalizeCardFormat, type CardFormat } from './canvas-style-scope'
+import { detectAuthorOwnedRegions } from './canvas-author-regions'
+import { resolveStageBackground } from './canvas-background'
 import { stripUnknownTags, wrapDialogue } from './canvas-platform-defaults'
 import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue } from './canvas-greetings'
 import { archiveRequestQuery, buildArchiveRows, isArchiveFull, nextArchiveAfterDelete } from './canvas-archives'
@@ -1414,15 +1420,16 @@ const roleView = computed(() => {
   return unref(currentRole) || {}
 });
 
-const getBackgroud = computed(() => {
-  return formData.backgroundUrl
-      ? formData.backgroundUrl
-      : roleView.value.roleBackground;
-});
 
-// 只回「玩家或作者真的設過」的那個值。desktop 先前沒有背景圖層，補上時若沿用
-// getBackgroud（會 fallback 到角色預設背景），等於一次改掉所有既有卡的外觀。
-const playerBackgroundUrl = computed(() => formData.backgroundUrl || '');
+// 舞台背景照 MMD 的兩級回退：玩家設過的 → 卡片的背景圖 → 卡片的形象圖。
+// 為什麼不是「只認玩家設過的」，以及「不要背景」為什麼要一個哨兵值，
+// 見 canvas-background.ts 的說明。
+const playerBackgroundUrl = computed(() => resolveStageBackground({
+  playerChoice: formData.backgroundUrl,
+  backgroundOff: formData.backgroundOff === true,
+  roleBackground: (roleView.value as any).roleBackground,
+  roleAvatar: (roleView.value as any).roleAvatar,
+}));
 
 onLoad((options) => {
   //监听页面加载
@@ -2240,6 +2247,16 @@ const hasAuthorAsset = computed(() => activeAuthorAsset.value.rules.length > 0);
 // 彈窗（uni-modal 1200），平台的彈窗永遠要在作者內容之上。
 const AUTHOR_LAYER_Z_INDEX = { under: 12, over: 30, cover: 1000 };
 
+/*
+  作者接管了畫布的哪幾塊。
+
+  我們的預設外觀跟 MMD 的不是同一套：作者只畫他要畫的，留白處 MMD 是素的、
+  我們卻先畫了一層，兩層疊起來就不像同一個設計（owner 2026-09-10：面板的淺色
+  格子裡包一顆作者畫的深色藥丸）。接管清單掛在根節點上，canvas.css 用 :not()
+  把宿主那一層收掉；什麼都沒寫的卡不會產生任何清單，外觀一個位元組都不變。
+*/
+const authorOwnedRegions = ref('');
+
 let authorAssetRuntime = null;
 // 作者範圍：這張卡的程式碼（掛載腳本、訊息裡的 <script>/<style>、訂閱回呼、inline handler）
 // 跑出來的計時器、監聽、塞到頁面根部的節點，全記在這裡，離場時一併收掉。容器只管容器裡
@@ -2291,8 +2308,9 @@ function buildAuthorAssetHost() {
       // 先動本地再寫穿伺服器。只寫伺服器的話畫面要重載才變，作者呼叫完會覺得
       // 「什麼都沒發生」——背景是 formData.backgroundUrl 算出來的，不同步就看不到。
       formData.backgroundUrl = url;
+      formData.backgroundOff = false;
       // 寫穿伺服器：換裝置再進來這張卡，桌布還在。純預覽沒有卡也沒有登入，只改本地。
-      if (!previewOnly.value) savePlayerPreference({ roleId: unref(roleId), prefs: { backgroundUrl: url } });
+      if (!previewOnly.value) savePlayerPreference({ roleId: unref(roleId), prefs: { backgroundUrl: url, backgroundOff: false } });
       return true;
     },
     scrollToTop: () => { scrollTopValue.value = 0; return true; },
@@ -2390,6 +2408,8 @@ function applyAuthorAsset(asset) {
         applyTavernRules(res.data.mountTrigger, activeAuthorAsset.value.rules, authorRuleOptions()).html,
         cardFormat.value,
       );
+      // 接管清單要在掛載之前算好：宿主那一層一旦畫出來再收，玩家會看到閃一下。
+      authorOwnedRegions.value = detectAuthorOwnedRegions(mounted).join(' ');
       const mountEl = authorAssetRuntime.mount({ mountLayer: res.data.mountLayer, html: mounted });
       // 來源寫在容器上：MMD 的卡以 content-box 排版（見 canvas.css 的說明），酒館的卡不是。
       if (mountEl) mountEl.setAttribute('data-luna-author-format', cardFormat.value);
@@ -2617,6 +2637,8 @@ function setAuthorAssetPageVisible(visible) {
 }
 
 function disposeAuthorAsset() {
+  // 接管清單跟著作者的東西一起收：換一張沒美化的卡時，宿主那一層要畫回來。
+  authorOwnedRegions.value = '';
   disposeCardTheme()
   applyImmersiveMode(false);
   disposeComposerOverhang();
@@ -9383,7 +9405,8 @@ async function forkArchive() {
 // 或把玩家自己設過的那張拿掉——作者的卡也可以用它自己的方式改背景。
 const backgroundOptions = computed(() => {
   const items: Array<{ key: string; label: string; current?: boolean }> = [
-    { key: 'reset', label: t('canvas.panel.backgroundReset'), current: !formData.backgroundUrl },
+    // 「不要背景」是獨立的偏好鍵：空字串＝沒設過、要照卡片走（見 canvas-background.ts）
+    { key: 'reset', label: t('canvas.panel.backgroundReset'), current: formData.backgroundOff === true },
   ]
   const roleBackground = (roleView.value as any).roleBackground
   if (roleBackground) {
@@ -9398,9 +9421,12 @@ const backgroundOptions = computed(() => {
 
 function onPickBackground(key: string) {
   const roleBackground = (roleView.value as any).roleBackground
-  const next = key === 'role' && roleBackground ? roleBackground : ''
+  const wantsRole = key === 'role' && !!roleBackground
+  const next = wantsRole ? roleBackground : ''
+  // 兩個鍵一起寫：關掉背景是玩家的明示選擇，跟「沒設過」必須分得開。
   formData.backgroundUrl = next
-  savePlayerPreference({ roleId: unref(roleId), prefs: { backgroundUrl: next } })
+  formData.backgroundOff = !wantsRole
+  savePlayerPreference({ roleId: unref(roleId), prefs: { backgroundUrl: next, backgroundOff: !wantsRole } })
   closeCanvasSheet()
 }
 

@@ -1440,6 +1440,20 @@
     max-width: var(--lt-canvas-column-width);
     margin: 0 auto;
     padding: 8px 12px 12px;
+  }
+
+  /*
+    面板的顏色只在作者沒接管這一塊時才畫。
+
+    MMD 的面板本身是素的，格子也沒有底色——作者的卡因此只畫圖示槽，沒有理由去
+    畫格子。我們無條件先畫一層，畫面上就變成「淺色格子裡包一顆作者畫的深色藥丸」
+    （owner 2026-09-10 截圖）。判據是作者有沒有伸手，不是卡片格式（沒宣告一律
+    當 mmd，等於全部）：見 canvas-author-regions.ts。
+
+    版面（grid、間距、置中）留在上面那條無條件的規則裡：那是「這一片要能用」，
+    不是外觀。作者接管的是顏色，不是要自己重排一次格子。
+  */
+  .canvas-root:not([data-lt-author-owns~="panel"]) .more-scope {
     background: var(--lt-canvas-panel-bg);
     color: var(--lt-canvas-panel-fg);
     border-top: 1px solid var(--lt-canvas-line);
@@ -1457,9 +1471,13 @@
     gap: 6px;
     min-height: 64px;
     padding: 8px 4px;
+    cursor: pointer;
+  }
+
+  /* 同上：格子的底色與圓角是外觀，作者接管面板時整個讓開。 */
+  .canvas-root:not([data-lt-author-owns~="panel"]) .more-scope .item {
     border-radius: var(--lt-canvas-radius);
     background: var(--lt-canvas-panel-item-bg);
-    cursor: pointer;
   }
 
   /* 停用（存檔滿了）：只降權，不拿掉節點、不吃掉點擊——點下去由頁面說明為什麼不能用 */
@@ -1479,17 +1497,46 @@
     color: inherit;
   }
 
-  .more-scope .item-icon svg {
+  /*
+    作者接管面板時，圖示槽的幾何換成 MMD 的。
+
+    MMD 的 `.item-icon` 是整格那塊大方塊（寬滿格、高 4.03125rem、圓角 1.25rem，
+    底色走 --more-item-bg-color），不是我們這個 20px 的小槽。作者對它寫的
+    `padding:10px 16px;border-radius:16px` 在 MMD 加在大方塊上是那塊底，加在 20px
+    上就縮成一顆小藥丸，整格看起來是另一個東西（owner 2026-09-10 截圖）。
+
+    幾何跟著接管走、不無條件改：沒美化的卡沿用我們自己的小槽，外觀不動。
+  */
+  .canvas-root[data-lt-author-owns~="panel"] .more-scope .item-icon {
+    width: 100%;
+    height: var(--lt-canvas-panel-icon-size, 64.5px);
+    border-radius: 20px;
+    border: 0;
+    background: var(--lt-canvas-panel-icon-bg);
+    /* 槽變大了，圖片不跟著撐：MMD 的圖片是固定 1.71875rem */
+    --lt-canvas-panel-icon-image: 27.5px;
+  }
+
+  /* 圖片本身照 MMD 的 1.71875rem，尺寸給 uni-image，裡面的 div 填滿它 */
+  .more-scope .item-icon uni-image {
+    width: var(--lt-canvas-panel-icon-image, 100%);
+    height: var(--lt-canvas-panel-icon-image, 100%);
+    flex: none;
+  }
+
+  .more-scope .item-icon uni-image > div {
     display: block;
-    width: 70%;
-    height: 70%;
+    width: 100%;
+    height: 100%;
   }
 
   .more-scope .item-title {
     font-size: 12px;
     line-height: 1.3;
     text-align: center;
-    color: var(--lt-canvas-panel-fg);
+    /* 顏色一律繼承：沒接管時繼承上面那條的 panel-fg，接管時繼承作者漆的
+       .chat-bottom。寫死 var() 會在接管後把作者的字色蓋掉。 */
+    color: inherit;
   }
 
   .msg-modify-scope {
