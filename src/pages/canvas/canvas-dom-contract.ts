@@ -20,6 +20,8 @@ export type CanvasRegion =
   | 'stage'
   | 'intro'
   | 'message'
+  /** 玩家自己那一則（MMD 對左右兩側用不同的節點名） */
+  | 'message-user'
   | 'prologue'
   | 'composer'
   | 'menu'
@@ -131,6 +133,18 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   // 動作列住在 .mes_block 的文流裡、氣泡之後（owner 2026-09-04：右上角會被作者的面板蓋住）。
   { selector: '.mes_block > .select-box.mes_buttons', region: 'message', origin: 'lt', why: '動作列在訊息主體的文流裡，不再絕對定位在角落' },
   { selector: '[data-lt="message-actions"]', region: 'message', origin: 'lt', why: '我方穩定鉤子' },
+
+  // ── 玩家自己那一則 ──────────────────────────────────────────────────
+  //
+  // MMD 對兩側用不同的節點名：AI 是 `.touch-scope`＋`.content.left`，玩家是
+  // `.touch-scope.touch-scope-right`＋`.content.right`。卡片因此把玩家氣泡寫成
+  // `.touch-scope.touch-scope-right .content.right`——少了那個修飾 class，整組
+  // （底色、::before 毛玻璃、::after 噪點）一條都不命中，畫面上只有 AI 那側被
+  // 美化，玩家那側留在宿主預設，左右看起來像兩張不同的卡。
+  { selector: '.mes.User', region: 'message-user', origin: 'mmd', why: '玩家訊息列' },
+  { selector: '.touch-scope.touch-scope-right', region: 'message-user', origin: 'mmd', why: 'MMD 玩家側訊息主體；卡片用它區分左右' },
+  { selector: '.touch-scope.touch-scope-right .content.right', region: 'message-user', origin: 'mmd', why: '玩家氣泡；卡片直接改它的底色與邊框' },
+  { selector: '.mes[is_user="true"]', region: 'message-user', origin: 'st', why: '酒館用屬性分辨誰說的' },
   { selector: '.lt-msg-regen', region: 'message', origin: 'lt', why: '重新生成（只有最新一則 AI 有）' },
   { selector: '[data-lt="message-regenerate"]', region: 'message', origin: 'lt', why: '我方穩定鉤子' },
   { selector: '.lt-context-chip', region: 'message', origin: 'lt', why: '這一輪的上下文用量（只露百分比與等級；沒有資料就不畫）' },
@@ -223,6 +237,11 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '.more-scope .item-icon', region: 'panel', origin: 'mmd', why: '卡片改格子圖示的尺寸與底色' },
   { selector: '.more-scope .item-title', region: 'panel', origin: 'mmd', why: '格子文字' },
   { selector: '.chat-bottom .more-scope .item .item-icon', region: 'panel', origin: 'mmd', why: '卡片寫的是帶 .chat 的完整路徑，面板必須真的住在 .chat-bottom 裡' },
+  // MMD 的圖示是 uni-image 裡一個帶 background-image 的 div，卡片統一用
+  // `filter` 給它換色（`.item-icon div{filter:var(--icon-filter)}`）。我們先前
+  // 槽裡放的是 inline svg，沒有 div——卡片那條上色規則一個都打不中，美化過的
+  // 面板只剩一排空的色塊（owner 2026-09-10 截圖）。
+  { selector: '.more-scope .item-icon uni-image div[style*="background-image"]', region: 'panel', origin: 'mmd', why: '卡片用 filter 對這個 div 換圖示顏色' },
 
   // ── 彈層的殼 ────────────────────────────────────────────────────────
   { selector: '.u-popup', region: 'popup', origin: 'mmd', why: 'uView 彈層外框' },

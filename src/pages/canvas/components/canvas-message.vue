@@ -38,7 +38,11 @@
       <span class="timestamp"></span>
     </div>
 
-    <div class="touch-scope mes_block" :id="'item' + message.mesid">
+    <!-- MMD 把左右兩側寫成不同的節點名：AI 是 `.touch-scope`，玩家多一個
+         `.touch-scope-right`。卡片的美化因此寫成
+         `.touch-scope.touch-scope-right .content.right`——少了這個修飾 class，
+         玩家那側一條都不命中，畫面上只有 AI 被美化（owner 2026-09-10 截圖）。 -->
+    <div class="touch-scope mes_block" :class="blockClass" :id="'item' + message.mesid">
       <!-- 這一輪 Agent 做了什麼。跟思考過程同一種形態：預設收起，但留得住——
            用戶付了錢等了一分多鐘，過程是他唯一能判斷「有沒有在幹活」的依據。 -->
       <details v-if="message.prepTrail && message.prepTrail.length" class="mes_reasoning_details lt-prep-trail">
@@ -251,6 +255,7 @@ const emit = defineEmits<{
 
 const roleClass = computed(() => (props.message.role === 'user' ? 'User' : 'Ai'))
 const bubbleClass = computed(() => (props.message.role === 'user' ? 'right' : 'left'))
+const blockClass = computed(() => (props.message.role === 'user' ? 'touch-scope-right' : ''))
 
 const hintEl = ref<HTMLElement | null>(null)
 

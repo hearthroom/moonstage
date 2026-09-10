@@ -98,6 +98,7 @@ export const useUserDefine = () => {
 		limitLevel: "medium", //道德感
 		showAll: false,
 		backgroundUrl: '', //用户设定角色聊天背景
+		backgroundOff: false, //玩家明示「不要背景」，跟「沒設過」分開
 		fontFamily: '', // 畫布字體偏好（card / wenkai / system；空＝依卡片來源）
 		context: 1,
 		systemPrompt:"",//系统预设
@@ -215,6 +216,9 @@ export const useUserDefine = () => {
 	const PLAY_PREFERENCE_DEFAULTS = {
 		showAll: false,
 		backgroundUrl: '',
+		// 玩家明示「不要背景」。獨立一個鍵，因為空字串要保留給「沒設過」
+		// （畫布據此照卡片回退，見 pages/canvas/canvas-background.ts）。
+		backgroundOff: false,
 		// 畫布字體：'' 跟卡片來源的預設走（MMD 卡＝文楷，其餘跟隨卡片）、wenkai、system、card
 		fontFamily: '',
 	};

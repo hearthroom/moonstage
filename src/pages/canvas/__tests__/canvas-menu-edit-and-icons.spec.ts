@@ -43,10 +43,13 @@ describe('「+」面板的圖示', () => {
     const w = mount(CanvasComposer, { props: { value: '', placeholder: '說點什麼', sendState: 'send', generating: false, moreItems: items, moreOpen: true } })
     const slots = w.findAll('.more-scope .item .item-icon')
     expect(slots.length).toBe(items.length)
+    // 槽裡是 MMD 形狀的 div（背景圖），不是 inline svg：卡片統一用
+    // `.item-icon div{filter:var(--icon-filter)}` 換圖示顏色，沒有 div 就一條
+    // 都不命中（owner 2026-09-10 截圖）。描邊色因此是固定值，不再是 currentColor。
     for (const slot of slots) {
-      const svg = slot.find('svg')
-      expect(svg.exists()).toBe(true)
-      expect(svg.attributes('stroke')).toBe('currentColor')
+      const div = slot.find('div')
+      expect(div.exists()).toBe(true)
+      expect(div.attributes('style') || '').toContain('background-image')
     }
   })
 
@@ -60,8 +63,8 @@ describe('「+」面板圖示槽的尺寸壓在 layer 外', () => {
     const vars = readFileSync(resolve(__dirname, '../../../common/canvas-theme-vars.css'), 'utf8')
     const stripped = vars.replace(/\/\*[\s\S]*?\*\//g, '')
     expect(stripped).not.toMatch(/@layer/)
-    expect(stripped).toMatch(/\.more-scope \.item-icon > uni-image \{[^}]*width: 100%;[^}]*height: 100%;/)
-    expect(stripped).toMatch(/\.more-scope \.item-icon > uni-image > svg \{[^}]*width: 70%;/)
+    expect(stripped).toMatch(/\.more-scope \.item-icon > uni-image \{[^}]*--lt-canvas-panel-icon-image, 100%/)
+    expect(stripped).toMatch(/\.more-scope \.item-icon > uni-image > div \{[^}]*width: 100%;[^}]*height: 100%;/)
   })
 })
 
