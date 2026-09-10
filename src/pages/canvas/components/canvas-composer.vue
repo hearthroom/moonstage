@@ -45,7 +45,10 @@
             @click="$emit('shortcut', item.key)"
             @keydown.enter.prevent="$emit('shortcut', item.key)"
           >
-            <span class="sb-icon" aria-hidden="true"></span>
+            <!-- 圖示形狀跟面板那一格同一套（uni-image 裡一個帶 background-image 的 div）：
+                 卡片統一用 filter 對那個 div 換色。MMD 每顆快捷鍵都是圖示＋文字，
+                 我們這裡本來是個空 span，同一排在對方有圖、在我們只有字。 -->
+            <span class="sb-icon" aria-hidden="true"><component :is="'uni-image'" v-html="panelIconMarkup(item.key)"></component></span>
             <span class="sb-text">{{ item.label }}</span>
           </div>
         </div>
