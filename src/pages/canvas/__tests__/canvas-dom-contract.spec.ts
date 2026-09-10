@@ -87,6 +87,10 @@ function mountRegion(region: string) {
     case 'message':
       // 中斷卡只在被停下的那則出現；契約要查得到它，所以掛的是被停下的那一則。
       return mount(CanvasMessage, { props: { message: { ...AI_MESSAGE, agentInterrupted: true, prepTrail: ['回想先前的劇情'] } } })
+    case 'message-user':
+      return mount(CanvasMessage, {
+        props: { message: { ...AI_MESSAGE, id: 'm2', mesid: 1, role: 'user', name: '小明', html: '<p>你好</p>', reasoning: '', swipes: null } },
+      })
     case 'prologue':
       return mount(CanvasPrologue, { props: PROLOGUE })
     case 'composer':
