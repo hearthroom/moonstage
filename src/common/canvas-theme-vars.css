@@ -13,14 +13,24 @@
  * ── 為什麼刻意樸素 ──
  * 畫布的預設外觀不是「我們的設計」，是「卡片還沒接手時不至於難看」。
  * 加漸層、加光暈、加品牌金只會讓卡片的美化看起來髒。
+ *
+ * ── 為什麼這裡會出現 MMD 的變數名 ──
+ * MMD 的介面是變數驅動的，卡片換色的主要手法不是選節點、是設幾個變數
+ * （`--primary-font-color` 對方讀 591 次、`--background-color` 211 次、
+ * `--card-background-color` 134 次，數字來自對方線上樣式表）。只認我們自己的名字，
+ * 等於把匯入卡片換色的主接口整條切斷——作者手寫的那幾條具體選擇器還在，
+ * 整體卻沒換色，看起來像「到處都對不上」（owner 2026-09-10）。
+ *
+ * 所以預設值一律寫成「先讀 MMD 的名字，讀不到才用我們原本的值」。沒設這些變數的卡
+ * 拿到的是同一個 fallback，外觀一個位元組都不變。
  */
 
 :root {
   /* ── 頁面 ── */
-  --lt-canvas-bg: #0f1217;
-  --lt-canvas-fg: #e8eaed;
+  --lt-canvas-bg: var(--background-color, #0f1217);
+  --lt-canvas-fg: var(--primary-font-color, #e8eaed);
   --lt-canvas-muted: rgba(232, 234, 237, 0.56);
-  --lt-canvas-line: rgba(255, 255, 255, 0.10);
+  --lt-canvas-line: var(--border-color, rgba(255, 255, 255, 0.10));
   --lt-canvas-radius: 16px;
   --lt-canvas-gap: 12px;
   /* 預設字體對齊酒館使用者的環境，不用主站品牌字體 Nunito：
@@ -78,17 +88,22 @@
 
   /* ── 輸入區 ── */
   --lt-canvas-composer-bg: rgba(15, 18, 23, 0.82);
-  --lt-canvas-composer-field-bg: rgba(255, 255, 255, 0.05);
+  --lt-canvas-composer-field-bg: var(--input-background-color, rgba(255, 255, 255, 0.05));
   --lt-canvas-composer-border: rgba(255, 255, 255, 0.10);
   --lt-canvas-composer-radius: 18px;
   --lt-canvas-composer-fg: var(--lt-canvas-fg);
-  --lt-canvas-placeholder-color: rgba(232, 234, 237, 0.38);
+  --lt-canvas-placeholder-color: var(--input-tip-color, rgba(232, 234, 237, 0.38));
   --lt-canvas-send-size: 32px;
   --lt-canvas-send-bg: rgba(255, 255, 255, 0.08);
   --lt-canvas-send-fg: var(--lt-canvas-fg);
 
   /* ── 選單 ── */
-  --lt-canvas-menu-bg: rgba(24, 27, 33, 0.98);
+  /* 「＋」面板圖示槽的底色與高度。MMD 的 `.item-icon` 是整格那塊大方塊
+     （寬滿格、高 4.03125rem、圓角 1.25rem），底色走 `--more-item-bg-color`。 */
+  --lt-canvas-panel-icon-bg: var(--more-item-bg-color, rgba(255, 255, 255, 0.05));
+  --lt-canvas-panel-icon-size: 64.5px;
+
+  --lt-canvas-menu-bg: var(--card-background-color, rgba(24, 27, 33, 0.98));
   --lt-canvas-menu-fg: var(--lt-canvas-fg);
   --lt-canvas-menu-radius: 14px;
   --lt-canvas-menu-scrim: rgba(0, 0, 0, 0.48);
@@ -99,10 +114,10 @@
   --lt-canvas-stop-border: rgba(255, 255, 255, 0.18);
 
   /* ── 功能面板與彈層 ── */
-  --lt-canvas-panel-bg: rgba(24, 27, 33, 0.98);
+  --lt-canvas-panel-bg: var(--card-background-color, rgba(24, 27, 33, 0.98));
   --lt-canvas-panel-fg: var(--lt-canvas-fg);
   --lt-canvas-panel-item-bg: rgba(255, 255, 255, 0.05);
-  --lt-canvas-sheet-bg: rgba(24, 27, 33, 0.98);
+  --lt-canvas-sheet-bg: var(--card-background-color, rgba(24, 27, 33, 0.98));
   --lt-canvas-sheet-fg: var(--lt-canvas-fg);
   --lt-canvas-sheet-radius: 16px;
   --lt-canvas-sheet-scrim: rgba(0, 0, 0, 0.48);
@@ -174,13 +189,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
+  /* 圖片尺寸：預設填滿我們的小槽；作者接管面板時由 canvas.css 換成 MMD 的 1.71875rem */
+  width: var(--lt-canvas-panel-icon-image, 100%);
+  height: var(--lt-canvas-panel-icon-image, 100%);
   overflow: visible;
 }
 
-.more-scope .item-icon > uni-image > svg {
+/* 槽裡是 MMD 形狀的 div（背景圖），不是 inline svg——見 canvas-panel-icons.ts */
+.more-scope .item-icon > uni-image > div {
   display: block;
-  width: 70%;
-  height: 70%;
+  width: 100%;
+  height: 100%;
 }
