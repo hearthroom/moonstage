@@ -36,6 +36,7 @@ export type CanvasSheet =
   | 'font'
   /** 一次性確認（重置聊天、開新對話） */
   | 'confirm'
+  | 'assist'
 
 export interface CanvasPanelState {
   /** ＋ 面板開著嗎 */

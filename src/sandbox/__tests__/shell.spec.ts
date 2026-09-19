@@ -368,3 +368,19 @@ describe('殼：載入更早的歷史', () => {
     expect(sent.filter((m) => m.type === 'history')).toEqual([])
   })
 })
+
+
+describe('assist paid confirmation in sandbox', () => {
+  it('does not allow a scripted click to approve spending', async () => {
+    const chromeState = {
+      header: { roleName: '露娜', avatar: '', modelName: 'M', badge: '', showModel: true, backLabel: '返回', modelLabel: '模型' },
+      composer: { placeholder: '說點什麼', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: '停止', more: '更多', send: '送出', paste: '貼上', clear: '清除', model: '模型', assist: '幫答', perTurn: '每輪' } },
+    }
+    const s=boot(config({chrome:'shell',chromeState}))
+    s.handle({type:'panels',state:{sheet:'assist',title:'Assist',closeLabel:'Close',props:{choices:[],busy:false,confirming:true,error:'',labels:{confirm:'Costs 10',generate:'Generate',cancel:'Cancel'}},menu:{open:false,editing:false,draft:'',message:null,actions:[],labels:{cancel:'Cancel',confirm:'OK'},anchor:null}}} as any)
+    await nextTick()
+    const button=document.querySelector('.assist-actions button') as HTMLButtonElement
+    expect(button).toBeTruthy(); button.click(); await nextTick()
+    expect(sent.filter((m:any)=>m.type==='panel.ui' && m.panel==='assist' && m.event==='confirm')).toEqual([])
+  })
+})

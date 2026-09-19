@@ -16,6 +16,7 @@ import CanvasDirectives from '@/pages/canvas/components/canvas-directives.vue'
 import CanvasNotepad from '@/pages/canvas/components/canvas-notepad.vue'
 import CanvasContextBreakdown from '@/pages/canvas/components/canvas-context-breakdown.vue'
 import CanvasMemory from '@/pages/canvas/components/canvas-memory.vue'
+import CanvasAssist from '@/pages/canvas/components/canvas-assist.vue'
 import CanvasConfirm from '@/pages/canvas/components/canvas-confirm.vue'
 import type { PanelsState } from '../protocol'
 
@@ -29,6 +30,7 @@ const COMPONENTS: Record<string, Component> = {
   'context-breakdown': CanvasContextBreakdown,
   memory: CanvasMemory,
   confirm: CanvasConfirm,
+  assist: CanvasAssist,
 }
 
 /** 各面板會發的事件（跟元件的 defineEmits 一致），全部轉給宿主。 */
@@ -42,6 +44,7 @@ const EVENTS: Record<string, string[]> = {
   'context-breakdown': ['close', 'retry', 'select', 'toggle-mod-details'],
   memory: ['close', 'retry', 'delete', 'toggle-expand'],
   confirm: ['ok', 'cancel'],
+  assist: ['confirm','cancel','refresh','pick'],
 }
 
 /** 殼自己持有的可打字欄位：事件名 → 屬性名。 */

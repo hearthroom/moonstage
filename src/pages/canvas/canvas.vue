@@ -323,6 +323,11 @@
       />
     </CanvasPopup>
 
+    <CanvasPopup :open="panel.sheet === 'assist'" v-if="!sandboxCard" :title="t('canvas.assist.title')" heading
+                 :close-label="t('main.cancel')" @close="closeCanvasSheet">
+      <CanvasAssist v-bind="assistProps" @confirm="assistSession.confirm" @cancel="cancelAssist" @refresh="assistSession.refresh" @pick="assistSession.pick" />
+    </CanvasPopup>
+
     <CanvasPopup :open="panel.sheet === 'confirm'" v-if="!sandboxCard" :title="confirmSpec.title" heading
                  :close-label="t('main.cancel')" @close="onConfirmCancel">
       <CanvasConfirm
@@ -408,7 +413,8 @@ import '@/common/canvas-theme-vars.css'
 import './canvas.css'
 // 殼的 margin／padding 在 layer 外的副本（由 scripts/gen-canvas-chrome-box.mjs 產生），要排在 canvas.css 之後
 import './canvas-chrome-box.css'
-import { shouldRegenerateAssist, assistLabelKey } from './canvas-assist-state'
+import { createAssistSession } from './canvas-assist-state'
+import CanvasAssist from './components/canvas-assist.vue'
 import CanvasHeader from './components/canvas-header.vue'
 import CanvasStage from './components/canvas-stage.vue'
 import CanvasIntro from './components/canvas-intro.vue'
@@ -2480,6 +2486,8 @@ function buildPanelsState() {
       title = memoryLabels.value.title;
       props = { atoms: memory.value.atoms, loading: memory.value.loading, loadFailed: memory.value.loadFailed, expandedIds: memory.value.expandedIds, deletingId: memory.value.deletingId, labels: memoryLabels.value };
       break;
+    case 'assist':
+      title = t('canvas.assist.title'); heading = true; props = assistProps.value; break;
     case 'confirm':
       title = confirmSpec.value.title;
       heading = true;
@@ -2511,6 +2519,12 @@ function onSandboxPanelUi(panelName: string, event: string, args: unknown[]) {
   }
   if (event === 'close') { closeCanvasSheet(); return; }
   switch (panelName) {
+    case 'assist':
+      if(event==='confirm') assistSession.confirm();
+      else if(event==='cancel') cancelAssist();
+      else if(event==='refresh') assistSession.refresh();
+      else if(event==='pick') assistSession.pick(Number(a0));
+      return;
     case 'conversations':
       if (event === 'pick') onPickArchive(str());
       else if (event === 'rename') onRenameArchive(str(), String(args[1] ?? ''));
@@ -8432,57 +8446,34 @@ const showGreetingSwipes = computed(() => pendingGreetingStart.value && hasAlter
 // MMD 實測（2026-09-04，以訪客身分開一張公開卡）：點一條＝輸入框的字換成那一條，區塊
 // 留著、不送出、不動 AI 的開場白。作者回報的事故正是我方先前把它接成「換掉第一則
 // 訊息」（跟替代開場白共用狀態）。標題照 MMD 措辭走五語（見 locale）。
-// ── 幫答（.ai-assistant）────────────────────────────────────────────────
-//
-// 伺服器替玩家寫下一句（固定便宜模型、固定點數），這裡只把它填進輸入框，
-// 玩家自己改、自己送。跟開場選項走同一個出口 fillComposer——畫布上所有
-// 「替玩家準備一句話」的東西都不代送。
+// 幫答只準備草稿；打開面板與確認付費生成是不同的操作。
 const ASSIST_COST = 10
-const assistBusy = ref(false)
-// 上一次幫答填進輸入框的那句。伺服器把這一輪的結果留著：輸入框還裝著這句、玩家沒改過
-// 就再按燈泡＝不滿意想換（regenerate:true，會再扣點）；輸入框空或是玩家自己的字＝
-// 拿回這一輪的那句（regenerate:false，命中就免費）。換了對話就忘掉。
-const lastAssistReply = ref('')
-watch(conversationId, () => { lastAssistReply.value = '' })
-
-async function onAssist() {
-  if (stageHost.capabilities?.assist === false) return
-  if (assistBusy.value) return
-  if (previewOnly.value) {
-    uni.showToast({ title: t('openChat.preview.intercepted'), icon: 'none' })
-    return
-  }
-  const targetConversationId = String(unref(conversationId) || '')
-  if (!targetConversationId) {
-    uni.showToast({ title: t('canvas.assist.failed'), icon: 'none' })
-    return
-  }
-  assistBusy.value = true
-  try {
-    const regenerate = shouldRegenerateAssist(content.value, lastAssistReply.value)
-    const res: any = await _this.http.post(_this.requestUrl.chatSuggestReply, {
-      data: { conversationId: targetConversationId, regenerate: regenerate },
-      showLoading: false,
-      timeout: 60000,
-    })
-    const reply = res?.statusCode === 200 ? String(res?.data?.reply || '') : ''
-    if (reply) {
-      // 扣不扣點以回應為準（cost 0 = 這一輪的那句拿回來，沒收錢）；命中不用提示。
-      lastAssistReply.value = reply
-      fillComposer(reply)
-      return
-    }
-    const code = String(res?.data?.error || '')
-    uni.showToast({
-      title: code === 'insufficient_credits' ? t('canvas.assist.insufficient') : t('canvas.assist.failed'),
-      icon: 'none',
-    })
-  } catch (e) {
-    uni.showToast({ title: t('canvas.assist.failed'), icon: 'none' })
-  } finally {
-    assistBusy.value = false
-  }
+const assistSession = createAssistSession(async (key, regenerate) => {
+  const targetConversationId = JSON.parse(key)[0]
+  const res: any = await _this.http.post(_this.requestUrl.chatSuggestReply, {
+    data: { conversationId: targetConversationId, regenerate, count: 3 },
+    showLoading: false, timeout: 60000,
+  })
+  if (res?.statusCode !== 200) throw new Error(String(res?.data?.error || res?.data?.code || 'failed'))
+  return Array.isArray(res.data?.replies) ? res.data.replies : res.data?.reply ? [String(res.data.reply)] : []
+}, text => { fillComposer(text); closeCanvasSheet() })
+const assistBusy = computed(() => assistSession.state.busy)
+const assistLabels = computed(() => Object.fromEntries(['confirm','generate','cancel','loading','hint','refresh','retry','failed','insufficient'].map(k => [k,t(`canvas.assist.${k}`, { cost: ASSIST_COST })])))
+const assistProps = computed(() => ({ ...assistSession.state, labels: assistLabels.value }))
+// 最新一則的內容也納入：重寫、回溯、編輯及新回覆都不能沿用舊建議。
+const assistContext = computed(() => {
+  const rows = talkList.value.filter((r:any) => !r.systemOnly && !r.chatLoading)
+  const tail:any = rows[rows.length-1]
+  return conversationId.value ? JSON.stringify([String(conversationId.value), tail?.chatId || tail?.id || '', String(tail?.content || '')]) : ''
+})
+function onAssist() {
+  if(stageHost.capabilities?.assist === false || isGenerating.value) return
+  if(previewOnly.value) { uni.showToast({title:t('openChat.preview.intercepted'),icon:'none'}); return }
+  assistSession.context(assistContext.value)
+  assistSession.open()
+  if(assistSession.state.visible) panel.value = openSheet(panel.value, 'assist')
 }
+function cancelAssist() { assistSession.cancel(); if(!assistSession.state.visible) closeCanvasSheet() }
 
 const prologue = ref<string[]>([])
 const composerRef = ref<any>(null)
@@ -8952,6 +8943,8 @@ const shortcutItems = computed(() => previewOnly.value ? [] : [
 // 自訂指令、用戶人設、設定補充、劇情總結、遊玩教程都不在 v1 裡，
 // 放一顆按下去沒反應的鍵比沒有那顆鍵更糟。
 const panel = ref<CanvasPanelState>(createPanelState())
+watch(assistContext, key => { assistSession.context(key); if(panel.value.sheet === 'assist') closeCanvasSheet() }, {flush:'sync'})
+watch(() => panel.value.sheet, (sheet, previous) => { if(previous==='assist' && sheet!=='assist') assistSession.close() })
 
 // 「＋」放得下全部：快捷列上的五樣也留著，玩家不必記得哪一樣在哪裡。
 const moreItems = computed(() => previewOnly.value ? [
@@ -10710,7 +10703,7 @@ const composerLabels = computed(() => ({
   clear: t('canvas.composer.clear'),
   model: t('canvas.panel.model'),
   perTurn: t('canvas.composer.perTurn'),
-  assist: t(assistLabelKey(content.value, lastAssistReply.value)),
+  assist: t('canvas.assist.tip'),
 }))
 
 const menuLabels = computed(() => ({
