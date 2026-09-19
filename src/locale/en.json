@@ -3947,7 +3947,7 @@
 	"canvas.composer.clear": "Clear",
 	"canvas.assist.tip": "Stuck? Let AI draft a reply",
 	"canvas.assist.another": "Try another line (costs 10 more)",
-	"canvas.assist.failed": "Could not draft a reply, try again",
+	"canvas.assist.failed": "Generation failed. Existing suggestions are kept. Please try again.",
 	"canvas.assist.insufficient": "Not enough points: a draft costs 10",
 	"canvas.stop": "Stop",
 	"canvas.copied": "Copied",
@@ -4092,5 +4092,13 @@
 	"canvas.hud.noTarget": "Target not found",
 	"canvas.hud.stale": "The target changed, reload and try again",
 	"canvas.hud.confirmRequired": "Confirmation required",
-	"canvas.menu.editResend": "Edit and resend"
+	"canvas.menu.editResend": "Edit and resend",
+	"canvas.assist.title": "Suggested replies",
+	"canvas.assist.confirm": "Generate suggestions for {cost} credits? Choosing one fills the composer without sending it.",
+	"canvas.assist.generate": "Confirm and generate",
+	"canvas.assist.cancel": "Cancel",
+	"canvas.assist.loading": "Preparing suggestions…",
+	"canvas.assist.hint": "Choose a suggestion, edit it in the composer, then send when ready.",
+	"canvas.assist.refresh": "Regenerate",
+	"canvas.assist.retry": "Try again"
 }

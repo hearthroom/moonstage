@@ -3947,7 +3947,7 @@
 	"canvas.composer.clear": "清空",
 	"canvas.assist.tip": "不知道怎麼回？讓 AI 幫你起個頭",
 	"canvas.assist.another": "換一句（會再扣 10 點）",
-	"canvas.assist.failed": "幫答失敗，再試一次",
+	"canvas.assist.failed": "生成失敗，原有建議仍會保留。請重試。",
 	"canvas.assist.insufficient": "點數不夠，幫答需要 10 點",
 	"canvas.stop": "停止",
 	"canvas.copied": "已複製",
@@ -4092,5 +4092,13 @@
 	"canvas.hud.noTarget": "找不到目標",
 	"canvas.hud.stale": "目標已變動，請重新讀取",
 	"canvas.hud.confirmRequired": "需要再次確認",
-	"canvas.menu.editResend": "編輯並重送"
+	"canvas.menu.editResend": "編輯並重送",
+	"canvas.assist.title": "建議回覆",
+	"canvas.assist.confirm": "生成建議需要 {cost} 點。選擇後只會填入輸入框，不會直接送出。",
+	"canvas.assist.generate": "確認並生成",
+	"canvas.assist.cancel": "取消",
+	"canvas.assist.loading": "正在準備建議…",
+	"canvas.assist.hint": "選一個建議帶入輸入框，修改後再送出。",
+	"canvas.assist.refresh": "重新生成",
+	"canvas.assist.retry": "重試"
 }

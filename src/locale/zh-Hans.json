@@ -3947,7 +3947,7 @@
 	"canvas.composer.clear": "清空",
 	"canvas.assist.tip": "不知道怎么回？让 AI 帮你起个头",
 	"canvas.assist.another": "换一句（会再扣 10 点）",
-	"canvas.assist.failed": "帮答失败，再试一次",
+	"canvas.assist.failed": "生成失败，原有建议仍会保留。请重试。",
 	"canvas.assist.insufficient": "点数不够，帮答需要 10 点",
 	"canvas.stop": "停止",
 	"canvas.copied": "已复制",
@@ -4092,5 +4092,13 @@
 	"canvas.hud.noTarget": "找不到目标",
 	"canvas.hud.stale": "目标已变动，请重新读取",
 	"canvas.hud.confirmRequired": "需要再次确认",
-	"canvas.menu.editResend": "编辑并重发"
+	"canvas.menu.editResend": "编辑并重发",
+	"canvas.assist.title": "建议回复",
+	"canvas.assist.confirm": "生成建议需要 {cost} 点。选择后只会填入输入框，不会直接发送。",
+	"canvas.assist.generate": "确认并生成",
+	"canvas.assist.cancel": "取消",
+	"canvas.assist.loading": "正在准备建议…",
+	"canvas.assist.hint": "选择一个建议填入输入框，修改后再发送。",
+	"canvas.assist.refresh": "重新生成",
+	"canvas.assist.retry": "重试"
 }

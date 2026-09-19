@@ -3947,7 +3947,7 @@
 	"canvas.composer.clear": "クリア",
 	"canvas.assist.tip": "返事に迷ったら AI に下書きしてもらう",
 	"canvas.assist.another": "別の一言にする（さらに 10 ポイント）",
-	"canvas.assist.failed": "下書きに失敗しました。もう一度お試しください",
+	"canvas.assist.failed": "生成に失敗しました。以前の候補は残っています。もう一度お試しください。",
 	"canvas.assist.insufficient": "ポイント不足：下書きには 10 ポイント必要です",
 	"canvas.stop": "停止",
 	"canvas.copied": "コピーしました",
@@ -4092,5 +4092,13 @@
 	"canvas.hud.noTarget": "対象が見つかりません",
 	"canvas.hud.stale": "対象が変わりました。再読み込みしてください",
 	"canvas.hud.confirmRequired": "確認が必要です",
-	"canvas.menu.editResend": "編集して送り直す"
+	"canvas.menu.editResend": "編集して送り直す",
+	"canvas.assist.title": "返信の候補",
+	"canvas.assist.confirm": "候補の生成には {cost} ポイントかかります。選んだ候補は入力欄に入り、自動送信されません。",
+	"canvas.assist.generate": "確認して生成",
+	"canvas.assist.cancel": "キャンセル",
+	"canvas.assist.loading": "候補を準備しています…",
+	"canvas.assist.hint": "候補を選び、入力欄で編集してから送信してください。",
+	"canvas.assist.refresh": "再生成",
+	"canvas.assist.retry": "再試行"
 }

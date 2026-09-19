@@ -319,7 +319,10 @@ export function createShell(options: CreateShellOptions): Shell {
   const panelsMount = doc.createElement('div')
   panelsMount.setAttribute('data-chat', 'panels')
   refs.root.appendChild(panelsMount)
-  const panels = standardChrome ? createPanels({ mount: panelsMount, send: (panel, event, args) => transport.send({ type: 'panel.ui', panel, event, args }) }) : null
+  const panels = standardChrome ? createPanels({ mount: panelsMount, send: (panel, event, args) => {
+    if (panel === 'assist' && event === 'confirm' && !gesture) { debug.warn('ignored assist confirmation without user gesture'); return }
+    transport.send({ type: 'panel.ui', panel, event, args })
+  } }) : null
 
   // ── 標準頁首與輸入區：跟一般卡同一套元件，資料由宿主送來（chrome 訊息），按鍵轉回宿主做。 ──
   let chromeApps: Array<{ unmount(): void }> = []
