@@ -1,4 +1,4 @@
-const MANUAL_EDIT_CLAIM_KEY = 'lunatalk:chat:manual-edit:last-request'
+const MANUAL_EDIT_CLAIM_KEY = 'moonstage:chat:manual-edit:last-request'
 const fallbackClaims = new Set()
 
 export function createManualEditRequestId(

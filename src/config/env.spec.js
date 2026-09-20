@@ -63,16 +63,16 @@ describe('resolveApiOrigin', () => {
   // 302 走到登入頁，把登入頁的 HTML 回在 /api/oauth/authorize 底下，流程就斷了。
   // 所以整頁跳轉必須打 API 的絕對位址；沒有另外設定時就從 WS base 推出來。
   it('預設從 VITE_WS_BASE 推出 http(s) 位址', () => {
-    expect(resolveApiOrigin({ VITE_WS_BASE: 'wss://api.lunatalk.ai' })).toBe('https://api.lunatalk.ai')
+    expect(resolveApiOrigin({ VITE_WS_BASE: 'wss://api.harperharbor.com' })).toBe('https://api.harperharbor.com')
     expect(resolveApiOrigin({ VITE_WS_BASE: 'ws://localhost:8888/' })).toBe('http://localhost:8888')
   })
 
   it('VITE_API_ORIGIN 可明確覆寫（第三方部署 API 與 WS 不同機時）', () => {
-    expect(resolveApiOrigin({ VITE_WS_BASE: 'wss://api.lunatalk.ai', VITE_API_ORIGIN: 'https://api.example.com/' }))
+    expect(resolveApiOrigin({ VITE_WS_BASE: 'wss://api.harperharbor.com', VITE_API_ORIGIN: 'https://api.example.com/' }))
       .toBe('https://api.example.com')
   })
 
   it('覆寫值必須是 http(s) 絕對位址', () => {
-    expect(() => resolveApiOrigin({ VITE_WS_BASE: 'wss://api.lunatalk.ai', VITE_API_ORIGIN: '/api' })).toThrow(/VITE_API_ORIGIN/)
+    expect(() => resolveApiOrigin({ VITE_WS_BASE: 'wss://api.harperharbor.com', VITE_API_ORIGIN: '/api' })).toThrow(/VITE_API_ORIGIN/)
   })
 })

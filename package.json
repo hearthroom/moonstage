@@ -45,7 +45,7 @@
     "vue-tsc": "^3.3.8"
   },
   "private": true,
-  "description": "Open chat stage for LunaTalk character cards. SillyTavern / MMD compatible rendering, talks only to the public /open/v1 API.",
+  "description": "Open chat stage for HarperHarbor character cards. SillyTavern / MMD compatible rendering, talks only to the public /open/v1 API.",
   "exports": {
     "./stage": "./dist-stage/moonstage-stage.js",
     "./stage.css": "./dist-stage/moonstage-stage.css"

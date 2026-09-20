@@ -40,7 +40,7 @@ export interface StageAuth {
 }
 
 export interface StageApi {
-  /** 開放 API 的主機，例如 'https://api.lunatalk.ai'（路徑表是相對的 /open/v1/...）。 */
+  /** 開放 API 的主機，例如 'https://api.harperharbor.com'（路徑表是相對的 /open/v1/...）。 */
   base: string
 }
 

@@ -120,7 +120,7 @@ class HcBtn extends HTMLElement {
 
     if (sendText) {
       // 填入輸入框
-      const textarea = document.querySelector('#lunatalk-input textarea.uni-textarea-textarea');
+      const textarea = document.querySelector('#moonstage-input textarea.uni-textarea-textarea');
       if (textarea) {
         textarea.value = sendText;
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
@@ -741,7 +741,7 @@ class HcForm extends HTMLElement {
     const output = results.join('\n');
 
     // 填入輸入框
-    const textarea = document.querySelector('#lunatalk-input textarea.uni-textarea-textarea');
+    const textarea = document.querySelector('#moonstage-input textarea.uni-textarea-textarea');
     if (textarea) {
       textarea.value = output;
       textarea.dispatchEvent(new Event('input', { bubbles: true }));

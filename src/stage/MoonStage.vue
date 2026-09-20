@@ -17,7 +17,7 @@ import '@/common/fui-app.css'
 import '@/components/firstui/fui-theme/fui-theme.css'
 import '@/static/icon/fui-custom-icon.css'
 import '@/common/html-card.css'
-import '@/static/styles/luna-tokens.css'
+import '@/static/styles/stage-tokens.css'
 
 const props = defineProps<{ roleId?: string; draft?: string; trial?: string }>()
 provide(STAGE_ROUTE_OPTIONS, {

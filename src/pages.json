@@ -27,7 +27,7 @@
 	],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "LunaTalk",
+		"navigationBarTitleText": "HarperHarbor",
 		"navigationBarBackgroundColor": "#000000",
 		"backgroundColor": "radial-gradient( 0% 100% at 100% 0%, #1C2A35 0%, rgba(3,6,5,0) 100%)",
 		"rpxCalcMaxDeviceWidth": 960, // rpx 计算所支持的最大设备宽度，单位 px，默认值为 960

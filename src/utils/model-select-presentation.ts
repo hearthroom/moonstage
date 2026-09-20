@@ -10,7 +10,7 @@ import { getModelLatencySignal, getModelPerformanceChips, getModelSignalBadges }
 
 export const FREE_MODEL_BASE = 'BaseBot'
 
-// 色盤取自 lunatalk-ui-primitives §5.1。不是任意 hash 值——任意 hue 會撞上
+// 色盤取自 shared UI primitives §5.1。不是任意 hash 值——任意 hue 會撞上
 // 60-90° 那段髒黃綠，在暗底上發灰。
 export const MONOGRAM_HUES = [350, 20, 45, 150, 190, 220, 260, 300]
 

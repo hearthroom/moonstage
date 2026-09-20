@@ -19,7 +19,7 @@ body:
   - type: dropdown
     id: scope
     attributes:
-      label: Does this need the LunaTalk API to change?
+      label: Does this need the HarperHarbor API to change?
       description: Moonstage only uses the public /open/v1 API. If the feature needs new data from the server, it is still worth filing, but it will take longer.
       options:
         - No, this is all in the stage

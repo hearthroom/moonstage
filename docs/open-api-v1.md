@@ -27,7 +27,9 @@ POST ${API_ORIGIN}/oauth/register
 Content-Type: application/json
 
 {
-  "client_name": "LunaTalk Open Chat",
+  "client_name": "Moonstage",
+  "scope": "profile.read role.read role.write chat.play",
+  "token_endpoint_auth_method": "none",
   "redirect_uris": ["<origin>/pages/oauth/callback"],
   "grant_types": ["authorization_code", "refresh_token"]
 }
@@ -46,14 +48,14 @@ ${API_ORIGIN}/oauth/authorize
   ?response_type=code
   &client_id=…
   &redirect_uri=…
-  &scope=mcp:card-writer
-  &resource=https://api.lunatalk.ai/open/v1
+  &scope=profile.read%20role.read%20role.write%20chat.play
+  &resource=https://api.harperharbor.com/open/v1
   &state=…
   &code_challenge=…            (base64url of SHA-256 of the verifier)
   &code_challenge_method=S256
 ```
 
-The server redirects to the LunaTalk sign-in and consent page, and finally back to
+The server redirects to the HarperHarbor sign-in and consent page, and finally back to
 `redirect_uri` with `?code=…&state=…`.
 
 **3. Exchange the code.**
@@ -63,17 +65,18 @@ POST ${API_ORIGIN}/oauth/token
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=authorization_code&code=…&client_id=…&redirect_uri=…
-&code_verifier=…&resource=https://api.lunatalk.ai/open/v1
+&code_verifier=…&resource=https://api.harperharbor.com/open/v1
 ```
 
 → `{ "access_token": "...", "token_type": "Bearer", "expires_in": 3600,
-"refresh_token": "...", "resource": "https://api.lunatalk.ai/open/v1" }`
+"refresh_token": "...", "resource": "https://api.harperharbor.com/open/v1" }`
 
 Refresh with `grant_type=refresh_token&refresh_token=…&client_id=…&resource=…`.
 
-> `resource` is always the literal string `https://api.lunatalk.ai/open/v1`, whichever
-> API origin you actually talk to. It names what the token is for, not where the request
-> goes. A token bound to a different resource is rejected by v1.
+> `resource` is `${API_ORIGIN}/open/v1` (production: `https://api.harperharbor.com/open/v1`).
+> Client registrations and credentials are scoped to that issuer. `role.read` includes
+> private agent configurations and Lorebooks; `role.write` permits changes; `chat.play`
+> can spend credits. A token bound to a different resource is rejected by v1.
 
 On any `401` from v1: refresh once; if that fails, discard the tokens and start the
 authorization flow again.
@@ -369,16 +372,15 @@ consulted.
 
 ## Deployment notes (official hosting)
 
-- The official build at `playground.lunatalk.ai` is a static deployment of this repo behind
+- The official build at `playground.hearthroom.club` is a static deployment of this repo behind
   a small same-origin proxy.
-- The proxy forwards same-origin `/api/*` to `https://api.lunatalk.ai/*` (forwarding
+- The proxy forwards same-origin `/api/open/v1/*` and `/api/oauth/{register,authorize,token}` to `https://api.harperharbor.com/*` (forwarding
   `Authorization`). All XHR in this client therefore uses the relative `API_BASE`.
 - The OAuth **authorize** step is a full-page navigation, not XHR. It must go to the
   absolute API origin (`API_ORIGIN`, derived from `VITE_WS_BASE` or overridden by
-  `VITE_API_ORIGIN`): a proxied fetch would follow the server's 302 to the LunaTalk
-  login page and return its HTML under `/api/oauth/authorize`, breaking the flow.
-- Third-party hosts without a same-origin proxy: set `VITE_API_PROXY_PATH` to your
-  proxy path, or point `VITE_API_ORIGIN` / `VITE_WS_BASE` at the API host directly.
+  `VITE_API_ORIGIN`). The Worker preserves upstream redirects without following them.
+- Third-party hosts need an equivalent same-origin proxy. `VITE_API_PROXY_PATH` sets
+  its prefix; `VITE_API_ORIGIN` / `VITE_WS_BASE` select the authorization and stream host.
 
 ### Per-reply context usage (optional provider extension)
 

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import { withModalDefaults, installModalDefaults, LUNA_CONFIRM_COLOR, LUNA_CANCEL_COLOR } from './modal-defaults'
+import { withModalDefaults, installModalDefaults, STAGE_CONFIRM_COLOR, STAGE_CANCEL_COLOR } from './modal-defaults'
 
 describe('withModalDefaults', () => {
   it('沒傳 confirmColor 時注入品牌金（取代 uni 內建的 iOS 藍 #007AFF）', () => {
     const out = withModalDefaults({ title: '刪除', content: '確定嗎' })
-    expect(out.confirmColor).toBe(LUNA_CONFIRM_COLOR)
+    expect(out.confirmColor).toBe(STAGE_CONFIRM_COLOR)
   })
 
   it('危險操作傳入的紅色必須保留，不能被預設值蓋掉', () => {
@@ -13,7 +13,7 @@ describe('withModalDefaults', () => {
   })
 
   it('沒傳 cancelColor 時注入暗底可讀的灰白（內建 #000 在暗底不可讀）', () => {
-    expect(withModalDefaults({}).cancelColor).toBe(LUNA_CANCEL_COLOR)
+    expect(withModalDefaults({}).cancelColor).toBe(STAGE_CANCEL_COLOR)
   })
 
   it('其餘 options 原樣透傳', () => {
@@ -26,7 +26,7 @@ describe('withModalDefaults', () => {
   })
 
   it('undefined options 不炸', () => {
-    expect(withModalDefaults(undefined as never).confirmColor).toBe(LUNA_CONFIRM_COLOR)
+    expect(withModalDefaults(undefined as never).confirmColor).toBe(STAGE_CONFIRM_COLOR)
   })
 })
 
@@ -37,7 +37,7 @@ describe('installModalDefaults', () => {
     installModalDefaults(uniLike as never)
     ;(uniLike.showModal as (o: unknown) => void)({ title: 'T' })
     expect(original).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'T', confirmColor: LUNA_CONFIRM_COLOR, cancelColor: LUNA_CANCEL_COLOR })
+      expect.objectContaining({ title: 'T', confirmColor: STAGE_CONFIRM_COLOR, cancelColor: STAGE_CANCEL_COLOR })
     )
   })
 

@@ -25,7 +25,7 @@ terms.
   logos themselves remain trademarks of their respective owners.
 - `src/static/uni.ttf` is the uni-icons font from DCloud (Apache-2.0).
 - `src/static/icon/fui-custom-icon.ttf` is an icon font generated with iconfont.cn from
-  icons used by the LunaTalk client.
+  icons used by the HarperHarbor client.
 
 ## Dependencies
 

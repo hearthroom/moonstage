@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url'
  * 涵蓋 http/https/ws/wss——初版只寫 https?:// 的話會漏掉 wss://，
  * 而 share-chat.vue 的 WebSocket 寫死測試環境正是這樣躲過檢查的。
  */
-const ENDPOINT_RE = /(?:https?|wss?):\/\/api\.lunatalk\.ai/g;
+const ENDPOINT_RE = /(?:https?|wss?):\/\/api\.harperharbor\.com/g;
 
 export const ALLOWED = {
 	// 位址本來就該待的地方

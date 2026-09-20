@@ -5,7 +5,7 @@ import store from './store'
 import messages from './locale/index'
 import Antd from 'ant-design-vue';
 import 'ant-design-vue/dist/reset.css';
-import './static/styles/luna-tokens.css';
+import './static/styles/stage-tokens.css';
 import loading from './utils/loadingManager.js';
 import toast from './utils/toastManager.js';
 import { getFreshAccessToken, refreshAccessToken, clearTokens, redirectToLogin } from './common/open-oauth';

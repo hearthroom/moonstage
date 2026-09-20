@@ -635,7 +635,7 @@ describe('開放客戶端：不再帶主站才需要的相依', () => {
   }
 })
 
-// 開放客戶端不是 lunatalk.ai：它沒有主站的分析帳號、也不該把自己宣告成主站的
+// 開放客戶端不是 harperharbor.com：它沒有主站的分析帳號、也不該把自己宣告成主站的
 // 正規網址（那會讓搜尋引擎把 playground 的頁面歸給主站）。
 describe('開放客戶端：入口網頁不帶主站的分析與網址宣告', () => {
   const html = readFileSync(resolve(__dirname, '../../../../index.html'), 'utf8')

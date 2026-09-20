@@ -28,11 +28,11 @@ function getMarkdownIt() {
   return _md;
 }
 
-// 偵測重 HTML：包含 block-level / 文件結構 / 媒體 / LunaTalk 自訂元件的 tag
+// 偵測重 HTML：包含 block-level / 文件結構 / 媒體 / HarperHarbor 自訂元件的 tag
 // 這類內容應走純 HTML 路徑，避免 MD parser 誤處理
 const HEAVY_HTML_TAGS = /<\s*(div|section|article|header|footer|nav|main|aside|h[1-6]|p|ul|ol|li|dl|dt|dd|table|thead|tbody|tr|td|th|form|fieldset|figure|hr|body|html|pre|blockquote|code|details|summary|audio|video|canvas|iframe)(\s|>|\/)/i;
 
-// LunaTalk 自訂 Web Components（hc-btn / hc-collapse / hc-form / hc-radio 等）
+// HarperHarbor 自訂 Web Components（hc-btn / hc-collapse / hc-form / hc-radio 等）
 // 這類元件靠作者 HTML 組合邏輯，絕對不能被 MD 誤處理
 const CUSTOM_HC_TAGS = /<\s*hc-[a-z]/i;
 
@@ -138,12 +138,12 @@ function renderTaskLists(html) {
 }
 
 /**
- * 連結白名單：只允許跳轉至 lunatalk.pro / lunatalk.ai 及其子網域。
+ * 連結白名單：只允許跳轉至 harperharbor.com / hearthroom.club 及其子網域。
  * 非白名單連結 → 保留文字但移除 href，加 title 提示已阻擋。
  * 內部錨點 (#xxx) / 相對路徑 (/xxx) 一律允許。
  * 只處理 <a href>，圖片/影片/iframe 的 src 完全不碰。
  */
-const LINK_ALLOW_HOST = /^(https?:)?\/\/([a-z0-9-]+\.)*(lunatalk\.pro|lunatalk\.ai)(\/|$|\?|#|:)/i;
+const LINK_ALLOW_HOST = /^(https?:)?\/\/([a-z0-9-]+\.)*(harperharbor\.com|hearthroom\.club)(\/|$|\?|#|:)/i;
 
 function sanitizeLinks(html) {
   if (!html) return html;
