@@ -3,7 +3,11 @@ main = "worker/index.js"
 compatibility_date = "2026-09-10"
 workers_dev = false
 preview_urls = false
-routes = [{ pattern = "playground.hearthroom.club", custom_domain = true }]
+# The explicit zone route takes precedence over the community sandbox wildcard.
+routes = [
+  { pattern = "playground.hearthroom.club", custom_domain = true },
+  { pattern = "playground.hearthroom.club/*", zone_name = "hearthroom.club" }
+]
 
 [assets]
 directory = "dist/build/h5"
