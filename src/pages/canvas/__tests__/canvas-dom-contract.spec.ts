@@ -6,7 +6,7 @@
  * 所以逐個區塊掛起來，用 querySelector 問。
  */
 import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -28,6 +28,7 @@ import CanvasDirectives from '../components/canvas-directives.vue'
 import CanvasNotepad from '../components/canvas-notepad.vue'
 import CanvasContextBreakdown from '../components/canvas-context-breakdown.vue'
 import CanvasMemory from '../components/canvas-memory.vue'
+import CanvasResponseSettings from '../components/canvas-response-settings.vue'
 import { normalizeServerReport } from '../canvas-context-breakdown'
 import catalog from './fixtures/model-catalog.json'
 
@@ -76,6 +77,13 @@ const CONTEXT_BREAKDOWN_LABELS = {
 
 function mountRegion(region: string) {
   switch (region) {
+    case 'response-settings':
+      return mount(CanvasResponseSettings, { props: {
+        conversationId: 'fixture', t: (key: string) => key, confirm: async () => true,
+        save: async () => ({}), load: async () => ({ conversationId: 'fixture', scope: 'conversation', schemaVersion: 1, revision: 0,
+          overrides: { style: 'custom', customStyle: 'Natural prose' },
+          effective: { agency: 'protect', style: 'custom', perspective: 'card', length: 'auto', pace: 'natural' } }),
+      } })
     case 'header':
       return mount(CanvasHeader, {
         props: { roleName: '示範角色', avatar: '', modelName: 'Luna' },
@@ -200,8 +208,9 @@ describe('畫布契約：每一條宿主選擇器都查得到', () => {
   for (const region of regions) {
     describe(`區塊 ${region}`, () => {
       for (const entry of selectorsForRegion(region)) {
-        it(`${entry.selector}（${entry.origin}）`, () => {
+        it(`${entry.selector}（${entry.origin}）`, async () => {
           const wrapper = mountRegion(region)
+          await flushPromises()
           const el = wrapper.element as HTMLElement
           // 掛載根自己也可能就是那個節點，所以兩邊都問。
           const hit = el.matches?.(entry.selector) || !!el.querySelector(entry.selector)

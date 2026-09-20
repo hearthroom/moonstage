@@ -216,7 +216,7 @@
 
     <CanvasPopup v-if="responseSettingsSupported && panel.sheet === 'response-settings'" :open="true"
       :title="t('responseSettings.title')" :close-label="t('main.cancel')" @close="closeCanvasSheet">
-      <CanvasResponseSettings :key="String(conversationId)" ref="responseSettingsPanel" :conversation-id="String(conversationId)"
+      <CanvasResponseSettings :key="String(conversationId)" ref="responseSettingsPanel" :conversation-id="String(conversationId)" @close="closeCanvasSheet"
         :load="loadResponseSettings" :save="saveResponseSettings" :t="t" :confirm="confirmResponseDiscard" />
     </CanvasPopup>
 

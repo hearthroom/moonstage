@@ -31,6 +31,8 @@ export type CanvasRegion =
   | 'popup'
   /** 模型設定 */
   | 'model-panel'
+  /** 回覆偏好（MMD ConvStyleSetting） */
+  | 'response-settings'
   /** 一次性確認 */
   | 'confirm'
   /** 一疊選項（更換背景） */
@@ -273,6 +275,18 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   // 它裝的是「輸出 Token 上限」）在我們這裡沒有對應的東西：上下文檔位與思考深度
   // 住在搬進來的那份選單裡，用它自己的節點名。沒有渲染的名字不進契約——
   // 這份表是「作者打得到的名字」，不是「我們想過的名字」。
+
+  // ── 回覆偏好：MMD 公開 ConvStyleSetting 組件的美化掛點 ───────────────
+  { selector: '.conv-style-modal[data-host="style"]', region: 'response-settings', origin: 'mmd', why: '卡片的對話設定面板底色與字色' },
+  { selector: '[data-lt="response-settings"]', region: 'response-settings', origin: 'lt', why: '我方穩定鉤子' },
+  { selector: '.cs-modal-header .cs-header-left', region: 'response-settings', origin: 'mmd', why: '關閉面板' },
+  { selector: '.cs-modal-header .cs-header-center .cs-header-title', region: 'response-settings', origin: 'mmd', why: '面板標題' },
+  { selector: '.cs-modal-header .cs-header-right .confirm-btn', region: 'response-settings', origin: 'mmd', why: '儲存鍵' },
+  { selector: '.cs-modal-content .outer-scroll-view, .cs-modal-content.outer-scroll-view', region: 'response-settings', origin: 'mmd', why: '設定捲動區' },
+  { selector: '.cs-group-card .section.behavior-section .cs-section-header .cs-title-row .cs-section-title', region: 'response-settings', origin: 'mmd', why: '各設定軸的標題' },
+  { selector: '.cs-group-card .cs-section-subtitle', region: 'response-settings', origin: 'mmd', why: '設定軸說明' },
+  { selector: '.cs-collapsible.is-open .cs-content-inner .cs-style-section .style-scroll-view .cs-style-grid .cs-style-item.active .style-label', region: 'response-settings', origin: 'mmd', why: '選項與選中狀態沿用卡片美化' },
+  { selector: '.cs-custom-input .cs-custom-textarea', region: 'response-settings', origin: 'mmd', why: '自訂文風輸入區' },
 
   // ── 用戶人設 ────────────────────────────────────────────────────────
   { selector: '.role-setting', region: 'persona', origin: 'mmd', why: '卡片寫 .role-setting .card.textarea-wrapper .textarea-dark' },
