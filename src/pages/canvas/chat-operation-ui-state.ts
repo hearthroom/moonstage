@@ -174,7 +174,11 @@ export function classifyBackwardOperationResponse(
   }
   if (statusCode === 200) return 'success'
   if (statusCode === 202) return 'pending'
-  if (statusCode === 409) return 'terminal_failure'
+  // Rejected requests cannot succeed by replaying the same payload.
+  // Timeouts and rate limits remain transient; pending/fallback codes above win.
+  if (statusCode >= 400 && statusCode < 500 && statusCode !== 408 && statusCode !== 429) {
+    return 'terminal_failure'
+  }
   return 'retry'
 }
 
