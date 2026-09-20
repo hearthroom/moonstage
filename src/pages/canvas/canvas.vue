@@ -4562,7 +4562,8 @@ function schedulePendingBackwardOperation(entry: any, legacyFallbackUsed = false
   if (isChatOperationVisibleOutcomeExpired({
     localStartedAt: entry.createdAt,
     now: Date.now(),
-    agentTurn: resolveAgentTurnForOwnership(),
+    // 回溯不執行模型生成；深入準備的等待豁免不適用。
+    agentTurn: false,
   })) {
     failPendingBackwardOperation(entry, 'chat.rollbackTimedOut');
     return false;
