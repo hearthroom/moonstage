@@ -5,7 +5,7 @@
 # node_modules 內的動態 import chunk 會得到 `..-node_modules-*` 檔名；Rollup 見
 # specifier 以 `.` 開頭不再補 `./` → 瀏覽器當裸模組標識符拒絕解析（線上事故：
 # Monaco CSS 語言包 / html2canvas 動態載入全數失敗，2026-07-23）。
-# vite.config.js 的 lunatalk:sanitize-chunk-file-names 插件是修復；本 gate 防回歸
+# vite.config.js 的 moonstage:sanitize-chunk-file-names 插件是修復；本 gate 防回歸
 #（例如 uni 升級改了命名邏輯、或插件被誤刪）。
 #
 # 用法： ./scripts/check-build-output.sh [assets_dir]
@@ -26,7 +26,7 @@ if [ "$bad_names" -ne 0 ] || [ "$bad_imports" -ne 0 ]; then
   echo "✖ 構建產物檢查失敗：以 . 開頭的 chunk $bad_names 個；含裸 ..- import specifier 的檔案 $bad_imports 個。"
   echo "  瀏覽器會把不以 ./ / ../ / / 開頭的 specifier 當裸模組標識符拒絕解析，"
   echo "  該 chunk 的動態載入在線上必定失敗（Monaco/html2canvas 事故同類）。"
-  echo "  修法：確認 vite.config.js 的 lunatalk:sanitize-chunk-file-names 插件仍在生效。"
+  echo "  修法：確認 vite.config.js 的 moonstage:sanitize-chunk-file-names 插件仍在生效。"
   find "$ASSETS_DIR" -maxdepth 1 -name '.*' -type f | head -5
   grep -rlE "import\\((\"|')\\.\\.-" "$ASSETS_DIR" 2>/dev/null | head -5
   exit 1

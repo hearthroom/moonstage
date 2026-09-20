@@ -187,7 +187,7 @@ import { describeTrialFailure } from '@/common/trial-errors'
 import type { TrialProblem } from '@/common/trial-errors'
 import { getAuthorDraftStore } from '@/common/author-draft-store'
 
-const SOURCE_URL = 'https://github.com/lunatalkai/moonstage'
+const SOURCE_URL = 'https://github.com/hearthroom/moonstage'
 // 窄於這個寬度視為手機：正則檔那一段預設收起，動作列固定在底部（CSS 同一個斷點）。
 const NARROW_MAX_PX = 900
 

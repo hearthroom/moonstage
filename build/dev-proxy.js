@@ -11,7 +11,7 @@
  */
 
 export const DEV_PROXY_DEFAULTS = {
-  '/api': 'https://api.lunatalk.ai',
+  '/api': 'https://api.harperharbor.com',
 }
 
 export const DEV_PROXY_ENV_MAP = {

@@ -6,7 +6,7 @@ FSL-1.1-ALv2
 
 ## Notice
 
-Copyright 2026 LunaTalk AI
+Copyright 2026 Hearthroom
 
 ## Terms and Conditions
 

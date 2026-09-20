@@ -18,7 +18,7 @@ describe('default Desktop H5 API proxy', () => {
     // 這樣本機驗收看到的才是線上行為。
     const proxy = buildDevProxy({})
 
-    expect(proxy['/api'].target).toBe('https://api.lunatalk.ai')
+    expect(proxy['/api'].target).toBe('https://api.harperharbor.com')
   })
 
   it('points both HTTP and WebSocket at the local server in dev:h5:local', () => {

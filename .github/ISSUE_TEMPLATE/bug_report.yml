@@ -23,8 +23,8 @@ body:
     id: where
     attributes:
       label: Where
-      description: The site you were on (e.g. playground.lunatalk.ai) or "local build", plus the commit if you know it.
-      placeholder: playground.lunatalk.ai
+      description: The site you were on (e.g. playground.hearthroom.club) or "local build", plus the commit if you know it.
+      placeholder: playground.hearthroom.club
     validations:
       required: true
   - type: input

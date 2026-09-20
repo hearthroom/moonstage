@@ -49,6 +49,6 @@ body:
     id: where
     attributes:
       label: Where you saw it
-      placeholder: playground.lunatalk.ai, Chrome 152 on macOS
+      placeholder: playground.hearthroom.club, Chrome 152 on macOS
     validations:
       required: true

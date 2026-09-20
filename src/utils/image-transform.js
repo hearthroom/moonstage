@@ -20,9 +20,11 @@
  * // => 'https://images.example.com/cdn-cgi/image/width=100,quality=85/xxx.png'
  */
 // 開著 Image Resizing 的網域：只有我們自己的。
-const RESIZING_ZONE = 'lunatalk.ai'
+// Opt in only after the hosting zone has Image Resizing enabled.
 
 function supportsCloudflareResizing(hostname) {
+	const RESIZING_ZONE = (import.meta.env.VITE_IMAGE_RESIZING_ZONE || '').trim().toLowerCase()
+	if (!RESIZING_ZONE) return false
 	const host = String(hostname || '').toLowerCase()
 	return host === RESIZING_ZONE || host.endsWith('.' + RESIZING_ZONE)
 }

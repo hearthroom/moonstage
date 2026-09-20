@@ -6,7 +6,7 @@
 
 import { useStageHost } from '@/host/stage-host'
 
-const STORAGE_KEY_PREFIX = 'lunatalkShowThinkingProcess_'
+const STORAGE_KEY_PREFIX = 'moonstageShowThinkingProcess_'
 
 function storageKey(roleId: string): string {
   return STORAGE_KEY_PREFIX + roleId

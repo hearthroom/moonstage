@@ -10,7 +10,7 @@ import { buildDevProxy } from './build/dev-proxy.js'
 // 包裹它的函数，把文件名开头的 `.`/`-` 清洗掉。
 function sanitizeChunkFileNames() {
   return {
-    name: 'lunatalk:sanitize-chunk-file-names',
+    name: 'moonstage:sanitize-chunk-file-names',
     enforce: 'post',
     outputOptions(options) {
       const orig = options.chunkFileNames

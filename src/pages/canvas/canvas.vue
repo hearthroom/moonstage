@@ -876,7 +876,7 @@ const compactWatchdogTimer = ref(null);
 function compactWatchdogMs() {
   let override;
   try {
-    override = window.localStorage.getItem('lunatalk.compactWatchdogMs');
+    override = window.localStorage.getItem('moonstage.compactWatchdogMs');
   } catch (e) {
     override = null; // 隱私模式 / 存取被擋：照預設走，不讓它變成錯誤
   }

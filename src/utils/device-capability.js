@@ -1,4 +1,4 @@
-// LunaTalk · 裝置能力探測（低端降級用）
+// HarperHarbor · 裝置能力探測（低端降級用）
 //
 // desktop H5 沒有 APP-PLUS 那條原生降級路徑：低階集顯 / 少核 CPU / 小記憶體的機器，
 // 跑滿配的 ambient 動態背景（多層旋轉 conic + blur(55px)）與常駐 backdrop-filter 會嚴重掉幀。

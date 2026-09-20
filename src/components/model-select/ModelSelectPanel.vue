@@ -1341,7 +1341,7 @@ const truncationText = (completionRate: number) => {
 	 * `name.toLowerCase is not a function`，整份列表渲染成空白（實測踩過）。
 	 *
 	 * 同時處理兩件 v3 的事：
-	 *  - 免費模型掛 LunaTalk 自己的標記。它刻意不揭露承接它的那一家，所以
+	 *  - 免費模型掛 HarperHarbor 自己的標記。它刻意不揭露承接它的那一家，所以
 	 *    **不該掛任何供應商 logo**——這不是退路，是它自己的識別。
 	 *  - 認不出品牌時回空字串，讓模板走 monogram，而不是既有的 default.svg。
 	 *    那張圖是一次性插畫，八個未知模型會長得一模一樣；monogram 由名稱決定

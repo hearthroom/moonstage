@@ -19,7 +19,7 @@ const FORBIDDEN = [
   'refreshToken',
   'Authorization',
   '/open/v1',
-  'lunatalk.ai',
+  'harperharbor.com',
   'localStorage.getItem("hearthroom',
   'XMLHttpRequest',
   'fetch(',

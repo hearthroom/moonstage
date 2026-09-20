@@ -52,9 +52,9 @@ class FIRSTUI_INNER {
 							uni.hideLoading()
 							this.loading = false
 						}
-						// LunaTalk patch: expose request URL for response interceptor use
+						// HarperHarbor patch: expose request URL for response interceptor use
 						res._requestUrl = options.url
-						// LunaTalk patch: 讓回應攔截器能在 401 換完 token 後原樣重送這一筆。
+						// HarperHarbor patch: 讓回應攔截器能在 401 換完 token 後原樣重送這一筆。
 						res._requestConfig = config
 						resolve(params.brief ? res.data : res)
 					},

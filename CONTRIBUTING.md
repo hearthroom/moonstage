@@ -1,6 +1,6 @@
 # Contributing to Moonstage
 
-Thanks for helping. Moonstage is the stage where LunaTalk character cards are played, and
+Thanks for helping. Moonstage is the stage where HarperHarbor character cards are played, and
 most of what makes it better comes from people who play and author cards. This page tells
 you how to report a problem, ask for something, and send a change.
 

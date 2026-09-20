@@ -159,7 +159,7 @@ describe('japanese/korean localization checks · desktop', () => {
 
     it('品牌名/技術符號不得誤報', () => {
       const r = checkScriptResidue(
-        { 'a.a': 'LunaTalk', 'a.b': 'VIP', 'a.c': 'HTML', 'a.d': 'Tokens' },
+        { 'a.a': 'HarperHarbor', 'a.b': 'VIP', 'a.c': 'HTML', 'a.d': 'Tokens' },
         'ja',
         { allowlistKeys: new Set() }
       )

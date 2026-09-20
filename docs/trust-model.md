@@ -42,10 +42,10 @@ Concretely, this client:
   the same origin and can read it. If you are going to open cards you did not write,
   host this client on an origin you are willing to treat as disposable, and sign out
   when you are done.
-- **That token carries the `mcp:card-writer` scope**, the same scope the card-writing
-  tools use. A script that reads it can not only chat as you but also edit the cards you
-  own. There is no narrower play-only scope yet; until there is, the advice above is the
-  mitigation, not a formality.
+- **The playground requests `profile.read role.read role.write chat.play`.** These
+  permissions include private agent configurations and Lorebooks, editing your assets,
+  and conversations that can spend credits. A script with access to that token can use
+  those same permissions. Embedded hosts control their own authorization scopes.
 
 ### Reporting
 
@@ -97,9 +97,9 @@ Reports that are in scope:
 - **你的存取權杖存在這個來源的 `localStorage` 裡。** 卡片的腳本跑在同一個來源上，讀
   得到它。如果你打算打開別人寫的卡，請把這個客戶端架在一個你願意當成拋棄式的來源上，
   玩完就登出。
-- **這個權杖帶的是 `mcp:card-writer` 範圍**，跟寫卡工具用的是同一個。讀到它的腳本不只
-  能用你的身分聊天，還能改你名下的卡。目前還沒有只給遊玩用的更窄範圍；在那之前，上面
-  那條建議是真正的防線，不是形式。
+- **Playground 申請 `profile.read role.read role.write chat.play`。** 權限包含讀取私有
+  智慧體設定與 Lorebook、修改你的資產，以及可能消耗 credits 的對話。讀到權杖的腳本
+  具有相同權限；嵌入站台則自行管理授權範圍。
 
 ### 回報
 

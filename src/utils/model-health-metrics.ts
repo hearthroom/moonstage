@@ -307,7 +307,7 @@ export interface AaAgenticLike {
 }
 
 // Agent 分數：模型在多步、要用工具的任務上的表現。跟綜合智力分開下發，因為兩者
-// 常常不一致——一個模型可以很會寫、卻不會自己把一串準備工作跑完，而 LunaTalk 的
+// 常常不一致——一個模型可以很會寫、卻不會自己把一串準備工作跑完，而 HarperHarbor 的
 // Agent 模式吃的是後者。伺服器沒有值時整項不下發，這裡回 null 讓畫面直接不顯示；
 // 回 0 的話畫面會顯示「Agent 0 分」，那是在說這個模型很差，而不是在說我們沒資料。
 export const getAaAgenticIndex = (

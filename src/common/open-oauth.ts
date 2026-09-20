@@ -6,24 +6,24 @@
  *
  * 三步：
  *   1. 動態註冊（每個來源一次，client_id 存本機）
- *   2. 導向 /oauth/authorize，使用者在 LunaTalk 登入並同意後帶 code 回來
+ *   2. 導向 /oauth/authorize，使用者在 HarperHarbor 登入並同意後帶 code 回來
  *   3. 用 code + code_verifier 換 access token / refresh token
  *
- * `resource` 永遠是開放 API 的正式識別字串，跟你實際連哪個環境無關——伺服器用它
+ * `resource` 使用目前 API origin 的開放 API 識別字串——伺服器用它
  * 判斷這張 token 能不能用在開放 API 上，不是用它決定往哪裡送請求。
  */
 
 import { API_BASE, API_ORIGIN } from '@/config/env'
 
-export const OPEN_API_RESOURCE = 'https://api.lunatalk.ai/open/v1'
-export const OPEN_API_SCOPE = 'mcp:card-writer'
+export const OPEN_API_RESOURCE = `${API_ORIGIN}/open/v1`
+export const OPEN_API_SCOPE = 'profile.read role.read role.write chat.play'
 export const OAUTH_CLIENT_NAME = 'Moonstage'
 export const OAUTH_CALLBACK_ROUTE = '/pages/oauth/callback'
 export const LOGIN_ROUTE = '/pages/login/login'
 
-const CLIENT_ID_KEY = 'lt.openchat.oauth.clientId'
-const TOKENS_KEY = 'lt.openchat.oauth.tokens'
-const FLOW_KEY = 'lt.openchat.oauth.flow'
+const CLIENT_ID_KEY = `moonstage.oauth.${API_ORIGIN}.${OPEN_API_SCOPE}.clientId`
+const TOKENS_KEY = `moonstage.oauth.${API_ORIGIN}.tokens`
+const FLOW_KEY = `moonstage.oauth.${API_ORIGIN}.flow`
 
 /** access token 剩不到這麼多秒就先換一張，免得請求送出途中剛好過期。 */
 const REFRESH_SKEW_SECONDS = 60
@@ -148,6 +148,8 @@ export async function ensureClientId(): Promise<string> {
 
   const res = await rawRequest('/oauth/register', 'POST', {
     client_name: OAUTH_CLIENT_NAME,
+    scope: OPEN_API_SCOPE,
+    token_endpoint_auth_method: 'none',
     redirect_uris: [getRedirectUri()],
     grant_types: ['authorization_code', 'refresh_token'],
   })

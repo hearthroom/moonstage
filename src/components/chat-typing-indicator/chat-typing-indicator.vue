@@ -53,8 +53,8 @@ withDefaults(defineProps<{
 .typing-dot {
   width: 5px;
   height: 5px;
-  border-radius: var(--luna-r-pill, 9999px);
-  background: var(--lt-canvas-accent, var(--luna-gold, #F5C542));
+  border-radius: var(--stage-r-pill, 9999px);
+  background: var(--lt-canvas-accent, var(--stage-gold, #F5C542));
   opacity: 0.38;
   animation: typing-dot-lift 500ms var(--ease-in-out, cubic-bezier(0.4, 0, 0.2, 1)) infinite alternate;
 }

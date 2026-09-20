@@ -2,7 +2,7 @@
  *
  * uni-app H5 把 uni.showModal 渲染成一組固定 DOM（uni-h5 內建樣式）：
  *   UNI-MODAL > .uni-mask + .uni-modal > (__hd | __bd | __ft > .uni-modal__btn)
- * 內建預設是 iOS 白底彈窗（#fff / radius 3px / 遮罩 alpha 0），壓在 LunaTalk
+ * 內建預設是 iOS 白底彈窗（#fff / radius 3px / 遮罩 alpha 0），壓在 HarperHarbor
  * 暗色玻璃介面上非常突兀，且 .uni-mask 完全透明使彈窗與背景沒有層次。
  *
  * 全站 180+ 處 uni.showModal 呼叫共用這組 DOM，因此覆蓋樣式放全域一處即可，

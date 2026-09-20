@@ -14,50 +14,50 @@ const scan = (text, file = 'src/utils/foo.js') => scanSource(file, text)
 
 describe('scanSource：該抓的', () => {
   it('抓到寫死的 API 位址', () => {
-    expect(scan(`const host = "https://api.lunatalk.ai";`)).toHaveLength(1)
+    expect(scan(`const host = "https://api.harperharbor.com";`)).toHaveLength(1)
   })
 
   // 初版掃描只寫 https?://，漏掉 wss://，而 mobile 的 share-chat.vue
   // WebSocket 寫死測試環境正是這樣躲過檢查的。
   it('抓到寫死的 WebSocket 位址', () => {
-    expect(scan(`url: "wss://api.lunatalk.ai/x"`)).toHaveLength(1)
+    expect(scan(`url: "wss://api.harperharbor.com/x"`)).toHaveLength(1)
   })
 
   it('抓到藏在 replace 呼叫裡的位址', () => {
-    expect(scan(`url.replace(/localhost:9000/g, 'https://api.lunatalk.ai')`)).toHaveLength(1)
+    expect(scan(`url.replace(/localhost:9000/g, 'https://api.harperharbor.com')`)).toHaveLength(1)
   })
 })
 
 describe('scanSource：不該抓的', () => {
   it('放行註解裡的範例位址', () => {
     expect(scan(`// 例如: https://api.example.com/x`)).toHaveLength(0)
-    expect(scan(` * @returns https://api.lunatalk.ai`)).toHaveLength(0)
+    expect(scan(` * @returns https://api.harperharbor.com`)).toHaveLength(0)
   })
 
   // 這三類不隨環境變化，理由見 src/config/env.js 的 SITE_ORIGIN 註解。
   it('放行 objects / downloads / 站台主網域', () => {
     expect(scan(`url.replace('objects.example.com', 'objects.example.org')`)).toHaveLength(0)
-    expect(scan(`src="https://downloads.lunatalk.ai/a.png"`)).toHaveLength(0)
-    expect(scan(`item: 'https://lunatalk.ai/pages/square/main'`)).toHaveLength(0)
+    expect(scan(`src="https://downloads.harperharbor.com/a.png"`)).toHaveLength(0)
+    expect(scan(`item: 'https://harperharbor.com/pages/square/main'`)).toHaveLength(0)
   })
 
   it('放行設定檔與允許清單內的檔案', () => {
-    expect(scanSource('src/config/env.js', `const A = "https://api.lunatalk.ai"`)).toHaveLength(0)
+    expect(scanSource('src/config/env.js', `const A = "https://api.harperharbor.com"`)).toHaveLength(0)
     expect(scanSource('build/dev-proxy.js', `target: 'https://api.example.com'`)).toHaveLength(0)
-    expect(scanSource('src/config/env.js', `const O = 'https://api.lunatalk.ai'`)).toHaveLength(0)
+    expect(scanSource('src/config/env.js', `const O = 'https://api.harperharbor.com'`)).toHaveLength(0)
   })
 
   it('放行 locale 與測試檔', () => {
-    expect(scanSource('src/locale/en.json', `"x": "https://api.lunatalk.ai"`)).toHaveLength(0)
+    expect(scanSource('src/locale/en.json', `"x": "https://api.harperharbor.com"`)).toHaveLength(0)
     expect(scanSource('src/foo.spec.js', `expect(u).toBe('https://api.example.com')`)).toHaveLength(0)
   })
 })
 
 describe('回報內容', () => {
   it('指出行號與命中的位址', () => {
-    const [hit] = scan(`line1\nconst h = "https://api.lunatalk.ai";`)
+    const [hit] = scan(`line1\nconst h = "https://api.harperharbor.com";`)
     expect(hit.line).toBe(2)
-    expect(hit.match).toContain('api.lunatalk.ai')
+    expect(hit.match).toContain('api.harperharbor.com')
   })
 })
 

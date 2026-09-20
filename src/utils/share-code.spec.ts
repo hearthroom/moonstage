@@ -15,7 +15,7 @@ describe('normalizeShareCodeInput', () => {
       `  ${canonical}  `,
       'LTNBA7K29QRMT',
       'LT NB A7K29QRMT',
-      'https://lunatalk.ai/s/NB-A7K29QRMT',
+      'https://harperharbor.com/s/NB-A7K29QRMT',
     ]) {
       expect(normalizeShareCodeInput(variant)).toBe(canonical);
     }
