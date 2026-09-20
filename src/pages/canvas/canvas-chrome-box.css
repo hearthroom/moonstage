@@ -7,7 +7,7 @@
 .conv-style-modal p {
     margin: 0
 }
-.conv-style-modal .cs-modal-content {
+.conv-style-modal .outer-scroll-view {
     padding: 2px
 }
 .conv-style-modal fieldset {

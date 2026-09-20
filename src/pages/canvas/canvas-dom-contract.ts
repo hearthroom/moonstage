@@ -282,7 +282,7 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '.cs-modal-header .cs-header-left', region: 'response-settings', origin: 'mmd', why: '關閉面板' },
   { selector: '.cs-modal-header .cs-header-center .cs-header-title', region: 'response-settings', origin: 'mmd', why: '面板標題' },
   { selector: '.cs-modal-header .cs-header-right .confirm-btn', region: 'response-settings', origin: 'mmd', why: '儲存鍵' },
-  { selector: '.cs-modal-content .outer-scroll-view, .cs-modal-content.outer-scroll-view', region: 'response-settings', origin: 'mmd', why: '設定捲動區' },
+  { selector: '.cs-modal-content > .outer-scroll-view', region: 'response-settings', origin: 'mmd', why: '設定捲動區' },
   { selector: '.cs-group-card .section.behavior-section .cs-section-header .cs-title-row .cs-section-title', region: 'response-settings', origin: 'mmd', why: '各設定軸的標題' },
   { selector: '.cs-group-card .cs-section-subtitle', region: 'response-settings', origin: 'mmd', why: '設定軸說明' },
   { selector: '.cs-collapsible.is-open .cs-content-inner .cs-style-section .style-scroll-view .cs-style-grid .cs-style-item.active .style-label', region: 'response-settings', origin: 'mmd', why: '選項與選中狀態沿用卡片美化' },
