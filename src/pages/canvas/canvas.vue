@@ -214,6 +214,12 @@
       />
     </CanvasPopup>
 
+    <CanvasPopup v-if="responseSettingsSupported && panel.sheet === 'response-settings'" :open="true"
+      :title="t('responseSettings.title')" :close-label="t('main.cancel')" @close="closeCanvasSheet">
+      <CanvasResponseSettings :key="String(conversationId)" ref="responseSettingsPanel" :conversation-id="String(conversationId)"
+        :load="loadResponseSettings" :save="saveResponseSettings" :t="t" :confirm="confirmResponseDiscard" />
+    </CanvasPopup>
+
     <CanvasPopup :open="panel.sheet === 'directives'" v-if="!sandboxCard" :title="t('directive.title')"
                  :close-label="t('main.cancel')" @close="closeCanvasSheet">
       <CanvasDirectives
@@ -454,6 +460,7 @@ import CanvasModify from './components/canvas-modify.vue'
 import CanvasConversationList from './components/canvas-conversation-list.vue'
 import CanvasPersona from './components/canvas-persona.vue'
 import CanvasDirectives from './components/canvas-directives.vue'
+import CanvasResponseSettings from './components/canvas-response-settings.vue'
 import ChatSystemMessage from '@/components/chat-system-message/chat-system-message.vue'
 import CanvasNotepad from './components/canvas-notepad.vue'
 import CanvasContextBreakdown from './components/canvas-context-breakdown.vue'
@@ -1412,6 +1419,7 @@ onMounted(() => {
   // #ifdef H5
   keyboardHandler = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
+    if (panel.value.sheet === 'response-settings') return;
     // 蓋在畫面上的東西先關：功能面板、彈層。ESC 在有東西蓋著的時候按下去，
     // 玩家要的是把它關掉，不是停掉正在生成的回覆。
     const next = onEscape(panel.value);
@@ -4818,6 +4826,7 @@ function chatStart(greetingIndex?: number) {
       : { roleId: unref(roleId), greetingIndex },
   }).then(res => {
     if (res.statusCode == 200) {
+      responseSettingsVersion.value = res.data.responseSettingsVersion === 1 ? 1 : 0;
       pic.value = res.data.roleInfo.roleAvatar;
       historyConversation.value = res.data.historyConversation;
       conversationId.value = res.data.conversationId;
@@ -6153,6 +6162,7 @@ function getHistoryMsg() {
         clearStreamState();
         closeWebSocket();
       }
+      responseSettingsVersion.value = res.data.responseSettingsVersion === 1 ? 1 : 0;
       const operationProjectionUnavailable = (
         res.data.schemaVersion === 'outcome_v1'
         && res.data.operationStatusAvailable === false
@@ -8950,6 +8960,21 @@ const shortcutItems = computed(() => previewOnly.value ? [] : [
 // 自訂指令、用戶人設、設定補充、劇情總結、遊玩教程都不在 v1 裡，
 // 放一顆按下去沒反應的鍵比沒有那顆鍵更糟。
 const panel = ref<CanvasPanelState>(createPanelState())
+const responseSettingsVersion = ref(0)
+const responseSettingsSupported = computed(() => responseSettingsVersion.value === 1 && Boolean(conversationId.value) && !previewOnly.value)
+const responseSettingsPanel = ref<InstanceType<typeof CanvasResponseSettings> | null>(null)
+const confirmResponseDiscard = (content: string) => stageHost.ui.confirm({ content, confirmText: t('responseSettings.discardButton'), cancelText: t('responseSettings.keepEditing') })
+async function loadResponseSettings(id: string) {
+  const res = await _this.http.get('/open/v1/conversation/response-settings', { data: { conversationId: id }, showLoading: false })
+  if (res.statusCode !== 200) throw { status: res.statusCode }
+  return res.data
+}
+async function saveResponseSettings(id: string, revision: number, patch: Record<string, string | null>) {
+  const res = await _this.http.post('/open/v1/conversation/response-settings/save', { data: { conversationId: id, expectedRevision: revision, patch }, showLoading: false })
+  if (res.statusCode !== 200) throw { status: res.statusCode }
+  return res.data
+}
+watch(conversationId, () => { if (panel.value.sheet === 'response-settings') panel.value = closeSheet(panel.value) })
 watch(assistContext, key => { assistSession.context(key); if(panel.value.sheet === 'assist') closeCanvasSheet() }, {flush:'sync'})
 watch(() => panel.value.sheet, (sheet, previous) => { if(previous==='assist' && sheet!=='assist') assistSession.close() })
 
@@ -8961,6 +8986,7 @@ const moreItems = computed(() => previewOnly.value ? [
   { key: 'persona', label: t('canvas.panel.persona') },
   { key: 'directives', label: t('directive.entry') },
   { key: 'notepad', label: t('notepad.entry') },
+  ...(responseSettingsSupported.value ? [{ key: 'response-settings', label: t('responseSettings.title') }] : []),
   // AI 自己每輪記下的記錄（owner 2026-09-05：「AI 自己記的記錄，我們都看不到」）。
   // 身分跟 mobile 同一條判準：Agent 開著是「AI 記事本」，沒開是「永久記憶」。
   { key: 'memory', label: deepPrepOn.value ? t('chat.aiNotebookEntry') : t('chat.permanentMemory') },
@@ -8975,7 +9001,8 @@ const moreItems = computed(() => previewOnly.value ? [
   { key: 'bottom', label: t('canvas.shortcut.toBottom') },
 ].filter(item => allowsStagePanel(stageHost.capabilities, item.key)))
 
-function closeCanvasSheet() {
+async function closeCanvasSheet() {
+  if (panel.value.sheet === 'response-settings' && responseSettingsPanel.value && !await responseSettingsPanel.value.mayClose()) return
   panel.value = closeSheet(panel.value)
 }
 
@@ -8984,7 +9011,8 @@ function onPanelPick(key: string) {
   onShortcut(key)
 }
 
-function onShortcut(key: string) {
+async function onShortcut(key: string) {
+  if (panel.value.sheet === 'response-settings' && responseSettingsPanel.value && !await responseSettingsPanel.value.mayClose()) return
   if (!allowsStagePanel(stageHost.capabilities, key)) return
   if (key === 'new-chat') {
     // 滿了就不問「要不要開新的」——先講清楚為什麼開不了、給一條去刪的路。
@@ -9005,6 +9033,7 @@ function onShortcut(key: string) {
   if (key === 'conversations') { openConversationList(); return }
   if (key === 'persona') { openPersonaSheet(); return }
   if (key === 'directives') { openDirectivesSheet(); return }
+  if (key === 'response-settings') { if (responseSettingsSupported.value) panel.value = openSheet(panel.value, 'response-settings'); return }
   if (key === 'notepad') { openNotepadSheet(); return }
   if (key === 'memory') { openMemorySheet(); return }
   if (key === 'background') { panel.value = openSheet(panel.value, 'background'); return }

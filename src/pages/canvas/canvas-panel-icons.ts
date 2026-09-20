@@ -11,6 +11,7 @@ const STROKE = 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-line
 const ICONS: Record<string, string> = {
   // 模型設定：滑桿
   model: '<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="9" cy="7" r="2.2"/><circle cx="15" cy="17" r="2.2"/>',
+  'response-settings': '<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>',
   // 用戶人設：人
   persona: '<circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>',
   // 長期指令：清單勾
