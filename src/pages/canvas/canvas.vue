@@ -2394,7 +2394,7 @@ function buildChromeState() {
 
 // ── 宿主層面板的皮膚同步 ─────────────────────────────────────────────
 //
-// 模型設定留在宿主這一層（它自己抓清單、牽到登入態）。要讓它跟其他面板一樣吃到作者的美化，
+// 模型設定與回覆偏好留在宿主這一層（自行讀寫登入態 API）。要讓它們跟其他面板一樣吃到作者的美化，
 // 面板開著的期間把「作者的樣式表」與「作者腳本在殼的 html／body 上記的狀態」套到宿主頁：只套樣式，
 // 一行作者腳本都不跑；面板關掉就撤掉、還原 html／body。作者樣式本來就能改整個舊頁，這裡沒有比舊頁更多的權限。
 const sandboxDocState = ref<{ html: { className: string; data: Record<string, string> }; body: { className: string; data: Record<string, string> } } | null>(null);
@@ -2454,7 +2454,7 @@ function removeSandboxSkin() {
 }
 
 // 宿主層還留著的面板：開著就套皮膚，關了就撤。
-watch(() => sandboxCard.value && panel.value.sheet === 'model', (on) => { if (on) applySandboxSkin(); else removeSandboxSkin(); });
+watch(() => sandboxCard.value && (panel.value.sheet === 'model' || panel.value.sheet === 'response-settings'), (on) => { if (on) applySandboxSkin(); else removeSandboxSkin(); });
 
 // 面板與訊息選單的呈現資料：跟模板上綁給各面板元件的是同一批值（模板那份在沙箱模式不畫）。
 // 只送開著那張面板的屬性；模型選擇留在宿主自己畫，殼看到 sheet='model' 什麼都不畫。
