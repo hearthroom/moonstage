@@ -2,6 +2,33 @@ import { expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import Panel from '../components/canvas-response-settings.vue'
 
+it('exposes the MMD response preference styling hooks and active option state', async () => {
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k,confirm:async()=>true}})
+ await flushPromises()
+ expect(wrapper.element.matches('.conv-style-modal[data-host="style"][data-lt="response-settings"]')).toBe(true)
+ expect(wrapper.find('.cs-modal-header .cs-header-title').exists()).toBe(true)
+ expect(wrapper.findAll('.cs-modal-content .cs-group-card .cs-section-title')).toHaveLength(5)
+ expect(wrapper.findAll('.cs-style-grid .cs-style-item.active')).toHaveLength(5)
+ await wrapper.get('[data-axis="agency"][data-value="coauthor"]').trigger('click')
+ expect(wrapper.get('[data-axis="agency"].active').attributes('data-value')).toBe('coauthor')
+ expect(wrapper.get('.cs-header-right .confirm-btn').attributes('data-action')).toBe('save')
+ await wrapper.get('[data-axis="style"][data-value="custom"]').trigger('click')
+ expect(wrapper.find('.cs-custom-input .cs-custom-textarea').exists()).toBe(true)
+ wrapper.unmount()
+})
+
+it('explains all three player-writing choices before the player selects one', async () => {
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k,confirm:async()=>true}})
+ await flushPromises()
+ expect(wrapper.text()).toContain('responseSettings.agencyHint')
+ for(const value of ['protect','assist','coauthor']) {
+  const option=wrapper.get(`[data-axis="agency"][data-value="${value}"]`)
+  expect(option.text()).toContain(`responseSettings.agencyHints.${value}`)
+  expect(wrapper.get('#'+option.attributes('aria-describedby')).text()).toContain(`responseSettings.agencyHints.${value}`)
+ }
+ wrapper.unmount()
+})
+
 const initial = () => ({conversationId:'c1',scope:'conversation',schemaVersion:1,revision:0,overrides:{},effective:{agency:'protect',style:'card',perspective:'card',length:'auto',pace:'natural'}})
 it('preserves independent axes, clears hidden custom text and uses server readback', async () => {
  const load=vi.fn().mockResolvedValue(initial())

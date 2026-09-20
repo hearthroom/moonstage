@@ -1,6 +1,37 @@
 /* 由 scripts/gen-canvas-chrome-box.mjs 從 canvas.css 產生，不要手改。
    殼的 margin／padding 在 @layer 外再宣告一次：卡片的 `* { margin: 0; padding: 0 }` 在 MMD 只清作者
    自己的內容，到這裡不能把殼一起清掉。為什麼與範圍見產生器檔頭。 */
+.conv-style-modal .cs-header-title {
+    margin: 0
+}
+.conv-style-modal p {
+    margin: 0
+}
+.conv-style-modal .cs-modal-content {
+    padding: 2px
+}
+.conv-style-modal fieldset {
+    padding: 0;
+    margin: 0
+}
+.conv-style-modal .cs-section-header {
+    margin-bottom: var(--luna-s-2, 8px)
+}
+.conv-style-modal button {
+    padding: var(--luna-s-2, 8px) var(--luna-s-3, 12px)
+}
+.conv-style-modal .response-reset {
+    padding: 0 var(--luna-s-2, 8px)
+}
+.conv-style-modal .response-custom {
+    margin-top: var(--luna-s-2, 8px)
+}
+.conv-style-modal .cs-custom-textarea {
+    padding: var(--luna-s-3, 12px)
+}
+.conv-style-modal .response-footer {
+    padding-bottom: env(safe-area-inset-bottom)
+}
 .header-box {
     padding: 0 10px
 }

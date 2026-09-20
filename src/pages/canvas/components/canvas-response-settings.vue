@@ -1,6 +1,14 @@
 <template>
- <section class="response-settings" :aria-busy="loading || saving">
-  <h2>{{ t('responseSettings.title') }}</h2>
+ <section class="response-settings conv-style-modal" data-host="style" data-lt="response-settings" :aria-busy="loading || saving">
+  <header class="cs-modal-header">
+   <button type="button" class="cs-header-left response-reset" :disabled="saving" @click="$emit('close')">{{ t('main.cancel') }}</button>
+   <div class="cs-header-center"><h2 class="cs-header-title">{{ t('responseSettings.title') }}</h2></div>
+   <div class="cs-header-right">
+    <button v-if="saved" type="button" class="confirm-btn response-save" data-action="save" :disabled="!dirty || invalid || loading || saving || error === 'conflict'" @click="submit">
+     {{ t(saving ? 'responseSettings.saving' : 'responseSettings.save') }}
+    </button>
+   </div>
+  </header>
   <p class="response-hint">{{ t('responseSettings.scope') }}</p>
   <p v-if="loading" role="status">{{ t('responseSettings.loading') }}</p>
   <div v-if="error" role="alert" class="response-error">
@@ -8,32 +16,35 @@
    <button type="button" data-action="reload" :disabled="loading || saving" @click="reload">{{ t('responseSettings.reload') }}</button>
   </div>
   <template v-if="saved">
-   <div class="response-fields">
-   <fieldset v-for="(options, axis) in responseAxes" :key="axis" :disabled="loading || saving">
-    <legend>{{ t(`responseSettings.axes.${axis}`) }}</legend>
-    <div class="response-options">
-     <button v-for="option in options" :key="option" type="button" :data-axis="axis" :data-value="option"
-      :aria-pressed="(draft[axis] ?? responseDefaults[axis]) === option" @click="choose(axis, option)">
-      {{ t(`responseSettings.options.${axis}.${option}`) }}
-     </button>
+   <div class="response-fields cs-modal-content outer-scroll-view">
+    <div v-for="(options, axis) in responseAxes" :key="axis" class="cs-group-card">
+     <fieldset class="section behavior-section" :disabled="loading || saving">
+      <legend class="cs-section-header"><span class="cs-title-row"><span class="cs-section-title">{{ t(`responseSettings.axes.${axis}`) }}</span></span></legend>
+      <p v-if="axis === 'agency'" class="response-hint cs-section-subtitle">{{ t('responseSettings.agencyHint') }}</p>
+      <div class="cs-collapsible is-open"><div class="cs-content-inner"><div class="sub-section cs-style-section">
+       <div class="style-scroll-view"><div class="response-options cs-style-grid" :class="{ 'response-agency-options': axis === 'agency' }">
+        <button v-for="option in options" :key="option" type="button" class="cs-style-item" :data-axis="axis" :data-value="option"
+         :class="{ active: (draft[axis] ?? responseDefaults[axis]) === option }"
+         :aria-label="t(`responseSettings.options.${axis}.${option}`)"
+         :aria-describedby="axis === 'agency' ? `response-agency-${conversationId}-${option}` : undefined"
+         :aria-pressed="(draft[axis] ?? responseDefaults[axis]) === option" @click="choose(axis, option)">
+         <span class="style-label">{{ t(`responseSettings.options.${axis}.${option}`) }}</span>
+         <span v-if="axis === 'agency'" :id="`response-agency-${conversationId}-${option}`" class="response-option-hint">{{ t(`responseSettings.agencyHints.${option}`) }}</span>
+        </button>
+       </div></div>
+       <label v-if="axis === 'style' && draft.style === 'custom'" class="response-custom cs-custom-input">
+        <span>{{ t('responseSettings.customLabel') }}</span>
+        <textarea v-model="draft.customStyle" class="cs-custom-textarea" rows="3" :aria-invalid="customTooLong" />
+        <span class="char-count" :class="{ 'response-error': customTooLong }">{{ t('responseSettings.customCount', { count: [...(draft.customStyle || '')].length }) }}</span>
+       </label>
+      </div></div></div>
+      <p v-if="axis === 'length'" class="response-hint">{{ t('responseSettings.lengthHint') }}</p>
+      <p v-if="axis === 'perspective' && draft.perspective === 'first_character'" class="response-hint">{{ t('responseSettings.firstPersonHint') }}</p>
+      <button v-if="draft[axis] !== undefined" type="button" class="response-reset" @click="reset(axis)">{{ t('responseSettings.reset') }}</button>
+     </fieldset>
     </div>
-    <p v-if="axis === 'agency'" class="response-hint">{{ t(`responseSettings.agencyHints.${draft.agency ?? 'protect'}`) }}</p>
-    <p v-if="axis === 'length'" class="response-hint">{{ t('responseSettings.lengthHint') }}</p>
-    <p v-if="axis === 'perspective' && draft.perspective === 'first_character'" class="response-hint">{{ t('responseSettings.firstPersonHint') }}</p>
-    <label v-if="axis === 'style' && draft.style === 'custom'" class="response-custom">
-     <span>{{ t('responseSettings.customLabel') }}</span>
-     <textarea v-model="draft.customStyle" rows="3" :aria-invalid="customTooLong" />
-     <span :class="{ 'response-error': customTooLong }">{{ t('responseSettings.customCount', { count: [...(draft.customStyle || '')].length }) }}</span>
-    </label>
-    <button v-if="draft[axis] !== undefined" type="button" class="response-reset" @click="reset(axis)">{{ t('responseSettings.reset') }}</button>
-   </fieldset>
    </div>
-   <footer>
-    <p class="response-hint" role="status">{{ t(savedNotice ? 'responseSettings.saved' : 'responseSettings.nextReply') }}</p>
-    <button type="button" class="response-save" data-action="save" :disabled="!dirty || invalid || loading || saving || error === 'conflict'" @click="submit">
-     {{ t(saving ? 'responseSettings.saving' : 'responseSettings.save') }}
-    </button>
-   </footer>
+   <footer class="response-footer"><p class="response-hint" role="status">{{ t(savedNotice ? 'responseSettings.saved' : 'responseSettings.nextReply') }}</p></footer>
   </template>
  </section>
 </template>
@@ -48,6 +59,7 @@ const props=defineProps<{
  t:(key:string, values?:Record<string,unknown>)=>string
  confirm:(content:string)=>Promise<boolean>
 }>()
+defineEmits<{ (e: 'close'): void }>()
 const saved=ref<ResponseSettings|null>(null),draft=ref<ResponseDraft>({}),loading=ref(false),saving=ref(false),error=ref(''),savedNotice=ref(false)
 let alive=true
 onBeforeUnmount(()=>{alive=false})
@@ -72,25 +84,3 @@ async function submit(){
 onMounted(reload)
 defineExpose({mayClose})
 </script>
-
-<style scoped>
-.response-settings { display:flex; flex-direction:column; gap:var(--luna-s-4,16px); padding:0; box-sizing:border-box; color:var(--lt-canvas-fg); max-height:76dvh; overflow:hidden; }
-h2 { font-size:1.125rem; font-weight:600; padding-right:var(--luna-s-7,32px); margin:0; }
-p { margin:0; }
-.response-fields { min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:var(--luna-s-4,16px); padding:2px; }
-fieldset { min-width:0; border:0; padding:0; margin:0; display:flex; flex-direction:column; gap:var(--luna-s-2,8px); }
-legend { font-size:.875rem; font-weight:600; margin-bottom:var(--luna-s-2,8px); }
-.response-options { display:flex; flex-wrap:wrap; gap:var(--luna-s-2,8px); }
-button { font:inherit; font-size:.875rem; min-height:44px; padding:var(--luna-s-2,8px) var(--luna-s-3,12px); border:1px solid var(--lt-canvas-sheet-line); border-radius:var(--luna-r-pill,9999px); color:inherit; background:var(--lt-canvas-sheet-item-bg); cursor:pointer; white-space:normal; }
-button[aria-pressed="true"] { border-color:var(--lt-canvas-accent); background:var(--lt-canvas-sheet-item-bg); box-shadow:inset 0 0 0 1px var(--lt-canvas-accent); }
-button:focus-visible, textarea:focus-visible { outline:2px solid var(--lt-canvas-accent); outline-offset:2px; }
-button:disabled { opacity:.5; cursor:default; }
-.response-hint,.response-custom span { color:var(--lt-canvas-muted); font-size:.8125rem; line-height:1.5; }
-.response-reset { align-self:flex-start; border-color:transparent; background:transparent; color:var(--lt-canvas-muted); min-height:44px; padding:0 var(--luna-s-2,8px); }
-.response-custom { display:flex; flex-direction:column; gap:var(--luna-s-2,8px); }
-textarea { width:100%; box-sizing:border-box; resize:vertical; border:1px solid var(--lt-canvas-sheet-line); border-radius:var(--lt-canvas-radius); background:var(--lt-canvas-sheet-item-bg); color:inherit; font:inherit; padding:var(--luna-s-3,12px); }
-.response-error { color:var(--lt-canvas-danger); display:grid; gap:var(--luna-s-2,8px); }
-footer { flex-shrink:0; display:flex; align-items:center; flex-wrap:wrap; gap:var(--luna-s-3,12px); padding-bottom:env(safe-area-inset-bottom); }
-footer p { flex:1; min-width:10rem; }
-.response-save { background:var(--lt-canvas-accent); color:var(--lt-canvas-accent-fg); border-color:transparent; font-weight:600; }
-</style>

@@ -290,6 +290,156 @@
 }
 
 @layer lt-base {
+  /* 回覆偏好沿用 MMD ConvStyleSetting 的 DOM；預設樣式讓位給作者卡片。 */
+  .u-popup__content:has(.conv-style-modal) > .u-popup__content__close {
+    display: none;
+  }
+  .conv-style-modal {
+    display: flex;
+    flex-direction: column;
+    gap: var(--luna-s-4, 16px);
+    box-sizing: border-box;
+    color: var(--primary-font-color, var(--lt-canvas-sheet-fg));
+    max-height: 76dvh;
+    overflow: hidden;
+  }
+  .conv-style-modal .cs-modal-header {
+    display: flex;
+    align-items: center;
+    gap: var(--luna-s-2, 8px);
+    flex-shrink: 0;
+  }
+  .conv-style-modal .cs-header-center {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+  }
+  .conv-style-modal .cs-header-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  .conv-style-modal .cs-header-right {
+    flex: 0 1 auto;
+  }
+  .conv-style-modal p {
+    margin: 0;
+  }
+  .conv-style-modal .cs-modal-content {
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--luna-s-4, 16px);
+    padding: 2px;
+  }
+  .conv-style-modal .cs-group-card {
+    background: var(--card-background-color, transparent);
+    border-radius: var(--luna-r-lg, 16px);
+  }
+  .conv-style-modal fieldset {
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--luna-s-2, 8px);
+  }
+  .conv-style-modal .cs-section-header {
+    font-size: .875rem;
+    font-weight: 600;
+    margin-bottom: var(--luna-s-2, 8px);
+  }
+  .conv-style-modal .cs-style-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--luna-s-2, 8px);
+  }
+  .conv-style-modal button {
+    font: inherit;
+    font-size: .875rem;
+    min-height: 44px;
+    padding: var(--luna-s-2, 8px) var(--luna-s-3, 12px);
+    border: 1px solid var(--btn-border-color, var(--lt-canvas-sheet-line));
+    border-radius: var(--luna-r-pill, 9999px);
+    color: inherit;
+    background: var(--btn-bg-color, var(--lt-canvas-sheet-item-bg));
+    cursor: pointer;
+    white-space: normal;
+  }
+  .conv-style-modal .cs-style-item.active {
+    border-color: var(--primary-color, var(--lt-canvas-accent));
+    box-shadow: inset 0 0 0 1px var(--primary-color, var(--lt-canvas-accent));
+  }
+  .conv-style-modal .response-agency-options {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .conv-style-modal .response-agency-options .cs-style-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--luna-s-1, 4px);
+    text-align: start;
+    border-radius: var(--luna-r-lg, 16px);
+  }
+  .conv-style-modal .response-agency-options .style-label {
+    font-weight: 600;
+  }
+  .conv-style-modal button:focus-visible, .conv-style-modal textarea:focus-visible {
+    outline: 2px solid var(--primary-color, var(--lt-canvas-accent));
+    outline-offset: 2px;
+  }
+  .conv-style-modal button:disabled {
+    opacity: .5;
+    cursor: default;
+  }
+  .conv-style-modal .response-hint, .conv-style-modal .response-option-hint, .conv-style-modal .response-custom span {
+    color: var(--tip-font-color, color-mix(in srgb, currentColor 78%, transparent));
+    font-size: .8125rem;
+    line-height: 1.5;
+  }
+  .conv-style-modal .response-reset {
+    align-self: flex-start;
+    border-color: transparent;
+    background: transparent;
+    color: inherit;
+    min-height: 44px;
+    padding: 0 var(--luna-s-2, 8px);
+  }
+  .conv-style-modal .response-custom {
+    display: flex;
+    flex-direction: column;
+    gap: var(--luna-s-2, 8px);
+    margin-top: var(--luna-s-2, 8px);
+  }
+  .conv-style-modal .cs-custom-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    border: 1px solid var(--btn-border-color, var(--lt-canvas-sheet-line));
+    border-radius: var(--luna-r-lg, 16px);
+    background: var(--input-background-color, var(--lt-canvas-sheet-item-bg));
+    color: inherit;
+    font: inherit;
+    padding: var(--luna-s-3, 12px);
+  }
+  .conv-style-modal .response-error {
+    color: var(--lt-canvas-danger);
+    display: grid;
+    gap: var(--luna-s-2, 8px);
+  }
+  .conv-style-modal .response-footer {
+    flex-shrink: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .conv-style-modal .response-save {
+    background: var(--primary-color, var(--lt-canvas-accent));
+    color: var(--lt-canvas-accent-fg);
+    border-color: transparent;
+    font-weight: 600;
+  }
   /* ── 頁面骨架 ────────────────────────────────────────────────── */
 
   .canvas-root {
