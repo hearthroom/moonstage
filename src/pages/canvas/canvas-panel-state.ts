@@ -22,6 +22,7 @@ export type CanvasSheet =
   | 'conversations'
   /** 用戶人設：稱呼、性別、自我介紹 */
   | 'persona'
+  | 'response-settings'
   /** 自訂指令（這段對話一直有效的要求） */
   | 'directives'
   /** AI 筆記 */

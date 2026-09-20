@@ -34,6 +34,7 @@ export function setupHttp(http, deps) {
 
 	// 呼叫端會自己呈現錯誤的背景 API，不再彈全域 toast
 	const silentErrorApis = [
+        '/conversation/response-settings', // 回覆偏好面板保留草稿並呈現載入、儲存與版本衝突錯誤
 		'/conversation/operations',   // 背景恢復查詢；拿不到就靜默回退，不打擾使用者
 		'/conversation/rewrite-by-id', // 重寫的錯誤由聊天頁的系統訊息卡呈現，避免重複 toast
 		'/role/author-asset/serve',   // 玩家路徑：沒有資產就是「這張卡沒裝修」，不是使用者要處理的錯誤
