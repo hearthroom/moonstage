@@ -363,10 +363,14 @@ import {useStore} from 'vuex' // Add this import
 
 import $fui from '@/components/firstui/fui-clipboard';
 import { useStageHost } from '@/host/stage-host';
+import { createConversationActivityReporter } from './canvas-conversation-activity';
 // 主站的訊息／對話框元件庫在畫布上不用：卡片沒有沙盒，它的 CSS 會打到
 // 那些元件而作者根本不知道它們存在。改用 uni 自己的提示與對話框。
 // 提示走 StageHost：uni-app 殼就是 uni.showToast，嵌進別的站台時由宿主決定長相。
 const stageHost = useStageHost();
+const reportConversationActivity = createConversationActivityReporter(activity => {
+  stageHost.events.emit('conversationActivity', activity);
+});
 // 宿主說沒有上一頁（獨立的卡片 App）就不畫返回鍵；頁首與沙箱殼的頁首（chromeState）都用這個值
 const showBack = stageHost.nav.canBack ? stageHost.nav.canBack() !== false : true;
 const message = {
@@ -6090,6 +6094,7 @@ function getHistoryMsg() {
         historyRecoveryKey = '';
       }
       const chatList = res.data.chats;
+      reportConversationActivity(String(unref(roleId)), conversationIdAtHistoryRequest, chatList);
       ajax.value.hasNextPage = res.data.hasNextPage;
       if (pageAtHistoryRequest == 1) {
         contextFootprint.value = res.data.contextFootprint || null;
@@ -8800,6 +8805,7 @@ function scheduleContextUsageRefresh() {
       })
       if (!isConversationGenerationCurrent(generation)) return
       const chats = res?.statusCode == 200 && Array.isArray(res.data?.chats) ? res.data.chats : []
+      reportConversationActivity(String(unref(roleId)), conversationAtSchedule, chats)
       for (const chat of chats) {
         if (chat?.chatRole !== 'AI') continue
         const tokens = Number(chat.inputTokens)
