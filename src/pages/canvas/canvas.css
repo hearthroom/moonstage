@@ -327,6 +327,12 @@
   }
   .conv-style-modal .cs-modal-content {
     min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .conv-style-modal .outer-scroll-view {
+    min-height: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;

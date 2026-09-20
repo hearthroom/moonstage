@@ -16,7 +16,7 @@
    <button type="button" data-action="reload" :disabled="loading || saving" @click="reload">{{ t('responseSettings.reload') }}</button>
   </div>
   <template v-if="saved">
-   <div class="response-fields cs-modal-content outer-scroll-view">
+   <div class="cs-modal-content"><div class="response-fields outer-scroll-view">
     <div v-for="(options, axis) in responseAxes" :key="axis" class="cs-group-card">
      <fieldset class="section behavior-section" :disabled="loading || saving">
       <legend class="cs-section-header"><span class="cs-title-row"><span class="cs-section-title">{{ t(`responseSettings.axes.${axis}`) }}</span></span></legend>
@@ -43,7 +43,7 @@
       <button v-if="draft[axis] !== undefined" type="button" class="response-reset" @click="reset(axis)">{{ t('responseSettings.reset') }}</button>
      </fieldset>
     </div>
-   </div>
+   </div></div>
    <footer class="response-footer"><p class="response-hint" role="status">{{ t(savedNotice ? 'responseSettings.saved' : 'responseSettings.nextReply') }}</p></footer>
   </template>
  </section>
