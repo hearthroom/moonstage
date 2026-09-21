@@ -13,6 +13,7 @@
  */
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { stageDataChunk, stageModelAssets } from './build/stage-assets'
 import path from 'node:path'
 import type { Root as PostcssRoot, Plugin as PostcssPlugin } from 'postcss'
 
@@ -100,6 +101,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       stripUniConditional(),
+      stageModelAssets(),
       vue({ template: { compilerOptions: { nodeTransforms: [renameUniTags] } } }),
     ],
     resolve: {
@@ -119,7 +121,7 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       cssCodeSplit: false,
       sourcemap: false,
-      // 圖示等靜態檔全部內嵌：套件是單一 ESM 給別的站台 import，沒有自己的 /assets 可放檔案
+      // 模型圖示由 stageModelAssets 獨立輸出，跟隨 dist-stage 一起發佈；其餘小素材沿用內嵌。
       assetsInlineLimit: 512 * 1024,
       lib: {
         entry: path.resolve(__dirname, 'src/stage/index.ts'),
@@ -129,7 +131,7 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         external: ['vue', 'vue-i18n', 'pinia'],
-        output: { assetFileNames: (info) => (info.name && info.name.endsWith('.css') ? 'moonstage-stage.css' : 'assets/[name]-[hash][extname]') },
+        output: { manualChunks: stageDataChunk, assetFileNames: (info) => (info.name && info.name.endsWith('.css') ? 'moonstage-stage.css' : 'assets/[name]-[hash][extname]') },
       },
     },
     // 讓 config/env.js 的 requireEnv 在 build 時看得到 .env.production 的值
