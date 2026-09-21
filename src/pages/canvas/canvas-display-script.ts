@@ -20,7 +20,7 @@
  * 單字落在「一簡對多繁」字表就不動，才交給 OpenCC cn→tw；反向對稱。
  * 那套比裸 OpenCC 穩：混排、已是繁體、人名裡的多義字都不會被誤轉。
  */
-import * as OpenCC from 'opencc-js'
+import { convertChinese } from '@/common/chinese-converter'
 import TradOrSimp from '@/common/TradOrSimp'
 import { isAmbiguousChar } from '@/common/ambiguous-chars'
 
@@ -84,9 +84,6 @@ const MEMO_LIMIT = 400
  */
 export function createDisplayScriptConverter(direction: ScriptDirection): (text: string) => string {
   if (direction === 'none') return (text) => text
-  const converter = direction === 's2t'
-    ? OpenCC.Converter({ from: 'cn', to: 'tw' })
-    : OpenCC.Converter({ from: 'tw', to: 'cn' })
   const memo = new Map<string, string>()
   return (text: string) => {
     if (!text) return text
@@ -100,9 +97,9 @@ export function createDisplayScriptConverter(direction: ScriptDirection): (text:
     // 周末→週末、了解→瞭解、阿里→阿裡），已回退；同形整句本來就少見。
     // 單字＋一簡對多繁 → 不動（沒有上下文，誰也判不了）。
     if (direction === 's2t') {
-      if (!(text.length === 1 && isAmbiguousChar(text)) && TradOrSimp.isSimplified(text)) out = converter(text)
+      if (!(text.length === 1 && isAmbiguousChar(text)) && TradOrSimp.isSimplified(text)) out = convertChinese(text, direction)
     } else if (TradOrSimp.isTraditional(text)) {
-      out = converter(text)
+      out = convertChinese(text, direction)
     }
     if (memo.size >= MEMO_LIMIT) memo.clear()
     memo.set(text, out)

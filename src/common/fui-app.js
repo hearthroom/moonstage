@@ -1,5 +1,5 @@
 import cryptoJs from "crypto-js"
-import * as OpenCC from 'opencc-js'
+import { convertChinese } from './chinese-converter'
 import { isAmbiguousChar } from './ambiguous-chars'
 import TradOrSimp from './TradOrSimp'
 
@@ -217,8 +217,7 @@ const fui = {
 	// 繁体转简体
 	sify(text) {
 		if (!text) return text;
-		const converter = OpenCC.Converter({ from: 'tw', to: 'cn' });
-		return converter(text);
+		return convertChinese(text, 't2s');
 	},
 	// 智能转繁体：自动检测输入是简体还是繁体
 	// 使用 TradOrSimp 库检测，只有明确是简体才转换
@@ -230,8 +229,7 @@ const fui = {
 		}
 		// 只有明確是簡體才轉換，否則不轉換（包含繁體和簡繁通用如「小栗帽」）
 		if (TradOrSimp.isSimplified(text)) {
-			const converter = OpenCC.Converter({ from: 'cn', to: 'tw' });
-			return converter(text);
+			return convertChinese(text, 's2t');
 		}
 		return text;
 	}
