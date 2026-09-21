@@ -6,6 +6,10 @@ preview_urls = false
 # The explicit zone route takes precedence over the community sandbox wildcard.
 routes = [
   { pattern = "playground.hearthroom.club", custom_domain = true },
+  { pattern = "playground.sukisuki.ai", custom_domain = true },
+  { pattern = "playground.sukisuki.ai/*", zone_name = "sukisuki.ai" },
+  { pattern = "playground.sukisuki.chat", custom_domain = true },
+  { pattern = "playground.sukisuki.chat/*", zone_name = "sukisuki.chat" },
   { pattern = "playground.hearthroom.club/*", zone_name = "hearthroom.club" }
 ]
 

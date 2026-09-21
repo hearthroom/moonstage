@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { fetchPlayground } from '../../worker/index.js'
 
 const env = { API_ORIGIN: 'https://api.harperharbor.com', ASSETS: { fetch: vi.fn() } }
@@ -43,3 +44,11 @@ describe('playground API proxy', () => {
     expect(assets.fetch).toHaveBeenCalledOnce()
   })
 })
+
+it('deploys standalone playgrounds on each official community domain', () => {
+ const config=readFileSync(new URL('../../wrangler.toml', import.meta.url),'utf8');
+ for(const root of ['hearthroom.club','sukisuki.ai','sukisuki.chat']) {
+  expect(config).toContain(`pattern = "playground.${root}", custom_domain = true`);
+  expect(config).toContain(`pattern = "playground.${root}/*", zone_name = "${root}"`);
+ }
+});

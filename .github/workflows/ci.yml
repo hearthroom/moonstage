@@ -23,4 +23,5 @@ jobs:
       - run: npm run build:h5:prod
       - run: npm run build:stage
       - run: npm run build:sandbox
+      - run: node scripts/copy-playground-sandbox.mjs
       - run: ./scripts/check-build-output.sh

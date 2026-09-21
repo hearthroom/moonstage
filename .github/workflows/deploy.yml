@@ -28,6 +28,7 @@ jobs:
       - run: ./scripts/check-build-output.sh
       - run: npm run build:stage
       - run: npm run build:sandbox
+      - run: node scripts/copy-playground-sandbox.mjs
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
