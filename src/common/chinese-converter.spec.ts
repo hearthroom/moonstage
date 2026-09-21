@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 
 const { factory } = vi.hoisted(() => ({ factory: vi.fn(() => (text: string) => text) }))
-vi.mock('opencc-js', () => ({ Converter: factory }))
+vi.mock('./chinese-preset', () => ({ Converter: factory }))
 beforeEach(() => { vi.resetModules(); factory.mockClear() })
 
 it('does not build a dictionary for a display that needs no conversion', async () => {
