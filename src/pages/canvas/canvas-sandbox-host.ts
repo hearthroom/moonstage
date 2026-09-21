@@ -118,7 +118,8 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     for (const [hostId, t] of tracked.entries()) if (t.shellId === shellId) return hostId
     return null
   }
-  const viewOf = (m: HudHostMessage): MessageView | undefined => (m.view ? (m.view as MessageView) : undefined)
+  // Agent 進度陣列等巢狀值可能是 Vue proxy；訊息協議只傳 JSON 呈現資料，先脫離響應式物件。
+  const viewOf = (m: HudHostMessage): MessageView | undefined => (m.view ? JSON.parse(JSON.stringify(m.view)) as MessageView : undefined)
   const viewKeyOf = (m: HudHostMessage): string => (m.view ? JSON.stringify(m.view) : '')
   const toShell = (m: HudHostMessage, shellId: string): SandboxMessage => {
     const finished = finishedOf(m)
@@ -230,7 +231,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
         }
         // 正文沒變、呈現資料變了（可重生成的鍵亮起、上下文用量、思考過程…）：只換呈現。
         const key = viewKeyOf(m)
-        if (key !== t.viewKey) { t.viewKey = key; if (m.view) post({ type: 'message.view', id: t.shellId, view: m.view as MessageView }) }
+        if (key !== t.viewKey) { t.viewKey = key; if (m.view) post({ type: 'message.view', id: t.shellId, view: viewOf(m)! }) }
         return
       }
       if (finished) {
@@ -247,7 +248,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
         return
       }
       const key = viewKeyOf(m)
-      if (key !== t.viewKey) { t.viewKey = key; if (m.view) post({ type: 'message.view', id: t.shellId, view: m.view as MessageView }) }
+      if (key !== t.viewKey) { t.viewKey = key; if (m.view) post({ type: 'message.view', id: t.shellId, view: viewOf(m)! }) }
     })
   }
 

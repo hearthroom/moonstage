@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { reactive } from 'vue'
 import { createSandboxHost } from '../canvas-sandbox-host'
 import type { HudHost, HudHostMessage, HudHostState } from '../canvas-hud-bridge'
 import { envelope, SANDBOX_PROTOCOL_VERSION } from '@/sandbox/protocol'
@@ -49,11 +50,11 @@ interface Harness {
   iframe: HTMLIFrameElement
 }
 
-function harness(): Harness {
+function harness(clone = false): Harness {
   const posted: Array<Record<string, unknown>> = []
   const iframe = document.createElement('iframe')
   document.body.appendChild(iframe)
-  const target = { postMessage: (data: unknown) => posted.push(data as Record<string, unknown>) }
+  const target = { postMessage: (data: unknown) => posted.push((clone ? structuredClone(data) : data) as Record<string, unknown>) }
   Object.defineProperty(iframe, 'contentWindow', { value: target, configurable: true })
   return {
     posted,
@@ -75,6 +76,40 @@ describe('沙箱宿主橋', () => {
   let h: Harness
   beforeEach(() => { h = harness() })
   afterEach(() => { h.iframe.remove() })
+
+  it('Agent 響應式呈現資料可跨沙箱複製，進度、串流、交稿後正常解除 busy', async () => {
+    h.iframe.remove()
+    h = harness(true)
+    const view = reactive({ prepSteps: ['搜尋設定'], prepTrail: [] as string[], finished: false })
+    const greeting = msg({ id: '10', text: '你好', opening: true, view })
+    const state = { current: makeState({ messages: [greeting] }) }
+    const { hud } = fakeHud(state)
+    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '1', hello })
+    host.start()
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    expect(h.posted.find((p) => p.type === 'messages')).toMatchObject({ messages: [{ view: { prepSteps: ['搜尋設定'] } }] })
+    h.posted.length = 0
+    const reply = msg({ id: '11', finished: false, view })
+    state.current = makeState({ generation: 'streaming', messages: [greeting, reply] })
+    expect(() => host.sync()).not.toThrow()
+    view.prepSteps.push('保存筆記')
+    expect(() => host.sync()).not.toThrow()
+    reply.text = '簡報'
+    expect(() => host.sync()).not.toThrow()
+    view.prepTrail = [...view.prepSteps]
+    view.prepSteps = []
+    view.finished = true
+    reply.finished = true
+    state.current.generation = 'idle'
+    expect(() => host.sync()).not.toThrow()
+    expect(h.posted.find((p) => p.type === 'message.new')).toMatchObject({ message: { view: { prepSteps: ['搜尋設定'] } } })
+    expect(h.posted.some((p) => p.type === 'message.view')).toBe(true)
+    expect(h.posted.some((p) => p.type === 'message.stream')).toBe(true)
+    expect(h.posted.find((p) => p.type === 'message.done')).toMatchObject({ content: '簡報', view: { prepTrail: ['搜尋設定', '保存筆記'] } })
+    expect(h.posted.at(-1)).toMatchObject({ type: 'generation', busy: false })
+    host.destroy()
+  })
 
   it('只認來自 iframe 且 origin 相符的訊息；握手後送 hello + 全量訊息（開場白 id 是 greeting、歷史 h<id>）', async () => {
     const state = { current: makeState({ messages: [msg({ id: '10', text: '你好', opening: true }), msg({ id: '11', role: 'user', text: '嗨' }), msg({ id: '12', text: '哈囉', canonicalLatestAI: true })] }) }
