@@ -1396,7 +1396,7 @@ const truncationText = (completionRate: number) => {
 
 
 	const loadDeepPrepPreference = async () => {
-		if (stageHost.capabilities?.agentMode === false) return;
+		if (!props.open || stageHost.capabilities?.agentMode === false) return;
 		if (!formData.roleId) return;
 		try {
 			// 帶上「使用者現在挑的那個模型」，而不是只問已存檔的那個。
@@ -1445,7 +1445,7 @@ const truncationText = (completionRate: number) => {
 	});
 
 	const onDeepPrepChange = async (nextEnabled) => {
-		if (stageHost.capabilities?.agentMode === false) return;
+		if (!props.open || stageHost.capabilities?.agentMode === false) return;
 		// 停用態仍然在畫面上，所以也可能被觸發——在這裡擋掉，不要送出一個
 		// 伺服器本來就不會生效的偏好。
 		if (!deepPrepModelSupported.value) return;
@@ -1691,17 +1691,6 @@ const truncationText = (completionRate: number) => {
 		}
 	};
 
-	// Select a specific variant (tier pill click)
-	// 換了模型就要重問一次支不支援。
-	//
-	// loadDeepPrepPreference 本來就帶「使用者現在挑的那個模型」（見那裡的註解），
-	// 但先前只在進頁與 onShow 時呼叫——於是使用者點了支援的模型，Agent 那一列
-	// 仍然掛著上一個模型的答案。實測：卡片已打勾 Claude Sonnet 5，開關卻還寫著
-	// 「這個模型還不支援」，而那是已存檔的 qwen:32b 的答案。
-	watch(() => formData.selectModel, (next, prev) => {
-		if (!next || next === prev) return;
-		loadDeepPrepPreference();
-	});
 
 	const selectVariant = (family, variant) => {
 		formData.selectModel = variant.value;
