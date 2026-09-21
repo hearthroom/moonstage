@@ -97,3 +97,19 @@ describe('圍欄整段解包（AI 常見 fence-wrapped HTML 卡）', () => {
     expect(unwrapSingleHtmlFence(wrapped)).toBe('<div class="hc-c">內容</div>')
   })
 })
+
+describe('official SukiSuki links', () => {
+  for (const root of ['sukisuki.ai', 'sukisuki.chat']) {
+    test(`keeps ${root} links and rejects lookalike hosts`, () => {
+      for (const host of [root, `play.${root}`, `playground.${root}`]) {
+        const url = `https://${host}/cards/example`;
+        expect(renderRichText(`<a href="${url}">open</a>`)).toContain(`href="${url}"`);
+      }
+      for (const host of [`${root}.evil.test`, `not-${root}`]) {
+        const output = renderRichText(`<a href="https://${host}/">outside</a>`);
+        expect(output).not.toContain('href=');
+        expect(output).toContain('link-blocked');
+      }
+    });
+  }
+});
