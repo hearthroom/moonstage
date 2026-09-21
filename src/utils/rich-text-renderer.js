@@ -138,12 +138,12 @@ function renderTaskLists(html) {
 }
 
 /**
- * 連結白名單：只允許跳轉至 harperharbor.com / hearthroom.club 及其子網域。
+ * 連結白名單：只允許跳轉至 harperharbor.com / hearthroom.club / sukisuki.ai / sukisuki.chat 及其子網域。
  * 非白名單連結 → 保留文字但移除 href，加 title 提示已阻擋。
  * 內部錨點 (#xxx) / 相對路徑 (/xxx) 一律允許。
  * 只處理 <a href>，圖片/影片/iframe 的 src 完全不碰。
  */
-const LINK_ALLOW_HOST = /^(https?:)?\/\/([a-z0-9-]+\.)*(harperharbor\.com|hearthroom\.club)(\/|$|\?|#|:)/i;
+const LINK_ALLOW_HOST = /^(https?:)?\/\/([a-z0-9-]+\.)*(harperharbor\.com|hearthroom\.club|sukisuki\.ai|sukisuki\.chat)(\/|$|\?|#|:)/i;
 
 function sanitizeLinks(html) {
   if (!html) return html;
