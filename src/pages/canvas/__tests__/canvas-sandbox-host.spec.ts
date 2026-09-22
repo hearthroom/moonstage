@@ -461,6 +461,25 @@ describe('視窗高度與連結', () => {
 
   // 一般模式不送鍵盤幾何：殼的根維持 iframe 的 100%，鍵盤與工具列交給瀏覽器（iOS Safari 自己會捲頁；
   // 殼的根跟著縮會露出空白、拖到底被拉回——owner 2026-09-22 iOS 回報）。
+  // iOS 自動放大頁面後 innerHeight 從 796 縮成 747；殼的根要維持 iframe 的版面高度 796。
+  it('非全螢幕時送 iframe 自己的版面高度，不是 innerHeight（iOS 自動放大時兩者不同）', async () => {
+    Object.defineProperty(window, 'innerHeight', { value: 747, configurable: true })
+    const host = await handshake()
+    try {
+      const iframe = document.querySelector('iframe') as HTMLIFrameElement
+      const helloMsg = h.posted.find((m) => m.type === 'hello') as { config: { viewportHeight?: number } }
+      // jsdom 的 iframe 矩形是 0，退回 innerHeight
+      expect(helloMsg.config.viewportHeight).toBe(747)
+      iframe.getBoundingClientRect = () => ({ top: 0, bottom: 796, height: 796, left: 0, right: 440, width: 440, x: 0, y: 0, toJSON() {} } as DOMRect)
+      window.dispatchEvent(new Event('resize'))
+      await settle()
+      expect(h.posted.filter((m) => m.type === 'viewport')).toEqual([{ ms: 1, type: 'viewport', height: 796 }])
+    } finally {
+      host.destroy()
+      Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true })
+    }
+  })
+
   it('非全螢幕時鍵盤幾何不送給殼：hello 與 viewport 都是 iframe 自己的高度', async () => {
     const keyboard = Object.assign(new EventTarget(), { boundingRect: { top: 430, height: 338 } })
     Object.defineProperty(window.navigator, 'virtualKeyboard', { value: keyboard, configurable: true })

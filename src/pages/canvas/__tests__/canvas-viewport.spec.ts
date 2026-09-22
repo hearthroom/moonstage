@@ -102,3 +102,15 @@ describe('鍵盤收起後把視覺視窗捲回原點', () => {
     expect(main).not.toMatch(/visualViewport\.addEventListener|vv\.addEventListener/)
   })
 })
+
+// iOS Safari 聚焦字級小於 16px 的欄位會把整頁自動放大（owner 2026-09-22 面板數值 scale 1.07），
+// 收鍵盤後不縮回來，整個畫布上偏、殼的根縮短。觸控裝置上輸入欄位一律 ≥16px。
+describe('觸控裝置上輸入欄位字級不小於 16px（擋 iOS 自動放大）', () => {
+  it('canvas.css 在 (hover: none) and (pointer: coarse) 下把 .uni-textarea 與 textarea／input 設成 max(16px, 1em)', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/pages/canvas/canvas.css'), 'utf8')
+    const block = css.match(/@media \(hover: none\) and \(pointer: coarse\) \{[\s\S]*?\n\}/)?.[0] || ''
+    expect(block).toMatch(/\.canvas-root \.uni-textarea,/)
+    expect(block).toMatch(/\.canvas-root textarea,/)
+    expect(block).toMatch(/font-size: max\(16px, 1em\)/)
+  })
+})

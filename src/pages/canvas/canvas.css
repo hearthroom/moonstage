@@ -227,6 +227,22 @@
   line-height: inherit;
 }
 
+/*
+  觸控裝置上輸入欄位字級不得小於 16px：iOS Safari 在聚焦字級小於 16px 的欄位時會把整頁自動放大
+  （owner 2026-09-22 iOS 面板數值：visualViewport scale 1.07、視窗 796→747），收鍵盤後不縮回來——
+  固定定位的畫布整個上偏、沙箱殼的根跟著縮成 747、底下留空白、作者的底部工具列被擠出畫面、
+  吸附的 HUD 跑掉。字級寫在 .uni-textarea 這一層，欄位與提示字一起放大，游標與字才對得齊。
+  也蓋住面板裡的其他 textarea／文字 input。層外、高特異性，作者的卡與 layer 內規則都蓋不掉。
+*/
+@media (hover: none) and (pointer: coarse) {
+  .canvas-root .uni-textarea,
+  .canvas-root .uni-textarea textarea,
+  .canvas-root textarea,
+  .canvas-root input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+    font-size: max(16px, 1em);
+  }
+}
+
 /* 不能寫成 `textarea.uni-textarea-textarea`：uni-app 的編譯器會把選擇器裡的 textarea
    元素名改寫成它自己的 <uni-textarea> 標籤，出來的規則對不到真的 <textarea>（實測 2026-09-06）。
    只用 class 疊特異性。 */
