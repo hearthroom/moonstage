@@ -9,6 +9,13 @@
     </button>
    </div>
   </header>
+  <!-- 有沒存的修改時關掉：問一次，問在面板裡。面板開著時在瀏覽器 top layer，系統對話框
+       （uni.showModal）z-index 再大也畫在它底下，玩家看不到也按不到，只能按儲存才脫身。 -->
+  <div class="response-discard" role="alertdialog" :hidden="!discardAsked">
+   <span class="response-discard-text">{{ t('responseSettings.discard') }}</span>
+   <button type="button" class="response-discard-keep" data-action="keep-editing" @click="answerDiscard(false)">{{ t('responseSettings.keepEditing') }}</button>
+   <button type="button" class="response-discard-ok" data-action="discard" @click="answerDiscard(true)">{{ t('responseSettings.discardButton') }}</button>
+  </div>
   <p class="response-hint">{{ t('responseSettings.scope') }}</p>
   <p v-if="loading" role="status">{{ t('responseSettings.loading') }}</p>
   <div v-if="error" role="alert" class="response-error">
@@ -57,18 +64,21 @@ const props=defineProps<{
  load:(id:string)=>Promise<unknown>
  save:(id:string,revision:number,patch:Record<string,string|null>)=>Promise<unknown>
  t:(key:string, values?:Record<string,unknown>)=>string
- confirm:(content:string)=>Promise<boolean>
 }>()
 defineEmits<{ (e: 'close'): void }>()
 const saved=ref<ResponseSettings|null>(null),draft=ref<ResponseDraft>({}),loading=ref(false),saving=ref(false),error=ref(''),savedNotice=ref(false)
 let alive=true
-onBeforeUnmount(()=>{alive=false})
+const discardAsked=ref(false)
+let discardAnswer:((ok:boolean)=>void)|null=null
+function askDiscard(){discardAnswer?.(false);discardAsked.value=true;return new Promise<boolean>(resolve=>{discardAnswer=resolve})}
+function answerDiscard(ok:boolean){discardAsked.value=false;const resolve=discardAnswer;discardAnswer=null;resolve?.(ok)}
+onBeforeUnmount(()=>{alive=false;answerDiscard(false)})
 const dirty=computed(()=>JSON.stringify(responsePatch(draft.value))!==JSON.stringify(responsePatch(saved.value?.overrides || {})))
 const customTooLong=computed(()=>[...(draft.value.customStyle || '')].length>1000)
 const invalid=computed(()=>draft.value.style==='custom' && (!draft.value.customStyle?.trim() || customTooLong.value))
 function choose(axis:ResponseAxis,value:string){draft.value[axis]=value;if(axis==='style' && value!=='custom')delete draft.value.customStyle;savedNotice.value=false}
 function reset(axis:ResponseAxis){delete draft.value[axis];if(axis==='style')delete draft.value.customStyle;savedNotice.value=false}
-async function mayClose(){return !saving.value && (!dirty.value || await props.confirm(props.t('responseSettings.discard')))}
+async function mayClose(){return !saving.value && (!dirty.value || await askDiscard())}
 async function reload(){
  if(loading.value || saving.value || (dirty.value && !await mayClose()))return
  loading.value=true;error.value=''

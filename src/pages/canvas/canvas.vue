@@ -222,7 +222,7 @@
     <CanvasPopup v-if="responseSettingsSupported && panel.sheet === 'response-settings'" :open="true"
       :title="t('responseSettings.title')" :close-label="t('main.cancel')" @close="closeCanvasSheet">
       <CanvasResponseSettings :key="String(conversationId)" ref="responseSettingsPanel" :conversation-id="String(conversationId)" @close="closeCanvasSheet"
-        :load="loadResponseSettings" :save="saveResponseSettings" :t="t" :confirm="confirmResponseDiscard" />
+        :load="loadResponseSettings" :save="saveResponseSettings" :t="t" />
     </CanvasPopup>
 
     <CanvasPopup :open="panel.sheet === 'directives'" v-if="!sandboxCard" :title="t('directive.title')"
@@ -8994,7 +8994,6 @@ const panel = ref<CanvasPanelState>(createPanelState())
 const responseSettingsVersion = ref(0)
 const responseSettingsSupported = computed(() => responseSettingsVersion.value === 1 && Boolean(conversationId.value) && !previewOnly.value)
 const responseSettingsPanel = ref<InstanceType<typeof CanvasResponseSettings> | null>(null)
-const confirmResponseDiscard = (content: string) => stageHost.ui.confirm({ content, confirmText: t('responseSettings.discardButton'), cancelText: t('responseSettings.keepEditing') })
 async function loadResponseSettings(id: string) {
   const res = await _this.http.get('/open/v1/conversation/response-settings', { data: { conversationId: id }, showLoading: false })
   if (res.statusCode !== 200) throw { status: res.statusCode }

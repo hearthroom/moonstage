@@ -32,6 +32,9 @@
 .conv-style-modal .response-footer {
     padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px))
 }
+.conv-style-modal .response-discard {
+    padding: var(--luna-s-2, 8px) var(--luna-s-3, 12px)
+}
 .header-box {
     padding: 0 10px
 }
