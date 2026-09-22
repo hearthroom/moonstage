@@ -19,6 +19,7 @@ import {
   type HostToShell, type SandboxHelloConfig, type SandboxMessage, type ShellAction, type ShellToHost,
 } from '@/sandbox/protocol'
 import type { SandboxSavesStore } from '@/host/sandbox-host'
+import { observeViewport, visibleViewport } from './canvas-viewport'
 import type { ChromeState, ChromeUiEvent, MessageMenuAnchor, MessageView, PanelsState, StageState } from '@/sandbox/protocol'
 
 export interface SandboxHostDeps {
@@ -302,9 +303,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   //    （--chat-viewport-height）把版面收進看得見的那一段。hello 帶初值，之後變了就推：
   //    一幀合併一次、同值不重送。沒有 visualViewport 的環境退回 innerHeight。 ──
   const viewportHeight = (): number | undefined => {
-    const vv = (win as Window & { visualViewport?: VisualViewport | null }).visualViewport
-    const top = vv ? vv.offsetTop : 0
-    const bottom = vv ? vv.offsetTop + vv.height : win.innerHeight
+    const { top, bottom } = visibleViewport(win)
     let rect: { top: number; bottom: number; height: number } | null = null
     try { rect = deps.iframe.getBoundingClientRect() } catch { rect = null }
     const visible = rect && rect.height > 0 ? Math.min(rect.bottom, bottom) - Math.max(rect.top, top) : bottom - top
@@ -325,10 +324,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       post({ type: 'viewport', height: h })
     })
   }
-  const viewportTargets = (): EventTarget[] => {
-    const vv = (win as Window & { visualViewport?: VisualViewport | null }).visualViewport
-    return vv ? [win, vv] : [win]
-  }
+  let stopViewport: (() => void) | undefined
 
   const sendHello = async () => {
     if (helloSent || destroyed) return
@@ -505,7 +501,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   return {
     start() {
       win.addEventListener('message', onMessage)
-      for (const t of viewportTargets()) { t.addEventListener('resize', pushViewport); t.addEventListener('scroll', pushViewport) }
+      stopViewport = observeViewport(win, pushViewport)
       const timeout = deps.handshakeTimeoutMs ?? 20_000
       if (deps.onHandshakeTimeout && timeout > 0) {
         handshakeTimer = setTimeout(() => { if (!helloSent && !destroyed) { handshakeTimedOut = true; deps.onHandshakeTimeout!() } }, timeout)
@@ -558,7 +554,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       if (helloSent) { try { post({ type: 'dispose' }) } catch { /* iframe 可能已經拆了 */ } }
       destroyed = true
       win.removeEventListener('message', onMessage)
-      for (const t of viewportTargets()) { t.removeEventListener('resize', pushViewport); t.removeEventListener('scroll', pushViewport) }
+      stopViewport?.()
     },
   }
 }

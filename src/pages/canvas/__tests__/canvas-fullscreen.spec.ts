@@ -41,12 +41,14 @@ describe('player fullscreen', () => {
   })
   it('exposes the action inside the author-styled header, including exit state', async () => {
     const wrapper = mount(CanvasHeader, { props: {
-      roleName: 'Example', avatar: '', modelName: 'Model', fullscreenSupported: true,
+      roleName: 'Example', avatar: '', modelName: 'Provider / A very long model name', fullscreenSupported: true,
       fullscreenActive: false, fullscreenLabel: 'Enter fullscreen',
     } })
     const button = wrapper.get('[data-lt="header-actions"] .header-meun[data-lt="fullscreen"]')
     expect(button.attributes('aria-label')).toBe('Enter fullscreen')
     expect(button.attributes('aria-pressed')).toBe('false')
+    // The fullscreen action stays at the trailing edge, regardless of model-name length.
+    expect(wrapper.findAll('[data-lt="header-actions"] [role="button"]').at(-1)?.attributes('data-lt')).toBe('fullscreen')
     await button.trigger('click')
     expect(wrapper.emitted('fullscreen')).toHaveLength(1)
     await wrapper.setProps({ fullscreenActive: true, fullscreenLabel: 'Exit fullscreen' })
