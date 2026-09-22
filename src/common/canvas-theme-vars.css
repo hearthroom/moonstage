@@ -169,7 +169,9 @@
   輸入欄位只剩下兩百多像素（2026-09-04 owner 截圖）。
 */
 @media (max-width: 768px) {
-  :root {
+  /* 格式鎖暗色時，畫布根也宣告了預設欄寬；必須同步覆寫，不能只靠 :root 繼承。 */
+  :root,
+  .canvas-root.lt-theme-dark {
     --lt-canvas-column-width: 100%;
   }
 }

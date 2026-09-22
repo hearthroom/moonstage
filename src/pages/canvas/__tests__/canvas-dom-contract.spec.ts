@@ -620,6 +620,8 @@ describe('畫布契約：PC 欄寬與置中規則', () => {
     const vars = readFileSync(resolve(__dirname, '../../../common/canvas-theme-vars.css'), 'utf8')
     const mobileVars = vars.slice(vars.indexOf('@media (max-width: 768px)'))
     expect(mobileVars).toMatch(/--lt-canvas-column-width:\s*100%/)
+    // 鎖暗色的美化卡會在畫布根宣告整組預設值；只改 :root 的繼承值仍會被桌面欄寬蓋掉。
+    expect(mobileVars).toMatch(/:root\s*,\s*\.canvas-root\.lt-theme-dark\s*\{\s*--lt-canvas-column-width:\s*100%/)
     // 那個檔沒有任何 @layer 區塊（註解裡提到不算，先把註解剝掉再看）
     expect(vars.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/@layer/)
     // canvas.css 的斷點在 @layer 裡，寫在那裡是死的——不要再寫回去
