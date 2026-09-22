@@ -421,7 +421,7 @@ import { draftToAuthorAsset, draftDisplayName, type AuthorDraft } from '@/common
 import { createSandboxHost, type SandboxHost } from './canvas-sandbox-host'
 import { resolveSandbox } from '@/host/sandbox-host'
 import { hoistFixedAuthorNodes } from './canvas-author-node-hoist'
-import { composerOverhang, paintedTop } from './canvas-composer-overhang'
+import { bindComposerOverhang } from './canvas-composer-overhang'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
 
@@ -3250,38 +3250,8 @@ function observeAuthorColumn() {
 
 // 作者把輸入區往上推（例如為了給自己的底部工具列讓位）時，捲動區的底部會被
 // 輸入區蓋住，最後一則訊息的結尾永遠捲不出來。量出被蓋住多少，補成對話欄的
-// 底部內距。純函式在 canvas-composer-overhang.ts。
-let composerOverhangObserver = null;
-let composerOverhangRaf = 0;
-function measureComposerOverhang() {
-  const scroll = document.querySelector('.scroll-view');
-  const composer = document.querySelector('.composer-scope');
-  if (!scroll || !composer) return;
-  const s = scroll.getBoundingClientRect();
-  const c = composer.getBoundingClientRect();
-  // 作者推的可能是子節點而不是最外層（見 canvas-composer-overhang.ts 的 paintedTop）：
-  // 量整棵子樹裡畫出來最高的那個。
-  const rects = [{ top: c.top, height: c.height, width: c.width, position: 'static' }];
-  composer.querySelectorAll('*').forEach((el) => {
-    const r = el.getBoundingClientRect();
-    if (!(r.height > 0)) return;
-    rects.push({ top: r.top, height: r.height, width: r.width, position: getComputedStyle(el).position });
-  });
-  const top = paintedTop(rects);
-  const px = composerOverhang({ scrollBottom: s.bottom, scrollHeight: s.height, composerTop: Number.isFinite(top) ? top : c.top, composerHeight: c.height });
-  const root = document.documentElement;
-  if (px > 0) root.style.setProperty('--lt-canvas-composer-overhang', px + 'px');
-  else root.style.removeProperty('--lt-canvas-composer-overhang');
-}
-function scheduleComposerOverhang() {
-  if (composerOverhangRaf) return;
-  const schedule = typeof window.requestAnimationFrame === 'function'
-    ? window.requestAnimationFrame
-    : (fn) => setTimeout(fn, 16);
-  composerOverhangRaf = schedule(() => { composerOverhangRaf = 0; measureComposerOverhang(); });
-}
-// transform 不會觸發 ResizeObserver，所以除了尺寸還要盯 style／class 的變化——
-// 作者的腳本通常就是改這兩個把輸入區推上去的。
+// 底部內距。量法與觀察器在 canvas-composer-overhang.ts（沙箱殼共用同一份）。
+let disposeComposerOverhangBinding: (() => void) | null = null;
 // ── 從作者的卡抽出「塊」與「藥丸」的外觀 ──────────────────────────────
 //
 // 量卡片已經漆好的兩個節點（AI 氣泡、快捷鍵），把邊框／底色／圓角／主色寫回我們的變數，
@@ -3369,23 +3339,19 @@ function disposeCardTheme() {
 }
 
 function observeComposerOverhang() {
-  const composer = document.querySelector('.composer-scope');
-  if (!composer) return;
-  if (typeof MutationObserver === 'function') {
-    composerOverhangObserver = new MutationObserver(scheduleComposerOverhang);
-    // subtree：作者推的可能是子節點（.chat-bottom），不只最外層。
-    composerOverhangObserver.observe(composer, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
-  }
-  window.addEventListener('resize', scheduleComposerOverhang);
-  scheduleComposerOverhang();
+  disposeComposerOverhang();
+  disposeComposerOverhangBinding = bindComposerOverhang({
+    doc: document,
+    win: window,
+    scroll: document.querySelector('.scroll-view'),
+    composer: document.querySelector('.composer-scope'),
+    target: document.documentElement,
+  });
 }
 function disposeComposerOverhang() {
-  if (composerOverhangObserver) {
-    try { composerOverhangObserver.disconnect(); } catch (e) { /* 收尾不得拋錯 */ }
-    composerOverhangObserver = null;
-  }
-  window.removeEventListener('resize', scheduleComposerOverhang);
-  try { document.documentElement.style.removeProperty('--lt-canvas-composer-overhang'); } catch (e) { /* 同上 */ }
+  if (!disposeComposerOverhangBinding) return;
+  try { disposeComposerOverhangBinding(); } catch (e) { /* 收尾不得拋錯 */ }
+  disposeComposerOverhangBinding = null;
 }
 
 // MMD 的「工具列／HUD 面板」這類卡片，慣用手法是讓 AI 每輪都在回覆裡重新吐一次

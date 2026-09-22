@@ -58,3 +58,67 @@ export function paintedTop(rects: PaintedRect[]): number {
   }
   return top
 }
+
+export type BindOverhangOptions = {
+  doc: Document
+  win: Window
+  /** 捲動區（.scroll-view）；沒有就不量 */
+  scroll: HTMLElement | null
+  /** 輸入區的最外層（.composer-scope）；沒有就不量 */
+  composer: HTMLElement | null
+  /** 變數寫在哪個節點：一般畫布是 documentElement，殼在 iframe 裡也是它自己的 documentElement */
+  target: HTMLElement
+}
+
+export const COMPOSER_OVERHANG_VAR = '--lt-canvas-composer-overhang'
+
+/*
+  把「量侵入量 → 寫成 CSS 變數 → 盯著輸入區子樹的 style／class 與視窗尺寸」綁在一個文件上。
+  一般畫布（canvas.vue）與沙箱殼（sandbox/shell.ts）都用這一個：殼在跨源 iframe 裡自己
+  掛標準舞台與標準輸入區，作者腳本推的是 iframe 裡的輸入區，畫布那邊的觀察器看不到
+  （owner 2026-09-22：沙箱卡在 Android 上動作列一直被推上來的輸入區蓋住，修一般畫布三次都
+  沒動靜，因為根本不是同一份文件）。
+
+  transform 不會觸發 ResizeObserver，所以盯的是 style／class 的變化——作者的腳本通常就是
+  改這兩個把輸入區推上去的；subtree 是因為推的可能是子節點（paintedTop 的說明）。
+*/
+export function bindComposerOverhang(opts: BindOverhangOptions): () => void {
+  const { doc, win, scroll, composer, target } = opts
+  if (!scroll || !composer) return () => {}
+  let raf = 0
+  const measure = () => {
+    const s = scroll.getBoundingClientRect()
+    const c = composer.getBoundingClientRect()
+    const rects: PaintedRect[] = [{ top: c.top, height: c.height, width: c.width, position: 'static' }]
+    composer.querySelectorAll('*').forEach((el) => {
+      const r = el.getBoundingClientRect()
+      if (!(r.height > 0)) return
+      rects.push({ top: r.top, height: r.height, width: r.width, position: win.getComputedStyle(el).position })
+    })
+    const top = paintedTop(rects)
+    const px = composerOverhang({ scrollBottom: s.bottom, scrollHeight: s.height, composerTop: Number.isFinite(top) ? top : c.top, composerHeight: c.height })
+    if (px > 0) target.style.setProperty(COMPOSER_OVERHANG_VAR, px + 'px')
+    else target.style.removeProperty(COMPOSER_OVERHANG_VAR)
+  }
+  const schedule = () => {
+    if (raf) return
+    const next = typeof win.requestAnimationFrame === 'function'
+      ? (fn: () => void) => win.requestAnimationFrame(fn)
+      : (fn: () => void) => win.setTimeout(fn, 16) as unknown as number
+    raf = next(() => { raf = 0; measure() })
+  }
+  let observer: MutationObserver | null = null
+  const MO = (win as Window & { MutationObserver?: typeof MutationObserver }).MutationObserver || (typeof MutationObserver === 'function' ? MutationObserver : null)
+  if (MO) {
+    observer = new MO(schedule)
+    observer.observe(composer, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] })
+  }
+  win.addEventListener('resize', schedule)
+  schedule()
+  return () => {
+    if (observer) { try { observer.disconnect() } catch { /* 收尾不得拋錯 */ } observer = null }
+    win.removeEventListener('resize', schedule)
+    try { target.style.removeProperty(COMPOSER_OVERHANG_VAR) } catch { /* 同上 */ }
+    void doc
+  }
+}

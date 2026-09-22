@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { composerOverhang, paintedTop } from '../canvas-composer-overhang'
+import { bindComposerOverhang, composerOverhang, paintedTop } from '../canvas-composer-overhang'
 
 describe('輸入區侵入捲動區的量', () => {
   it('作者把輸入區往上推 52px 時，對話欄要多 52px 底部內距', () => {
@@ -37,10 +37,13 @@ describe('對話欄的底部內距吃這個量', () => {
     expect(hits.length).toBe(2)
   })
 
-  it('畫布量到之後把它寫成 CSS 變數，卸載時清掉', () => {
-    expect(vue).toContain("setProperty('--lt-canvas-composer-overhang'")
-    expect(vue).toContain("removeProperty('--lt-canvas-composer-overhang')")
-    expect(vue).toMatch(/composerOverhang\(\{/)
+  it('量到之後把它寫成 CSS 變數，解綁時清掉（量法搬進 canvas-composer-overhang.ts，畫布與殼共用）', () => {
+    const mod = readFileSync(resolve(process.cwd(), 'src/pages/canvas/canvas-composer-overhang.ts'), 'utf8')
+    expect(mod).toMatch(/setProperty\(COMPOSER_OVERHANG_VAR/)
+    expect(mod).toMatch(/removeProperty\(COMPOSER_OVERHANG_VAR/)
+    expect(mod).toMatch(/composerOverhang\(\{/)
+    expect(mod).toMatch(/subtree: true/)
+    expect(vue).toMatch(/bindComposerOverhang\(\{/)
   })
 })
 
@@ -99,12 +102,54 @@ describe('作者推的是輸入區的子節點時，一樣要量到', () => {
     expect(paintedTop([{ top: 792, height: 0, width: 0 }])).toBe(Number.POSITIVE_INFINITY)
   })
 
-  it('畫布量的是子樹最高點，觀察器也盯子樹', () => {
+  it('一般畫布與沙箱殼都用同一個 bindComposerOverhang，各自在自己的文件上量', () => {
     const vue = readFileSync(resolve(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
-    const measure = vue.slice(vue.indexOf('function measureComposerOverhang()'), vue.indexOf('function scheduleComposerOverhang()'))
-    expect(measure).toMatch(/paintedTop\(/)
-    expect(measure).toMatch(/composer\.querySelectorAll\('\*'\)/)
-    const observe = vue.slice(vue.indexOf('function observeComposerOverhang()'), vue.indexOf('function disposeComposerOverhang()'))
-    expect(observe).toMatch(/subtree: true/)
+    const shell = readFileSync(resolve(process.cwd(), 'src/sandbox/shell.ts'), 'utf8')
+    expect(vue).toMatch(/bindComposerOverhang\(\{/)
+    expect(shell).toMatch(/bindComposerOverhang\(\{/)
+    // 殼在 dispose 時要解綁
+    expect(shell).toMatch(/disposeComposerOverhang\(\)/)
+  })
+
+})
+
+// @vitest-environment jsdom 不在檔頭：這組自己用 jsdom 的 document（vitest 預設環境已是 jsdom，見 vitest.config）。
+describe('bindComposerOverhang：量、寫變數、盯子樹', () => {
+  const rectOf = (el: Element, r: { top: number; height: number; width: number }) => {
+    ;(el as HTMLElement).getBoundingClientRect = () => ({ top: r.top, bottom: r.top + r.height, height: r.height, width: r.width, left: 0, right: r.width, x: 0, y: r.top, toJSON() {} } as DOMRect)
+  }
+  const tick = () => new Promise((r) => setTimeout(r, 40))
+
+  it('作者只推子節點（.chat-bottom）時也量得到，變數寫在 target 上；解綁後清掉', async () => {
+    document.body.innerHTML = '<div class="scroll-view"></div><div class="composer-scope"><div class="chat-bottom"><div class="row"></div></div></div>'
+    const scroll = document.querySelector('.scroll-view') as HTMLElement
+    const composer = document.querySelector('.composer-scope') as HTMLElement
+    const child = document.querySelector('.chat-bottom') as HTMLElement
+    rectOf(scroll, { top: 54, height: 738, width: 412 })      // 捲動區 54–792
+    rectOf(composer, { top: 792, height: 123, width: 412 })   // 最外層沒動
+    rectOf(child, { top: 740, height: 123, width: 412 })      // 子節點被推上去 52px
+    rectOf(document.querySelector('.row')!, { top: 748, height: 50, width: 412 })
+    const dispose = bindComposerOverhang({ doc: document, win: window, scroll, composer, target: document.documentElement })
+    await tick()
+    expect(document.documentElement.style.getPropertyValue('--lt-canvas-composer-overhang')).toBe('52px')
+    // 作者把子節點放回去（裡面的列也跟著回去）：style 變了 → 觀察器重量 → 變數清掉
+    rectOf(child, { top: 792, height: 123, width: 412 })
+    rectOf(document.querySelector('.row')!, { top: 800, height: 50, width: 412 })
+    child.style.transform = 'none'
+    await tick()
+    expect(document.documentElement.style.getPropertyValue('--lt-canvas-composer-overhang')).toBe('')
+    // 再推一次，然後解綁
+    rectOf(child, { top: 740, height: 123, width: 412 })
+    rectOf(document.querySelector('.row')!, { top: 748, height: 50, width: 412 })
+    child.style.transform = 'translateY(-52px)'
+    await tick()
+    expect(document.documentElement.style.getPropertyValue('--lt-canvas-composer-overhang')).toBe('52px')
+    dispose()
+    expect(document.documentElement.style.getPropertyValue('--lt-canvas-composer-overhang')).toBe('')
+  })
+
+  it('沒有捲動區或輸入區就什麼都不做', () => {
+    document.body.innerHTML = ''
+    expect(() => bindComposerOverhang({ doc: document, win: window, scroll: null, composer: null, target: document.documentElement })()).not.toThrow()
   })
 })
