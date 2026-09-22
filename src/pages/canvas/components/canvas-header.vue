@@ -34,6 +34,25 @@
         </div>
 
         <div class="header-icon-meun" data-lt="header-actions">
+          <div
+            v-if="fullscreenSupported"
+            role="button"
+            tabindex="0"
+            class="header-meun fullscreen-toggle"
+            data-lt="fullscreen"
+            :aria-label="fullscreenLabel"
+            :title="fullscreenLabel"
+            :aria-pressed="fullscreenActive"
+            @click="$emit('fullscreen')"
+            @keydown.enter.prevent="$emit('fullscreen')"
+            @keydown.space.prevent="$emit('fullscreen')"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path v-if="fullscreenActive" d="M8 3v5H3m13-5v5h5M3 16h5v5m13-5h-5v5" />
+              <path v-else d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />
+            </svg>
+          </div>
           <div class="header-meun header-meun-rating">
             <!-- 作者常把分級徽章整顆藏掉；節點不在的話那條規則會靜默失效。 -->
             <div class="header-badge"></div>
@@ -75,10 +94,14 @@ withDefaults(defineProps<{
   showModel?: boolean
   /** 宿主沒有上一頁可回（獨立的卡片 App）就不畫返回鍵 */
   showBack?: boolean
+  fullscreenSupported?: boolean
+  fullscreenActive?: boolean
+  fullscreenLabel?: string
 }>(), { badge: '', showModel: true, showBack: true })
 
 defineEmits<{
   (e: 'back'): void
   (e: 'model'): void
+  (e: 'fullscreen'): void
 }>()
 </script>

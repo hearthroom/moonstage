@@ -337,6 +337,7 @@ export function createShell(options: CreateShellOptions): Shell {
         ...chromeState.header,
         onBack: () => { if (!handleBack()) sendUi('back') },
         onModel: () => sendUi('model'),
+        onFullscreen: () => sendUi('fullscreen'),
       } as Record<string, unknown>),
     })
     headerApp.config.warnHandler = () => {}

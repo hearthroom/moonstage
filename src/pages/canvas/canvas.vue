@@ -23,6 +23,10 @@
       :show-model="!previewOnly"
       :back-label="t('common.back')"
       :model-label="t('chat.modelSelectAria')"
+      :fullscreen-supported="fullscreenSupported"
+      :fullscreen-active="fullscreenActive"
+      :fullscreen-label="fullscreenLabel"
+      @fullscreen="toggleFullscreen"
       @back="onHeaderBack"
       @model="openModelSelect"
     />
@@ -350,6 +354,7 @@
 <script lang="ts" setup>
 import { cfImageDesktop } from "@/utils/image-transform.js"
 
+import { createFullscreenController } from './canvas-fullscreen';
 import {computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, unref, getCurrentInstance, nextTick, watch, watchEffect} from 'vue';
 import {
   onLoad,
@@ -2363,6 +2368,18 @@ function collectCanvasVars(): Record<string, string> {
   return out;
 }
 
+const fullscreenActive = ref(false);
+const fullscreenSupported = ref(false);
+const fullscreenLabel = computed(() => t(fullscreenActive.value ? 'canvas.fullscreen.exit' : 'canvas.fullscreen.enter'));
+let fullscreenControl: ReturnType<typeof createFullscreenController> | undefined;
+onMounted(() => {
+  fullscreenControl = createFullscreenController(document, active => { fullscreenActive.value = active; },
+    () => uni.showToast({ title: t('canvas.fullscreen.failed'), icon: 'none' }));
+  fullscreenSupported.value = fullscreenControl.supported;
+});
+onUnmounted(() => fullscreenControl?.dispose());
+function toggleFullscreen() { void fullscreenControl?.toggle(); }
+
 // 頁首與輸入區的呈現資料：跟模板上綁給 CanvasHeader／CanvasComposer 的是同一批值，殼那邊用同一套元件畫。
 function buildChromeState() {
   return {
@@ -2375,6 +2392,9 @@ function buildChromeState() {
       showBack,
       backLabel: t('common.back'),
       modelLabel: t('chat.modelSelectAria'),
+      fullscreenSupported: fullscreenSupported.value,
+      fullscreenActive: fullscreenActive.value,
+      fullscreenLabel: fullscreenLabel.value,
     },
     composer: {
       placeholder: t('canvas.placeholder'),
@@ -2708,6 +2728,7 @@ function mountSandbox(asset: any) {
           case 'assist': onAssist(); return;
           case 'more-pick': onPanelPick(String(key || '')); return;
           case 'model': openModelSelect(); return;
+          case 'fullscreen': toggleFullscreen(); return;
           case 'shortcut': onShortcut(String(key || '')); return;
           case 'back': goBackToEntry(); return;
         }

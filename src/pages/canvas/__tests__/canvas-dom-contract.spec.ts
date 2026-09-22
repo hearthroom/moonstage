@@ -86,7 +86,7 @@ function mountRegion(region: string) {
       } })
     case 'header':
       return mount(CanvasHeader, {
-        props: { roleName: '示範角色', avatar: '', modelName: 'Luna' },
+        props: { roleName: '示範角色', avatar: '', modelName: 'Luna', fullscreenSupported: true, fullscreenLabel: 'Enter fullscreen' },
       })
     case 'stage':
       return mount(CanvasStage, { props: { backgroundUrl: '' } })
@@ -669,7 +669,7 @@ describe('畫布：手機也要能用', () => {
   })
 
   it('輸入區避開系統手勢區', () => {
-    expect(css).toContain('env(safe-area-inset-bottom)')
+    expect(css).toContain('env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px))')
   })
 
   it('窄螢幕收掉桌面的欄寬', () => {

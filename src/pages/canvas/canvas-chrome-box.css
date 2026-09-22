@@ -30,10 +30,13 @@
     padding: var(--luna-s-3, 12px)
 }
 .conv-style-modal .response-footer {
-    padding-bottom: env(safe-area-inset-bottom)
+    padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px))
 }
 .header-box {
     padding: 0 10px
+}
+.fullscreen-toggle {
+    padding: 0
 }
 .preview-badge {
     padding: 4px 10px
@@ -50,12 +53,15 @@
 .agent-resume-card__btn {
     padding: 6px 14px
 }
+.canvas-sandbox-frame {
+    padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px))
+}
 .canvas-sandbox-notice {
     margin: 8px 16px 12px;
     padding: 10px 14px
 }
 .chat-bottom {
-    padding-bottom: env(safe-area-inset-bottom)
+    padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px))
 }
 .shortcut-bar {
     padding: 8px 12px 0

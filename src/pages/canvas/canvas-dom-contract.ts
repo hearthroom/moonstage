@@ -78,6 +78,7 @@ export const ALWAYS_PRESENT_SELECTORS = [
 ] as const
 
 export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
+  { selector: '[data-lt="fullscreen"]', region: 'header', origin: 'lt', why: '全螢幕按鈕沿用 header-meun，美化可用穩定鉤子覆寫' },
   // ── 頂欄 ────────────────────────────────────────────────────────────
   { selector: '.topTabbar', region: 'header', origin: 'mmd', why: '卡片寫 .kg .topTabbar 換頂欄底色' },
   { selector: '#top-bar', region: 'header', origin: 'st', why: '酒館主題移植' },

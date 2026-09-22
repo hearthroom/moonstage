@@ -1,4 +1,8 @@
 {
+	"canvas.fullscreen.enter": "전체 화면으로 보기",
+	"canvas.fullscreen.exit": "전체 화면 종료",
+	"canvas.fullscreen.failed": "전체 화면으로 전환하지 못했어요. 그대로 플레이하거나 다시 시도할 수 있어요.",
+
 	"error.contextCapacityTitle": "모델의 컨텍스트 용량을 초과했습니다",
 	"error.contextCapacityExceeded": "내용이 모델의 사용 가능한 컨텍스트 용량을 초과했습니다. 이번 메시지를 줄이거나 용량이 더 큰 모델로 변경해 주세요. 기존 대화는 보존되어 있습니다.",
 	"mine.checkRole.author": "작성자",

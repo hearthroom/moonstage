@@ -1,4 +1,8 @@
 {
+	"canvas.fullscreen.enter": "全画面表示",
+	"canvas.fullscreen.exit": "全画面表示を終了",
+	"canvas.fullscreen.failed": "全画面表示に切り替えられませんでした。そのまま続けるか、もう一度お試しください。",
+
 	"error.contextCapacityTitle": "モデルのコンテキスト容量を超えています",
 	"error.contextCapacityExceeded": "内容がモデルのコンテキスト容量を超えています。今回のメッセージを短くするか、容量の大きいモデルに切り替えてください。これまでの会話は保存されています。",
 	"mine.checkRole.author": "作成者",
