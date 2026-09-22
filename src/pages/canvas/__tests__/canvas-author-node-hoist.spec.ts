@@ -8,7 +8,7 @@
  * 的節點，觸發幾次都只剩一份——這支測試釘住「搬家去重」要做到同一件事。
  */
 import { describe, it, expect } from 'vitest'
-import { hoistFixedAuthorNodes } from '../canvas-author-node-hoist'
+import { adoptAuthorBodyNode, hoistFixedAuthorNodes } from '../canvas-author-node-hoist'
 
 const FIXED = () => ({ position: 'fixed' })
 const STATIC = () => ({ position: 'static' })
@@ -126,5 +126,25 @@ describe('hoistFixedAuthorNodes', () => {
 
     expect(result).toEqual({ hoisted: 0, removed: 0 })
     expect(container.children.length).toBe(1)
+  })
+})
+
+describe('adoptAuthorBodyNode', () => {
+  it('fixed 節點搬進容器；流內節點、容器本身、沒有容器時都不動', () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const overlay = document.createElement('div')
+    document.body.appendChild(overlay)
+    expect(adoptAuthorBodyNode(overlay, container, FIXED)).toBe(true)
+    expect(overlay.parentNode).toBe(container)
+
+    const note = document.createElement('div')
+    document.body.appendChild(note)
+    expect(adoptAuthorBodyNode(note, container, STATIC)).toBe(false)
+    expect(note.parentNode).toBe(document.body)
+
+    expect(adoptAuthorBodyNode(container, container, FIXED)).toBe(false)
+    expect(adoptAuthorBodyNode(note, null, FIXED)).toBe(false)
+    expect(adoptAuthorBodyNode(document.createTextNode('x'), container, FIXED)).toBe(false)
   })
 })

@@ -422,7 +422,7 @@ import { getAuthorDraftStore } from '@/common/author-draft-store'
 import { draftToAuthorAsset, draftDisplayName, type AuthorDraft } from '@/common/author-draft'
 import { createSandboxHost, type SandboxHost } from './canvas-sandbox-host'
 import { resolveSandbox } from '@/host/sandbox-host'
-import { hoistFixedAuthorNodes } from './canvas-author-node-hoist'
+import { adoptAuthorBodyNode, hoistFixedAuthorNodes } from './canvas-author-node-hoist'
 import { bindComposerOverhang } from './canvas-composer-overhang'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
@@ -3120,6 +3120,12 @@ function ensureAuthorScope() {
       win: window,
       isAuthorRoot: (el) => !!(el.hasAttribute && el.hasAttribute(AUTHOR_CONTAINER_ATTR)),
       isOwnNode: (node) => !!(node.hasAttribute && node.hasAttribute(AUTHOR_CONTAINER_ATTR)),
+      // 作者直接塞進 body 的 fixed 節點（常見的是「點外面就關」的透明遮罩）搬進掛載層容器，
+      // 跟面板在同一個 stacking context 裡比 z-index（見 adoptAuthorBodyNode 的說明）。
+      onBodyNode: (node) => {
+        if (!authorAssetRuntime || !authorFixedNodeHoistLayer) return;
+        adoptAuthorBodyNode(node, authorAssetRuntime.containerFor(authorFixedNodeHoistLayer), (el) => getComputedStyle(el));
+      },
     });
   }
   return authorScope;
@@ -3187,6 +3193,9 @@ function applyAuthorAsset(asset) {
       );
       // 接管清單要在掛載之前算好：宿主那一層一旦畫出來再收，玩家會看到閃一下。
       authorOwnedRegions.value = detectAuthorOwnedRegions(mounted).join(' ');
+      // 掛載層的名字要在掛載前記好：掛載腳本當下往 body 塞的 fixed 節點也要搬進同一個容器
+      // （容器在腳本執行前就建好了）。
+      authorFixedNodeHoistLayer = res.data.mountLayer;
       const mountEl = authorAssetRuntime.mount({ mountLayer: res.data.mountLayer, html: mounted });
       // 來源寫在容器上：MMD 的卡以 content-box 排版（見 canvas.css 的說明），酒館的卡不是。
       if (mountEl) mountEl.setAttribute('data-stage-author-format', cardFormat.value);
@@ -3199,8 +3208,7 @@ function applyAuthorAsset(asset) {
 
       // 掛載點自己只搬一次，但訊息串裡的內容會不斷冒出新的 fixed 面板重複觸發
       // （見 runFixedAuthorNodeHoist 的說明），這裡記住掛載層的名字讓那支函式
-      // 知道要搬去哪個容器，再跑一次＋掛上持續監看。
-      authorFixedNodeHoistLayer = res.data.mountLayer;
+      // 知道要搬去哪個容器（名字在掛載前已記好），再跑一次＋掛上持續監看。
       runFixedAuthorNodeHoist();
       observeFixedAuthorNodes();
     }

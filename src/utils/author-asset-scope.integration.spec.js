@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 
 import { createAuthorAssetRuntime, CONTAINER_ATTR } from './author-asset-mount.js'
 import { createAuthorScope } from './author-asset-scope.js'
+import { adoptAuthorBodyNode } from '../pages/canvas/canvas-author-node-hoist'
 
 const nativeSetTimeout = window.setTimeout
 function wait(ms) { return new Promise((resolve) => { nativeSetTimeout(resolve, ms) }) }
@@ -143,6 +144,61 @@ describe('作者範圍 × 執行期：一張會殘留的卡', () => {
     expect(document.getElementById('card-b-panel')).toBeNull()
     expect(document.body.children.length).toBe(1)
     expect(document.body.firstElementChild.id).toBe('app')
+  })
+
+  // 社群回報的卡（2026-09-22）：面板在掛載層裡用 z-index 9999，點開時再往 body 塞一層
+  // z-index 9998 的全螢幕透明遮罩當「點外面就關」。作者容器是自己的 stacking context，
+  // 遮罩若留在 body，9998 是跟整個畫布比，面板與預覽彈窗全被它蓋住：點什麼都先點到
+  // 遮罩，面板就關了。遮罩搬進同一個容器，9998 < 9999 才又成立。
+  it('作者點開面板時塞到 body 的 fixed 遮罩，搬進面板所在的容器；流內節點不搬', async () => {
+    let runtime = null
+    const scope = createAuthorScope({
+      doc: document,
+      win: window,
+      isAuthorRoot: (el) => !!(el.hasAttribute && el.hasAttribute(CONTAINER_ATTR)),
+      isOwnNode: (node) => !!(node.hasAttribute && node.hasAttribute(CONTAINER_ATTR)),
+      onBodyNode: (node) => {
+        adoptAuthorBodyNode(node, runtime && runtime.containerFor('over'), (el) => window.getComputedStyle(el))
+      },
+    })
+    runtime = createAuthorAssetRuntime({
+      doc: document,
+      layerZIndex: { under: 12, over: 30, cover: 1000 },
+      runAuthorCode: (fn) => scope.run(fn),
+    })
+    const container = runtime.mount({ mountLayer: 'over', html: `
+      <div class="sidebar" style="position:fixed;z-index:9999" onclick="event.stopPropagation()">
+        <div id="trigger" onclick="
+          var p=this.nextElementSibling;
+          p.style.display='flex';
+          var overlay=document.createElement('div');
+          overlay.id='teapot-overlay';
+          overlay.style.cssText='position:fixed;inset:0;z-index:9998;background:transparent;';
+          overlay.onclick=function(){p.style.display='none';this.remove();};
+          document.body.appendChild(overlay);
+          var note=document.createElement('div');
+          note.id='flow-note';
+          document.body.appendChild(note);
+        ">特化库</div>
+        <div id="bubble" style="display:none"></div>
+      </div>` })
+
+    document.getElementById('trigger').click()
+    // 面板自己 stopPropagation，事件到不了 window，窗口由頁面根部的觀察回呼（微任務）
+    // 先結帳——瀏覽器在繪製前就跑完，這裡等一拍。
+    await Promise.resolve()
+
+    const overlay = document.getElementById('teapot-overlay')
+    expect(overlay.parentNode).toBe(container)
+    // 流內節點搬進 0×0 的容器會被裁掉看不見，留在原地
+    expect(document.getElementById('flow-note').parentNode).toBe(document.body)
+
+    overlay.click()
+    expect(document.getElementById('bubble').style.display).toBe('none')
+    expect(document.getElementById('teapot-overlay')).toBeNull()
+
+    leaveCard({ runtime, scope })
+    expect(document.getElementById('flow-note')).toBeNull()
   })
 
   it('作者訂閱 dispose 事件時在回呼裡做的事也收得掉', () => {
