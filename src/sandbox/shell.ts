@@ -22,6 +22,7 @@ import CanvasStage from '@/pages/canvas/components/canvas-stage.vue'
 import CanvasHeader from '@/pages/canvas/components/canvas-header.vue'
 import { chromeTopColor } from '@/pages/canvas/canvas-chrome-tone'
 import CanvasComposer from '@/pages/canvas/components/canvas-composer.vue'
+import { bindComposerOverhang } from '@/pages/canvas/canvas-composer-overhang'
 import { reactive, ref } from 'vue'
 // 標準播放器的樣式表整份帶進殼：訊息區的每一條規則跟一般卡同一份。頁首與輸入區的規則在殼裡沒有對應節點，不礙事。
 import '@/pages/canvas/canvas.css'
@@ -326,6 +327,7 @@ export function createShell(options: CreateShellOptions): Shell {
 
   // ── 標準頁首與輸入區：跟一般卡同一套元件，資料由宿主送來（chrome 訊息），按鍵轉回宿主做。 ──
   let chromeApps: Array<{ unmount(): void }> = []
+  let disposeComposerOverhang: (() => void) | null = null
   const headerResize = typeof ResizeObserver === 'function'
     ? new ResizeObserver(() => refs.root.style.setProperty('--shell-header-h', `${refs.header.offsetHeight}px`))
     : null
@@ -362,6 +364,13 @@ export function createShell(options: CreateShellOptions): Shell {
     composerApp.mount(refs.composer)
     chromeApps = [headerApp, composerApp]
     if (headerResize) headerResize.observe(refs.header)
+    // 作者腳本把輸入區往上推（給自己的底部工具列讓位）時，訊息區底部被蓋住的量要補成
+    // 對話欄的底部內距——跟一般畫布同一套量法；殼在 iframe 裡，畫布那邊的觀察器看不到這裡。
+    disposeComposerOverhang = bindComposerOverhang({
+      doc, win, scroll: scrollView,
+      composer: (refs.composer.querySelector('.composer-scope') as HTMLElement | null) || refs.composer,
+      target: doc.documentElement,
+    })
   }
 
   // ── 返回：舞台開著先關舞台（平台關的，發 stage:close）；否則交給宿主。 ──
@@ -518,6 +527,7 @@ export function createShell(options: CreateShellOptions): Shell {
       scope.uninstall()
       try { stageApp.unmount() } catch { /* 已經拆掉 */ }
       for (const app of chromeApps) { try { app.unmount() } catch { /* 已經拆掉 */ } }
+      if (disposeComposerOverhang) { try { disposeComposerOverhang() } catch { /* 已經拆掉 */ } disposeComposerOverhang = null }
       if (panels) panels.unmount()
       if (docObserver) docObserver.disconnect()
       if (headerResize) headerResize.disconnect()
