@@ -567,4 +567,21 @@ describe('沙箱宿主橋：更早的歷史', () => {
     host.sync()
     expect(h.posted.filter((m) => m.type === 'history')).toEqual([expect.objectContaining({ more: false, loading: false })])
   })
+  // 2026-09-23 作者回報：沙箱卡看不到「选择开场」。宿主算好的開場選項要送進殼，變了才送。
+  it('開場選項：握手後送 prologue，沒變不重送，玩家送出第一句後送空清單', async () => {
+    const greeting = msg({ id: '10', text: '你好', opening: true })
+    const state = { current: makeState({ messages: [greeting], prologue: { title: '选择开场', items: ['我想搭船。'] } }) }
+    const { hud } = fakeHud(state)
+    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '1', hello })
+    host.start()
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    host.sync()
+    host.sync()
+    expect(h.posted.filter((m) => m.type === 'prologue')).toEqual([expect.objectContaining({ title: '选择开场', items: ['我想搭船。'] })])
+    state.current = makeState({ messages: [greeting, msg({ id: '11', role: 'user', text: '我想搭船。' })], prologue: { title: '选择开场', items: [] } })
+    host.sync()
+    expect(h.posted.filter((m) => m.type === 'prologue').at(-1)).toMatchObject({ items: [] })
+    host.destroy()
+  })
 })

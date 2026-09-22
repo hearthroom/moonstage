@@ -454,6 +454,36 @@ export function createShell(options: CreateShellOptions): Shell {
     }
   }
 
+  // ── 開場選項（MMD「你可以选择开场」）：跟普通頁同一份 DOM 與樣式（canvas.css 的 .prologue-*）。
+  // 點一條只回報第幾條，由宿主用普通頁同一段邏輯填輸入框（不送出），再經 input 同步回來。
+  let prologueEl: HTMLElement | null = null
+  const renderPrologue = (title: string, items: string[]) => {
+    if (prologueEl) { prologueEl.remove(); prologueEl = null }
+    if (!items.length) return
+    const scope = doc.createElement('div')
+    scope.className = 'prologue-scope'
+    scope.setAttribute('data-lt', 'prologue')
+    const head = doc.createElement('div')
+    head.className = 'prologue-title'
+    const label = doc.createElement('span')
+    label.textContent = title
+    head.appendChild(label)
+    scope.appendChild(head)
+    items.forEach((text, index) => {
+      const item = doc.createElement('div')
+      item.className = 'prologue-content'
+      item.setAttribute('role', 'button')
+      item.tabIndex = 0
+      item.textContent = text
+      const pick = (e: Event) => { e.preventDefault(); e.stopPropagation(); sendUi('prologue', String(index)); input.focus() }
+      item.addEventListener('click', pick)
+      item.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') pick(e) })
+      scope.appendChild(item)
+    })
+    refs.list.after(scope)
+    prologueEl = scope
+  }
+
   const handle = (message: HostToShell) => {
     switch (message.type) {
       case 'hello':
@@ -488,6 +518,9 @@ export function createShell(options: CreateShellOptions): Shell {
         busy = !!message.busy
         refs.root.setAttribute('data-busy', busy ? '1' : '0')
         refs.send.disabled = busy
+        return
+      case 'prologue':
+        renderPrologue(String(message.title ?? ''), Array.isArray(message.items) ? message.items.map(String) : [])
         return
       case 'input':
         input.set(String(message.value ?? ''))

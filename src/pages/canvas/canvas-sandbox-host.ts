@@ -171,6 +171,8 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       return toShell(m, shellId)
     })
     post({ type: 'messages', messages })
+    // 開場選項畫在訊息列之後，跟著全量訊息一起到；之後變了才由 sync 再送。
+    syncPrologue(snapshot)
   }
 
   // 宿主的訊息 id 會換：送出時玩家那則與 AI 占位先拿暫時 id，伺服器受理／定稿後換成正式 id。
@@ -290,6 +292,17 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     if (key === lastPanelsKey) return
     lastPanelsKey = key
     post({ type: 'panels', state: JSON.parse(key) as PanelsState })
+  }
+
+  let lastPrologueKey = ''
+  const syncPrologue = (snapshot: HudHostState) => {
+    const prologue = snapshot.prologue
+    if (!prologue) return
+    const state = { title: String(prologue.title || ''), items: prologue.items.map(String) }
+    const key = JSON.stringify(state)
+    if (key === lastPrologueKey) return
+    lastPrologueKey = key
+    post({ type: 'prologue', ...state })
   }
 
   const syncInput = (snapshot: HudHostState) => {
@@ -536,6 +549,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       syncChrome(snapshot)
       syncPanels(snapshot)
       syncHistory(snapshot)
+      syncPrologue(snapshot)
     },
     conversationSwitched() {
       if (!helloSent || destroyed) return

@@ -2753,6 +2753,7 @@ function mountSandbox(asset: any) {
           case 'fullscreen': toggleFullscreen(); return;
           case 'shortcut': onShortcut(String(key || '')); return;
           case 'back': goBackToEntry(); return;
+          case 'prologue': onProloguePick(Number(key)); return;
         }
       },
       onComposer: (visible) => { sandboxComposerHidden.value = !visible; },
@@ -2957,6 +2958,8 @@ function buildHudHost(): HudHost {
         panels: sandboxCard.value ? buildPanelsState() : undefined,
         // 沙箱殼用：更早的歷史還有沒有（殼捲到頂附近會來要下一頁；一般卡是隱藏的捲動容器自己觸發）。
         history: sandboxCard.value ? { more: !!ajax.value.hasNextPage, loading: !ajax.value.flag } : undefined,
+        // 沙箱殼用：開場選項（跟普通頁同一份清單與顯示時機）。
+        prologue: sandboxCard.value ? { title: prologueTitle.value, items: prologueItems.value } : undefined,
         character: {
           id: String(unref(roleId) || '') || null,
           name: convertPlainText(view.roleName || '', displayScript),

@@ -414,3 +414,26 @@ describe('殼的根不准被內部捲動（iOS 鍵盤露出輸入框時會捲 ov
     expect(block).toMatch(/overflow: clip;/)
   })
 })
+
+// 2026-09-23 作者回報：沙箱卡看不到「选择开场」。普通頁與沙箱頁都要有，點一條交給宿主填輸入框、不送出。
+describe('殼：開場選項（MMD prologue）', () => {
+  it('宿主給了選項就畫在訊息列之後；點一條回報第幾條給宿主；清空就拿掉', () => {
+    const s = boot(config())
+    s.handle({ type: 'messages', messages: [{ id: 'greeting', role: 'ai', content: '開場白', serverId: null }] })
+    s.handle({ type: 'prologue', title: '选择开场', items: ['我想搭船。', '<b>不是標籤</b>'] })
+    const scope = s.refs.messages.querySelector('[data-lt="prologue"]') as HTMLElement
+    expect(scope).not.toBeNull()
+    expect(scope.classList.contains('prologue-scope')).toBe(true)
+    expect(scope.previousElementSibling).toBe(s.refs.list)
+    expect(scope.querySelector('.prologue-title')!.textContent).toBe('选择开场')
+    const items = [...scope.querySelectorAll('.prologue-content')] as HTMLElement[]
+    expect(items.map((n) => n.textContent)).toEqual(['我想搭船。', '<b>不是標籤</b>'])
+    expect(scope.querySelector('b')).toBeNull()
+    sent = []
+    items[1].click()
+    expect(sent).toContainEqual({ type: 'ui', event: 'prologue', key: '1' })
+    expect(sent.some((m) => m.type === 'request')).toBe(false)
+    s.handle({ type: 'prologue', title: '选择开场', items: [] })
+    expect(s.refs.messages.querySelector('[data-lt="prologue"]')).toBeNull()
+  })
+})
