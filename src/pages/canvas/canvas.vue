@@ -357,6 +357,7 @@ import { cfImageDesktop } from "@/utils/image-transform.js"
 
 import { createFullscreenController } from './canvas-fullscreen';
 import { bindCanvasViewport } from './canvas-viewport';
+import { mountGeometryDebug, rectText } from '@/common/geometry-debug';
 import {computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, unref, getCurrentInstance, nextTick, watch, watchEffect} from 'vue';
 import {
   onLoad,
@@ -2376,13 +2377,27 @@ let disposeViewport: (() => void) | undefined;
 const fullscreenSupported = ref(false);
 const fullscreenLabel = computed(() => t(fullscreenActive.value ? 'canvas.fullscreen.exit' : 'canvas.fullscreen.enter'));
 let fullscreenControl: ReturnType<typeof createFullscreenController> | undefined;
+let disposeGeometryDebug: (() => void) | undefined;
 onMounted(() => {
   if (canvasRoot.value) disposeViewport = bindCanvasViewport(window, canvasRoot.value);
+  // ?sdkDebug=1：疊一塊幾何數值面板（common/geometry-debug.ts），手機截圖就能回報版面問題。
+  if (/[?&]sdkDebug=1\b/.test(String(window.location.search || ''))) {
+    disposeGeometryDebug = mountGeometryDebug(document, window, 'host', () => {
+      const root = canvasRoot.value as HTMLElement | null;
+      return {
+        root: rectText(root), rootClass: root ? root.className.replace(/\s+/g, '.') : '-',
+        vars: root ? ['--lt-viewport-top', '--lt-viewport-height', '--lt-viewport-bottom'].map((n) => root.style.getPropertyValue(n) || '·').join('/') : '-',
+        iframe: rectText(document.querySelector('.canvas-sandbox-frame iframe')),
+        composer: rectText(document.querySelector('.composer-scope')),
+        overhang: document.documentElement.style.getPropertyValue('--lt-canvas-composer-overhang') || '·',
+      };
+    });
+  }
   fullscreenControl = createFullscreenController(document, active => { fullscreenActive.value = active; },
     () => uni.showToast({ title: t('canvas.fullscreen.failed'), icon: 'none' }));
   fullscreenSupported.value = fullscreenControl.supported;
 });
-onUnmounted(() => { fullscreenControl?.dispose(); disposeViewport?.(); });
+onUnmounted(() => { fullscreenControl?.dispose(); disposeViewport?.(); disposeGeometryDebug?.(); });
 function toggleFullscreen() { void fullscreenControl?.toggle(); }
 
 // 頁首與輸入區的呈現資料：跟模板上綁給 CanvasHeader／CanvasComposer 的是同一批值，殼那邊用同一套元件畫。
