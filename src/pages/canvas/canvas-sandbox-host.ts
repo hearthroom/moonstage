@@ -307,11 +307,18 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   //    鍵盤與工具列的幾何交給瀏覽器——iOS Safari 鍵盤一彈會自己捲頂層頁，這時殼的根若跟著
   //    visualViewport 縮短，iframe 下半截露出空白、拖到底又被重排拉回（owner 2026-09-22 iOS
   //    回報，392d23e 上線幾小時後；在那之前殼的根從不小於 100%）。
+  //    一般模式送的是 iframe 自己的版面高度（getBoundingClientRect，CSS px），不是 innerHeight：
+  //    iOS 自動放大頁面時 innerHeight 會跟著縮（796→747），拿它當整高會把殼的根縮短、底下留空白
+  //    （owner 2026-09-22 面板數值）。版面高度不受縮放影響。
   const viewportHeight = (): number | undefined => {
     const fullscreen = !!win.document.fullscreenElement
-    const { top, bottom } = fullscreen ? visibleViewport(win) : { top: 0, bottom: win.innerHeight }
     let rect: { top: number; bottom: number; height: number } | null = null
     try { rect = deps.iframe.getBoundingClientRect() } catch { rect = null }
+    if (!fullscreen) {
+      const own = rect && rect.height > 0 ? rect.height : win.innerHeight
+      return Number.isFinite(own) && own > 0 ? Math.round(own) : undefined
+    }
+    const { top, bottom } = visibleViewport(win)
     const visible = rect && rect.height > 0 ? Math.min(rect.bottom, bottom) - Math.max(rect.top, top) : bottom - top
     return Number.isFinite(visible) && visible > 0 ? Math.round(visible) : undefined
   }
