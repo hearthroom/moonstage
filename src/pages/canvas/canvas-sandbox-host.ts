@@ -302,8 +302,14 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   // ── 視窗高度：手機鍵盤彈起時 iframe 本身不會縮，縮的是頂層頁的 visualViewport；殼靠這個值
   //    （--chat-viewport-height）把版面收進看得見的那一段。hello 帶初值，之後變了就推：
   //    一幀合併一次、同值不重送。沒有 visualViewport 的環境退回 innerHeight。 ──
+  //    只有全螢幕才把「可見視窗∩鍵盤上方」送過去：全螢幕的 Android Chrome 把輸入法蓋在頁面上、
+  //    不縮任何 viewport，殼得自己收。一般模式把 iframe 自己的高度送過去（殼的根 = 100%），
+  //    鍵盤與工具列的幾何交給瀏覽器——iOS Safari 鍵盤一彈會自己捲頂層頁，這時殼的根若跟著
+  //    visualViewport 縮短，iframe 下半截露出空白、拖到底又被重排拉回（owner 2026-09-22 iOS
+  //    回報，392d23e 上線幾小時後；在那之前殼的根從不小於 100%）。
   const viewportHeight = (): number | undefined => {
-    const { top, bottom } = visibleViewport(win)
+    const fullscreen = !!win.document.fullscreenElement
+    const { top, bottom } = fullscreen ? visibleViewport(win) : { top: 0, bottom: win.innerHeight }
     let rect: { top: number; bottom: number; height: number } | null = null
     try { rect = deps.iframe.getBoundingClientRect() } catch { rect = null }
     const visible = rect && rect.height > 0 ? Math.min(rect.bottom, bottom) - Math.max(rect.top, top) : bottom - top

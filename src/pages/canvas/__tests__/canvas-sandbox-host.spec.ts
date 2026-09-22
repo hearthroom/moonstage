@@ -459,9 +459,29 @@ describe('視窗高度與連結', () => {
     Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true })
   })
 
+  // 一般模式不送鍵盤幾何：殼的根維持 iframe 的 100%，鍵盤與工具列交給瀏覽器（iOS Safari 自己會捲頁；
+  // 殼的根跟著縮會露出空白、拖到底被拉回——owner 2026-09-22 iOS 回報）。
+  it('非全螢幕時鍵盤幾何不送給殼：hello 與 viewport 都是 iframe 自己的高度', async () => {
+    const keyboard = Object.assign(new EventTarget(), { boundingRect: { top: 430, height: 338 } })
+    Object.defineProperty(window.navigator, 'virtualKeyboard', { value: keyboard, configurable: true })
+    const host = await handshake()
+    try {
+      const helloMsg = h.posted.find((m) => m.type === 'hello') as { config: { viewportHeight?: number } }
+      expect(helloMsg.config.viewportHeight).toBe(window.innerHeight)
+      keyboard.boundingRect = { top: 300, height: 468 }
+      keyboard.dispatchEvent(new Event('geometrychange'))
+      await settle()
+      expect(h.posted.filter((m) => m.type === 'viewport')).toEqual([])
+    } finally {
+      host.destroy()
+      delete (window.navigator as any).virtualKeyboard
+    }
+  })
+
   it('全螢幕鍵盤覆蓋時，把鍵盤上方高度送給跨來源殼', async () => {
     const keyboard = Object.assign(new EventTarget(), { boundingRect: { top: 430, height: 338 } })
     Object.defineProperty(window.navigator, 'virtualKeyboard', { value: keyboard, configurable: true })
+    Object.defineProperty(document, 'fullscreenElement', { value: document.body, configurable: true })
     const host = await handshake()
     try {
       const helloMsg = h.posted.find((m) => m.type === 'hello') as { config: { viewportHeight?: number } }
@@ -473,6 +493,7 @@ describe('視窗高度與連結', () => {
     } finally {
       host.destroy()
       delete (window.navigator as any).virtualKeyboard
+      Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true })
     }
   })
 

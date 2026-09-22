@@ -148,6 +148,29 @@ describe('bindComposerOverhang：量、寫變數、盯子樹', () => {
     expect(document.documentElement.style.getPropertyValue('--lt-canvas-composer-overhang')).toBe('')
   })
 
+  it('被推的是綁定的根本身（殼的輸入區容器）時：根與子節點一起上移，量到的就是根的 top', async () => {
+    document.body.innerHTML = '<div class="scroll-view"></div><div data-chat="composer"><div class="composer-scope"><div class="chat-bottom"></div></div></div>'
+    const scroll = document.querySelector('.scroll-view') as HTMLElement
+    const wrap = document.querySelector('[data-chat="composer"]') as HTMLElement
+    rectOf(scroll, { top: 54, height: 738, width: 412 })
+    rectOf(wrap, { top: 792, height: 123, width: 412 })
+    rectOf(document.querySelector('.composer-scope')!, { top: 792, height: 123, width: 412 })
+    rectOf(document.querySelector('.chat-bottom')!, { top: 792, height: 123, width: 412 })
+    const dispose = bindComposerOverhang({ doc: document, win: window, scroll, composer: wrap, target: document.documentElement })
+    await tick()
+    expect(document.documentElement.style.getPropertyValue('--lt-canvas-composer-overhang')).toBe('')
+    for (const sel of ['[data-chat="composer"]', '.composer-scope', '.chat-bottom']) rectOf(document.querySelector(sel)!, { top: 740, height: 123, width: 412 })
+    wrap.style.transform = 'translateY(-52px)'
+    await tick()
+    expect(document.documentElement.style.getPropertyValue('--lt-canvas-composer-overhang')).toBe('52px')
+    dispose()
+  })
+
+  it('殼把綁定的根設成輸入區容器 [data-chat="composer"]，不是裡面的 .composer-scope', () => {
+    const shell = readFileSync(resolve(process.cwd(), 'src/sandbox/shell.ts'), 'utf8')
+    expect(shell).toMatch(/composer: refs\.composer, target: doc\.documentElement/)
+  })
+
   it('沒有捲動區或輸入區就什麼都不做', () => {
     document.body.innerHTML = ''
     expect(() => bindComposerOverhang({ doc: document, win: window, scroll: null, composer: null, target: document.documentElement })()).not.toThrow()

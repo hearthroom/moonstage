@@ -366,11 +366,9 @@ export function createShell(options: CreateShellOptions): Shell {
     if (headerResize) headerResize.observe(refs.header)
     // 作者腳本把輸入區往上推（給自己的底部工具列讓位）時，訊息區底部被蓋住的量要補成
     // 對話欄的底部內距——跟一般畫布同一套量法；殼在 iframe 裡，畫布那邊的觀察器看不到這裡。
-    disposeComposerOverhang = bindComposerOverhang({
-      doc, win, scroll: scrollView,
-      composer: (refs.composer.querySelector('.composer-scope') as HTMLElement | null) || refs.composer,
-      target: doc.documentElement,
-    })
+    // 綁在殼的輸入區容器（[data-chat="composer"]）而不是裡面的 .composer-scope：作者腳本從
+    // textarea 往上找「貼底的最後一個祖先」來推，在殼裡走得到這個容器；子樹量法連帶蓋住裡面的節點。
+    disposeComposerOverhang = bindComposerOverhang({ doc, win, scroll: scrollView, composer: refs.composer, target: doc.documentElement })
   }
 
   // ── 返回：舞台開著先關舞台（平台關的，發 stage:close）；否則交給宿主。 ──
