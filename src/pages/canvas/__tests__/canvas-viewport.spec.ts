@@ -122,3 +122,14 @@ describe('觸控裝置上輸入欄位字級不小於 16px（擋 iOS 自動放大
     expect(block).toMatch(/font-size: max\(16px, 1em\)/)
   })
 })
+
+// Android Chrome 全螢幕實測（owner 2026-09-22 面板數值）：kb=top0 h340，視窗 622——高度對、top 是 0。
+// 只信 top 會把鍵盤當不存在，畫布維持 622、輸入框被蓋住。鍵盤貼底，用視窗高減鍵盤高推回 282。
+it('鍵盤矩形 top 為 0 但有高度：以視窗高減鍵盤高當鍵盤上緣', () => {
+  const { win, vk } = browser()
+  Object.defineProperty(win, 'innerHeight', { value: 622, configurable: true })
+  vk.boundingRect = { top: 0, height: 340 }
+  expect(visibleViewport(win)).toEqual({ top: 0, bottom: 282, height: 282 })
+  vk.boundingRect = { top: 282, height: 340 }
+  expect(visibleViewport(win)).toEqual({ top: 0, bottom: 282, height: 282 })
+})

@@ -12,7 +12,12 @@ export function visibleViewport(win: Window) {
   const top = useVisual ? Math.max(0, vv.offsetTop || 0) : 0
   let bottom = useVisual ? Math.min(win.innerHeight, top + vv.height) : win.innerHeight
   const keyboard = keyboardOf(win)?.boundingRect
-  if (keyboard && keyboard.height > 0 && keyboard.top > top) bottom = Math.min(bottom, keyboard.top)
+  if (keyboard && keyboard.height > 0) {
+    // Android Chrome 全螢幕實測（owner 2026-09-22 面板數值 kb=top0 h340 ov1）：高度對、top 卻是 0。
+    // 鍵盤永遠貼在視窗底部，top 不可信時用「視窗高 − 鍵盤高」推回來。
+    const keyboardTop = keyboard.top > top ? keyboard.top : win.innerHeight - keyboard.height
+    if (keyboardTop > top) bottom = Math.min(bottom, keyboardTop)
+  }
   return { top, bottom, height: Math.max(0, bottom - top) }
 }
 
