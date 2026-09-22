@@ -31,3 +31,30 @@ export function composerOverhang(input: OverhangInput): number {
   if (raw > scrollHeight / 2) return 0
   return Math.round(raw)
 }
+
+export type PaintedRect = {
+  top: number
+  height: number
+  width: number
+  /** getComputedStyle(el).position；absolute／fixed 的子節點（浮在輸入區上方的選單、面板）不算輸入區本體 */
+  position?: string
+}
+
+/*
+  輸入區「畫出來的上緣」：整棵子樹裡最高的那個節點，而不只是最外層容器。
+
+  作者腳本推輸入區時挑的是哪一層並不固定——實測那張 MMD 卡從 textarea 往上走，挑
+  「寬過半、高不到 190、貼底」的最後一個祖先來套 translateY；同一張卡在不同機器上
+  可能挑到 .composer-scope，也可能挑到它的子節點 .chat-bottom（owner 2026-09-22 的
+  Android 截圖就是後者：玻璃那層推上去了，最外層沒動，侵入量量成 0，動作列壓在
+  玻璃底下只露一半）。只看最外層就會漏掉這種情況。
+*/
+export function paintedTop(rects: PaintedRect[]): number {
+  let top = Number.POSITIVE_INFINITY
+  for (const r of rects) {
+    if (!(r.height > 0) || !(r.width > 0)) continue
+    if (r.position === 'absolute' || r.position === 'fixed') continue
+    if (r.top < top) top = r.top
+  }
+  return top
+}

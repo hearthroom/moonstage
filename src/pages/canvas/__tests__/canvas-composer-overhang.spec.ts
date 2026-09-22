@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { composerOverhang } from '../canvas-composer-overhang'
+import { composerOverhang, paintedTop } from '../canvas-composer-overhang'
 
 describe('輸入區侵入捲動區的量', () => {
   it('作者把輸入區往上推 52px 時，對話欄要多 52px 底部內距', () => {
@@ -72,5 +72,39 @@ describe('捲底要把這段內距一起捲出來', () => {
     expect(defs.length).toBe(2)
     const pads = css.match(/#chat \{[^}]*padding:[^;]*var\(--lt-chat-pad-bottom\)/g) || []
     expect(pads.length).toBe(2)
+  })
+})
+
+describe('作者推的是輸入區的子節點時，一樣要量到', () => {
+  // owner 2026-09-22 Android 截圖：那張 MMD 卡的腳本從 textarea 往上找「寬過半、高不到 190、
+  // 貼底」的祖先套 translateY，在那台機器上挑到 .chat-bottom 而不是 .composer-scope。
+  // 最外層沒動、玻璃那層推上去了，只量最外層會得到 0，動作列壓在玻璃底下只露一半。
+  it('畫出來的上緣取整棵子樹裡最高的節點', () => {
+    expect(paintedTop([
+      { top: 792, height: 123, width: 412, position: 'relative' }, // .composer-scope 沒動
+      { top: 740, height: 123, width: 412, position: 'static' },   // .chat-bottom 被推上去 52px
+      { top: 748, height: 50, width: 412, position: 'static' },
+    ])).toBe(740)
+  })
+
+  it('浮在輸入區上方的 absolute／fixed 子節點（選單、面板）不算本體；沒尺寸的也不算', () => {
+    expect(paintedTop([
+      { top: 792, height: 123, width: 412, position: 'relative' },
+      { top: 500, height: 240, width: 400, position: 'absolute' },
+      { top: 100, height: 0, width: 412, position: 'static' },
+    ])).toBe(792)
+  })
+
+  it('全都沒尺寸時回 Infinity，讓呼叫端退回最外層的 top', () => {
+    expect(paintedTop([{ top: 792, height: 0, width: 0 }])).toBe(Number.POSITIVE_INFINITY)
+  })
+
+  it('畫布量的是子樹最高點，觀察器也盯子樹', () => {
+    const vue = readFileSync(resolve(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
+    const measure = vue.slice(vue.indexOf('function measureComposerOverhang()'), vue.indexOf('function scheduleComposerOverhang()'))
+    expect(measure).toMatch(/paintedTop\(/)
+    expect(measure).toMatch(/composer\.querySelectorAll\('\*'\)/)
+    const observe = vue.slice(vue.indexOf('function observeComposerOverhang()'), vue.indexOf('function disposeComposerOverhang()'))
+    expect(observe).toMatch(/subtree: true/)
   })
 })
