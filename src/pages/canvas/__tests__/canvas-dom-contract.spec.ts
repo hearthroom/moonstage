@@ -79,7 +79,7 @@ function mountRegion(region: string) {
   switch (region) {
     case 'response-settings':
       return mount(CanvasResponseSettings, { props: {
-        conversationId: 'fixture', t: (key: string) => key, confirm: async () => true,
+        conversationId: 'fixture', t: (key: string) => key,
         save: async () => ({}), load: async () => ({ conversationId: 'fixture', scope: 'conversation', schemaVersion: 1, revision: 0,
           overrides: { style: 'custom', customStyle: 'Natural prose' },
           effective: { agency: 'protect', style: 'custom', perspective: 'card', length: 'auto', pace: 'natural' } }),

@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import Panel from '../components/canvas-response-settings.vue'
 
 it('exposes the MMD response preference styling hooks and active option state', async () => {
- const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k,confirm:async()=>true}})
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k}})
  await flushPromises()
  expect(wrapper.element.matches('.conv-style-modal[data-host="style"][data-lt="response-settings"]')).toBe(true)
  expect(wrapper.find('.cs-modal-header .cs-header-title').exists()).toBe(true)
@@ -18,7 +18,7 @@ it('exposes the MMD response preference styling hooks and active option state', 
 })
 
 it('explains all three player-writing choices before the player selects one', async () => {
- const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k,confirm:async()=>true}})
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k}})
  await flushPromises()
  expect(wrapper.text()).toContain('responseSettings.agencyHint')
  for(const value of ['protect','assist','coauthor']) {
@@ -33,7 +33,7 @@ const initial = () => ({conversationId:'c1',scope:'conversation',schemaVersion:1
 it('preserves independent axes, clears hidden custom text and uses server readback', async () => {
  const load=vi.fn().mockResolvedValue(initial())
  const save=vi.fn().mockImplementation(async (_id, rev, patch)=>({...initial(),revision:rev+1,overrides:Object.fromEntries(Object.entries(patch).filter(([,v])=>v!==null))}))
- const wrapper=mount(Panel,{props:{conversationId:'c1',load,save,t:(k:string)=>k,confirm:vi.fn().mockResolvedValue(true)}})
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load,save,t:(k:string)=>k}})
  await flushPromises()
  await wrapper.get('[data-axis="agency"][data-value="coauthor"]').trigger('click')
  await wrapper.get('[data-axis="perspective"][data-value="second_user"]').trigger('click')
@@ -48,7 +48,7 @@ it('preserves independent axes, clears hidden custom text and uses server readba
 it('keeps draft on conflict and never saves assumed defaults after failed load', async()=>{
  const load=vi.fn().mockRejectedValue(new Error('offline'))
  const save=vi.fn().mockRejectedValue({statusCode:409})
- const wrapper=mount(Panel,{props:{conversationId:'c1',load,save,t:(k:string)=>k,confirm:vi.fn().mockResolvedValue(true)}})
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load,save,t:(k:string)=>k}})
  await flushPromises()
  expect(wrapper.find('[data-action="save"]').exists()).toBe(false)
  load.mockResolvedValue(initial())
@@ -59,14 +59,34 @@ it('keeps draft on conflict and never saves assumed defaults after failed load',
  expect(wrapper.get('[data-axis="agency"][data-value="assist"]').attributes('aria-pressed')).toBe('true')
 })
 it('keeps edits when close is cancelled and validates Unicode style length', async()=>{
- const confirm=vi.fn().mockResolvedValue(false)
- const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k,confirm}})
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k}})
  await flushPromises()
  await wrapper.get('[data-axis="style"][data-value="custom"]').trigger('click')
  await wrapper.get('textarea').setValue('🌙'.repeat(1000))
  expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeUndefined()
- expect(await (wrapper.vm as any).mayClose()).toBe(false)
+ const closing=(wrapper.vm as any).mayClose()
+ await flushPromises()
+ await wrapper.get('[data-action="keep-editing"]').trigger('click')
+ expect(await closing).toBe(false)
+ expect(wrapper.get('.response-discard').attributes('hidden')).toBeDefined()
  await wrapper.get('textarea').setValue('🌙'.repeat(1001))
  expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeDefined()
  expect(wrapper.get('textarea').element.value.length).toBe(2002)
+})
+
+// 面板在瀏覽器 top layer 裡，系統對話框（uni.showModal）永遠畫在它底下、按不到；
+// 放棄確認必須長在面板自己裡面。
+it('asks to discard inside the panel, not through a system dialog', async()=>{
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k}})
+ await flushPromises()
+ expect(wrapper.get('.response-discard').attributes('hidden')).toBeDefined()
+ expect(await (wrapper.vm as any).mayClose()).toBe(true)
+ await wrapper.get('[data-axis="agency"][data-value="assist"]').trigger('click')
+ const closing=(wrapper.vm as any).mayClose()
+ await flushPromises()
+ const bar=wrapper.get('.response-discard')
+ expect(bar.attributes('hidden')).toBeUndefined()
+ expect(bar.text()).toContain('responseSettings.discard')
+ await bar.get('[data-action="discard"]').trigger('click')
+ expect(await closing).toBe(true)
 })

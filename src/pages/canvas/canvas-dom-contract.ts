@@ -288,6 +288,7 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '.cs-group-card .cs-section-subtitle', region: 'response-settings', origin: 'mmd', why: '設定軸說明' },
   { selector: '.cs-collapsible.is-open .cs-content-inner .cs-style-section .style-scroll-view .cs-style-grid .cs-style-item.active .style-label', region: 'response-settings', origin: 'mmd', why: '選項與選中狀態沿用卡片美化' },
   { selector: '.cs-custom-input .cs-custom-textarea', region: 'response-settings', origin: 'mmd', why: '自訂文風輸入區' },
+  { selector: '.response-discard', region: 'response-settings', origin: 'lt', why: '關掉前問一次有沒存的修改；只在問的時候出現' },
 
   // ── 用戶人設 ────────────────────────────────────────────────────────
   { selector: '.role-setting', region: 'persona', origin: 'mmd', why: '卡片寫 .role-setting .card.textarea-wrapper .textarea-dark' },
