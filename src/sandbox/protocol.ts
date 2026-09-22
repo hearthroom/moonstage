@@ -179,7 +179,7 @@ export interface PanelsState {
 }
 
 /** 標準頁首與輸入區上的按鍵，交給宿主做。 */
-export type ChromeUiEvent = 'send' | 'stop' | 'continue' | 'more' | 'assist' | 'more-pick' | 'model' | 'shortcut' | 'back' | 'fullscreen'
+export type ChromeUiEvent = 'send' | 'stop' | 'continue' | 'more' | 'assist' | 'more-pick' | 'model' | 'shortcut' | 'back' | 'fullscreen' | 'prologue'
 
 /** 三個點選單從哪裡呼出（座標是 iframe 內的；宿主自己換算）。 */
 export type MessageMenuAnchor =
@@ -213,6 +213,8 @@ export type HostToShell =
   | { type: 'viewport'; height: number }
   /** 更早的歷史：還有沒有（more）、正在載（loading）。殼捲到頂附近且 more 才會要（history）。 */
   | { type: 'history'; more: boolean; loading: boolean }
+  // 開場選項（MMD「你可以选择开场」）：空清單＝拿掉。玩家點一條回 ui prologue，key 是第幾條。
+  | { type: 'prologue'; title: string; items: string[] }
   | { type: 'conversation.switch' }
   | { type: 'back' }
   | { type: 'dispose' }

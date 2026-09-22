@@ -66,6 +66,8 @@ export interface HudHostState {
   panels?: unknown
   /** 沙箱殼用：更早的歷史還有沒有、正在載嗎（殼捲到頂附近會要下一頁）。 */
   history?: { more: boolean; loading: boolean }
+  /** 沙箱殼用：開場選項（標題＋要畫的條目；玩家說過第一句之後是空的）。 */
+  prologue?: { title: string; items: string[] }
   messages: HudHostMessage[]
   generation: 'idle' | 'starting' | 'streaming'
   streamingMessageId: string | null

@@ -65,6 +65,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 | `theme` | `{ theme: 'dark' \| 'light' }` | 使用者切主題 |
 | `viewport` | `{ height }` | 視窗變動（鍵盤彈出） |
 | `history` | `{ more, loading }` 更早的歷史還有沒有、正在載嗎 | 狀態變了就送；殼捲到頂附近且 `more` 才會要 |
+| `prologue` | `{ title, items }` 開場選項（MMD「你可以选择开场」）；`items` 空＝拿掉 | 跟全量 `messages` 一起到，之後變了才送（玩家說出第一句後送空清單） |
 | `conversation.switch` | — | 切存檔：殼清氣泡、關舞台、清補發記錄，之後宿主再送 `messages` |
 | `back` | — | 宿主的返回：舞台開著殼先關舞台並回 `back-handled: true`；否則回 false 由宿主導頁 |
 | `dispose` | — | 離開頁面 |
@@ -136,7 +137,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 
 節點：`style:author-css`、`div:root[data-theme][data-composer]`、`header:header`（`header-back`、
 `header-title`、`header-actions`）、`main:messages > div:list > div:message-frame > article:message
-[data-from][data-state][data-msg-id] > message-avatar / message-body`、`div:list-spacer`、
+[data-from][data-state][data-msg-id] > message-avatar / message-body`、開場選項 `div.prologue-scope[data-lt="prologue"] > .prologue-title + .prologue-content×n`（在 `list` 之後；點一條發 `ui { event: 'prologue', key: 第幾條 }`，宿主填輸入框、不送出）、`div:list-spacer`、
 `div:author-stage[data-stage]`、`footer:composer`（`shortcut`、`instruction-bar`、`assistant`、
 `textarea:input`、`model-chip`、`send`）。插槽：`header-extra`、`statusbar`、`left`、`right`、`toolbar`。
 
