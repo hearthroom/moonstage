@@ -223,6 +223,9 @@
 .ms-cost {
     padding: 20px
 }
+.ms-cost.confirm-scope {
+    padding: 20px
+}
 @media (min-width: 769px) {
     .u-popup {
       padding: 24px
