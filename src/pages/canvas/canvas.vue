@@ -353,6 +353,7 @@
 </template>
 
 <script lang="ts" setup>
+import { cardPortrait } from './canvas-portrait'
 import { cfImageDesktop } from "@/utils/image-transform.js"
 
 import { createFullscreenController } from './canvas-fullscreen';
@@ -1493,7 +1494,8 @@ function _onWheel() { _wheelScrollEndAt = Date.now(); }
 // 純預覽沒有角色：頂欄與訊息署名用草稿的名字。
 const roleView = computed(() => {
   if (previewOnly.value) return { roleName: previewRoleName() }
-  return unref(currentRole) || {}
+  const role = unref(currentRole) || {}
+  return { ...role, roleAvatar: cardPortrait(role) }
 });
 
 
@@ -1582,7 +1584,7 @@ function bootRole(targetRoleId: any, draft: AuthorDraft | null) {
     if (error) return;
     greeting.list = buildGreetingList(data);
     prologue.value = buildPrologueList(data);
-    if (data && data.roleAvatar) pic.value = data.roleAvatar;
+    if (data) pic.value = cardPortrait(data);
     // 選開場白只在「這張卡還沒開始過」時才有意義。
     // 回頭玩的人押後開對話，畫面上會變成一張沒有歷史的空白對話頁加一個選單——
     // 而他的紀錄好好地在伺服器上。
@@ -4844,7 +4846,7 @@ function chatStart(greetingIndex?: number) {
   }).then(res => {
     if (res.statusCode == 200) {
       responseSettingsVersion.value = res.data.responseSettingsVersion === 1 ? 1 : 0;
-      pic.value = res.data.roleInfo.roleAvatar;
+      pic.value = cardPortrait(res.data.roleInfo);
       historyConversation.value = res.data.historyConversation;
       conversationId.value = res.data.conversationId;
       // 通知 right-window 更新 conversationId
