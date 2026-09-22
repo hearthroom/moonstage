@@ -86,6 +86,10 @@ describe('開場選項（MMD prologue）', () => {
     expect(buildPrologueList({ prologue: many })).toHaveLength(MAX_PROLOGUE)
   })
 
+  it('Harbor 的角色詳情叫 rolePrologue，一樣讀得到', () => {
+    expect(buildPrologueList({ rolePrologue: ['老師早安', ''] })).toEqual(['老師早安'])
+  })
+
   it('舊版伺服器沒有這個欄位當空，不是錯誤', () => {
     expect(buildPrologueList({ roleWelcome: '主' })).toEqual([])
     expect(buildPrologueList(null)).toEqual([])

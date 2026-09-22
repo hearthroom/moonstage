@@ -83,9 +83,9 @@ export function greetingIndexForStart(state: GreetingState): number | undefined 
 /** 伺服器端上限一致；再多的清單在畫面上也沒有意義。 */
 export const MAX_PROLOGUE = 20
 
-/** 從角色詳情組出開場選項。舊版伺服器沒有這個欄位＝空陣列，不是錯誤。 */
+/** 從角色詳情組出開場選項（LunaTalk 叫 prologue，Harbor 叫 rolePrologue）。舊版伺服器沒有這個欄位＝空陣列，不是錯誤。 */
 export function buildPrologueList(detail: any): string[] {
-  const raw = detail?.prologue
+  const raw = detail?.prologue ?? detail?.rolePrologue
   if (!Array.isArray(raw)) return []
   return raw
     .filter((s: any) => typeof s === 'string' && s.trim() !== '')
