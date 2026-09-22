@@ -1,4 +1,8 @@
 {
+	"canvas.fullscreen.enter": "進入全螢幕",
+	"canvas.fullscreen.exit": "退出全螢幕",
+	"canvas.fullscreen.failed": "全螢幕沒有開啟，你可以繼續遊玩或再試一次。",
+
 	"error.contextCapacityTitle": "內容超過模型容量",
 	"error.contextCapacityExceeded": "目前的內容超過模型可用容量，請縮短這次訊息或切換容量較大的模型，既有對話已保留。",
 	"mine.checkRole.author": "作者",

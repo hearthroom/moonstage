@@ -115,6 +115,21 @@ describe('殼：冷啟動與事件順序', () => {
     expect(t.refs.root.getAttribute('data-chrome')).toBe('shell')
   })
 
+  it('the themed fullscreen header action goes to the host and reflects host exit state', async () => {
+    const header = { roleName: 'Example', avatar: '', modelName: 'M', badge: '', showModel: true, backLabel: 'Back', modelLabel: 'Model', fullscreenSupported: true, fullscreenActive: false, fullscreenLabel: 'Enter fullscreen' }
+    const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Assist', perTurn: 'Per turn' } }
+    const s = boot(config({ chromeState: { header, composer }, card: { rules: [], statusbar: '' } }))
+    const button = s.refs.root.querySelector<HTMLElement>('.header-meun[data-lt="fullscreen"]')!
+    expect(button.getAttribute('aria-label')).toBe('Enter fullscreen')
+    button.click()
+    expect(sent).toContainEqual({ type: 'ui', event: 'fullscreen' })
+    s.handle({ type: 'chrome', state: { header: { ...header, fullscreenActive: true, fullscreenLabel: 'Exit fullscreen' }, composer } })
+    await nextTick()
+    expect(button.getAttribute('aria-label')).toBe('Exit fullscreen')
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+    s.dispose()
+  })
+
   it('殼一掛好就回報頁首底色；作者換了 html 的 class 之後再量一次', async () => {
     const header = { roleName: '露娜', avatar: '', modelName: 'M', badge: '', showModel: true, backLabel: '返回', modelLabel: '模型' }
     const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: '停止', more: '更多', send: '送出', paste: '貼上', clear: '清除', model: '模型', assist: '幫答', perTurn: '每輪' } }

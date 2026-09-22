@@ -438,7 +438,7 @@
   }
   .conv-style-modal .response-footer {
     flex-shrink: 0;
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px));
   }
   .conv-style-modal .response-save {
     background: var(--primary-color, var(--lt-canvas-accent));
@@ -449,6 +449,10 @@
   /* ── 頁面骨架 ────────────────────────────────────────────────── */
 
   .canvas-root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
     position: fixed;
     inset: 0;
     display: flex;
@@ -545,6 +549,24 @@
     align-items: center;
     color: inherit;
   }
+
+  .fullscreen-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: var(--lt-canvas-header-height);
+    height: var(--lt-canvas-header-height);
+    padding: 0;
+    border: 0;
+    border-radius: var(--lt-canvas-radius);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .fullscreen-toggle svg { width: 20px; height: 20px; }
+  .fullscreen-toggle:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
 
   .header-meun-rating {
     display: none;
@@ -1226,6 +1248,7 @@
 
   /* 新版沙箱卡：整個聊天區是一個 iframe（作者的殼），吃掉頂欄以下的全部空間。 */
   .canvas-sandbox-frame {
+    padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px));
     position: relative;
     flex: 1 1 auto;
     min-height: 0;
@@ -1236,7 +1259,7 @@
   /* 作者開全螢幕舞台：iframe 蓋滿整頁（頁首與輸入區同時由 v-show 藏掉）。 */
   .canvas-sandbox-frame.is-full {
     position: fixed;
-    inset: 0;
+    inset: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
     z-index: 90;
   }
 
@@ -1281,7 +1304,7 @@
     之後那三處還是灰的（owner 2026-09-16 截圖）。所以底色搬到兩塊上面。
   */
   .chat-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px));
   }
 
   .shortcut-bar-wrapper,

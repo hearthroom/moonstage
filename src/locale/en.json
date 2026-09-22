@@ -1,4 +1,8 @@
 {
+	"canvas.fullscreen.enter": "Enter fullscreen",
+	"canvas.fullscreen.exit": "Exit fullscreen",
+	"canvas.fullscreen.failed": "Fullscreen could not open; you can keep playing or try again.",
+
 	"error.contextCapacityTitle": "Context capacity exceeded",
 	"error.contextCapacityExceeded": "This content exceeds the model’s available context. Shorten your message or choose a model with a larger context window. Your conversation has been kept.",
 	"mine.checkRole.author": "Author",
