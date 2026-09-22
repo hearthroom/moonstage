@@ -24,6 +24,7 @@ import { chromeTopColor } from '@/pages/canvas/canvas-chrome-tone'
 import CanvasComposer from '@/pages/canvas/components/canvas-composer.vue'
 import { bindComposerOverhang } from '@/pages/canvas/canvas-composer-overhang'
 import { createFollowBottom } from './render/follow-bottom'
+import { mountGeometryDebug, rectText } from '@/common/geometry-debug'
 import { reactive, ref } from 'vue'
 // 標準播放器的樣式表整份帶進殼：訊息區的每一條規則跟一般卡同一份。頁首與輸入區的規則在殼裡沒有對應節點，不礙事。
 import '@/pages/canvas/canvas.css'
@@ -68,6 +69,19 @@ export function createShell(options: CreateShellOptions): Shell {
   })
   // 殼的根不准被內部捲動：iOS Safari 為了露出聚焦的輸入框會捲 overflow:hidden 的祖先且不捲回
   // （見 shell.css 的說明）。overflow:clip 擋掉大多數情況；認不得 clip 的舊 Safari 靠這裡歸零。
+  // ?sdkDebug=1（宿主頁的網址帶進 hello.config.debug）：殼這邊也疊一塊幾何數值面板。
+  const disposeGeometryDebug = (config.debug || options.debugFromUrl)
+    ? mountGeometryDebug(doc, win, 'shell', () => ({
+      root: rectText(refs.root), rootScroll: `${refs.root.scrollTop}/${refs.root.scrollHeight}`,
+      rootVar: refs.root.style.getPropertyValue('--chat-viewport-height') || '·',
+      header: rectText(refs.header), messages: rectText(refs.messages),
+      scroll: (() => { const sv = refs.messages.querySelector('#scrollview') as HTMLElement | null; return sv ? `${rectText(sv)} top${Math.round(sv.scrollTop)}/${sv.scrollHeight - sv.clientHeight}` : '-' })(),
+      composer: rectText(refs.composer.querySelector('.composer-scope') || refs.composer),
+      textarea: rectText(refs.composer.querySelector('textarea')),
+      overhang: doc.documentElement.style.getPropertyValue('--lt-canvas-composer-overhang') || '·',
+      bodyScroll: `${Math.round(win.scrollY)}/${(doc.scrollingElement || doc.documentElement).scrollHeight}`,
+    }))
+    : null
   const resetRootScroll = () => { if (refs.root.scrollTop) refs.root.scrollTop = 0; if (refs.root.scrollLeft) refs.root.scrollLeft = 0 }
   refs.root.addEventListener('scroll', resetRootScroll, { passive: true })
   // 宿主接管頁首與輸入區時，殼只畫訊息區：樣式看 data-chrome 藏掉自己的那兩塊（節點留著，作者的 sdk.input 仍有東西可讀）。
@@ -542,6 +556,7 @@ export function createShell(options: CreateShellOptions): Shell {
       scrollView.removeEventListener('scroll', onScroll)
       followBottom.dispose()
       refs.root.removeEventListener('scroll', resetRootScroll)
+      if (disposeGeometryDebug) disposeGeometryDebug()
       refs.root.remove()
       refs.authorCss.remove()
     },
