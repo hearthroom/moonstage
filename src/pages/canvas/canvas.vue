@@ -421,7 +421,7 @@ import { draftToAuthorAsset, draftDisplayName, type AuthorDraft } from '@/common
 import { createSandboxHost, type SandboxHost } from './canvas-sandbox-host'
 import { resolveSandbox } from '@/host/sandbox-host'
 import { hoistFixedAuthorNodes } from './canvas-author-node-hoist'
-import { composerOverhang } from './canvas-composer-overhang'
+import { composerOverhang, paintedTop } from './canvas-composer-overhang'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
 
@@ -3259,7 +3259,16 @@ function measureComposerOverhang() {
   if (!scroll || !composer) return;
   const s = scroll.getBoundingClientRect();
   const c = composer.getBoundingClientRect();
-  const px = composerOverhang({ scrollBottom: s.bottom, scrollHeight: s.height, composerTop: c.top, composerHeight: c.height });
+  // 作者推的可能是子節點而不是最外層（見 canvas-composer-overhang.ts 的 paintedTop）：
+  // 量整棵子樹裡畫出來最高的那個。
+  const rects = [{ top: c.top, height: c.height, width: c.width, position: 'static' }];
+  composer.querySelectorAll('*').forEach((el) => {
+    const r = el.getBoundingClientRect();
+    if (!(r.height > 0)) return;
+    rects.push({ top: r.top, height: r.height, width: r.width, position: getComputedStyle(el).position });
+  });
+  const top = paintedTop(rects);
+  const px = composerOverhang({ scrollBottom: s.bottom, scrollHeight: s.height, composerTop: Number.isFinite(top) ? top : c.top, composerHeight: c.height });
   const root = document.documentElement;
   if (px > 0) root.style.setProperty('--lt-canvas-composer-overhang', px + 'px');
   else root.style.removeProperty('--lt-canvas-composer-overhang');
@@ -3364,7 +3373,8 @@ function observeComposerOverhang() {
   if (!composer) return;
   if (typeof MutationObserver === 'function') {
     composerOverhangObserver = new MutationObserver(scheduleComposerOverhang);
-    composerOverhangObserver.observe(composer, { attributes: true, attributeFilter: ['style', 'class'] });
+    // subtree：作者推的可能是子節點（.chat-bottom），不只最外層。
+    composerOverhangObserver.observe(composer, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
   }
   window.addEventListener('resize', scheduleComposerOverhang);
   scheduleComposerOverhang();
