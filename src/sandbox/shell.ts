@@ -23,6 +23,7 @@ import CanvasHeader from '@/pages/canvas/components/canvas-header.vue'
 import { chromeTopColor } from '@/pages/canvas/canvas-chrome-tone'
 import CanvasComposer from '@/pages/canvas/components/canvas-composer.vue'
 import { bindComposerOverhang } from '@/pages/canvas/canvas-composer-overhang'
+import { createFollowBottom } from './render/follow-bottom'
 import { reactive, ref } from 'vue'
 // 標準播放器的樣式表整份帶進殼：訊息區的每一條規則跟一般卡同一份。頁首與輸入區的規則在殼裡沒有對應節點，不礙事。
 import '@/pages/canvas/canvas.css'
@@ -249,6 +250,8 @@ export function createShell(options: CreateShellOptions): Shell {
     }
   })()
 
+  // 內容在 mount 之後才撐高（作者腳本補畫面板、圖片載入、虛擬化重建）時，本來在底部的玩家要跟到新的底。
+  const followBottom = createFollowBottom({ scroller: scrollView, content: scrollView.querySelector('#chat') || listHost, win })
   const list = createMessageList({
     doc,
     list: refs.list,
@@ -261,7 +264,7 @@ export function createShell(options: CreateShellOptions): Shell {
     userAvatar: config.user.avatarUrl,
     labels: config.labels,
     menuLabel: config.menuLabel,
-    onGrow: () => { scrollView.scrollTop = scrollView.scrollHeight },
+    onGrow: () => { scrollView.scrollTop = scrollView.scrollHeight; followBottom.pin() },
     // 三個點、動作列、開場白切換：殼只負責畫，做事的是宿主。
     onUi: (id, ui) => {
       // 重新生成、繼續（會花點數）同樣只認真的手勢。
@@ -533,6 +536,7 @@ export function createShell(options: CreateShellOptions): Shell {
       doc.removeEventListener('keydown', onGesture, true)
       doc.removeEventListener('click', onLinkClick)
       scrollView.removeEventListener('scroll', onScroll)
+      followBottom.dispose()
       refs.root.remove()
       refs.authorCss.remove()
     },
