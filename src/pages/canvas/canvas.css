@@ -3026,6 +3026,12 @@
     color: var(--lt-canvas-sheet-fg);
   }
 
+  /* 這個框同時掛著 confirm-scope，而 .confirm-scope 的 padding: 8px 0 在後面宣告、特異性相同，
+     會把上面的 20px 蓋掉——文字因此貼到框邊（owner 2026-09-22 手機截圖）。用兩個 class 把內距釘回來。 */
+  .ms-cost.confirm-scope {
+    padding: 20px;
+  }
+
   .ms-cost-title {
     font-size: 15px;
     font-weight: 600;
