@@ -34,6 +34,24 @@
         </div>
 
         <div class="header-icon-meun" data-lt="header-actions">
+          <div class="header-meun header-meun-rating">
+            <!-- 作者常把分級徽章整顆藏掉；節點不在的話那條規則會靜默失效。 -->
+            <div class="header-badge"></div>
+          </div>
+          <!-- 本機草稿在套用中：純預覽或蓋掉線上規則時都亮著，讓作者知道現在看的不是線上版。 -->
+          <div v-if="badge" class="header-meun preview-badge" data-lt="preview-badge">{{ badge }}</div>
+          <div
+            v-if="showModel"
+            class="header-meun model-chip"
+            role="button"
+            tabindex="0"
+            :aria-label="modelLabel"
+            @click="$emit('model')"
+            @keydown.enter.prevent="$emit('model')"
+            @keydown.space.prevent="$emit('model')"
+          >
+            <span class="model-chip-name">{{ modelName }}</span>
+          </div>
           <div
             v-if="fullscreenSupported"
             role="button"
@@ -52,24 +70,6 @@
               <path v-if="fullscreenActive" d="M8 3v5H3m13-5v5h5M3 16h5v5m13-5h-5v5" />
               <path v-else d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />
             </svg>
-          </div>
-          <div class="header-meun header-meun-rating">
-            <!-- 作者常把分級徽章整顆藏掉；節點不在的話那條規則會靜默失效。 -->
-            <div class="header-badge"></div>
-          </div>
-          <!-- 本機草稿在套用中：純預覽或蓋掉線上規則時都亮著，讓作者知道現在看的不是線上版。 -->
-          <div v-if="badge" class="header-meun preview-badge" data-lt="preview-badge">{{ badge }}</div>
-          <div
-            v-if="showModel"
-            class="header-meun model-chip"
-            role="button"
-            tabindex="0"
-            :aria-label="modelLabel"
-            @click="$emit('model')"
-            @keydown.enter.prevent="$emit('model')"
-            @keydown.space.prevent="$emit('model')"
-          >
-            <span class="model-chip-name">{{ modelName }}</span>
           </div>
         </div>
       </div>

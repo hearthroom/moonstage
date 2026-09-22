@@ -459,6 +459,23 @@ describe('視窗高度與連結', () => {
     Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true })
   })
 
+  it('全螢幕鍵盤覆蓋時，把鍵盤上方高度送給跨來源殼', async () => {
+    const keyboard = Object.assign(new EventTarget(), { boundingRect: { top: 430, height: 338 } })
+    Object.defineProperty(window.navigator, 'virtualKeyboard', { value: keyboard, configurable: true })
+    const host = await handshake()
+    try {
+      const helloMsg = h.posted.find((m) => m.type === 'hello') as { config: { viewportHeight?: number } }
+      expect(helloMsg.config.viewportHeight).toBe(430)
+      keyboard.boundingRect = { top: 0, height: 0 }
+      keyboard.dispatchEvent(new Event('geometrychange'))
+      await settle()
+      expect(h.posted.filter((m) => m.type === 'viewport')).toEqual([{ ms: 1, type: 'viewport', height: window.innerHeight }])
+    } finally {
+      host.destroy()
+      delete (window.navigator as any).virtualKeyboard
+    }
+  })
+
   it('殼送來 open-url：http／https 由宿主開新分頁（noopener），其他協定丟掉', async () => {
     const host = await handshake()
     const opened: unknown[][] = []

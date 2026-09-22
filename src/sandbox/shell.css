@@ -32,8 +32,8 @@ html, body { margin: 0; padding: 0; height: 100%; }
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: var(--chat-viewport-height, 100%);
+  height: var(--chat-viewport-height, 100%);
+  min-height: 0;
   overflow: hidden;
 }
 /* 殼自己畫陽春版頁首與輸入區時才用這套底色與字型；標準元件或宿主接管時，底色、字型跟標準畫布（.canvas-root）。 */

@@ -455,6 +455,9 @@
     padding-right: env(safe-area-inset-right, 0px);
     position: fixed;
     inset: 0;
+    top: var(--lt-viewport-top, 0px);
+    bottom: auto;
+    height: var(--lt-viewport-height, 100%);
     display: flex;
     flex-direction: column;
     font-family: var(--lt-canvas-font);
@@ -591,6 +594,8 @@
      淡版。作者仍可直接對 .model-chip 寫規則蓋掉。
   */
   .model-chip {
+    box-sizing: border-box;
+    min-width: 0;
     max-width: 40vw;
     padding: 4px 10px;
     border-radius: 9999px;
@@ -608,6 +613,12 @@
   .model-chip:hover,
   .model-chip:focus-visible {
     opacity: 1;
+  }
+
+  .model-chip-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* ── 舞台 ─────────────────────────────────────────────────────── */
@@ -1259,7 +1270,7 @@
   /* 作者開全螢幕舞台：iframe 蓋滿整頁（頁首與輸入區同時由 v-show 藏掉）。 */
   .canvas-sandbox-frame.is-full {
     position: fixed;
-    inset: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+    inset: calc(var(--lt-viewport-top, 0px) + env(safe-area-inset-top, 0px)) env(safe-area-inset-right, 0px) var(--lt-viewport-bottom, 0px) env(safe-area-inset-left, 0px);
     z-index: 90;
   }
 

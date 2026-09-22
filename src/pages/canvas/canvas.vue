@@ -9,6 +9,7 @@
     我們自己的 class 不做承諾，data-lt 做。
   -->
   <div
+    ref="canvasRoot"
     class="canvas-root chat"
     :class="{ 'is-touch': isTouchDevice, 'lt-format-mmd': cardFormat === 'mmd', 'lt-theme-dark': themeLocked }"
     :data-lt-author-owns="authorOwnedRegions || null"
@@ -355,6 +356,7 @@
 import { cfImageDesktop } from "@/utils/image-transform.js"
 
 import { createFullscreenController } from './canvas-fullscreen';
+import { bindCanvasViewport } from './canvas-viewport';
 import {computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, unref, getCurrentInstance, nextTick, watch, watchEffect} from 'vue';
 import {
   onLoad,
@@ -2369,15 +2371,18 @@ function collectCanvasVars(): Record<string, string> {
 }
 
 const fullscreenActive = ref(false);
+const canvasRoot = ref<HTMLElement | null>(null);
+let disposeViewport: (() => void) | undefined;
 const fullscreenSupported = ref(false);
 const fullscreenLabel = computed(() => t(fullscreenActive.value ? 'canvas.fullscreen.exit' : 'canvas.fullscreen.enter'));
 let fullscreenControl: ReturnType<typeof createFullscreenController> | undefined;
 onMounted(() => {
+  if (canvasRoot.value) disposeViewport = bindCanvasViewport(window, canvasRoot.value);
   fullscreenControl = createFullscreenController(document, active => { fullscreenActive.value = active; },
     () => uni.showToast({ title: t('canvas.fullscreen.failed'), icon: 'none' }));
   fullscreenSupported.value = fullscreenControl.supported;
 });
-onUnmounted(() => fullscreenControl?.dispose());
+onUnmounted(() => { fullscreenControl?.dispose(); disposeViewport?.(); });
 function toggleFullscreen() { void fullscreenControl?.toggle(); }
 
 // 頁首與輸入區的呈現資料：跟模板上綁給 CanvasHeader／CanvasComposer 的是同一批值，殼那邊用同一套元件畫。
