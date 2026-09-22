@@ -48,9 +48,10 @@ export function bootSandbox(win: Window & typeof globalThis = window) {
     post({ type: 'debug', level: 'error', args: ['unhandled rejection', String((event as PromiseRejectionEvent).reason)] })
   })
 
-  // 視窗高度跟著鍵盤走：宿主也會送 viewport，這裡是 iframe 自己量得到的部分。
-  const vv = win.visualViewport
-  if (vv) vv.addEventListener('resize', () => { if (shell) shell.handle({ type: 'viewport', height: vv.height }) })
+  // 視窗高度只聽宿主的 viewport 訊息，殼不再自己量 iframe 的 visualViewport：
+  // iOS Safari 鍵盤一彈，iframe 裡的 visualViewport 也跟著縮，殼把根縮短之後，Safari 又把視覺視窗
+  // 往上平移去露出輸入框，玩家看到的是根以下整片空白（owner 2026-09-22 iOS 截圖）。
+  // 一般模式宿主送的是 iframe 的整高（根 = 100%），全螢幕才送鍵盤上方的高度。
 
   // 握手：殼喊 ready-shell，宿主回 hello。殼可能比宿主的 load 監聽先跑完（快取命中時常見），
   // 一喊就沒了會白白等到宿主逾時，所以每 500ms 重喊一次直到 hello 到，最多 10 秒。

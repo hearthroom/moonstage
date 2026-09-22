@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { bindCanvasViewport, visibleViewport } from '../canvas-viewport'
+import { bindCanvasViewport, restoreAfterKeyboard, visibleViewport } from '../canvas-viewport'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -74,5 +74,31 @@ describe('一般畫布只在全螢幕時讀視窗變數', () => {
     expect(full).toMatch(/top: var\(--lt-viewport-top, 0px\)/)
     expect(full).toMatch(/height: var\(--lt-viewport-height, 100%\)/)
     expect(vue).toMatch(/'is-fullscreen': fullscreenActive/)
+  })
+})
+
+// iOS Safari 為了露出 iframe 裡的輸入框把視覺視窗往上平移，鍵盤收起後不平移回來：畫布整個往上偏 49px、
+// 底下空白（owner 2026-09-22 面板數值 iframe=-49..747）。鍵盤收起（視覺視窗高度回到整個視窗）且有偏移就捲回原點。
+describe('鍵盤收起後把視覺視窗捲回原點', () => {
+  const fake = (over: { vvHeight: number; offsetTop: number; scrollY?: number; fullscreen?: boolean }) => {
+    const scrollTo = vi.fn()
+    const win = { innerHeight: 796, scrollY: over.scrollY ?? 0, scrollTo, visualViewport: { height: over.vvHeight, offsetTop: over.offsetTop, scale: 1 }, document: { fullscreenElement: over.fullscreen ? {} : null } }
+    return { win: win as unknown as Window, scrollTo }
+  }
+  it('鍵盤收起、視覺視窗仍偏移 49px → scrollTo(0,0)', () => {
+    const { win, scrollTo } = fake({ vvHeight: 796, offsetTop: 49 })
+    restoreAfterKeyboard(win)
+    expect(scrollTo).toHaveBeenCalledWith(0, 0)
+  })
+  it('鍵盤開著（視覺視窗還短）不動；沒有偏移不動；全螢幕不動', () => {
+    for (const over of [{ vvHeight: 456, offsetTop: 300 }, { vvHeight: 796, offsetTop: 0 }, { vvHeight: 796, offsetTop: 49, fullscreen: true }]) {
+      const { win, scrollTo } = fake(over)
+      restoreAfterKeyboard(win)
+      expect(scrollTo).not.toHaveBeenCalled()
+    }
+  })
+  it('殼不再自己聽 iframe 的 visualViewport（宿主是唯一來源）', () => {
+    const main = readFileSync(resolve(process.cwd(), 'src/sandbox/main.ts'), 'utf8')
+    expect(main).not.toMatch(/visualViewport\.addEventListener|vv\.addEventListener/)
   })
 })

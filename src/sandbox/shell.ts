@@ -80,7 +80,7 @@ export function createShell(options: CreateShellOptions): Shell {
       textarea: rectText(refs.composer.querySelector('textarea')),
       overhang: doc.documentElement.style.getPropertyValue('--lt-canvas-composer-overhang') || '·',
       bodyScroll: `${Math.round(win.scrollY)}/${(doc.scrollingElement || doc.documentElement).scrollHeight}`,
-    }))
+    }), 300, 120)
     : null
   const resetRootScroll = () => { if (refs.root.scrollTop) refs.root.scrollTop = 0; if (refs.root.scrollLeft) refs.root.scrollLeft = 0 }
   refs.root.addEventListener('scroll', resetRootScroll, { passive: true })
