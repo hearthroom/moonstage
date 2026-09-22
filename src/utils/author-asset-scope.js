@@ -110,6 +110,9 @@ function createAuthorScope(options) {
   const isHostResource = function (node) { return isHostResourceNode(node, doc) }
   const isAuthorRoot = typeof config.isAuthorRoot === 'function' ? config.isAuthorRoot : function () { return false }
   const isOwnNode = typeof config.isOwnNode === 'function' ? config.isOwnNode : function () { return false }
+  // 作者掛到 <body> 第一層的節點，記帳之後交給宿主決定要不要搬（畫布把 fixed 的搬進作者容器，
+  // 見 canvas-author-node-hoist.ts 的 adoptAuthorBodyNode）。搬走的節點照樣在帳上，離場一起收。
+  const onBodyNode = typeof config.onBodyNode === 'function' ? config.onBodyNode : null
 
   let depth = 0
   let disposed = false
@@ -146,6 +149,10 @@ function createAuthorScope(options) {
         if (node.nodeType !== 1) continue
         if (isOwnNode(node) || isHostResource(node)) continue
         trackedNodes.add(node)
+        // 同一個窗口裡加了又拿掉的不交：它已經不在頁面上了。
+        if (onBodyNode && node.parentNode === doc.body && records[i].target === doc.body) {
+          try { onBodyNode(node) } catch (e) { /* 宿主的處置失敗不得影響記帳 */ }
+        }
       }
     }
   }

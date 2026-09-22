@@ -54,6 +54,46 @@ describe('author scope', () => {
       expect(document.getElementById('app')).not.toBeNull()
     })
 
+    it('作者塞到 body 的節點交給 onBodyNode（宿主塞的、head 裡的、已經被作者拿掉的不交）', () => {
+      const seen = []
+      scope = createAuthorScope({
+        doc: document,
+        win: window,
+        onBodyNode: (node) => seen.push(node.id),
+      })
+      scope.run(() => {
+        const overlay = document.createElement('div')
+        overlay.id = 'author-overlay'
+        document.body.appendChild(overlay)
+        const style = document.createElement('style')
+        style.id = 'author-style'
+        document.head.appendChild(style)
+        const flash = document.createElement('div')
+        flash.id = 'author-flash'
+        document.body.appendChild(flash)
+        flash.remove()
+      })
+      const host = document.createElement('div')
+      host.id = 'host-dialog'
+      document.body.appendChild(host)
+      scope.run(() => {})
+
+      expect(seen).toEqual(['author-overlay'])
+      // 交出去之後照樣記在作者帳上：搬到哪裡，離場時都一起收掉。
+      scope.dispose()
+      expect(document.getElementById('author-overlay')).toBeNull()
+    })
+
+    it('onBodyNode 拋錯不影響記帳', () => {
+      scope = createAuthorScope({ doc: document, win: window, onBodyNode: () => { throw new Error('boom') } })
+      scope.run(() => {
+        const hud = document.createElement('div')
+        hud.id = 'author-hud'
+        document.body.appendChild(hud)
+      })
+      expect(scope.trackedNodeCount()).toBe(1)
+    })
+
     it('窗口內加到 <html> 或 <head> 的也算', () => {
       scope = makeScope()
       scope.run(() => {

@@ -90,3 +90,36 @@ export function hoistFixedAuthorNodes(
 
   return result
 }
+
+/**
+ * 作者程式碼直接掛到 `<body>` 的 fixed 節點，搬進作者容器。回傳有沒有搬。
+ *
+ * ── 為什麼需要這個 ──
+ * 作者容器各自是一個 stacking context（見 author-asset-mount.js 檔頭），容器裡的
+ * z-index 只跟容器裡的東西比。作者卻常把「點面板外面就關」的透明遮罩直接塞進
+ * body：面板在容器裡寫 z-index 9999、遮罩在 body 上寫 9998，在 MMD 那邊兩者同在
+ * body 一層，9998 < 9999 成立；到我們這邊遮罩變成跟整個畫布比，蓋在容器（連同
+ * 面板、預覽彈窗）上面——點什麼都先點到遮罩，面板一點就關（2026-09-22 社群回報）。
+ * 搬進同一個容器，作者寫的那組數字才又是同一把尺。
+ *
+ * 只搬 fixed：容器是 0×0 並裁切，流內或 absolute 的節點搬進去就看不見了；fixed 的
+ * containing block 仍是視窗，搬過去位置不變。
+ */
+export function adoptAuthorBodyNode(
+  node: Node | null | undefined,
+  container: Element | null | undefined,
+  computeStyle: ComputeStyle,
+): boolean {
+  if (!node || !container || node.nodeType !== 1) return false
+  const el = node as Element
+  if (el === container || el.contains(container)) return false
+  let position: string
+  try {
+    position = computeStyle(el).position
+  } catch (e) {
+    return false
+  }
+  if (position !== 'fixed') return false
+  container.appendChild(el)
+  return true
+}
