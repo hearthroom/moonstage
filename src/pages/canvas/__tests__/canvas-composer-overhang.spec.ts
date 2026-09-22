@@ -44,19 +44,30 @@ describe('對話欄的底部內距吃這個量', () => {
   })
 })
 
-describe('捲底哨兵也要把這段內距捲出來', () => {
+describe('捲底要把這段內距一起捲出來', () => {
   const css = readFileSync(resolve(process.cwd(), 'src/pages/canvas/canvas.css'), 'utf8')
+  const vue = readFileSync(resolve(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
+  const body = () => {
+    const i = vue.indexOf('function scrollAnchorIntoView()')
+    return vue.slice(i, vue.indexOf('\n}\n', i))
+  }
 
-  // 哨兵住在內距之上：scrollIntoView({block:'end'}) 把哨兵貼到容器下緣，內距永遠留在
-  // 視窗外，最後一則的動作列（重新生成／上下文／…）就一直躺在被推上來的輸入區底下。
-  // owner 2026-09-22 回報：手機上那一列只露一半，怎麼滑都滑不出來（作者 HUD 一重畫
-  // 哨兵就把畫面拉回去）。哨兵要以 scroll-margin-bottom 吃同一個底部內距。
-  it('.chat-scroll-anchor 的 scroll-margin-bottom 吃 #chat 同一個底部內距變數', () => {
-    const anchor = css.match(/\.chat-scroll-anchor \{[^}]*\}/)?.[0] || ''
-    expect(anchor).toMatch(/scroll-margin-bottom:\s*var\(--lt-chat-pad-bottom\)/)
+  // 哨兵住在內距之上：用 scrollIntoView 把哨兵貼到容器下緣，內距永遠留在視窗外，
+  // 最後一則的動作列（重新生成／上下文／…）就一直躺在被推上來的輸入區底下
+  // （owner 2026-09-22 手機回報）。第一版用 scroll-margin-bottom 補，結果 iOS Safari
+  // 連文件一起捲：鍵盤一彈整頁被推上去露白底、拖到底被拉回。所以捲底只動容器的
+  // scrollTop——內距本來就在 scrollHeight 裡。
+  it('捲底直接把 #scrollview 的 scrollTop 設到 scrollHeight，只動容器', () => {
+    expect(body()).toMatch(/getElementById\('scrollview'\)/)
+    expect(body()).toMatch(/scrollTop = root\.scrollHeight/)
   })
 
-  it('那個變數在桌機與手機兩條 #chat 上都含 --lt-canvas-composer-overhang，內距只從它讀', () => {
+  it('哨兵不掛 scroll-margin-bottom（那會讓 scrollIntoView 去捲文件）', () => {
+    const anchor = css.match(/\.chat-scroll-anchor \{[^}]*\}/)?.[0] || ''
+    expect(anchor).not.toMatch(/scroll-margin-bottom:/)
+  })
+
+  it('底部內距變數在桌機與手機兩條 #chat 上都含 --lt-canvas-composer-overhang，內距只從它讀', () => {
     const defs = css.match(/#chat \{[^}]*--lt-chat-pad-bottom:\s*calc\(\d+px \+ var\(--lt-canvas-composer-overhang, 0px\)\)/g) || []
     expect(defs.length).toBe(2)
     const pads = css.match(/#chat \{[^}]*padding:[^;]*var\(--lt-chat-pad-bottom\)/g) || []
