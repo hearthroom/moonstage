@@ -12,11 +12,13 @@ export function mountGeometryDebug(
   label: string,
   extra: () => Record<string, unknown>,
   intervalMs = 300,
+  offsetTop = 0,
 ): () => void {
   const el = doc.createElement('pre')
   el.setAttribute('data-lt', 'geometry-debug')
-  el.style.cssText = 'position:fixed;left:0;top:0;z-index:2147483647;margin:0;padding:4px 6px;max-width:100%;box-sizing:border-box;'
-    + 'font:10px/1.3 ui-monospace,Menlo,monospace;color:#9f9;background:rgba(0,0,0,.72);pointer-events:none;white-space:pre-wrap;word-break:break-all'
+  el.style.cssText = `position:fixed;left:0;top:${offsetTop}px;z-index:2147483647;`
+    + 'margin:0;padding:4px 6px;max-width:100%;box-sizing:border-box;'
+    + 'margin:0;padding:4px 6px;max-width:100%;box-sizing:border-box;font:10px/1.3 ui-monospace,Menlo,monospace;color:#9f9;background:rgba(0,0,0,.72);pointer-events:none;white-space:pre-wrap;word-break:break-all'
   const r = (b: { top: number; bottom: number; height: number } | null | undefined) => (b ? `${Math.round(b.top)}..${Math.round(b.bottom)} h${Math.round(b.height)}` : '-')
   const render = () => {
     const vv = win.visualViewport
