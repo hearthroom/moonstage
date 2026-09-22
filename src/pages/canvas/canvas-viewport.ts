@@ -25,6 +25,9 @@ export function observeViewport(win: Window, update: () => void) {
   const bindings: [EventTarget | null | undefined, string][] = [
     [win, 'resize'], [win.visualViewport, 'resize'], [win.visualViewport, 'scroll'],
     [keyboardOf(win), 'geometrychange'], [win.document, 'fullscreenchange'],
+    // 切到後台時系統會收鍵盤，但後台頁面收不到幾何／視窗事件；切回來要重新量
+    // （owner 2026-09-22 Android：鍵盤開著切後台再回來，畫布卡在縮短狀態回不來）。
+    [win.document, 'visibilitychange'], [win, 'pageshow'], [win, 'focus'],
   ]
   for (const [target, event] of bindings) target?.addEventListener(event, update)
   return () => { for (const [target, event] of bindings) target?.removeEventListener(event, update) }
@@ -54,21 +57,32 @@ export function bindCanvasViewport(win: Window, root: HTMLElement) {
   const names = ['--lt-viewport-top', '--lt-viewport-height', '--lt-viewport-bottom']
   const previous = names.map(name => root.style.getPropertyValue(name))
   const settleTimers: number[] = []
-  const update = () => {
-    // Fullscreen Chrome can overlay the IME without resizing either viewport. Opt in to
-    // explicit geometry there; retain the browser's normal keyboard policy elsewhere.
-    if (keyboard) keyboard.overlaysContent = win.document.fullscreenElement ? true : !!previousOverlay
+  let lastVisibility: DocumentVisibilityState = win.document.visibilityState
+  const remeasure = () => {
     const { top, bottom, height } = visibleViewport(win)
     if (height <= 0) return
     const values = [top, height, Math.max(0, win.innerHeight - bottom)]
     names.forEach((name, index) => root.style.setProperty(name, `${Math.round(values[index])}px`))
+  }
+  const update = () => {
+    // 頁面剛從後台回來：鍵盤已被系統收掉，但焦點還在輸入框、鍵盤 API 的矩形可能還是舊值。
+    // 把焦點移開（跨源 iframe 的話 blur iframe 元素即可讓裡面的輸入框失焦），幾何才會跟著歸零。
+    if (win.document.visibilityState === 'visible' && lastVisibility === 'hidden') {
+      const active = win.document.activeElement as HTMLElement | null
+      if (active && active !== win.document.body && typeof active.blur === 'function') { try { active.blur() } catch { /* 不可聚焦的節點 */ } }
+    }
+    lastVisibility = win.document.visibilityState
+    // Fullscreen Chrome can overlay the IME without resizing either viewport. Opt in to
+    // explicit geometry there; retain the browser's normal keyboard policy elsewhere.
+    if (keyboard) keyboard.overlaysContent = win.document.fullscreenElement ? true : !!previousOverlay
+    remeasure()
     // 平移可能在我們縮好畫布之後才發生（Safari 的聚焦捲動晚於 visualViewport resize），
     // 所以除了現在，稍後再看兩次。
     settleVisualViewport(win)
     const later = typeof win.setTimeout === 'function' ? win.setTimeout.bind(win) : globalThis.setTimeout
     const cancel = typeof win.clearTimeout === 'function' ? win.clearTimeout.bind(win) : globalThis.clearTimeout
     for (const timer of settleTimers.splice(0)) cancel(timer)
-    for (const delay of [60, 300]) settleTimers.push(later(() => settleVisualViewport(win), delay) as unknown as number)
+    for (const delay of [60, 300]) settleTimers.push(later(() => { settleVisualViewport(win); remeasure() }, delay) as unknown as number)
   }
   const unobserve = observeViewport(win, update)
   update()

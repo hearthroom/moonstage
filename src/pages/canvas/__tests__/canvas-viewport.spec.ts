@@ -133,3 +133,35 @@ it('鍵盤矩形 top 為 0 但有高度：以視窗高減鍵盤高當鍵盤上�
   vk.boundingRect = { top: 282, height: 340 }
   expect(visibleViewport(win)).toEqual({ top: 0, bottom: 282, height: 282 })
 })
+
+// owner 2026-09-22 Android：鍵盤開著切後台（系統收鍵盤）再切回來，後台收不到幾何事件，畫布卡在縮短狀態。
+// 切回可見時重新量、把焦點從輸入框移開，稍後再量一次。
+it('從後台切回來：重新量、把焦點移開，60ms 後再量一次', () => {
+  vi.useFakeTimers()
+  try {
+    const { win, vk, doc } = browser(), root = document.createElement('div')
+    const ta = document.createElement('textarea'); document.body.appendChild(ta); ta.focus()
+    Object.assign(win as unknown as Record<string, unknown>, { scrollTo: vi.fn(), scrollY: 0, setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout })
+    let visibility = 'visible'
+    Object.assign(doc, { activeElement: ta, body: document.body })
+    Object.defineProperty(doc, 'visibilityState', { get: () => visibility, configurable: true })
+    Object.defineProperty(win, 'innerHeight', { value: 622, configurable: true })
+    doc.fullscreenElement = {}
+    const dispose = bindCanvasViewport(win, root)
+    vk.boundingRect = { top: 0, height: 340 }; vk.dispatchEvent(new Event('geometrychange'))
+    expect(root.style.getPropertyValue('--lt-viewport-height')).toBe('282px')
+    // 切到後台：系統收鍵盤，但沒有事件
+    visibility = 'hidden'; doc.dispatchEvent(new Event('visibilitychange'))
+    vk.boundingRect = { top: 0, height: 0 }
+    // 切回來
+    visibility = 'visible'; doc.dispatchEvent(new Event('visibilitychange'))
+    expect(document.activeElement).not.toBe(ta)
+    expect(root.style.getPropertyValue('--lt-viewport-height')).toBe('622px')
+    // 鍵盤矩形晚一點才歸零的情況：60ms 後再量
+    vk.boundingRect = { top: 0, height: 340 }; vk.dispatchEvent(new Event('geometrychange'))
+    vk.boundingRect = { top: 0, height: 0 }
+    vi.advanceTimersByTime(70)
+    expect(root.style.getPropertyValue('--lt-viewport-height')).toBe('622px')
+    dispose(); ta.remove()
+  } finally { vi.useRealTimers() }
+})
