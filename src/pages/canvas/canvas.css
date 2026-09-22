@@ -471,6 +471,12 @@
     padding-right: env(safe-area-inset-right, 0px);
     position: fixed;
     inset: 0;
+    /* 畫布跟著可見視窗走（canvas-viewport.ts 寫的變數）：手機鍵盤彈起時視覺視窗變矮，畫布跟著縮，
+       輸入區才會落在鍵盤上方（owner 2026-09-22 iOS 面板數值：可見 447、畫布仍 796，輸入框在 655 被蓋住）。
+       之前一度限制成只在全螢幕才跟，是誤把 iOS 輸入框自動放大造成的錯位算到這裡；放大已由 16px 字級擋掉。 */
+    top: var(--lt-viewport-top, 0px);
+    bottom: auto;
+    height: var(--lt-viewport-height, 100%);
     display: flex;
     flex-direction: column;
     font-family: var(--lt-canvas-font);
@@ -483,20 +489,6 @@
     color: var(--lt-canvas-fg);
     background: var(--lt-canvas-bg);
     overflow: hidden;
-  }
-
-  /*
-    只有全螢幕（Fullscreen API）時畫布才跟著可見視窗走：全螢幕的 Android Chrome 會把
-    輸入法直接蓋在頁面上，不縮任何一個 viewport，得自己拿鍵盤幾何把輸入列抬起來
-    （canvas-viewport.ts）。一般模式交給瀏覽器：iOS Safari 在輸入框聚焦、捲動鏈到文件
-    時會自己捲頁，這時每次 visualViewport 一變就改寫 fixed 根的 top/height 會跟它打架
-    ——拖到底畫面跳回去、鍵盤後面一片白（owner 2026-09-22 iOS 回報，這條上線幾小時後）。
-    沙箱卡的全舞台（.canvas-sandbox-frame.is-full）另外吃同一組變數，不在這裡。
-  */
-  .canvas-root.is-fullscreen {
-    top: var(--lt-viewport-top, 0px);
-    bottom: auto;
-    height: var(--lt-viewport-height, 100%);
   }
 
   /* ── 頂欄 ─────────────────────────────────────────────────────── */

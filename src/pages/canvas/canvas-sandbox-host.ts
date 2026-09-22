@@ -307,18 +307,13 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   //    鍵盤與工具列的幾何交給瀏覽器——iOS Safari 鍵盤一彈會自己捲頂層頁，這時殼的根若跟著
   //    visualViewport 縮短，iframe 下半截露出空白、拖到底又被重排拉回（owner 2026-09-22 iOS
   //    回報，392d23e 上線幾小時後；在那之前殼的根從不小於 100%）。
-  //    一般模式送的是 iframe 自己的版面高度（getBoundingClientRect，CSS px），不是 innerHeight：
-  //    iOS 自動放大頁面時 innerHeight 會跟著縮（796→747），拿它當整高會把殼的根縮短、底下留空白
-  //    （owner 2026-09-22 面板數值）。版面高度不受縮放影響。
+  //    鍵盤開著時（視覺視窗變矮）送可見的那一段，殼的根跟著縮，輸入區才在鍵盤上方（owner 2026-09-22
+  //    iOS 面板數值：可見 447、殼的根仍 796、輸入框 655 被蓋住）。之前一度只在全螢幕才送，是誤把 iOS 輸入框
+  //    自動放大造成的錯位算到這裡；放大已由 16px 字級擋掉。全螢幕時多考慮鍵盤幾何（visibleViewport）。
   const viewportHeight = (): number | undefined => {
-    const fullscreen = !!win.document.fullscreenElement
+    const { top, bottom } = visibleViewport(win)
     let rect: { top: number; bottom: number; height: number } | null = null
     try { rect = deps.iframe.getBoundingClientRect() } catch { rect = null }
-    if (!fullscreen) {
-      const own = rect && rect.height > 0 ? rect.height : win.innerHeight
-      return Number.isFinite(own) && own > 0 ? Math.round(own) : undefined
-    }
-    const { top, bottom } = visibleViewport(win)
     const visible = rect && rect.height > 0 ? Math.min(rect.bottom, bottom) - Math.max(rect.top, top) : bottom - top
     return Number.isFinite(visible) && visible > 0 ? Math.round(visible) : undefined
   }
