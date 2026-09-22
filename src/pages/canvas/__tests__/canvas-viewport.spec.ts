@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { bindCanvasViewport, restoreAfterKeyboard, visibleViewport } from '../canvas-viewport'
+import { bindCanvasViewport, settleVisualViewport, visibleViewport } from '../canvas-viewport'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -66,25 +66,44 @@ describe('畫布跟著可見視窗走', () => {
   })
 })
 
-// iOS Safari 為了露出 iframe 裡的輸入框把視覺視窗往上平移，鍵盤收起後不平移回來：畫布整個往上偏 49px、
-// 底下空白（owner 2026-09-22 面板數值 iframe=-49..747）。鍵盤收起（視覺視窗高度回到整個視窗）且有偏移就捲回原點。
-describe('鍵盤收起後把視覺視窗捲回原點', () => {
+// iOS Safari 聚焦輸入框時可能把視覺視窗往上平移（鍵盤開著或收起後都可能殘留）；畫布永遠跟著可見視窗高，
+// 平移從來不是必要的（owner 2026-09-22 iOS：兩三成機率整頁黑、先前 iframe=-49..747）。偵測到就歸零。
+describe('視覺視窗有平移就捲回原點', () => {
   const fake = (over: { vvHeight: number; offsetTop: number; scrollY?: number; fullscreen?: boolean }) => {
     const scrollTo = vi.fn()
     const win = { innerHeight: 796, scrollY: over.scrollY ?? 0, scrollTo, visualViewport: { height: over.vvHeight, offsetTop: over.offsetTop, scale: 1 }, document: { fullscreenElement: over.fullscreen ? {} : null } }
     return { win: win as unknown as Window, scrollTo }
   }
-  it('鍵盤收起、視覺視窗仍偏移 49px → scrollTo(0,0)', () => {
-    const { win, scrollTo } = fake({ vvHeight: 796, offsetTop: 49 })
-    restoreAfterKeyboard(win)
-    expect(scrollTo).toHaveBeenCalledWith(0, 0)
-  })
-  it('鍵盤開著（視覺視窗還短）不動；沒有偏移不動；全螢幕不動', () => {
-    for (const over of [{ vvHeight: 456, offsetTop: 300 }, { vvHeight: 796, offsetTop: 0 }, { vvHeight: 796, offsetTop: 49, fullscreen: true }]) {
+  it('鍵盤開著、視覺視窗被平移 349px → scrollTo(0,0)；鍵盤收起仍偏移 49px → 也歸零', () => {
+    for (const over of [{ vvHeight: 447, offsetTop: 349 }, { vvHeight: 796, offsetTop: 49 }]) {
       const { win, scrollTo } = fake(over)
-      restoreAfterKeyboard(win)
+      settleVisualViewport(win)
+      expect(scrollTo).toHaveBeenCalledWith(0, 0)
+    }
+  })
+  it('沒有偏移不動；全螢幕不動', () => {
+    for (const over of [{ vvHeight: 447, offsetTop: 0 }, { vvHeight: 796, offsetTop: 49, fullscreen: true }]) {
+      const { win, scrollTo } = fake(over)
+      settleVisualViewport(win)
       expect(scrollTo).not.toHaveBeenCalled()
     }
+  })
+  it('綁定後每次視窗變化除了當下，60ms 與 300ms 後再各檢查一次（Safari 的平移可能晚於 resize）', () => {
+    vi.useFakeTimers()
+    try {
+      const { win, vv } = browser(), root = document.createElement('div')
+      const scrollTo = vi.fn()
+      Object.assign(win as unknown as Record<string, unknown>, { scrollTo, scrollY: 0, setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout })
+      const dispose = bindCanvasViewport(win, root)
+      vv.height = 447; vv.dispatchEvent(new Event('resize'))
+      expect(scrollTo).not.toHaveBeenCalled()          // 還沒平移
+      vv.offsetTop = 349                                 // Safari 之後才平移
+      vi.advanceTimersByTime(70)
+      expect(scrollTo).toHaveBeenCalledTimes(1)
+      vi.advanceTimersByTime(300)
+      expect(scrollTo).toHaveBeenCalledTimes(2)
+      dispose()
+    } finally { vi.useRealTimers() }
   })
   it('殼不再自己聽 iframe 的 visualViewport（宿主是唯一來源）', () => {
     const main = readFileSync(resolve(process.cwd(), 'src/sandbox/main.ts'), 'utf8')
