@@ -399,3 +399,18 @@ describe('assist paid confirmation in sandbox', () => {
     expect(sent.filter((m:any)=>m.type==='panel.ui' && m.panel==='assist' && m.event==='confirm')).toEqual([])
   })
 })
+
+describe('殼的根不准被內部捲動（iOS 鍵盤露出輸入框時會捲 overflow:hidden 的祖先且不捲回）', () => {
+  it('根被捲動時立刻歸零；CSS 用 overflow: clip 讓它根本不可捲', async () => {
+    const s = boot(config())
+    const root = s.refs.root
+    let top = 0
+    Object.defineProperty(root, 'scrollTop', { configurable: true, get: () => top, set: (v: number) => { top = v } })
+    root.scrollTop = 55
+    root.dispatchEvent(new Event('scroll'))
+    expect(root.scrollTop).toBe(0)
+    const css = (await import('node:fs')).readFileSync((await import('node:path')).resolve(process.cwd(), 'src/sandbox/shell.css'), 'utf8')
+    const block = css.match(/\[data-chat="root"\] \{[^}]*\}/)?.[0] || ''
+    expect(block).toMatch(/overflow: clip;/)
+  })
+})
