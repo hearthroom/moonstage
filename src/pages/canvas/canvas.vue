@@ -11,7 +11,7 @@
   <div
     ref="canvasRoot"
     class="canvas-root chat"
-    :class="{ 'is-touch': isTouchDevice, 'lt-format-mmd': cardFormat === 'mmd', 'lt-theme-dark': themeLocked }"
+    :class="{ 'is-touch': isTouchDevice, 'is-fullscreen': fullscreenActive, 'lt-format-mmd': cardFormat === 'mmd', 'lt-theme-dark': themeLocked }"
     :data-lt-author-owns="authorOwnedRegions || null"
   >
     <CanvasHeader

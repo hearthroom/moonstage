@@ -455,9 +455,6 @@
     padding-right: env(safe-area-inset-right, 0px);
     position: fixed;
     inset: 0;
-    top: var(--lt-viewport-top, 0px);
-    bottom: auto;
-    height: var(--lt-viewport-height, 100%);
     display: flex;
     flex-direction: column;
     font-family: var(--lt-canvas-font);
@@ -470,6 +467,20 @@
     color: var(--lt-canvas-fg);
     background: var(--lt-canvas-bg);
     overflow: hidden;
+  }
+
+  /*
+    只有全螢幕（Fullscreen API）時畫布才跟著可見視窗走：全螢幕的 Android Chrome 會把
+    輸入法直接蓋在頁面上，不縮任何一個 viewport，得自己拿鍵盤幾何把輸入列抬起來
+    （canvas-viewport.ts）。一般模式交給瀏覽器：iOS Safari 在輸入框聚焦、捲動鏈到文件
+    時會自己捲頁，這時每次 visualViewport 一變就改寫 fixed 根的 top/height 會跟它打架
+    ——拖到底畫面跳回去、鍵盤後面一片白（owner 2026-09-22 iOS 回報，這條上線幾小時後）。
+    沙箱卡的全舞台（.canvas-sandbox-frame.is-full）另外吃同一組變數，不在這裡。
+  */
+  .canvas-root.is-fullscreen {
+    top: var(--lt-viewport-top, 0px);
+    bottom: auto;
+    height: var(--lt-viewport-height, 100%);
   }
 
   /* ── 頂欄 ─────────────────────────────────────────────────────── */

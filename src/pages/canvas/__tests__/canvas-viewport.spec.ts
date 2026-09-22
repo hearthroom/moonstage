@@ -1,4 +1,6 @@
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { bindCanvasViewport, visibleViewport } from '../canvas-viewport'
 
 afterEach(() => vi.restoreAllMocks())
@@ -50,4 +52,27 @@ it('preserves native pinch zoom and falls back when viewport APIs are absent', (
   Object.defineProperty(win, 'visualViewport', { value: null })
   Object.defineProperty(win, 'navigator', { value: {} })
   expect(visibleViewport(win)).toEqual({ top: 0, bottom: 800, height: 800 })
+})
+
+// 一般模式不跟 visualViewport：iOS Safari 在輸入框聚焦、捲動鏈到文件時自己會捲頁，每次
+// visualViewport 一變就改寫 fixed 根的 top/height 會跟它打架——拖到底畫面跳回去、鍵盤後面
+// 白屏（owner 2026-09-22 iOS 回報，這條上線幾小時後）。變數照寫（沙箱全舞台要用），
+// 只有全螢幕的一般畫布才讀它。
+describe('一般畫布只在全螢幕時讀視窗變數', () => {
+  const css = readFileSync(resolve(process.cwd(), 'src/pages/canvas/canvas.css'), 'utf8')
+  const vue = readFileSync(resolve(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
+  const block = (sel: string) => css.match(new RegExp(sel.replace(/[.]/g, '\\.') + ' \\{[^}]*\\}'))?.[0] || ''
+
+  it('.canvas-root 的基底是 inset: 0，不含視窗變數', () => {
+    const root = block('.canvas-root')
+    expect(root).toMatch(/inset: 0;/)
+    expect(root).not.toMatch(/--lt-viewport/)
+  })
+
+  it('.canvas-root.is-fullscreen 才吃 --lt-viewport-top／height，且模板在全螢幕時掛上這個 class', () => {
+    const full = block('.canvas-root.is-fullscreen')
+    expect(full).toMatch(/top: var\(--lt-viewport-top, 0px\)/)
+    expect(full).toMatch(/height: var\(--lt-viewport-height, 100%\)/)
+    expect(vue).toMatch(/'is-fullscreen': fullscreenActive/)
+  })
 })
