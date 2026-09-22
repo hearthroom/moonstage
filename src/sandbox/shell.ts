@@ -66,6 +66,10 @@ export function createShell(options: CreateShellOptions): Shell {
     composerVisible: config.composer !== false,
     backgroundUrl: config.backgroundUrl,
   })
+  // 殼的根不准被內部捲動：iOS Safari 為了露出聚焦的輸入框會捲 overflow:hidden 的祖先且不捲回
+  // （見 shell.css 的說明）。overflow:clip 擋掉大多數情況；認不得 clip 的舊 Safari 靠這裡歸零。
+  const resetRootScroll = () => { if (refs.root.scrollTop) refs.root.scrollTop = 0; if (refs.root.scrollLeft) refs.root.scrollLeft = 0 }
+  refs.root.addEventListener('scroll', resetRootScroll, { passive: true })
   // 宿主接管頁首與輸入區時，殼只畫訊息區：樣式看 data-chrome 藏掉自己的那兩塊（節點留著，作者的 sdk.input 仍有東西可讀）。
   // 三種頁首／輸入區：host＝宿主畫（殼藏起來）；standard＝殼用標準元件畫（資料由宿主送來）；shell＝殼自己的陽春版。
   const standardChrome = config.chrome !== 'host' && !!config.chromeState
@@ -537,6 +541,7 @@ export function createShell(options: CreateShellOptions): Shell {
       doc.removeEventListener('click', onLinkClick)
       scrollView.removeEventListener('scroll', onScroll)
       followBottom.dispose()
+      refs.root.removeEventListener('scroll', resetRootScroll)
       refs.root.remove()
       refs.authorCss.remove()
     },

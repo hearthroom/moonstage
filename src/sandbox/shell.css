@@ -34,7 +34,12 @@ html, body { margin: 0; padding: 0; height: 100%; }
   flex-direction: column;
   height: var(--chat-viewport-height, 100%);
   min-height: 0;
+  /* clip 讓這個盒子根本不可捲：iOS Safari 會為了露出聚焦的輸入框把 overflow:hidden 的祖先「內部捲動」，
+     而且鍵盤收起後不捲回來——整個殼往上偏一個頁首高、底下多一條空白、吸附的 HUD 跑出畫面
+     （owner 2026-09-22 iOS 截圖，偏移量剛好等於頁首高）。hidden 留給不認得 clip 的舊 Safari，
+     那些由 shell.ts 的 scroll 監聽把 scrollTop 歸零。 */
   overflow: hidden;
+  overflow: clip;
 }
 /* 殼自己畫陽春版頁首與輸入區時才用這套底色與字型；標準元件或宿主接管時，底色、字型跟標準畫布（.canvas-root）。 */
 [data-chat="root"][data-chrome="shell"] {
