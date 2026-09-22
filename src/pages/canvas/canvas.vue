@@ -6357,7 +6357,19 @@ let scrollTopNow = 0;
 
 // 捲到底的實作用元素定位，而不是 scrollTop 巨大值——後者會被 clamp 到當時的
 // scrollHeight，而那正是「內容還在長高」時算不準的東西。
+//
+// 只動捲動容器自己，不用 scrollIntoView：那個 API 會把每一層可捲的祖先都捲一次，
+// 包括文件本身。iOS Safari 鍵盤彈出時視覺視窗變小，它就把整頁往上推、露出白底，
+// 玩家拖到底也被它拉回（owner 2026-09-22 iOS 回報）。哨兵是 #chat 的最後一個子節點，
+// 它之後只剩 #chat 的底部內距（含輸入區被作者推上來蓋住的量），所以「捲到 scrollHeight」
+// 就是「哨兵連同內距一起到位」。內容還在長高時 scrollHeight 會再變，那正是哨兵觀察器
+// 會再叫一次的時機，所以這裡不需要比當下更大的值。
 function scrollAnchorIntoView() {
+  const root = document.getElementById('scrollview');
+  if (root) {
+    root.scrollTop = root.scrollHeight;
+    return;
+  }
   const el = document.getElementById('chat-scroll-anchor');
   if (!el) return;
   try {

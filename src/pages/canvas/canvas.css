@@ -659,7 +659,7 @@
   #chat {
     /* 欄寬與置中搬到 layer 外了，見檔頭說明。
        底部內距多加的那一段是輸入區被作者往上推時蓋住捲動區的量
-       （canvas-composer-overhang.ts）。寫成變數是因為捲底哨兵也要吃同一個量，見下。 */
+       （canvas-composer-overhang.ts）。 */
     --lt-chat-pad-bottom: calc(24px + var(--lt-canvas-composer-overhang, 0px));
     padding: 12px 12px var(--lt-chat-pad-bottom);
     box-sizing: border-box;
@@ -674,13 +674,11 @@
   .chat-scroll-anchor {
     height: 1px;
     /*
-      捲底走的是 scrollIntoView 對齊下緣：把哨兵貼到容器下緣。哨兵住在
-      #chat 的底部內距之上，所以那段內距永遠留在視窗外——輸入區被作者推上來
-      蓋住的那幾十 px 正好是最後一則的動作列（重新生成／上下文／…），玩家看到
-      它只露一半，往下拖到底又被下一次內容撐高（作者 HUD 重畫）拉回去
-      （owner 2026-09-22 手機回報）。scroll-margin 讓「貼到下緣」把內距一起算進去。
+      不要在這裡加 scroll-margin-bottom 配 scrollIntoView 來把 #chat 的底部內距捲出來：
+      scrollIntoView 會連文件一起捲，iOS Safari 鍵盤彈出時整頁被推上去露白底、拖到底
+      也被拉回（2026-09-22 上線半天就撤）。捲底改成直接設容器的 scrollTop（canvas.vue
+      的 scrollAnchorIntoView），內距自然在 scrollHeight 裡。
     */
-    scroll-margin-bottom: var(--lt-chat-pad-bottom);
   }
 
   .lt-canvas-root {
