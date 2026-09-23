@@ -162,7 +162,7 @@
             <span v-else class="cb-billing-total-value is-empty">{{ labels.unavailable }}</span>
           </div>
           <span v-if="report.billing.available" class="cb-billing-hit">
-            {{ labels.cacheHitRateFull }} {{ report.billing.cacheHitRate == null ? '--' : report.billing.cacheHitRate }}%
+            {{ labels.cacheHitRateFull }} {{ formatHitRate(report.billing.cacheHitRate) }}%
           </span>
         </div>
         <div v-if="report.billing.available && report.billing.componentsAvailable !== false" class="cb-billing-grid">
@@ -197,6 +197,7 @@ import {
   type PromptBreakdownItem,
   type PromptBreakdownReport,
   type PromptModUsageDetail,
+  formatHitRate,
 } from '../canvas-context-breakdown'
 
 export interface ContextBreakdownLabels {
