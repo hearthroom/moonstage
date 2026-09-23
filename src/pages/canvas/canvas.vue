@@ -501,6 +501,7 @@ import { contextUsageDisplayForRow, contextBudgetTokens } from './canvas-context
 import {
   BREAKDOWN_META,
   createPromptDiagnosticsRequestGate,
+  promptBreakdownHasModData,
   normalizeServerReport,
   type PromptBreakdownReport,
 } from './canvas-context-breakdown'
@@ -9812,7 +9813,7 @@ async function onDeleteDirective(sourceId: string) {
   )
 }
 
-// ── 這則回覆的組成 ─────────────────────────────────────────────────────
+// ── 上下文用量（舊名「這則回覆的組成」）──────────────────────────────────
 //
 // 氣泡底下的「上下文 NN%」chip 點開的那一片：上下文由哪些部分組成、各占多少、
 // 上一輪快取命中率、本輪花了多少點。mobile 聊天頁那份彈窗搬過來的，同一條伺服器
@@ -9830,10 +9831,13 @@ const contextBreakdownGate = createPromptDiagnosticsRequestGate()
 
 const contextBreakdownLabels = computed(() => ({
   title: t('promptBreakdown.title'),
-  subtitle: t(contextBreakdown.value.report?.chatId ? 'canvas.context.selectedReply' : 'promptBreakdown.subtitle'),
+  // 「變更 MOD 後⋯⋯」那句只給真的有 MOD 用量的報告（LunaTalk）；沒有 MOD 的供應商（HarperHarbor）不提 MOD。
+  subtitle: t(contextBreakdown.value.report?.chatId
+    ? 'canvas.context.selectedReply'
+    : (promptBreakdownHasModData(contextBreakdown.value.report) ? 'promptBreakdown.subtitleMod' : 'promptBreakdown.subtitle')),
   close: t('main.cancel'),
   retry: t('promptBreakdown.retry'),
-  loadFailed: t('promptBreakdown.modDetailsLoadError'),
+  loadFailed: t('promptBreakdown.loadError'),
   unsupportedModel: t('promptBreakdown.unsupportedModel'),
   notReady: t('promptBreakdown.notReady'),
   totalTokens: t('promptBreakdown.totalTokens'),

@@ -1,8 +1,9 @@
 <template>
   <div class="context-breakdown-scope">
   <!--
-    這則回覆的組成：上下文由哪些部分組成、各占多少。mobile 聊天頁那份彈窗搬過來的，
+    上下文用量：上下文由哪些部分組成、各占多少。mobile 聊天頁那份彈窗搬過來的，
     同一份口徑（估算 token、字元、百分比、快取命中率、本輪點數、MOD 明細）。
+    MOD 那一列只在報告真的帶著 MOD 用量時才畫（HarperHarbor 沒有 MOD，見 visiblePromptBreakdownItems）。
 
     元件不打 API：資料由頁面整理好餵進來（canvas-context-breakdown.ts 正規化過，
     內部欄位進不來），文案也由頁面翻好餵進來，這裡只負責畫。
@@ -128,7 +129,7 @@
 
       <div class="cb-list">
         <div
-          v-for="item in report.items"
+          v-for="item in visibleItems"
           :key="item.key"
           class="cb-row"
           :class="{ 'is-unavailable': !item.available, 'is-active': activeItem.key === item.key, 'is-selectable': selectable(item) }"
@@ -192,6 +193,7 @@ import {
   promptBreakdownItemSelectable,
   promptBreakdownModDisplayName,
   resolvePromptBreakdownActiveItem,
+  visiblePromptBreakdownItems,
   type PromptBreakdownItem,
   type PromptBreakdownReport,
   type PromptModUsageDetail,
@@ -275,7 +277,9 @@ const statusText = computed(() => {
   return props.labels.subtitle
 })
 
-const activeItem = computed(() => resolvePromptBreakdownActiveItem(props.report ? props.report.items : [], props.activeKey))
+const visibleItems = computed(() => visiblePromptBreakdownItems(props.report ? props.report.items : []))
+
+const activeItem = computed(() => resolvePromptBreakdownActiveItem(visibleItems.value, props.activeKey))
 
 const donutSegments = computed(() => buildPromptDonutSegments(props.report ? props.report.items : [], activeItem.value.key))
 
