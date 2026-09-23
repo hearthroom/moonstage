@@ -172,6 +172,13 @@ function cleanText(value: unknown): string {
   return ''
 }
 
+/** 命中率給人看的寫法：小數一位，整數不帶小數；沒有資料時是「--」。 */
+export function formatHitRate(value: number | null | undefined): string {
+  const n = Number(value)
+  if (value == null || !Number.isFinite(n)) return '--'
+  return String(Math.round(n * 10) / 10)
+}
+
 function compactNumber(value: unknown): number {
   const n = Number(value)
   return Number.isFinite(n) && n > 0 ? n : 0

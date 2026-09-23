@@ -404,3 +404,21 @@ describe('上下文用量：五語文案', () => {
     }
   })
 })
+
+// 伺服器給的命中率是原始比例（例如 91.59398…）：面板只要到小數一位，整數不帶小數。
+describe('formatHitRate', () => {
+  it('rounds to one decimal and drops a trailing .0', async () => {
+    const { formatHitRate } = await import('../canvas-context-breakdown')
+    expect(formatHitRate(91.59398496240601)).toBe('91.6')
+    expect(formatHitRate(80)).toBe('80')
+    expect(formatHitRate(99.96)).toBe('100')
+    expect(formatHitRate(0.04)).toBe('0')
+    expect(formatHitRate(null)).toBe('--')
+    expect(formatHitRate(Number.NaN)).toBe('--')
+  })
+  it('is what the panel shows', async () => {
+    const { readFileSync } = await import('node:fs')
+    const vue = readFileSync('src/pages/canvas/components/canvas-context-breakdown.vue', 'utf8')
+    expect(vue).toContain('formatHitRate(report.billing.cacheHitRate)')
+  })
+})
