@@ -1,5 +1,5 @@
 /**
- * 「這則回覆的組成」——把伺服器回的 breakdownVersion=2 報告整理成彈窗要畫的形狀。
+ * 「上下文用量」（舊名「這則回覆的組成」）——把伺服器回的 breakdownVersion=2 報告整理成彈窗要畫的形狀。
  *
  * 這份是 mobile 聊天頁那份（utils/prompt-breakdown.js，11 桶版）的搬運：桶的順序、
  * 顏色、MOD 明細的加總驗證、圓環的幾何都照搬，兩端看到的是同一件事。搬過來時
@@ -455,6 +455,29 @@ export function normalizeServerReport(report: any): PromptBreakdownReport | null
     cache: normalizeServerCache(report.cache),
     billing: normalizeServerBilling(report.billing),
   }
+}
+
+// ── 沒有 MOD 的供應商 ─────────────────────────────────────────────────
+//
+// 同一份舞台同時接 LunaTalk（有 MOD）與 HarperHarbor（沒有 MOD），而宿主沒有告訴
+// 舞台接的是哪一家——能判斷的只有報告本身。HarperHarbor 的第 2 版報告仍然帶著 mod
+// 這一桶，但永遠是 0 字、不可用、沒有明細；照畫的話玩家會看到一列「MOD／暫無資料」
+// 和「變更 MOD 後⋯⋯」的副標，講的是這一家根本沒有的東西。
+// 所以：MOD 那桶有 token 或有明細才算「這一家有 MOD」，否則那一列與 MOD 相關的字都收起來。
+
+/** 這份報告裡有沒有可講的 MOD 用量（沒有就代表這家供應商沒有 MOD，或這一輪沒用到）。 */
+export function promptBreakdownHasModData(report: Pick<PromptBreakdownReport, 'items'> | null | undefined): boolean {
+  const mod = report && Array.isArray(report.items) ? report.items.find((item) => item && item.key === 'mod') : null
+  return !!(mod && mod.available !== false && (
+    Number(mod.estimatedTokens) > 0 ||
+    (mod.detailsAvailable && Array.isArray(mod.details) && mod.details.length > 0)
+  ))
+}
+
+/** 列表要畫的桶：MOD 那桶沒有資料就不列，其餘照伺服器的固定順序全列。 */
+export function visiblePromptBreakdownItems(items: PromptBreakdownItem[] | null | undefined): PromptBreakdownItem[] {
+  const list = Array.isArray(items) ? items : []
+  return promptBreakdownHasModData({ items: list }) ? list : list.filter((item) => item && item.key !== 'mod')
 }
 
 // ── 選中的桶 ──────────────────────────────────────────────────────────

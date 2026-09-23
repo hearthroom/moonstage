@@ -15,8 +15,10 @@ import {
   buildPromptDonutSegments,
   createPromptDiagnosticsRequestGate,
   normalizeServerReport,
+  promptBreakdownHasModData,
   promptBreakdownItemSelectable,
   resolvePromptBreakdownActiveItem,
+  visiblePromptBreakdownItems,
 } from '../canvas-context-breakdown'
 
 const ITEM_LABELS: Record<string, string> = {
@@ -34,7 +36,7 @@ const ITEM_LABELS: Record<string, string> = {
 }
 
 const LABELS = {
-  title: '這則回覆的組成',
+  title: '上下文用量',
   subtitle: '依最近一次完成的回覆估算',
   close: '關閉',
   retry: '重試',
@@ -271,7 +273,8 @@ describe('組成：彈窗畫出來的東西', () => {
     raw.items.forEach((i: any) => { i.estimatedTokens = 0; i.charCount = 0; i.percent = 0; i.sourceCount = 0 })
     const el = mountSheet({ report: normalizeServerReport(raw) }).element as HTMLElement
     expect(el.querySelector('.cb-subtitle')!.textContent).toBe('完成一輪回覆後可查看')
-    expect(el.querySelectorAll('.cb-row').length).toBe(BREAKDOWN_META.length)
+    // 沒有 MOD 資料時 MOD 那列不畫（見下方「沒有 MOD 的供應商」），其餘十列都在
+    expect(el.querySelectorAll('.cb-row').length).toBe(BREAKDOWN_META.length - 1)
     expect(el.querySelector('.cb-billing-total-value')!.textContent).toBe('尚無資料')
   })
 
@@ -336,4 +339,68 @@ it('does not turn missing historical cache usage into a measured zero',()=>{
  const report=normalizeServerReport({supported:true,status:'ok',items:[],cache:{available:false,hitRate:null},billing:{available:true,totalPoints:1,componentsAvailable:false,cacheHitRate:null}})!
  expect(report.billing.cacheHitRate).toBeNull()
  expect(report.cache.hitRate).toBeNull()
+})
+
+// ── 沒有 MOD 的供應商（HarperHarbor）──────────────────────────────────
+//
+// 同一份舞台同時接 LunaTalk（有 MOD）與 HarperHarbor（沒有 MOD）。舞台不知道
+// 自己接的是哪一家，能看的只有報告本身：MOD 那桶沒有 token、也沒有明細，就代表
+// 這一家沒有 MOD 可講，那一列與 MOD 相關的字都不該出現。
+function harborReport() {
+  const raw = serverReport()
+  ;(raw.items as any[])[2] = { key: 'mod', labelKey: 'prompt.mod', color: '#6831FF', available: false, sourceCount: 0, charCount: 0, estimatedTokens: 0, percent: 0, detailsAvailable: false }
+  return raw
+}
+
+describe('上下文用量：沒有 MOD 的供應商', () => {
+  it('MOD 那桶沒有資料：判定為沒有 MOD，列表不列 MOD', () => {
+    const report = normalizeServerReport(harborReport())!
+    expect(promptBreakdownHasModData(report)).toBe(false)
+    expect(visiblePromptBreakdownItems(report.items).map((i) => i.key)).not.toContain('mod')
+  })
+
+  it('彈窗不畫 MOD 那一列，也沒有任何 MOD 字樣', () => {
+    const wrapper = mountSheet({ report: normalizeServerReport(harborReport()) })
+    const el = wrapper.element as HTMLElement
+    const titles = Array.from(el.querySelectorAll('.cb-row-title')).map((n) => n.textContent)
+    expect(titles).not.toContain('MOD')
+    expect(el.querySelectorAll('.cb-row').length).toBe(BREAKDOWN_META.length - 1)
+    expect(el.textContent).not.toContain('MOD')
+    wrapper.unmount()
+  })
+
+  it('有 MOD 的供應商照舊：MOD 有 token 時那一列還在', () => {
+    const report = normalizeServerReport(serverReport())!
+    expect(promptBreakdownHasModData(report)).toBe(true)
+    expect(visiblePromptBreakdownItems(report.items).map((i) => i.key)).toContain('mod')
+  })
+})
+
+describe('上下文用量：五語文案', () => {
+  const locales = ['zh-Hant', 'zh-Hans', 'en', 'ja', 'ko'] as const
+  const table = (l: string) => JSON.parse(readFileSync(resolve(__dirname, '../../../locale', l + '.json'), 'utf8')) as Record<string, string>
+  const expectedTitle: Record<string, string> = {
+    'zh-Hant': '上下文用量', 'zh-Hans': '上下文用量', en: 'Context usage', ja: 'コンテキスト使用量', ko: '컨텍스트 사용량',
+  }
+
+  it('標題叫「上下文用量」，跟氣泡底下的入口同名', () => {
+    for (const l of locales) {
+      const t = table(l)
+      expect(t['promptBreakdown.title']).toBe(expectedTitle[l])
+      expect(t['promptBreakdown.entry']).toBe(expectedTitle[l])
+      expect(t['canvas.context.details']).toBe(expectedTitle[l])
+    }
+  })
+
+  it('一般副標、讀取失敗與不支援的文案都不提 MOD，也不再叫「這則回覆的組成」', () => {
+    for (const l of locales) {
+      const t = table(l)
+      for (const key of ['promptBreakdown.subtitle', 'promptBreakdown.loadError', 'promptBreakdown.unsupportedModel']) {
+        expect(t[key], l + ' ' + key).toBeTruthy()
+        expect(t[key], l + ' ' + key).not.toMatch(/MOD/)
+      }
+      expect(Object.values(t).join('\n')).not.toMatch(/這則回覆的組成|这则回复的组成|What's in this reply|この返信の内訳|이 답장의 구성/)
+      expect(t).not.toHaveProperty('promptBreakdown.modDetailsLoadError')
+    }
+  })
 })
