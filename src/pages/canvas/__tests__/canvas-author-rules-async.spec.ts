@@ -171,6 +171,10 @@ function buildRenderMessage(authorRules: unknown, renderMarkdown: (item: any) =>
     streamRenderTimer: 0,
     activateMessageScripts: (_item: unknown, html: string) => { activated.push(html) },
     activateFrontendBlocks: () => {},
+    // 世界卡的發言者頭像裝飾（canvas-world.ts）：普通卡一律原樣回傳。
+    decorateSpeakers: (html: string) => html,
+    worldMembers: () => [],
+    roleView: { value: {} },
     setTimeout, Date, console,
   })
   const renderMessage = new vm.Script(`(function(){\n${parts}\nreturn renderMessage;\n})()`).runInContext(context)

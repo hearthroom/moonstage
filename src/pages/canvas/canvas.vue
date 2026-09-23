@@ -448,6 +448,7 @@ import CanvasMessage from './components/canvas-message.vue'
 import CanvasComposer from './components/canvas-composer.vue'
 import CanvasMessageMenu from './components/canvas-message-menu.vue'
 import { applyTavernRules, resolvePlayerName } from './canvas-rule-engine'
+import { decorateSpeakers, worldMembers, mentionShortcuts, mentionOf } from './canvas-world'
 import { getAuthorRuleRunner } from '@/common/author-rules'
 import { scopeCardHtml, normalizeCardFormat, type CardFormat } from './canvas-style-scope'
 import { withFencesProtected } from '@/common/markdown-fences'
@@ -1849,6 +1850,8 @@ const isConnecting = ref(false);
 const focus = ref(false);//对话输入框焦点
 const contine = ref(false);//继续说
 const rewrite = ref(false); //是否重说
+// 世界卡：玩家 @ 的成員 id（快捷列選的），送出時帶 mention，送出後清掉。
+const mention = ref('');
 const rewriteTargetChatId = ref(''); // V2 rewrite 必須指向已 accepted 的 USER chatId
 const continueTargetChatId = ref(''); // additive exact-parent identity for capable Continue
 const openMore = ref(false); //开启更多功能
@@ -4049,7 +4052,8 @@ const renderMessage = (item) => {
   }
 
   const provisionalBefore = authorRules.provisional
-  const html = renderMarkdown(item)
+  // 世界卡：發言者區塊的名字列補頭像（名冊來自 /role/detail 的 world）。普通卡沒有區塊，原樣回傳。
+  const html = decorateSpeakers(renderMarkdown(item), worldMembers(roleView.value))
   if (authorRules.provisional !== provisionalBefore) {
     // 規則結果還沒回來。串流中的照樣換上（字要立刻看得到）；已定稿的先留著上一版畫面（有的話），
     // 不讓它退回原文閃一下。worker 回來 epoch 一變，記錄就失效、重算成完整套用的結果。
@@ -8006,8 +8010,11 @@ function send() {
       : (unref(contine) ? unref(continueTargetChatId) : ''),
     clientTurnId: generateClientTurnId(),
     resumeFromOperationId: explicitResumeFrom,
+    // 世界卡：這一句 @ 的成員；普通卡永遠是空字串，白名單不會帶上。
+    mention: mention.value,
   };
   const preparedPayload = prepareChatPayload(payloadInput);
+  mention.value = '';
 
   beginPendingChatTurn({
     userBubbleId,
@@ -9122,6 +9129,8 @@ const isGenerating = computed(() => {
 
 // 輸入區上面那一排放「每次都會碰」的五樣（照 MMD 的習慣）；其餘全部收進「＋」。
 const shortcutItems = computed(() => previewOnly.value ? [] : [
+  // 世界卡：每個成員一顆「@名字」，點了就是這一句指名他先開口；再點一次取消。
+  ...mentionShortcuts(worldMembers(roleView.value), mention.value),
   { key: 'model', label: t('canvas.panel.model') },
   { key: 'persona', label: t('canvas.panel.persona') },
   { key: 'directives', label: t('directive.entry') },
@@ -9186,6 +9195,7 @@ function onPanelPick(key: string) {
 }
 
 async function onShortcut(key: string) {
+  if (mentionOf(key)) { mention.value = mention.value === mentionOf(key) ? '' : mentionOf(key); return }
   if (panel.value.sheet === 'response-settings' && responseSettingsPanel.value && !await responseSettingsPanel.value.mayClose()) return
   if (!allowsStagePanel(stageHost.capabilities, key)) return
   if (key === 'new-chat') {

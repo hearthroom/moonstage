@@ -152,6 +152,10 @@ Two lists on `/role/detail` look alike and are not:
 
 Either list may be empty, and an older server omits both. Treat a missing field as an empty list.
 
+A **world card** also carries `world: { maxSpeakers, characters: [{ id, name, avatar, profile }] }` on `/role/detail`
+(the author additionally sees `description`, `lorebookId`, `sex` and `strictness`). Show the roster as an @ picker in
+the composer and use it to draw the name and avatar of each speaker block. Ordinary cards have no `world` field.
+
 Anything not on this list is not part of the contract. Moderation, payments, analytics
 and account management are not part of v1 and are not planned for it.
 
@@ -177,6 +181,7 @@ rewritten on the way in.
 | POST | `/role/:roleId/document` | write card text as one document — `{ fields: { roleName?, roleDesc?, roleTag?, userName?, roleType?, roleAvatar?, roleBackground?, roleDetailDesc?, roleWelcome?, talkExample?, roleOutputContract?, customInstructions? } }`. Only the fields you send are written; an absent field is left alone, so an older client never blanks a newer field |
 | PATCH | `/role/:roleId/welcome` | opening lines — `{ roleWelcome, alternates?, prologue? }`. `alternates` and `prologue` are full replacements: omit to keep, send `[]` to clear |
 | POST | `/role/:roleId/visibility` | `{ visibility: "private" }` — the only value v1 accepts; going public is a publish |
+| PUT / DELETE | `/role/:roleId/world` | world mode members — `{ version: 1, maxSpeakers?, strictness?, characters: [{ id, name, avatar?, sex?, profile, description, lorebookId? }] }` turns the card into a **world card**: its `roleDetailDesc` is the shared world, its bound worldbooks are world-level lore, and each member carries a private description plus an optional worldbook of its own (author-owned, recalled only for that member). `DELETE` makes it an ordinary card again. Members change the content hash |
 | GET | `/role/validate` | `?roleId=` → the same report the card-writer shows before publishing |
 | POST | `/role/:roleId/publish` | submit for review — `{ userConfirmed: true, confirmationSummary }` → `{ roleId, reviewStatus }` |
 | POST | `/image/upload` | multipart `file` (+ optional `roleId`) for avatars and backgrounds; same size limit and quota as the site |
@@ -364,6 +369,12 @@ S→C   streamMeta · thinking · answer · messageMeta · operationStatus
 
 Treat unknown `S→C` events as ignorable — that is how the contract stays frozen while
 the server keeps moving.
+
+On a world card the `send` frame may carry `mention` (a member id from `world.characters`): that member is
+addressed directly and always answers first when it can hear the player. The reply is **one** assistant message per
+turn: the world's narration first, then one `<section class="hh-speaker hh-speaker--{id}" data-speaker="{id}">`
+block per member who spoke, each with a `<header class="hh-speaker__name">` and a `<div class="hh-speaker__body">`.
+The world's hidden judgment never reaches the client. `mention` is part of the turn's idempotency intent.
 
 ## Language
 
