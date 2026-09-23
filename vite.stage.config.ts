@@ -14,6 +14,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { stageDataChunk, stageModelAssets } from './build/stage-assets'
+import { authorRuleEngineDefine } from './build/engine-version'
 import path from 'node:path'
 import type { Root as PostcssRoot, Plugin as PostcssPlugin } from 'postcss'
 
@@ -114,6 +115,8 @@ export default defineConfig(({ mode }) => {
       'process.env.UNI_PLATFORM': JSON.stringify('h5'),
       'process.env.NODE_ENV': JSON.stringify('production'),
       'process.env.VUE_APP_PLATFORM': JSON.stringify('h5'),
+      // 作者規則持久層的鍵（引擎一改就不命中舊產物）
+      ...authorRuleEngineDefine(__dirname),
     },
     css: { postcss: { plugins: [stageCssPlugin()] } },
     build: {

@@ -240,14 +240,14 @@ describe('快取', () => {
     const store = new Map<string, any>()
     const persist = { get: async (k: string) => store.get(k), set: (k: string, v: any) => { store.set(k, v) } }
     const first = manualExecutor()
-    const a = createRuleRunner({ executor: first.executor, persist })
+    const a = createRuleRunner({ executor: first.executor, persist, engineVersion: 'v1' })
     a.display({ text: 'aa', rules })
     await settle() // 先查持久層（沒有）才排工作
     first.finish(0)
     await settle()
     expect(store.size).toBe(1)
     const second = manualExecutor()
-    const b = createRuleRunner({ executor: second.executor, persist })
+    const b = createRuleRunner({ executor: second.executor, persist, engineVersion: 'v1' })
     expect(b.display({ text: 'aa', rules }).provisional).toBe(true)
     await settle()
     expect(second.started).toHaveLength(0)
@@ -257,7 +257,7 @@ describe('快取', () => {
   it('持久層壞掉（儲存被停用）照樣跑完', async () => {
     const persist = { get: async () => { throw new Error('SecurityError') }, set: () => { throw new Error('QuotaExceeded') } }
     const { executor, started, finish } = manualExecutor()
-    const runner = createRuleRunner({ executor, persist })
+    const runner = createRuleRunner({ executor, persist, engineVersion: 'v1' })
     runner.display({ text: 'aa', rules })
     await settle()
     expect(started).toHaveLength(1)

@@ -12,14 +12,19 @@
  *       連可接的產物都沒有就回原文（provisional: true）。工作跑完發 onSettled，呼叫端重畫再來拿。
  *   apply(req)  Promise 版，給只要最終結果的呼叫端（applyTavernRulesAsync）。
  *
- * 排程：同一時間只有一個工作在跑（worker 是單執行緒，跑不跑得完都不打斷）。串流中的請求會合併：
- *   新的全文若是某個還在排隊的串流請求的延伸，那個舊版本直接拿掉——跑完手上這個，接著跑最新的。
- *   規則快的話幾乎每個 chunk 都跑得到（跟今天看不出差別）；慢的規則自然少跑幾次。
+ * 排程：同時最多 executor.concurrency 件（worker 池；每件跑不跑得完都不打斷）。
+ *   優先序：串流中的請求 → 其餘依「最近一次被要」由新到舊。畫面由舊到新渲染歷史，所以最新那則最後被要、
+ *   最先跑；重畫時還在等的列會再被要一次、往前排（看得到的列正是會被重畫的那些）。
+ *   2026-09-23 正式站：FIFO＋單一 worker 時，重整 13 則歷史、最新那則要約 87 秒才套上樣式。
+ *   串流中的請求會合併：新的全文若是某個還在排隊的串流請求的延伸，那個舊版本直接拿掉。
+ *   同一則訊息（同 prefixKey、全文互為前綴）一次只跑一件：新版本等手上那件跑完，不搶第二個 worker。
  *
- * 快取：鍵是（規則組內容、巨集與簡繁表、引擎種類、輸入全文）。
- *   - 定稿（非串流）的結果進 LRU（可選的持久層也只收這種）。
+ * 快取：鍵是（引擎版本、規則組內容、巨集與簡繁表、引擎種類、輸入全文）。
+ *   - 定稿（非串流）的結果進 LRU，也寫進持久層（IndexedDB，重整、回訪直接拿）。
  *   - 串流中途的結果只進「最近完成」小環：拿來接顯示、以及「最後一版剛好就是定稿全文」時直接升格——
- *     同一份輸入的套用結果就是同一份，升格不是把中途產物當定稿。
+ *     同一份輸入的套用結果就是同一份，升格不是把中途產物當定稿（升格時才寫持久層）。
+ *   - 持久層在排工作之前查（各自並行，不佔 worker）：命中就不排工作。沒注入引擎版本時不用持久層——
+ *     引擎改了鍵不變，會拿到舊產物，違反「跟同步套用逐字相同」。
  *
  * 後備：沒有執行器（測試、SSR、環境沒有 Worker）或執行器宣告不可用（worker 載入被擋）時，
  *   display／apply 直接在呼叫端同步套用，跟改動前的行為一樣。
@@ -45,12 +50,15 @@ export interface ExecutorJob {
 
 export interface RuleExecutor {
   run(job: ExecutorJob): Promise<RuleResult>
+  /** 同時能跑幾件（worker 池大小）；沒給算 1。 */
+  readonly concurrency?: number
   /** false：這個執行器已經確定跑不起來（例如 worker 被 CSP 擋），排程器改走同步。 */
   available(): boolean
   dispose?(): void
 }
 
 export interface RulePersistEntry {
+  /** prefixKey（含引擎版本）：讀回來時核對，雜湊撞了也不會拿錯。 */
   p: string
   text: string
   html: string
@@ -72,6 +80,8 @@ export interface DisplayResult {
 export interface RuleRunnerOptions {
   executor: RuleExecutor | null
   persist?: RulePersist | null
+  /** 規則引擎原始碼的雜湊（build 時注入）。空字串或沒給＝不用持久層。 */
+  engineVersion?: string
   /** LRU 上限（筆數與字元數，兩者先到先算）。 */
   cacheEntries?: number
   cacheChars?: number
@@ -134,6 +144,10 @@ interface Job extends Keyed {
   /** 結果要進定稿快取（有非串流的請求要它）。 */
   final: boolean
   waiters: Waiter[]
+  /** 最近一次被要的序號：越大越先跑（串流另外優先）。 */
+  seq: number
+  /** 'probe'：正在查持久層；'queued'：可以跑；'running'：在執行器上。 */
+  phase: 'probe' | 'queued' | 'running'
 }
 
 interface Completed { prefixKey: string; text: string; result: RuleResult }
@@ -142,7 +156,8 @@ const RECENT_LIMIT = 24
 
 export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
   const executor = options.executor
-  const persist = options.persist || null
+  const engineVersion = typeof options.engineVersion === 'string' ? options.engineVersion : ''
+  const persist = engineVersion ? options.persist || null : null
   const maxEntries = options.cacheEntries ?? 300
   const maxChars = options.cacheChars ?? 12_000_000
 
@@ -174,7 +189,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
       macroKey = JSON.stringify(macros)
     }
     const text = typeof req.text === 'string' ? req.text : ''
-    const prefixKey = `${engine}\u0001${rules.key}\u0001${variants.key}\u0001${macroKey}`
+    const prefixKey = `${engineVersion}\u0001${engine}\u0001${rules.key}\u0001${variants.key}\u0001${macroKey}`
     return { prefixKey, key: `${prefixKey}\u0001${text}`, text, engine, rulesKey: rules.key, rules: rules.plain, options: jobOptions }
   }
 
@@ -241,6 +256,11 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
     if (!persist) return
     try { persist.set(persistKey(k), { p: k.prefixKey, text: k.text, html: result.html, rollbacks: result.rollbacks }) } catch { /* 寫不進去就算了 */ }
   }
+  /** 定稿：進 LRU、寫持久層。 */
+  const promote = (k: Keyed, result: RuleResult) => {
+    lruSet(k.key, result)
+    persistSet(k, result)
+  }
 
   const stats = { jobs: 0, inline: 0, persistHits: 0 }
   const listeners = new Set<() => void>()
@@ -259,9 +279,11 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
   const inlineMode = () => !executor || !executor.available()
 
   // ── 排程 ──
+  const concurrency = Math.max(1, Math.floor((executor && executor.concurrency) || 1))
   const jobs = new Map<string, Job>()
   let queue: Job[] = []
-  let inflight: Job | null = null
+  const inflight = new Set<Job>()
+  let seqCounter = 0
 
   const emitSettled = () => {
     for (const fn of Array.from(listeners)) {
@@ -270,13 +292,16 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
   }
 
   const complete = (job: Job, result: RuleResult, fromPersist = false) => {
-    if (inflight === job) inflight = null
-    jobs.delete(job.key)
-    remember(job, result)
-    if (job.final) {
-      lruSet(job.key, result)
-      if (!fromPersist) persistSet(job, result)
+    if (!disposed) {
+      inflight.delete(job)
+      jobs.delete(job.key)
+      remember(job, result)
+      if (job.final) {
+        if (fromPersist) lruSet(job.key, result)
+        else promote(job, result)
+      }
     }
+    // 排程器被換掉（dispose）時手上的 apply() 照樣拿到結果，不會永遠等。
     for (const w of job.waiters) w.resolve(result)
     job.waiters = []
     if (disposed) return
@@ -285,7 +310,6 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
   }
 
   const execute = (job: Job) => {
-    if (disposed) return
     if (inlineMode()) { complete(job, runInline(job)); return }
     stats.jobs++
     executor!.run({ engine: job.engine, text: job.text, rulesKey: job.rulesKey, rules: job.rules, options: job.options }).then(
@@ -295,24 +319,54 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
     )
   }
 
-  function pump() {
-    if (inflight || disposed) return
-    const job = queue.shift()
-    if (!job) return
-    inflight = job
-    if (job.final && persist) {
-      persistGet(job).then((hit) => {
-        if (hit) { stats.persistHits++; complete(job, hit, true) } else execute(job)
-      })
-      return
+  /**
+   * 同一則訊息的另一個版本（同 prefixKey、全文互為前綴，至少一邊是串流中的）已經在跑。
+   * 兩件都是定稿就不算：「好」與「好的，…」是兩則不同的歷史，空字串更是任何全文的前綴——不能互擋。
+   */
+  const sameMessageRunning = (job: Job): boolean => {
+    for (const r of inflight) {
+      if (r.prefixKey !== job.prefixKey) continue
+      if (!job.streaming && !r.streaming) continue
+      if (job.text.startsWith(r.text) || r.text.startsWith(job.text)) return true
     }
-    execute(job)
+    return false
+  }
+
+  const pickNext = (): Job | null => {
+    let best: Job | null = null
+    for (const j of queue) {
+      if (sameMessageRunning(j)) continue
+      if (!best) { best = j; continue }
+      const js = j.streaming && !j.final
+      const bs = best.streaming && !best.final
+      if (js !== bs) { if (js) best = j; continue }
+      if (j.seq > best.seq) best = j
+    }
+    return best
+  }
+
+  function pump() {
+    while (!disposed && inflight.size < concurrency) {
+      const job = pickNext()
+      if (!job) return
+      queue = queue.filter((j) => j !== job)
+      job.phase = 'running'
+      inflight.add(job)
+      execute(job)
+    }
+  }
+
+  const makeRunnable = (job: Job) => {
+    job.phase = 'queued'
+    queue.push(job)
+    pump()
   }
 
   const enqueue = (k: Keyed, streaming: boolean): Job => {
     const existing = jobs.get(k.key)
     if (existing) {
       if (!streaming) { existing.final = true; existing.streaming = false }
+      existing.seq = ++seqCounter
       return existing
     }
     if (streaming) {
@@ -323,10 +377,17 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
         return !superseded
       })
     }
-    const job: Job = { ...k, streaming, final: !streaming, waiters: [] }
+    const job: Job = { ...k, streaming, final: !streaming, waiters: [], seq: ++seqCounter, phase: 'probe' }
     jobs.set(job.key, job)
-    queue.push(job)
-    pump()
+    if (!streaming && persist) {
+      // 先查持久層（不佔 worker、各自並行）；沒有才排進去跑。
+      persistGet(job).then((hit) => {
+        if (hit) { stats.persistHits++; complete(job, hit, true); return }
+        if (!disposed) makeRunnable(job)
+      })
+      return job
+    }
+    makeRunnable(job)
     return job
   }
 
@@ -338,7 +399,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
       if (hit) return { html: hit.html, provisional: false }
       const done = recentExact(k)
       if (done) {
-        if (!streaming) lruSet(k.key, done)
+        if (!streaming) promote(k, done)
         return { html: done.html, provisional: false }
       }
       if (inlineMode()) {
@@ -356,7 +417,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
       const hit = lruGet(k.key)
       if (hit) return Promise.resolve(hit)
       const done = recentExact(k)
-      if (done) { lruSet(k.key, done); return Promise.resolve(done) }
+      if (done) { promote(k, done); return Promise.resolve(done) }
       if (inlineMode()) {
         const result = runInline(k)
         remember(k, result)
@@ -384,7 +445,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
       listeners.clear()
       queue = []
       jobs.clear()
-      inflight = null
+      inflight.clear()
       try { if (executor && executor.dispose) executor.dispose() } catch { /* 收尾不得拋錯 */ }
     },
   }

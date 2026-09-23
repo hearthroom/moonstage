@@ -10,6 +10,7 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'node:path'
+import { authorRuleEngineDefine } from './build/engine-version'
 
 /**
  * 殼可能跑在不透明源（iframe 沒給 allow-same-origin，origin 為 'null'）：module script 與帶 crossorigin 的
@@ -40,6 +41,8 @@ export default defineConfig({
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify('production'),
+    // 作者規則持久層的鍵（殼在自己的源上有自己的 IndexedDB）
+    ...authorRuleEngineDefine(__dirname),
   },
   build: {
     outDir: path.resolve(__dirname, 'dist-sandbox'),
