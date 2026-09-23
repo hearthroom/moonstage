@@ -154,7 +154,8 @@ Either list may be empty, and an older server omits both. Treat a missing field 
 
 A **world card** also carries `world: { maxSpeakers, characters: [{ id, name, avatar, profile }] }` on `/role/detail`
 (the author additionally sees `description`, `lorebookId`, `sex` and `strictness`). Show the roster as an @ picker in
-the composer and use it to draw the name and avatar of each speaker block. Ordinary cards have no `world` field.
+the composer; it also names and draws the avatar of any speaker block (see the `send` note below). Ordinary cards
+have no `world` field.
 
 Anything not on this list is not part of the contract. Moderation, payments, analytics
 and account management are not part of v1 and are not planned for it.
@@ -372,9 +373,12 @@ the server keeps moving.
 
 On a world card the `send` frame may carry `mention` (a member id from `world.characters`): that member is
 addressed directly and always answers first when it can hear the player. The reply is **one** assistant message per
-turn: the world's narration first, then one `<section class="hh-speaker hh-speaker--{id}" data-speaker="{id}">`
-block per member who spoke, each with a `<header class="hh-speaker__name">` and a `<div class="hh-speaker__body">`.
-The world's hidden judgment never reaches the client. `mention` is part of the turn's idempotency intent.
+turn, normally a single continuous passage the world wrote after its members answered, in the card's own style. When
+that final writing step could not run, the message instead carries the world's sketch followed by one
+`<section class="hh-speaker hh-speaker--{id}" data-speaker="{id}">` block per member who spoke, each with a
+`<header class="hh-speaker__name">` and a `<div class="hh-speaker__body">`; older messages may have this shape too, so
+keep rendering it. The world's hidden judgment never reaches the client. `mention` is part of the turn's
+idempotency intent.
 
 ## Language
 
