@@ -432,6 +432,7 @@ import { adoptAuthorBodyNode, hoistFixedAuthorNodes } from './canvas-author-node
 import { bindComposerOverhang } from './canvas-composer-overhang'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
+import { clearPendingReplyPhase, insertBeforePendingReply, markPendingReplyPhase, pendingReplyLabel } from './canvas-pending-reply'
 
 // ── Open Canvas ─────────────────────────────────────────────────
 import '@/common/canvas-theme-vars.css'
@@ -5757,14 +5758,31 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
         store.commit('setCompactStatus', 'compacting');
         console.log('[AutoCompact] 伺服端觸發壓縮，原因:', event.data.reason);
         startCompactWatchdog();
-        // Resume 時 tryResumeOnMount 已先推占位，但壓縮階段該由 pill 接管、不該有空氣泡。
-        // 等 compactDone 後的 answer chunks 會再透過 upsertPendingAIBubble 補新占位。
-        removeOrphanPlaceholder();
+        // 等回覆的那顆氣泡留著，只把標籤換成「整理劇情中…」。這裡先前是拿掉它、「交給 pill」，
+        // 但那顆 pill 從 mobile 分出來時就沒有搬過來：整理劇情加上讀長上下文的那一兩分鐘，
+        // 回覆那一側什麼都沒有，玩家以為卡住（owner 2026-09-23）。伺服器每 15 秒重送一次，
+        // 所以這裡必須是冪等的；刷新進來時末尾沒有占位就補一顆。見 canvas-pending-reply.ts。
+        markPendingReplyPhase(talkList.value, 'compacting', () => {
+          const aiBubbleId = pendingChatTurn?.aiBubbleId ?? nextBubbleId();
+          return {
+            id: aiBubbleId,
+            operationBubbleId: aiBubbleId,
+            content: '',
+            type: 0,
+            pic: unref(pic),
+            playstate: false,
+            chatLoading: true,
+            chatFinish: false,
+            maskPosition: 1,
+          };
+        });
+        nextTick(() => scrollToBottom(true));
         break;
 
       case 'compactDone':
         clearCompactWatchdog();
         store.commit('setIsCompacting', false);
+        clearPendingReplyPhase(talkList.value);
         store.commit('setCompactStatus', 'success');
         console.log('[AutoCompact] 壓縮完成，summaryId:', event.data.summaryId);
         // Part D：將新 summary 即時插入 messages 陣列
@@ -5793,7 +5811,8 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
                 createTime: summaryPayload.createTime,
                 _isNewSummary: true,
               };
-              talkList.value.push(summaryMsg);
+              // 回覆還沒來：摘要接在等回覆的氣泡之前，跟刷新後的順序一致。
+              insertBeforePendingReply(talkList.value, summaryMsg);
               if (autoScrollEnabled.value) {
                 nextTick(() => scrollToBottom());
                 // 淡入提示（300ms 後清 flag）
@@ -5847,6 +5866,7 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
       case 'compactSkipped':
         clearCompactWatchdog();
         store.commit('setIsCompacting', false);
+        clearPendingReplyPhase(talkList.value);
         store.commit('setCompactStatus', '');
         console.log('[AutoCompact] 本輪壓縮已跳過，原因:', event.data?.reason);
         uni.showToast({
@@ -8725,9 +8745,15 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
   const liveSteps = (item.chatLoading && lines.length && item.id === unref(currentChatId)) ? lines : null
   // 軌跡在上面一步一步列著，指示器不重複最後一步——但也不能光三個點沒有字
   // （owner 2026-09-05）：準備中就寫「思考中」，其餘寫「正在回覆」。
-  const loadingLabel = liveSteps
-    ? t('chat.thinkingInProgress')
-    : (unref(prepStepText) || t('chat.aiReplying'))
+  // 整理劇情中（伺服器壓縮）時寫「整理劇情中…」，壓完換回上面那兩種。
+  // 同時看全域的 isCompacting：清壓縮狀態的路徑有好幾條（錯誤、看門狗、斷線、停止），
+  // 任何一條清掉，標籤就跟著換回來，不必每條都記得清氣泡上的標記。
+  const pendingPhase = item.chatLoading && unref(isCompacting) ? item.pendingPhase : ''
+  const loadingLabel = pendingReplyLabel({ phase: pendingPhase, hasLiveSteps: !!liveSteps, prepStepText: unref(prepStepText), t })
+  // 長上下文要讀幾十秒才出第一個字。伺服器說慢了就立即寫出來；沒說的話放一句延遲浮現的
+  // （CSS 延遲，見 .lt-waiting-hint.is-delayed），整理劇情與 Agent 準備中不放——那兩種已經在說它在做什麼。
+  const waitingHint = item.chatLoading && item.waitingHint ? String(item.waitingHint) : ''
+  const slowHint = item.chatLoading && !waitingHint && !liveSteps && pendingPhase !== 'compacting' ? t('error.modelSlow') : ''
   const html = htmlOverride != null ? htmlOverride : (item.chatLoading ? '' : renderMessage(item))
   return {
     mesid: index,
@@ -8737,6 +8763,8 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     avatar: item.pic || '',
     html,
     loadingLabel,
+    waitingHint,
+    slowHint,
     // 這一輪 Agent 做了什麼。用戶付了錢、等了一分多鐘，過程是他唯一能判斷
     // 「有沒有在幹活」的依據，不該隨氣泡出現而消失。
     prepTrail: Array.isArray(item.prepTrail) ? item.prepTrail : null,

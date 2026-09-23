@@ -60,6 +60,18 @@
   height: 14px;
 }
 
+/*
+  等回覆的指示器（「正在回覆／整理劇情中」）。跟停止鍵同一個理由寫在 layer 外：從送出到
+  第一個字之間它是回覆那一側唯一的東西，不該因為卡片對氣泡裡的子節點寫了
+  display:none／opacity:0 之類的整體重置就被順手帶走（玩家會以為卡住）。特異性跟
+  卡片常寫的一兩個 class 相當以上；卡片若直接指名這幾個 class 覆蓋，那是作者的明示選擇。
+*/
+.canvas-root .mes.is-loading .chat-typing-indicator {
+  display: inline-flex;
+  visibility: visible;
+  opacity: 1;
+}
+
 #chat,
 .header-box,
 .chat-bottom-wapper,
@@ -1040,6 +1052,33 @@
   .mes_text .chat-typing-indicator .typing-label {
     display: inline;
     white-space: nowrap;
+  }
+
+  /* 指示器下方那句「模型回應較慢」。字色跟著卡片走（inherit 後壓淡），不自帶底色。 */
+  .mes_text .lt-waiting-hint {
+    display: block;
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: inherit;
+    opacity: 0.72;
+  }
+
+  /* 沒有伺服器提示時：一般回覆幾秒內就出字，12 秒還沒出字才浮現（長上下文要讀幾十秒）。
+     靠 CSS 延遲而不是計時器：節點隨指示器一起掛上、一起拿掉，第一個字到了自然消失。 */
+  .mes_text .lt-waiting-hint.is-delayed {
+    animation: lt-waiting-hint-in 250ms var(--ease-out, cubic-bezier(0.25, 0.46, 0.45, 0.94)) 12s both;
+  }
+
+  @keyframes lt-waiting-hint-in {
+    from { opacity: 0; }
+    to { opacity: 0.72; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mes_text .lt-waiting-hint.is-delayed {
+      animation-timing-function: step-end;
+    }
   }
 
   /*
