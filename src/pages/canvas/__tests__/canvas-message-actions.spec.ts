@@ -259,8 +259,13 @@ describe('等待指示器', () => {
   })
 
   it('Agent 準備中指示器寫「思考中」，不是光三個點', () => {
+    // 測試語義變更（2026-09-23 等回覆指示器）：標籤的決定搬進 canvas-pending-reply.ts 的
+    // pendingReplyLabel（多了「整理劇情中」一種），畫布把 liveSteps 交給它。斷言跟著搬：
+    // 畫布有交、helper 在有軌跡時回「思考中」。
     const src = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
-    expect(src).toMatch(/const loadingLabel = liveSteps\s*\n\s*\? t\('chat\.thinkingInProgress'\)/)
+    expect(src).toMatch(/const loadingLabel = pendingReplyLabel\(\{[^}]*hasLiveSteps: !!liveSteps/)
+    const helper = readFileSync(resolve(__dirname, '../canvas-pending-reply.ts'), 'utf8')
+    expect(helper).toMatch(/if \(input\.hasLiveSteps\) return input\.t\('chat\.thinkingInProgress'\)/)
   })
 })
 

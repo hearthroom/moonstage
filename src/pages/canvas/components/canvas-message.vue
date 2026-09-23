@@ -106,6 +106,10 @@
             </div>
           </div>
           <ChatTypingIndicator :label="message.loadingLabel" />
+          <!-- 長上下文要讀幾十秒才出第一個字：伺服器說慢了就立即寫出來；沒說的話放一句
+               延遲浮現的（CSS 延遲，不用計時器；浮現前讀屏也不念）。 -->
+          <div v-if="message.waitingHint" class="lt-waiting-hint" data-lt="waiting-hint">{{ message.waitingHint }}</div>
+          <div v-else-if="message.slowHint" class="lt-waiting-hint is-delayed" data-lt="waiting-hint" aria-hidden="true">{{ message.slowHint }}</div>
         </template>
         <div v-else class="lt-bubble-body" v-html="message.html"></div>
       </div>
@@ -242,6 +246,10 @@ const props = withDefaults(defineProps<{
     finished?: boolean
     loading?: boolean
     loadingLabel?: string
+    /** 伺服器說模型回應慢時的那句話（立即顯示） */
+    waitingHint?: string
+    /** 沒有伺服器提示時延遲浮現的那句話 */
+    slowHint?: string
     prepSteps?: string[] | null
     prepTrail?: string[] | null
     /** Agent 準備到一半被停下：軌跡已固定，底下給一張「進度留著／繼續」的卡 */
