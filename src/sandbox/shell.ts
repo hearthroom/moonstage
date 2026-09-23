@@ -343,6 +343,8 @@ export function createShell(options: CreateShellOptions): Shell {
   refs.root.appendChild(panelsMount)
   const panels = standardChrome ? createPanels({ mount: panelsMount, send: (panel, event, args) => {
     if (panel === 'assist' && event === 'confirm' && !gesture) { debug.warn('ignored assist confirmation without user gesture'); return }
+    // 容量選擇會改玩家的設定並重送訊息（調高容量每輪多花點數），同樣只認真的手勢。
+    if (panel === 'capacity' && event === 'pick' && !gesture) { debug.warn('ignored capacity choice without user gesture'); return }
     transport.send({ type: 'panel.ui', panel, event, args })
   } }) : null
 

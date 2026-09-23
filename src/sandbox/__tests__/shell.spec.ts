@@ -437,3 +437,39 @@ describe('殼：開場選項（MMD prologue）', () => {
     expect(s.refs.messages.querySelector('[data-lt="prologue"]')).toBeNull()
   })
 })
+
+// 沙箱卡看不到宿主的系統訊息卡：第一輪容量不夠時的選擇要走面板，殼用同一個元件畫。
+describe('殼：容量不夠時的選擇', () => {
+  const capacityPanels = (props: Record<string, unknown>) => ({
+    type: 'panels', state: { sheet: 'capacity', title: '這張卡需要更多容量', closeLabel: '取消', heading: true, props,
+      menu: { open: false, editing: false, draft: '', message: null, actions: [], labels: { cancel: 'Cancel', confirm: 'OK' }, anchor: null } },
+  })
+  const chromeState = {
+    header: { roleName: '露娜', avatar: '', modelName: 'M', badge: '', showModel: true, backLabel: '返回', modelLabel: '模型' },
+    composer: { placeholder: '說點什麼', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: '停止', more: '更多', send: '送出', paste: '貼上', clear: '清除', model: '模型', assist: '幫答', perTurn: '每輪' } },
+  }
+  const props = { content: '說明', cancelText: '取消', saving: false, error: '', options: [
+    { key: 'raise', label: '調到 128K', desc: '保留完整設定' },
+    { key: 'trim', label: '用目前容量玩', desc: '只帶最重要的設定' },
+  ] }
+
+  it('宿主開了容量選擇就畫出兩個選項；取消交回宿主', async () => {
+    const s = boot(config({ chrome: 'shell', chromeState }))
+    s.handle(capacityPanels(props) as any)
+    await nextTick()
+    const rows = [...document.querySelectorAll('.capacity-scope .capacity-option')] as HTMLElement[]
+    expect(rows.map((r) => r.querySelector('.capacity-option-label')!.textContent)).toEqual(['調到 128K', '用目前容量玩'])
+    ;(document.querySelector('.capacity-cancel') as HTMLElement).click()
+    await nextTick()
+    expect(sent).toContainEqual({ type: 'panel.ui', panel: 'capacity', event: 'cancel', args: [] })
+  })
+
+  it('作者腳本合成的點擊不能替玩家選（調高容量會多花點數）', async () => {
+    const s = boot(config({ chrome: 'shell', chromeState }))
+    s.handle(capacityPanels(props) as any)
+    await nextTick()
+    ;(document.querySelector('.capacity-option') as HTMLElement).click()
+    await nextTick()
+    expect(sent.filter((m: any) => m.type === 'panel.ui' && m.panel === 'capacity' && m.event === 'pick')).toEqual([])
+  })
+})

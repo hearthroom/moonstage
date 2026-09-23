@@ -3168,7 +3168,8 @@
       width: min(720px, calc(100vw - 48px));
     }
 
-    .u-popup__content:has(.confirm-scope) {
+    .u-popup__content:has(.confirm-scope),
+    .u-popup__content:has(.capacity-scope) {
       width: min(440px, calc(100vw - 48px));
     }
 
@@ -3389,6 +3390,81 @@
   .confirm-bottom .btn-gap {
     width: 12px;
     flex: 0 0 auto;
+  }
+
+  /* ── 容量選擇（第一輪就裝不下的卡）──────────────────────────────── */
+  /* 跟確認框同一套語言：一句說明、藥丸狀的鍵；每個選項多一行小字說代價。
+     第一個是建議的玩法，用強調色；其餘走外框。 */
+
+  .capacity-scope {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 8px 0;
+  }
+
+  .capacity-content {
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  .capacity-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .capacity-scope .capacity-option {
+    min-height: 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 16px;
+    border-radius: var(--lt-canvas-radius);
+    border: 1px solid var(--lt-canvas-line);
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .capacity-scope .capacity-option.is-primary {
+    border-color: transparent;
+    background: var(--lt-canvas-accent-bg);
+    color: var(--lt-canvas-accent);
+  }
+
+  .capacity-scope .capacity-option.is-busy {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .capacity-option-label {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .capacity-option-desc {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--lt-canvas-muted);
+  }
+
+  .capacity-error {
+    font-size: 13px;
+    text-align: center;
+    color: var(--lt-canvas-danger);
+  }
+
+  .capacity-cancel {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--lt-canvas-muted);
+    cursor: pointer;
   }
 
   /* ── 一疊選項（更換背景）─────────────────────────────────────── */

@@ -282,6 +282,12 @@
 .confirm-scope {
     padding: 8px 0
 }
+.capacity-scope {
+    padding: 8px 0
+}
+.capacity-scope .capacity-option {
+    padding: 8px 16px
+}
 .modify-scope .modify-item {
     padding: 0 12px
 }

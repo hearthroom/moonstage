@@ -339,6 +339,12 @@
       <CanvasAssist v-bind="assistProps" @confirm="assistSession.confirm" @cancel="cancelAssist" @refresh="assistSession.refresh" @pick="assistSession.pick" />
     </CanvasPopup>
 
+    <!-- 第一輪就裝不下的卡：沙箱卡由殼畫同一個元件（buildPanelsState 的 'capacity'）。 -->
+    <CanvasPopup :open="panel.sheet === 'capacity'" v-if="!sandboxCard" :title="t('canvas.capacity.title')" heading
+                 :close-label="t('main.cancel')" @close="closeCapacityChoice">
+      <CanvasCapacityChoice v-bind="capacityProps" @pick="onCapacityPick" @cancel="closeCapacityChoice" />
+    </CanvasPopup>
+
     <CanvasPopup :open="panel.sheet === 'confirm'" v-if="!sandboxCard" :title="confirmSpec.title" heading
                  :close-label="t('main.cancel')" @close="onConfirmCancel">
       <CanvasConfirm
@@ -465,6 +471,11 @@ import CanvasModelPanel from './components/canvas-model-panel.vue'
 import { computeCardThemeVars, CARD_THEME_VAR_NAMES } from './canvas-card-theme'
 import { chromeTopColor, syncChromeTone } from './canvas-chrome-tone'
 import CanvasConfirm from './components/canvas-confirm.vue'
+import CanvasCapacityChoice from './components/canvas-capacity-choice.vue'
+import {
+  applyCapacityChoice, capacityChoiceOptions,
+  type CapacityAdvice, type CapacityChoiceKey, type CapacityPatch,
+} from './canvas-capacity-choice'
 import CanvasModify from './components/canvas-modify.vue'
 import CanvasConversationList from './components/canvas-conversation-list.vue'
 import CanvasPersona from './components/canvas-persona.vue'
@@ -615,6 +626,7 @@ import {
   resolveChatErrorTypeFromFailure,
   resolveChatErrorMessage,
   resolveChatErrorPresentation,
+  resolveContextCapacityAdvice,
 } from '@/utils/chat-error-message.js';
 import { isSignedIn as canUseChatOperationOutcome } from '@/common/open-oauth';
 // 卡片附加內容的名字有多語欄位；沒有對應語言就退回原名。
@@ -2542,6 +2554,8 @@ function buildPanelsState() {
       break;
     case 'assist':
       title = t('canvas.assist.title'); heading = true; props = assistProps.value; break;
+    case 'capacity':
+      title = t('canvas.capacity.title'); heading = true; props = capacityProps.value; break;
     case 'confirm':
       title = confirmSpec.value.title;
       heading = true;
@@ -2561,7 +2575,7 @@ function buildPanelsState() {
 function onSandboxPanelUi(panelName: string, event: string, args: unknown[]) {
   const a0 = args[0];
   const str = () => String(a0 ?? '');
-  if (panelName === 'popup') { if (event === 'close') { if (panel.value.sheet === 'confirm') onConfirmCancel(); else closeCanvasSheet(); } return; }
+  if (panelName === 'popup') { if (event === 'close') { if (panel.value.sheet === 'confirm') onConfirmCancel(); else if (panel.value.sheet === 'capacity') closeCapacityChoice(); else closeCanvasSheet(); } return; }
   if (panelName === 'menu') {
     switch (event) {
       case 'update:draft': menuDraft.value = str(); return;
@@ -2573,6 +2587,10 @@ function onSandboxPanelUi(panelName: string, event: string, args: unknown[]) {
   }
   if (event === 'close') { closeCanvasSheet(); return; }
   switch (panelName) {
+    case 'capacity':
+      if (event === 'pick') onCapacityPick(str() as CapacityChoiceKey);
+      else if (event === 'cancel') closeCapacityChoice();
+      return;
     case 'assist':
       if(event==='confirm') assistSession.confirm();
       else if(event==='cancel') cancelAssist();
@@ -4187,6 +4205,7 @@ function getSystemMsgKind(finishReason) {
     'quota_exhausted': 'quota',
     'compact_retryable': 'compact-retryable',
     'context_capacity_exceeded': 'model-error',
+    'context_capacity_choice': 'model-error',
     'conversation_stale': 'model-error',
     'operation_in_progress': 'model-error',
     'mutation_in_progress': 'model-error',
@@ -4224,6 +4243,7 @@ function getSystemMsgLabel(finishReason) {
     'insufficient_credits': t('chat.point_no_tips') || '點數已用完',
     'quota_exhausted':  t('chat.freeQuotaExhaustedTitle') || '免費額度已用完',
     'context_capacity_exceeded': t('error.contextCapacityTitle'),
+    'context_capacity_choice': t('error.contextCapacitySettingsTitle'),
     'compact_retryable': t('chat.compactFailed')    || '記錄失敗',
     'conversation_stale': t('error.replyNotGenerated'),
     'operation_in_progress': t('chat.operationPending') || '目前的聊天操作仍在進行中',
@@ -4270,13 +4290,16 @@ function getSystemMsgSub(finishReason) {
     'insufficient_credits': t('chat.manageCredits'),
     'quota_exhausted':  t('chat.manageCredits'),
     'context_capacity_exceeded': t('error.contextCapacityExceeded'),
+    // 伺服器說了哪種玩法裝得下（第一輪）：問題在這張卡的大小，不在訊息長短或模型，
+    // 所以不再叫玩家縮短訊息或換模型；鍵打開選擇（見 askCapacityChoice）。
+    'context_capacity_choice': t('error.contextCapacitySettings'),
     'compact_retryable': t('error.compactRetryable')   || '記憶整理未完成，對話已恢復，請再發送一次',
     'rewrite_target_not_latest': t('chat.rewriteTargetChangedSub') || '對話內容已變更，請重新整理後編輯最新一則 AI 回覆',
     'rewrite_target_invalid': t('chat.rewriteTargetChangedSub') || '對話內容已變更，請重新整理後編輯最新一則 AI 回覆',
   };
   return map[finishReason] || '';
 }
-function getSystemMsgCtaLabel(action: ChatOperationUIAction | 'refresh_history' | '') {
+function getSystemMsgCtaLabel(action: ChatOperationUIAction | 'refresh_history' | 'capacity_choice' | '') {
   if (
     action === 'retry'
     || action === 'retry_rewrite'
@@ -4290,10 +4313,13 @@ function getSystemMsgCtaLabel(action: ChatOperationUIAction | 'refresh_history' 
   }
   if (action === 'switch_model') return t('chat.switchModel') || '切換模型';
   if (action === 'refresh_history') return t('chat.refreshConversation') || '重新整理對話';
+  if (action === 'capacity_choice') return t('canvas.capacity.choose');
   return '';
 }
 
 function getSystemMsgCta(finishReason, item, index) {
+  // 容量選擇是改設定再送出，不是「繼續」那一類操作，不受那個能力開關管。
+  if (finishReason === 'context_capacity_choice') return getSystemMsgCtaLabel('capacity_choice');
   if (!allowsStageAction(stageHost.capabilities, 'continue')) return ''
   return getSystemMsgCtaLabel(
     getSystemMsgCtaAction(finishReason, item, index),
@@ -4313,6 +4339,7 @@ function getSystemMsgCtas(item, index) {
 }
 function getSystemMsgCtaAction(finishReason, item, index) {
   if (finishReason === 'history_load_error') return 'refresh_history';
+  if (finishReason === 'context_capacity_choice') return 'capacity_choice';
   // 逃生口必須留在 App 內：refresh_history 是重載這段對話,不是叫用戶自己
   // 重新整理瀏覽器——PWA 與原生 App 根本沒有那個動作。
   if (finishReason === 'outcome_unconfirmed') return 'refresh_history';
@@ -4376,6 +4403,10 @@ function startRetryGenerationFromAuthoritativeTerminal(item): boolean {
 }
 
 function onSystemMsgCta(action, item, index) {
+  if (action === 'capacity_choice') {
+    askCapacityChoice(item?.capacityAdvice || null, String(item?.capacityDraft || ''), String(item?.id ?? ''));
+    return;
+  }
   if (action === 'refresh_history') {
     teardownStreamForConversationSwitch({ invalidateHistory: true });
     ajax.value.page = 1;
@@ -4904,8 +4935,13 @@ function chatStart(greetingIndex?: number) {
 function appendChatErrorBubble(errorType, errorMessage = '', metadata: Record<string, any> = {}) {
   removeOrphanPlaceholder();
   const presentation = resolveChatErrorPresentation(errorType, t);
+  // 第一輪就裝不下、伺服器也說了哪種玩法裝得下：卡片換成講這張卡的大小，並打開選擇。
+  // 錯誤從好幾條路走到這裡（對帳後才確認、舊伺服器、直接失敗），建議在收到錯誤事件時
+  // 先記下，在這個唯一的出口取用。
+  const capacity = errorType === 'context_capacity_exceeded' ? takePendingCapacityAdvice() : null;
+  const bubbleId = nextBubbleId();
   talkList.value.push({
-    id: nextBubbleId(),
+    id: bubbleId,
     content: presentation.finishReason ? '' : (errorMessage || presentation.message),
     type: 0,
     pic: pic.value,
@@ -4914,12 +4950,14 @@ function appendChatErrorBubble(errorType, errorMessage = '', metadata: Record<st
     chatFinish: true,
     maskPosition: 1,
     ...metadata,
-    finishReason: presentation.finishReason,
+    finishReason: capacity ? 'context_capacity_choice' : presentation.finishReason,
+    ...(capacity ? { capacityAdvice: capacity.advice, capacityDraft: capacity.draft } : {}),
     errorAction: presentation.action,
     isApplicationError: true,
     systemOnly: true,
   });
   scrollToBottom();
+  if (capacity) askCapacityChoice(capacity.advice, capacity.draft, String(bubbleId));
 }
 
 // finishReasonOverride：內容審查(輸入端)確定性拒絕等場景，改推 <chat-system-message>
@@ -5791,6 +5829,11 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
         multiPassUpdating.value = false;
         // 解析後端傳來的錯誤類型
         const errorType = event.data?.error_type || 'connection_error';
+        // 建議要在這裡、回合還在手上時記下：之後可能走對帳才確認失敗，那時回合已經清掉了。
+        rememberCapacityAdvice(
+          errorType === 'context_capacity_exceeded' ? resolveContextCapacityAdvice(event.data) : null,
+          String(pendingChatTurn?.draft || tempContent.value || ''),
+        );
         if (markExplicitPreAdmissionError(
           pendingChatTurn,
           errorType,
@@ -7798,6 +7841,8 @@ function send() {
   // 「準備過程」。實測：agent 關閉的兩輪都掛著上一輪那 6 步。
   pendingPrepTrail.value = [];
   prepSteps.value = [];
+  // 上一輪留下、還沒畫成卡片的容量建議不屬於這一輪。
+  rememberCapacityAdvice(null, '');
 
   let data = null;
   let userBubbleId: string | number | undefined;
@@ -9086,6 +9131,94 @@ async function onShortcut(key: string) {
   if (key === 'export') { exportConversation(); return }
 }
 
+// ── 容量不夠時的選擇 ───────────────────────────────────────────────────
+//
+// 第一輪就裝不下的卡（常駐設定很大，預設 64K 裝不下）：伺服器說哪種玩法裝得下，
+// 玩家選一個，存好設定後同一則訊息自動重送。這一輪在伺服器受理前就被拒了，
+// 沒有扣點、也沒有留下任何一則，重送就是重新送一次。
+//
+// 用彈層而不是只在系統訊息卡上放兩顆鍵：沙箱卡看不到宿主的系統訊息卡
+// （canvas-sandbox-host 只轉玩家與 AI 的訊息），面板才是唯一兩種頁面都走得到的路。
+// 一般卡的錯誤卡另有一顆鍵把它打開回來。
+let pendingCapacityAdvice: { advice: CapacityAdvice; draft: string } | null = null
+const capacitySpec = ref<{ advice: CapacityAdvice | null; draft: string; bubbleId: string; saving: boolean; error: string }>({ advice: null, draft: '', bubbleId: '', saving: false, error: '' })
+
+function rememberCapacityAdvice(advice: CapacityAdvice | null, draft: string) {
+  pendingCapacityAdvice = advice ? { advice, draft } : null
+}
+
+function takePendingCapacityAdvice() {
+  const taken = pendingCapacityAdvice
+  pendingCapacityAdvice = null
+  return taken
+}
+
+function askCapacityChoice(advice: CapacityAdvice | null, draft: string, bubbleId: string) {
+  if (!advice) return
+  capacitySpec.value = { advice, draft, bubbleId, saving: false, error: '' }
+  panel.value = openSheet(panel.value, 'capacity')
+}
+
+const capacityProps = computed(() => {
+  const spec = capacitySpec.value
+  // 錯誤沒帶大小時，用模型選單上那一檔的大小。
+  const fallbackTokens = spec.advice?.requiredTier
+    ? contextBudgetTokens(selectedVariant.value?.contextBudgetOptions, spec.advice.requiredTier)
+    : null
+  return {
+    content: t('canvas.capacity.content'),
+    options: capacityChoiceOptions(spec.advice, t, fallbackTokens),
+    saving: spec.saving,
+    error: spec.error,
+    cancelText: t('main.cancel'),
+  }
+})
+
+function closeCapacityChoice() {
+  if (capacitySpec.value.saving) return
+  if (panel.value.sheet === 'capacity') panel.value = closeSheet(panel.value)
+}
+
+// 只寫動到的那一個欄位；存失敗就還原，畫面上的檔位不能停在沒存進去的值。
+async function saveCapacityPatch(patch: CapacityPatch): Promise<boolean> {
+  const before = { context: formData.context, trimConstantLore: formData.trimConstantLore === true }
+  if ('context' in patch) formData.context = patch.context
+  if ('trimConstantLore' in patch) formData.trimConstantLore = true
+  const ok = await persistRoleSettings()
+  if (!ok) {
+    formData.context = before.context
+    formData.trimConstantLore = before.trimConstantLore
+    return false
+  }
+  // 目錄的標價是按上下文檔位算的，換了檔位就重抓一次（跟模型選單同一個理由）。
+  if ('context' in patch) loadModelCatalog()
+  return true
+}
+
+function resendAfterCapacityChoice(draft: string) {
+  const spec = capacitySpec.value
+  capacitySpec.value = { ...spec, saving: false, error: '' }
+  if (panel.value.sheet === 'capacity') panel.value = closeSheet(panel.value)
+  // 舊的錯誤卡講的是剛解決的問題，留著會跟新的一輪疊在一起。
+  if (spec.bubbleId) talkList.value = talkList.value.filter((item: any) => String(item?.id ?? '') !== spec.bubbleId)
+  if (draft) content.value = draft
+  onCanvasSend()
+}
+
+async function onCapacityPick(key: CapacityChoiceKey) {
+  const spec = capacitySpec.value
+  if (spec.saving || !spec.advice) return
+  capacitySpec.value = { ...spec, saving: true, error: '' }
+  const done = await applyCapacityChoice({
+    key,
+    advice: spec.advice,
+    draft: spec.draft,
+    save: saveCapacityPatch,
+    resend: resendAfterCapacityChoice,
+  })
+  if (!done) capacitySpec.value = { ...capacitySpec.value, saving: false, error: t('canvas.capacity.saveFailed') }
+}
+
 // ── 一次性確認 ─────────────────────────────────────────────────────────
 const confirmSpec = ref<{ kind: string; title: string; content: string; okText: string; onOk?: () => void }>({ kind: '', title: '', content: '', okText: '' })
 
@@ -9263,6 +9396,7 @@ function currentRoleSettings(): RoleSettings {
     thinkingDepth: formData.thinkingDepth || '',
     sandboxLevel: formData.sandboxLevel || '',
     jailbreak: formData.jailbreak || '',
+    trimConstantLore: formData.trimConstantLore === true,
   }
 }
 

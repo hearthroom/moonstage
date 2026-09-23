@@ -123,8 +123,22 @@ describe('只送動到的欄位', () => {
   it('這一頁只認這幾個欄位', () => {
     expect(ROLE_SETTING_KEYS).toEqual([
       'personaMode', 'userName', 'userSex', 'userDefine', 'selectModel', 'context', 'thinkingDepth',
-      'sandboxLevel', 'jailbreak',
+      'sandboxLevel', 'jailbreak', 'trimConstantLore',
     ])
+  })
+
+  // 容量不夠時玩家可以選「用目前容量玩」：伺服器認的是布林值，送字串 "true" 會被拒。
+  it('trimConstantLore 讀成布林值、只在變了時送出，而且送的是布林值', () => {
+    expect(readRoleSettings({ trimConstantLore: true }).trimConstantLore).toBe(true)
+    expect(readRoleSettings({}).trimConstantLore).toBe(false)
+    expect(buildRoleSettingsSavePayload('r1', snapshot, { ...snapshot, trimConstantLore: true }))
+      .toEqual({ roleId: 'r1', trimConstantLore: true })
+    expect(buildRoleSettingsSavePayload('r1', { ...snapshot, trimConstantLore: true }, { ...snapshot, trimConstantLore: true })).toBe(null)
+  })
+
+  it('調高上下文檔位只送檔位', () => {
+    expect(buildRoleSettingsSavePayload('r1', { ...snapshot, context: 1 }, { ...snapshot, context: 3 }))
+      .toEqual({ roleId: 'r1', context: 3 })
   })
 
   it('context 送出去是數字，不是字串', () => {
