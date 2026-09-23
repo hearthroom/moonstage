@@ -4,6 +4,7 @@ import { reactive } from 'vue'
 import { createSandboxHost } from '../canvas-sandbox-host'
 import type { HudHost, HudHostMessage, HudHostState } from '../canvas-hud-bridge'
 import { envelope, SANDBOX_PROTOCOL_VERSION } from '@/sandbox/protocol'
+import { updateStorageScope, announceStorageClear } from '@/common/author-rules/storage-scope'
 
 const ORIGIN = 'https://c1.example.test'
 
@@ -583,5 +584,53 @@ describe('沙箱宿主橋：更早的歷史', () => {
     host.sync()
     expect(h.posted.filter((m) => m.type === 'prologue').at(-1)).toMatchObject({ items: [] })
     host.destroy()
+  })
+})
+
+describe('沙箱宿主橋：作者規則持久層的帳號範圍', () => {
+  let h: Harness
+  beforeEach(() => { h = harness() })
+  afterEach(() => { h.iframe.remove(); updateStorageScope(null) })
+  const start = async (roleId = '1') => {
+    const { hud } = fakeHud({ current: makeState() })
+    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId, hello })
+    host.start()
+    h.fromShell({ type: 'ready-shell' })
+    for (let i = 0; i < 5; i++) await flush()
+    return host
+  }
+  const helloConfig = () => (h.posted.find((p) => p.type === 'hello') as { config: Record<string, unknown> } | undefined)?.config
+
+  it('有帳號範圍：握手給這張卡專用的範圍（再雜湊過，不是帳號範圍本身，每張卡不同）', async () => {
+    const scope = 'a'.repeat(64)
+    updateStorageScope(scope)
+    const one = await start('1')
+    const first = helloConfig()!.storageScope as string
+    expect(first).toMatch(/^[0-9a-f]{64}$/)
+    expect(first).not.toBe(scope)
+    one.destroy()
+    h.iframe.remove(); h = harness()
+    const two = await start('2')
+    expect(helloConfig()!.storageScope).not.toBe(first)
+    two.destroy()
+  })
+
+  it('沒有帳號範圍：握手不帶範圍（殼就刪掉自己的資料、只用記憶體）', async () => {
+    const host = await start()
+    expect(helloConfig()).toBeTruthy()
+    expect(helloConfig()!.storageScope).toBeUndefined()
+    host.destroy()
+  })
+
+  it('登出清除：還開著的殼收到 storage.clear；拆掉之後不再送', async () => {
+    updateStorageScope('a'.repeat(64))
+    const host = await start()
+    h.posted.length = 0
+    announceStorageClear()
+    expect(h.posted.map((p) => p.type)).toContain('storage.clear')
+    host.destroy()
+    h.posted.length = 0
+    announceStorageClear()
+    expect(h.posted.map((p) => p.type)).not.toContain('storage.clear')
   })
 })

@@ -12,7 +12,7 @@ import { createSdk, type Sdk, type SdkHost } from './sdk/create-sdk'
 import { SdkError, sdkErrorFromHost } from './sdk/errors'
 import { installMessageScope } from './scope'
 import { expandMacros, installCard, renderAppliedContent } from './rules'
-import { getAuthorRuleRunner, type RuleRunner } from '@/common/author-rules'
+import { getAuthorRuleRunner, setAuthorRuleStorageScope, clearAuthorRuleStorage, type RuleRunner } from '@/common/author-rules'
 import { applyStylePolicyToHtml, stylePolicyFor } from '@/common/author-style-policy'
 import { mountFrontendBlocks } from '@/common/frontend-block'
 import { runAuthorScripts, runInlineScript } from './author-scripts'
@@ -228,6 +228,8 @@ export function createShell(options: CreateShellOptions): Shell {
   const macros = { user: config.user.nickname || '', char: config.role.name || '' }
   // 規則交給 worker（跟一般卡同一個排程器）：這裡從不等規則，結果還沒回來就先畫「上次套完的產物＋之後到的原文」，
   // 結果到了 onSettled 叫列表與狀態欄重畫。產物跟 renderContent 同步套用的逐字相同。
+  // 持久層在這個子網域上，宿主刪不到：先照握手給的範圍對一次（不同就清掉；沒給就刪掉、只用記憶體）再用。
+  setAuthorRuleStorageScope(config.storageScope ?? null)
   const ruleRunner = options.ruleRunner || getAuthorRuleRunner()
   const render = (content: string, opts: { streaming?: boolean } = {}): string | { html: string; provisional: true } => {
     const out = ruleRunner.display(
@@ -521,6 +523,9 @@ export function createShell(options: CreateShellOptions): Shell {
     switch (message.type) {
       case 'hello':
         // 已經建好；重複的 hello 忽略（宿主重送握手時）。
+        return
+      case 'storage.clear':
+        void clearAuthorRuleStorage()
         return
       case 'messages':
         coldStart(message.messages || [])

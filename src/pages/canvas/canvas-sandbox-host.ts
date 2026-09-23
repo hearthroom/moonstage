@@ -20,6 +20,7 @@ import {
 } from '@/sandbox/protocol'
 import type { SandboxSavesStore } from '@/host/sandbox-host'
 import { observeViewport, visibleViewport } from './canvas-viewport'
+import { cardStorageScope, getAuthorRuleStorageScope, onStorageScopeChange } from '@/common/author-rules/storage-scope'
 import type { ChromeState, ChromeUiEvent, MessageMenuAnchor, MessageView, PanelsState, StageState } from '@/sandbox/protocol'
 
 export interface SandboxHostDeps {
@@ -346,6 +347,10 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     })
   }
   let stopViewport: (() => void) | undefined
+  // 登出（clearAuthorRuleStorage）：叫還開著的殼也清掉它那個子網域上的持久層。盡力而為，下次握手殼也會比對範圍。
+  const stopStorageWatch = onStorageScopeChange((event) => {
+    if (event.type === 'clear' && helloSent && !destroyed) { try { post({ type: 'storage.clear' }) } catch { /* iframe 可能已經拆了 */ } }
+  })
 
   const sendHello = async () => {
     if (helloSent || destroyed) return
@@ -360,6 +365,8 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
         if (deps.onDebug) deps.onDebug('warn', ['saves load failed', String(e)])
       }
     }
+    // 作者規則持久層的範圍：帳號範圍再跟卡 id 雜湊一次，殼那邊（作者腳本也在那個 origin）拿不到可跨卡比對的標記。
+    const storageScope = await cardStorageScope(getAuthorRuleStorageScope(), deps.roleId)
     if (destroyed) return
     const base = deps.hello()
     // 殼一開始的草稿是空的；宿主此刻的草稿若非空，第一次 sync 會送過去，空的就不必。
@@ -370,7 +377,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     lastViewport = base.viewportHeight ?? viewportHeight()
     post({
       type: 'hello',
-      config: { ...base, viewportHeight: lastViewport, capabilities: { saves: savesOk, edit: true, send: true }, saves, chromeState: chrome ? (JSON.parse(lastChromeKey) as ChromeState) : undefined },
+      config: { ...base, ...(storageScope ? { storageScope } : {}), viewportHeight: lastViewport, capabilities: { saves: savesOk, edit: true, send: true }, saves, chromeState: chrome ? (JSON.parse(lastChromeKey) as ChromeState) : undefined },
     })
     // 殼建好之後才有東西可畫：歷史一到就送全量訊息，殼跑完冷啟動再喊 ready。
     armColdStart()
@@ -577,6 +584,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       destroyed = true
       win.removeEventListener('message', onMessage)
       stopViewport?.()
+      stopStorageWatch()
     },
   }
 }
