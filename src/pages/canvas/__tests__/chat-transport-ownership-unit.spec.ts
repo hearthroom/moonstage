@@ -62,6 +62,32 @@ describe('desktop chat transport ownership state machine', () => {
     })).toBe('server_error')
   })
 
+  // 上游失敗的公開原因是 temporary_failure（伺服器把細分的原因留在內部）。有思考、
+  // 沒有正文的收尾與中斷各有自己的說法，不因原因碼落成通用失敗卡。
+  it('只有思考的收尾與上游中斷各自對應到正確的說法', () => {
+    // 有思考、沒有正文的中斷仍是「回覆已中斷」，不因原因碼變成失敗卡
+    expect(projectionFinishReason({
+      kind: 'send',
+      state: 'interrupted',
+      reasonCode: 'temporary_failure',
+      outputDisposition: 'partial',
+    }, '', 'thinking')).toBe('interrupted')
+    // 沒有任何輸出就失敗：伺服器暫時不穩定（會帶重試動作）
+    expect(projectionFinishReason({
+      kind: 'send',
+      state: 'failed_retryable',
+      reasonCode: 'temporary_failure',
+      outputDisposition: 'none',
+    })).toBe('server_error')
+    // 伺服器把只有思考的收尾標成 reasoning_only
+    expect(projectionFinishReason({
+      kind: 'send',
+      state: 'interrupted',
+      reasonCode: 'no_final_answer',
+      outputDisposition: 'reasoning_only',
+    })).toBe('reasoning_only')
+  })
+
   // 逾時說明義務（owner 2026-08-07 裁決）：reasoning_only 若肇因於伺服器端 idle
   // watchdog（上游太慢），要換成專屬 finishReason，讓 UI 能顯示「模型太久沒回應」
   // 而不是聽起來像模型自己選擇不回答。reasonCode 判斷必須排在既有的
