@@ -29,7 +29,7 @@ export interface CapacityChoiceOption {
   desc: string
 }
 
-export type CapacityPatch = { context: number } | { trimConstantLore: true }
+export type CapacityPatch = { context: number; trimConstantLore: false } | { trimConstantLore: true }
 
 type Translate = (key: string, params?: Record<string, unknown>) => string
 
@@ -68,7 +68,8 @@ export function capacityChoiceOptions(
 /** 選了之後要存的那一個欄位；伺服器沒說裝得下的選項回 null。 */
 export function capacityChoicePatch(key: CapacityChoiceKey, advice: CapacityAdvice | null | undefined): CapacityPatch | null {
   if (!advice) return null
-  if (key === 'raise' && advice.requiredTier) return { context: advice.requiredTier }
+  // 調高就是要完整的設定：之前選過精簡的話一起關掉，不然調高了設定還是被截掉。
+  if (key === 'raise' && advice.requiredTier) return { context: advice.requiredTier, trimConstantLore: false }
   if (key === 'trim' && advice.trimFits) return { trimConstantLore: true }
   return null
 }
