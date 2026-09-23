@@ -1265,6 +1265,11 @@ export function prepareChatPayload(input: any) {
   if (resumeFrom) {
     Object.assign(payload, { resumeFromOperationId: resumeFrom })
   }
+  // 世界卡的 @：非空才帶上，普通卡的封包一個位元組都不變（跟續跑來源同一個道理）。
+  const mention = source.mention == null ? '' : String(source.mention).trim()
+  if (mention) {
+    Object.assign(payload, { mention })
+  }
   if (source.supportsOperationOutcome === true) {
     Object.assign(payload, {
       supportsOperationOutcome: true,

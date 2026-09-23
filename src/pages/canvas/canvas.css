@@ -5643,3 +5643,43 @@ pre.lt-frontend[data-lt-frontend] { display: none; }
 .mes_turn:has(pre.lt-frontend), .mes_text:has(pre.lt-frontend) { width: 100%; }
 iframe.lt-frontend__frame { display: block; width: 100%; min-height: 1px; border: 0; background: transparent; color-scheme: normal; }
 }
+
+/*
+  世界卡的發言者區塊。伺服器把每個開口的成員包成
+  <section class="hh-speaker hh-speaker--id"><header class="hh-speaker__name">名字</header><div class="hh-speaker__body">…</div></section>，
+  舞台再把頭像插進名字列（canvas-world.ts）。放在 layer 裡：作者的正則與樣式想把它改成別的長相，直接贏。
+*/
+@layer lt-base {
+  .mes_text .hh-speaker {
+    margin: 1em 0;
+    padding: 0.5em 0.75em;
+    border-left: 3px solid var(--lt-canvas-accent, currentColor);
+    border-radius: var(--lt-canvas-radius, 8px);
+    background: var(--lt-canvas-accent-bg, rgba(127, 127, 127, 0.08));
+  }
+  .mes_text .hh-speaker:last-child {
+    margin-bottom: 0;
+  }
+  .mes_text .hh-speaker__name {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin: 0 0 0.35em;
+    font-weight: 600;
+    font-size: 0.95em;
+    color: var(--lt-canvas-accent, inherit);
+  }
+  .mes_text .hh-speaker__avatar {
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 50%;
+    object-fit: cover;
+    flex: none;
+  }
+  .mes_text .hh-speaker__body > p:first-child {
+    margin-top: 0;
+  }
+  .mes_text .hh-speaker__body > p:last-child {
+    margin-bottom: 0;
+  }
+}
