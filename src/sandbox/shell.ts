@@ -11,7 +11,8 @@ import { createEventBus } from './sdk/events'
 import { createSdk, type Sdk, type SdkHost } from './sdk/create-sdk'
 import { SdkError, sdkErrorFromHost } from './sdk/errors'
 import { installMessageScope } from './scope'
-import { installCard, renderContent } from './rules'
+import { expandMacros, installCard, renderAppliedContent } from './rules'
+import { getAuthorRuleRunner, type RuleRunner } from '@/common/author-rules'
 import { applyStylePolicyToHtml, stylePolicyFor } from '@/common/author-style-policy'
 import { mountFrontendBlocks } from '@/common/frontend-block'
 import { runAuthorScripts, runInlineScript } from './author-scripts'
@@ -44,6 +45,8 @@ export interface CreateShellOptions {
   transport: ShellTransport
   /** 網址上有 ?sdkDebug=1 也開面板。 */
   debugFromUrl?: boolean
+  /** 作者規則的排程器（測試注入）；沒給用頁面共用的那個（規則在 worker 裡跑）。 */
+  ruleRunner?: RuleRunner
 }
 
 export interface Shell {
@@ -223,14 +226,33 @@ export function createShell(options: CreateShellOptions): Shell {
   const card = installCard(config.card.rules || [], stylePolicy)
   refs.authorCss.textContent = card.styles.join('\n')
   const macros = { user: config.user.nickname || '', char: config.role.name || '' }
-  const render = (content: string) => applyStylePolicyToHtml(renderContent(content, card.rules, { macros, variants: config.variants || null, doc, fencedDocument: stylePolicy.fencedDocument }), stylePolicy)
+  // 規則交給 worker（跟一般卡同一個排程器）：這裡從不等規則，結果還沒回來就先畫「上次套完的產物＋之後到的原文」，
+  // 結果到了 onSettled 叫列表與狀態欄重畫。產物跟 renderContent 同步套用的逐字相同。
+  const ruleRunner = options.ruleRunner || getAuthorRuleRunner()
+  const render = (content: string, opts: { streaming?: boolean } = {}): string | { html: string; provisional: true } => {
+    const out = ruleRunner.display(
+      { engine: 'display', text: expandMacros(content, macros), rules: card.rules, options: { variants: config.variants || null } },
+      { streaming: !!opts.streaming },
+    )
+    const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, fencedDocument: stylePolicy.fencedDocument }), stylePolicy)
+    return out.provisional ? { html, provisional: true } : html
+  }
+  const htmlOf = (out: string | { html: string }) => (typeof out === 'string' ? out : out.html)
   // 狀態欄先掛、腳本後跑：舊頁寫法的卡把引擎零件（隱藏的 span、樣式）放在狀態欄裡，腳本一跑就去找它們，
   // 先跑腳本會找不到、功能少一半（碧藍檔案那張：導覽 13 步變 9 步、開場白裡的檔案面板不出來）。
   // 舞台與訊息列容器也已經在上面掛好了，作者腳本啟動時看得到跟舊頁一樣的骨架。
   // 前端區塊協議：圍欄裝的整份 HTML 文件，定稿後各自掛成 iframe（跟酒館助手的渲染器同一套慣例）。
   const mountFrontend = (root: HTMLElement) => { mountFrontendBlocks(root, { charAvatar: config.role.avatarUrl, userAvatar: config.user.avatarUrl, doc }) }
+  // 狀態欄的規則結果還沒回來：先畫暫時的，結果到了重畫一次（下面 onSettled）。
+  let statusbarPending = false
   if (refs.statusbar) {
-    refs.statusbar.innerHTML = config.card.statusbarHtml != null && config.card.statusbarHtml !== '' ? config.card.statusbarHtml : render(config.card.statusbar)
+    if (config.card.statusbarHtml != null && config.card.statusbarHtml !== '') {
+      refs.statusbar.innerHTML = config.card.statusbarHtml
+    } else {
+      const out = render(config.card.statusbar)
+      statusbarPending = typeof out !== 'string'
+      refs.statusbar.innerHTML = htmlOf(out)
+    }
     mountFrontend(refs.statusbar)
   }
   runAuthorScripts(card.scripts, {
@@ -293,6 +315,15 @@ export function createShell(options: CreateShellOptions): Shell {
     runScripts: runMessageScripts,
     mountFrontend,
     virtualize,
+  })
+
+  const offRuleSettled = ruleRunner.onSettled(() => {
+    if (statusbarPending && refs.statusbar) {
+      const out = render(config.card.statusbar)
+      statusbarPending = typeof out !== 'string'
+      if (!statusbarPending) { refs.statusbar.innerHTML = htmlOf(out); mountFrontend(refs.statusbar) }
+    }
+    list.refresh()
   })
 
   // ── 更早的歷史：捲到頂附近就向宿主要下一頁；宿主用 message.new + before 插進來，列表補償捲動位置。 ──
@@ -575,6 +606,7 @@ export function createShell(options: CreateShellOptions): Shell {
     refs,
     sdk: controller.sdk,
     dispose() {
+      offRuleSettled()
       bus.emit('dispose')
       for (const waiter of pending.values()) waiter.reject(new SdkError('HOST_DENIED', 'shell disposed'))
       pending.clear()

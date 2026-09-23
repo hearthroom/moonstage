@@ -38,7 +38,7 @@ const CHAT_VUE_PATH = path.join(root, 'src/pages/canvas/canvas.vue')
 
 function extractHighlightTextSource(): string {
   const source = fs.readFileSync(CHAT_VUE_PATH, 'utf8')
-  const anchor = 'const highlightText = (content, type, cacheKey) => {'
+  const anchor = 'const highlightText = (content, type, cacheKey, streaming) => {'
   const startIdx = source.indexOf(anchor)
   if (startIdx === -1) {
     throw new Error('highlightText 錨點找不到 — chat.vue heavy 分支結構已變，需同步更新本測試')
@@ -82,6 +82,7 @@ function buildHighlightText(): (content: string, type?: number, cacheKey?: strin
     // 這裡給空資產，等價於「沒有作者資產的角色」——也就是既有卡的路徑。
     applyDisplayRules: (text: string) => ({ html: text, rollbacks: [] }),
     activeAuthorAsset: { value: { rules: [], version: 0, crossLine: false } },
+    authorRules: { provisional: 0, display: (text: string) => text },
     console,
   })
   const script = new vm.Script(wrapped, { filename: 'chat-vue-highlightText-extract.js' })

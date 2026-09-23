@@ -106,11 +106,20 @@ export function colorDialogueQuotes(root: Element) {
   }
 }
 
-/** 一則內容（訊息正文或功能欄）→ 可放進 innerHTML 的 HTML。 */
+/** 一則內容（訊息正文或功能欄）→ 可放進 innerHTML 的 HTML。規則在呼叫端的執行緒上同步套用。 */
 export function renderContent(content: string, rules: SandboxRule[], options: RenderOptions): string {
-  const doc = options.doc || document
   const expanded = expandMacros(content, options.macros)
   const applied = applyDisplayRules(expanded, rules, { variants: options.variants || null }).html as string
+  return renderAppliedContent(applied, options)
+}
+
+/**
+ * 規則套完之後的那一段（Markdown → 淨化 → 對白上色 → 前端區塊）。殼的訊息渲染把規則交給 worker
+ * （common/author-rules，引擎 'display'、輸入是展開過巨集的全文），拿回產物——或結果還沒回來時的
+ * 「上次套完的產物＋之後到的原文」——再走這一段，跟 renderContent 同一條管線。
+ */
+export function renderAppliedContent(applied: string, options: Pick<RenderOptions, 'doc' | 'fencedDocument'>): string {
+  const doc = options.doc || document
   // 不在白名單的標籤（含中文尖括號那種）在進 markdown 之前就剝殼：markdown 會把它們跳脫成文字，
   // 之後的淨化就看不到、玩家會看到「<状态>」原樣印出來。反引號裡的原樣保留（stripUnknownTags 自己護）。
   const html = md.render(stripUnknownTags(applied))

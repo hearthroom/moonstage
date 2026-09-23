@@ -447,6 +447,7 @@ import CanvasMessage from './components/canvas-message.vue'
 import CanvasComposer from './components/canvas-composer.vue'
 import CanvasMessageMenu from './components/canvas-message-menu.vue'
 import { applyTavernRules, resolvePlayerName } from './canvas-rule-engine'
+import { getAuthorRuleRunner } from '@/common/author-rules'
 import { scopeCardHtml, normalizeCardFormat, type CardFormat } from './canvas-style-scope'
 import { withFencesProtected } from '@/common/markdown-fences'
 import { tagFrontendBlocks, mountFrontendBlocks } from '@/common/frontend-block'
@@ -2317,6 +2318,37 @@ function authorRuleOptions() {
   };
 }
 
+// 訊息的作者規則在 worker 裡跑（見 common/author-rules）：作者的正則可能有災難性回溯，
+// 在這條執行緒上跑就是整頁凍住，串流時每個 chunk 凍一次（2026-09-23 正式站量到 30 個 span 要 24 秒）。
+// display() 從不等規則：有結果就是結果；沒有就先給「上次套完的產物＋之後到的原文」並排工作，
+// 工作跑完 authorRuleEpoch 加一，用到暫時結果的那幾列重畫再來拿。
+// provisional 每回傳一次暫時結果就加一：呼叫端比對前後值，就知道這一趟渲染有沒有用到暫時的東西
+// （暫時的畫面不進串流快取、不啟動作者腳本、定稿列先留著上一版畫面）。
+// 掛載點與沙箱狀態欄的一次性套用仍走同步 applyTavernRules（掛載前就要知道接管哪些區塊）。
+const authorRuleRunner = getAuthorRuleRunner();
+const authorRuleEpoch = ref(0);
+let authorRuleEpochTimer: ReturnType<typeof setTimeout> | null = null;
+const offAuthorRuleSettled = authorRuleRunner.onSettled(() => {
+  // 一批工作連著完成（載入歷史）時合併成一次重畫。
+  if (authorRuleEpochTimer) return;
+  authorRuleEpochTimer = setTimeout(() => { authorRuleEpochTimer = null; authorRuleEpoch.value++; }, 16);
+});
+onUnmounted(() => {
+  offAuthorRuleSettled();
+  if (authorRuleEpochTimer) { clearTimeout(authorRuleEpochTimer); authorRuleEpochTimer = null; }
+});
+const authorRules = {
+  provisional: 0,
+  display(text: string, streaming: boolean): string {
+    const out = authorRuleRunner.display(
+      { engine: 'tavern', text, rules: activeAuthorAsset.value.rules, options: authorRuleOptions() },
+      { streaming },
+    );
+    if (out.provisional) authorRules.provisional++;
+    return out.html;
+  },
+};
+
 // ── 新版沙箱卡（pageMode=sandbox）──
 // 整個聊天區交給作者的殼（跨源 iframe）；宿主橋把畫布狀態翻成協議訊息餵進去。
 // 舊頁的規則引擎、作者範圍、HUD 橋在沙箱模式下一律不啟動（見 applyAuthorAsset）。
@@ -2926,16 +2958,17 @@ function hostOutsideAuthorScope(host, scope) {
 // 狀態一變就叫 bridge.refresh()（bridge 自己比對內容，沒變不發事件）。
 const hudBridgeRef = shallowRef<HudBridge | null>(null);
 // 每則訊息的 HTML 只在內容變了才重算：串流時每個 token 都會觸發 read()，不能每次重畫整串。
-const hudHtmlCache = new Map<string, { content: string; html: string }>();
+const hudHtmlCache = new Map<string, { content: string; html: string; ruleEpoch: number | null }>();
 
 function hudMessageHtml(item: any): string {
   const key = String(item.id);
   const content = String(item.content || '');
   const hit = hudHtmlCache.get(key);
-  if (hit && hit.content === content) return hit.html;
+  // 暫時的規則結果（還在等 worker）只記到下一次 epoch：沙箱殼要換上完整套用的結果。
+  if (hit && hit.content === content && (hit.ruleEpoch == null || hit.ruleEpoch === authorRuleEpoch.value)) return hit.html;
   let html = '';
   try { html = String(renderMessage(item) || ''); } catch (e) { html = ''; }
-  hudHtmlCache.set(key, { content, html });
+  hudHtmlCache.set(key, { content, html, ruleEpoch: renderIsProvisional(item) ? authorRuleEpoch.value : null });
   return html;
 }
 
@@ -2994,7 +3027,9 @@ function buildHudHost(): HudHost {
             text: String(item.content || ''),
             html: item.chatLoading ? '' : hudMessageHtml(item),
             opening,
-            finished: !!item.chatFinish,
+            // 沙箱殼：定稿要等作者規則的完整結果（上面 html 那一格剛算過）。殼收到 done 才重畫、啟動作者腳本、
+            // 發 message:done——拿暫時畫面去發，作者的收尾邏輯會對著原文跑。結果到了 epoch 一變，這裡再讀一次就放行。
+            finished: !!item.chatFinish && !(sandboxCard.value && renderIsProvisional(item)),
             canonicalLatestAI: isAI && !opening && !!item.chatFinish && isLatestCanonicalAIIndex(index),
             canContinue: isAI && canContinueFromIndex(index),
             // 沙箱殼用：標準訊息元件的整份呈現資料（html 走同一個快取，不重算）。
@@ -3493,7 +3528,7 @@ function disposeAuthorAsset() {
   setActiveAuthorAsset(null);
 }
 
-const highlightText = (content, type, cacheKey) => {
+const highlightText = (content, type, cacheKey, streaming) => {
   if (!content) return '';
 
   // streaming render cache 短路 (issue #5 · O(N²) 解法 · mirror mobile chat.vue)
@@ -3511,19 +3546,24 @@ const highlightText = (content, type, cacheKey) => {
       return m ? m[1] : h;
     };
     const concat = (a, b) => !a ? (b || '') : !b ? a : a + '\n' + b;
+    let prefixEnd = cache.boundary;
+    let prefixHtml = cache.html;
     if (boundary > cache.boundary) {
       const newPrefix = content.substring(cache.boundary, boundary);
-      const newPrefixHtml = stripWrap(highlightText(newPrefix, type));
-      cache = { boundary, html: concat(cache.html, newPrefixHtml) };
-      setStreamCacheEntry(cacheKey, cache.boundary, cache.html);
+      const provisionalBefore = authorRules.provisional;
+      const newPrefixHtml = stripWrap(highlightText(newPrefix, type, null, true));
+      prefixEnd = boundary;
+      prefixHtml = concat(cache.html, newPrefixHtml);
+      // 規則結果還沒回來的段落只顯示、不進快取：快取住的前綴不會再重算，暫時的畫面會永遠留著。
+      if (authorRules.provisional === provisionalBefore) setStreamCacheEntry(cacheKey, prefixEnd, prefixHtml);
     }
     let combined;
-    if (cache.boundary >= content.length) {
-      combined = cache.html;
+    if (prefixEnd >= content.length) {
+      combined = prefixHtml;
     } else {
-      const tail = content.substring(cache.boundary);
-      const tailHtml = stripWrap(highlightText(tail, type));
-      combined = concat(cache.html, tailHtml);
+      const tail = content.substring(prefixEnd);
+      const tailHtml = stripWrap(highlightText(tail, type, null, true));
+      combined = concat(prefixHtml, tailHtml);
     }
     return `<div class="rich-md">${combined}</div>`;
   }
@@ -3536,8 +3576,10 @@ const highlightText = (content, type, cacheKey) => {
   // 節奏走：前綴穩定時套一次就進快取，之後只有短短的尾段每次重算。
   // 邊界永遠落在空行之後，而不跨行的規則不可能跨越它，所以
   // 「切開各自套」與「整段套」結果相同。會跨行的規則已在上面放棄快取。
+  // 規則在 worker 裡跑（authorRules.display 不等它）：結果還沒回來時這裡拿到的是
+  // 「上次套完的產物＋之後到的原文」，照樣走下面同一條渲染管線。
   if (activeAuthorAsset.value.rules.length) {
-    processedContent = applyTavernRules(processedContent, activeAuthorAsset.value.rules, authorRuleOptions()).html;
+    processedContent = authorRules.display(processedContent, !!cacheKey || !!streaming);
     // 酒館來源的卡在原平台是有沙盒的（它的 <style> 會被加訊息層前綴），
     // 所以它寫裸選擇器是安全的。這裡沒有沙盒，得替它補上那層前綴，
     // 否則同一張卡搬過來會把整頁弄壞。MMD 來源不加——那邊的作者就是靠
@@ -3950,6 +3992,7 @@ function renderMemoKey(item) {
   }
 }
 
+// ruleEpoch 只有用到暫時規則結果的記錄才有：worker 回來（epoch 變了）就當沒記住，重算一次。
 function renderMemoHit(entry, key) {
   return !!entry
     && entry.key.content === key.content
@@ -3958,6 +4001,13 @@ function renderMemoHit(entry, key) {
     && entry.key.summary === key.summary
     && entry.key.version === key.version
     && entry.key.script === key.script
+    && (entry.ruleEpoch == null || entry.ruleEpoch === authorRuleEpoch.value)
+}
+
+/** 這一列目前畫的是不是暫時的規則結果（還在等 worker）。 */
+function renderIsProvisional(item) {
+  const entry = renderMemo.get(item)
+  return !!entry && entry.ruleEpoch != null
 }
 
 // 卡片自己的規則若提到某個思考類標籤（<思考>、<thought>…），那段就讓給卡片畫，不折進
@@ -3996,7 +4046,17 @@ const renderMessage = (item) => {
     }
   }
 
+  const provisionalBefore = authorRules.provisional
   const html = renderMarkdown(item)
+  if (authorRules.provisional !== provisionalBefore) {
+    // 規則結果還沒回來。串流中的照樣換上（字要立刻看得到）；已定稿的先留著上一版畫面（有的話），
+    // 不讓它退回原文閃一下。worker 回來 epoch 一變，記錄就失效、重算成完整套用的結果。
+    const shown = item.chatFinish && entry && entry.html ? entry.html : html
+    renderMemo.set(item, { key, html: shown, streamAt: item.chatFinish ? 0 : Date.now(), ruleEpoch: authorRuleEpoch.value })
+    return shown
+  }
+  activateMessageScripts(item, html)
+  activateFrontendBlocks(item, html)
   renderMemo.set(item, { key, html, streamAt: item.chatFinish ? 0 : Date.now() })
   return html
 }
@@ -4126,10 +4186,8 @@ const renderMarkdown = (item) => {
   // HTML 與純文字走同一條：規則套完才知道有沒有 <script>／<style>，所以腳本啟動
   // 看的是套完規則的結果，不是原文（見 activateMessageScripts）。
   const cacheKey = (!item.chatFinish && item.id != null) ? (item.id + ':' + item.type + ':' + activeAuthorAsset.value.version) : null;
-  const cleanContent = highlightText(processedContent, item.type, cacheKey);
-  activateMessageScripts(item, cleanContent);
-  activateFrontendBlocks(item, cleanContent);
-  return cleanContent;
+  // 腳本與前端區塊的啟動在 renderMessage：規則結果還沒回來的暫時畫面不啟動。
+  return highlightText(processedContent, item.type, cacheKey);
 
 };
 
