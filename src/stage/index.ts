@@ -22,6 +22,7 @@ import messages from '@/locale/index'
 import { setupHttp } from '@/api/http-setup'
 import { useExternalAuth, getFreshAccessToken, refreshAccessToken, clearTokens, redirectToLogin } from '@/common/open-oauth'
 import loading from '@/utils/loadingManager.js'
+import { setAuthorRuleStorageScope } from '@/common/author-rules'
 
 export { browserHost, setStageHost, useStageHost } from '@/host/stage-host'
 export type { StageHost } from '@/host/stage-host'
@@ -29,6 +30,7 @@ export type { SandboxHostOptions, SandboxSavesStore } from '@/host/sandbox-host'
 export { sandboxOriginFor } from '@/sandbox/protocol'
 export { default as MoonStage } from './MoonStage.vue'
 export { STAGE_ROUTE_OPTIONS } from './uni-app-shim'
+export { clearAuthorRuleStorage } from '@/common/author-rules'
 
 export interface StageAuth {
   /** 宿主的 bearer token；回 null 表示沒登入。舞台每次請求前都會問一次，快取由宿主管。 */
@@ -37,6 +39,12 @@ export interface StageAuth {
   onUnauthorized(): void
   /** 目前登入的人（給畫布顯示用）。給了就視為已登入；沒給就當訪客——訪客送訊息會被畫布擋下並丟 notLogin。 */
   user?: { id: string; nickName?: string; avatar?: string }
+  /**
+   * 作者規則定稿結果（含聊天原文）存進 IndexedDB 時的帳號範圍：宿主算好的不可逆雜湊（16–128 個
+   * [A-Za-z0-9_-]，例如 SHA-256(供應商, 帳號) 的十六進位），不要給帳號 ID 本身。沒給就不存、只用記憶體。
+   * 宿主登出時要呼叫 clearAuthorRuleStorage()（或直接刪掉 AUTHOR_RULE_DB_NAME 那個資料庫）。
+   */
+  storageScope?: string | null
 }
 
 export interface StageApi {
@@ -71,6 +79,7 @@ export async function installMoonStage(app: App, options: InstallMoonStageOption
   installed = true
   const { host, auth, api, i18n } = options
 
+  setAuthorRuleStorageScope(auth.storageScope ?? null)
   setStageHost({ ...host, apiBase: api.base })
   setSandboxHostOptions(options.sandbox || null)
   installUniShim(host)

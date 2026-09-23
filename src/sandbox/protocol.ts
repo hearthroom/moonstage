@@ -86,6 +86,11 @@ export interface SandboxHelloConfig {
   backgroundUrl?: string
   /** 視窗高度（--chat-viewport-height），之後由 viewport 訊息更新。 */
   viewportHeight?: number
+  /**
+   * 作者規則持久層（這個子網域的 IndexedDB）的範圍：宿主算好、這張卡專用的不可逆雜湊。
+   * 跟殼上次記的不同就先清掉；沒給＝刪掉、只用記憶體（沒登入或舊宿主）。
+   */
+  storageScope?: string
 }
 
 /**
@@ -218,6 +223,8 @@ export type HostToShell =
   // 開場選項（MMD「你可以选择开场」）：空清單＝拿掉。玩家點一條回 ui prologue，key 是第幾條。
   | { type: 'prologue'; title: string; items: string[] }
   | { type: 'conversation.switch' }
+  /** 宿主登出：殼刪掉作者規則的持久層、之後只用記憶體。 */
+  | { type: 'storage.clear' }
   | { type: 'back' }
   | { type: 'dispose' }
 
