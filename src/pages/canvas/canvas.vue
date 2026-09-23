@@ -483,6 +483,7 @@ import CanvasPersona from './components/canvas-persona.vue'
 import CanvasDirectives from './components/canvas-directives.vue'
 import CanvasResponseSettings from './components/canvas-response-settings.vue'
 import ChatSystemMessage from '@/components/chat-system-message/chat-system-message.vue'
+import { sandboxRetryPrompt } from './canvas-sandbox-retry';
 import CanvasNotepad from './components/canvas-notepad.vue'
 import CanvasContextBreakdown from './components/canvas-context-breakdown.vue'
 import CanvasMemory from './components/canvas-memory.vue'
@@ -9285,6 +9286,34 @@ function askConfirm(kind: string, title: string, content: string, okText: string
   confirmSpec.value = { kind, title, content, okText, onOk }
   panel.value = openSheet(panel.value, 'confirm')
 }
+
+// 沙箱卡看不到系統訊息卡（殼只畫玩家與角色的訊息），可重試的失敗在那裡沒有「重試」鍵。
+// 改用面板通道的確認框問一次：標題與說明跟卡片同一句，按下去走卡片同一個動作。
+// 同一則失敗只問一次；有別的面板開著就先不問，關掉後再問。
+const sandboxRetryAsked = new Set<string>()
+// 系統訊息卡決定按鈕的那一支，以這一列自己的結果為準。
+function sandboxRetryCtaAction(item: any, index: number) {
+  return getSystemMsgCtaAction(item?.finishReason, item, index)
+}
+function promptSandboxRetry() {
+  if (!sandboxCard.value || panel.value.sheet) return
+  // 跟系統訊息卡同一道閘：這個殼不給接續類操作時，卡上沒有鍵，這裡也不問。
+  if (!allowsStageAction(stageHost.capabilities, 'continue')) return
+  const prompt = sandboxRetryPrompt(talkList.value, sandboxRetryCtaAction)
+  if (!prompt || sandboxRetryAsked.has(prompt.key)) return
+  sandboxRetryAsked.add(prompt.key)
+  askConfirm('modal', getSystemMsgLabel(prompt.finishReason), getSystemMsgSub(prompt.finishReason), getSystemMsgCtaLabel(prompt.action as ChatOperationUIAction), () => {
+    // 問與按之間列表可能變了：只對還是同一則、還是最新的那一列動作。
+    const current = sandboxRetryPrompt(talkList.value, sandboxRetryCtaAction)
+    if (!current || current.key !== prompt.key) return
+    onSystemMsgCta(current.action, talkList.value[current.index], current.index)
+  })
+}
+watch(
+  () => [sandboxCard.value, panel.value.sheet, sandboxCard.value ? sandboxRetryPrompt(talkList.value, sandboxRetryCtaAction)?.key : ''],
+  () => promptSandboxRetry(),
+  { flush: 'post' },
+)
 
 function onConfirmCancel() {
   // 從記憶那一片來的確認：取消要回到清單，不能把玩家丟在空畫布上。
