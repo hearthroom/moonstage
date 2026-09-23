@@ -44,7 +44,8 @@ describe('容量選項', () => {
 
 describe('要存的欄位', () => {
   it('調高容量只動檔位；用目前容量玩只打開精簡', () => {
-    expect(capacityChoicePatch('raise', both)).toEqual({ context: 3 })
+    // 之前選過精簡的玩家改調高容量：要一起關掉精簡，否則調高了設定還是被截掉
+    expect(capacityChoicePatch('raise', both)).toEqual({ context: 3, trimConstantLore: false })
     expect(capacityChoicePatch('trim', both)).toEqual({ trimConstantLore: true })
   })
 
@@ -61,7 +62,7 @@ describe('選了之後', () => {
     const save = vi.fn(async (patch) => { calls.push('save:' + JSON.stringify(patch)); return true })
     const resend = vi.fn((draft: string) => { calls.push('resend:' + draft) })
     await expect(applyCapacityChoice({ key: 'raise', advice: both, draft: '你好', save, resend })).resolves.toBe(true)
-    expect(calls).toEqual(['save:{"context":3}', 'resend:你好'])
+    expect(calls).toEqual(['save:{"context":3,"trimConstantLore":false}', 'resend:你好'])
   })
 
   it('用目前容量玩：先存精簡，存好才重送', async () => {

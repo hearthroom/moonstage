@@ -9183,7 +9183,7 @@ function closeCapacityChoice() {
 async function saveCapacityPatch(patch: CapacityPatch): Promise<boolean> {
   const before = { context: formData.context, trimConstantLore: formData.trimConstantLore === true }
   if ('context' in patch) formData.context = patch.context
-  if ('trimConstantLore' in patch) formData.trimConstantLore = true
+  if ('trimConstantLore' in patch) formData.trimConstantLore = patch.trimConstantLore
   const ok = await persistRoleSettings()
   if (!ok) {
     formData.context = before.context
