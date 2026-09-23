@@ -38,6 +38,8 @@ export type CanvasSheet =
   /** 一次性確認（重置聊天、開新對話） */
   | 'confirm'
   | 'assist'
+  /** 第一輪就裝不下的卡：調到建議的容量，或用目前容量玩 */
+  | 'capacity'
 
 export interface CanvasPanelState {
   /** ＋ 面板開著嗎 */

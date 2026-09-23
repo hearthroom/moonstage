@@ -1,5 +1,5 @@
 /**
- * 這張卡的遊玩設定：稱呼、性別、自我介紹、模型／線路、上下文檔位、思考深度。
+ * 這張卡的遊玩設定：稱呼、性別、自我介紹、模型／線路、上下文檔位、思考深度、常駐設定精簡。
  *
  * 為什麼另開一支而不是繼續用玩家偏好：**送出那一輪讀的是這一份**。玩家偏好是
  * 外觀（桌布、字體），寫進去不會影響生成；把模型跟上下文寫到那裡，畫面上看起來
@@ -24,6 +24,7 @@ export const ROLE_SETTING_KEYS = [
   'thinkingDepth',
   'sandboxLevel',
   'jailbreak',
+  'trimConstantLore',
 ] as const
 
 export type RoleSettingKey = (typeof ROLE_SETTING_KEYS)[number]
@@ -41,6 +42,8 @@ export interface RoleSettings {
   sandboxLevel: string
   /** 玩家自訂的內容範圍框架。'' ＝用這張卡（或平台）的預設 */
   jailbreak: string
+  /** 容量不夠時玩家選了「用目前容量玩」：只帶最重要的常駐設定。布林值，伺服器不收字串。 */
+  trimConstantLore: boolean
 }
 
 /**
@@ -60,6 +63,7 @@ export const ROLE_SETTINGS_DEFAULTS: RoleSettings = {
   thinkingDepth: '',
   sandboxLevel: '',
   jailbreak: '',
+  trimConstantLore: false,
 }
 
 /** 主站與畫布共用的性別代號。'women' 是既有存量值，不要寫成 'woman'。 */
@@ -105,6 +109,7 @@ export function readRoleSettings(raw: any): RoleSettings {
     thinkingDepth: asText(src.thinkingDepth),
     sandboxLevel: asText(src.sandboxLevel),
     jailbreak: asText(src.jailbreak),
+    trimConstantLore: src.trimConstantLore === true,
   }
 }
 
@@ -130,6 +135,12 @@ export function diffRoleSettings(
     if (key === 'context') {
       if (Number(prevValue) === Number(nextValue)) continue
       changed[key] = Number(nextValue)
+      any = true
+      continue
+    }
+    if (key === 'trimConstantLore') {
+      if ((prevValue === true) === (nextValue === true)) continue
+      changed[key] = nextValue === true
       any = true
       continue
     }

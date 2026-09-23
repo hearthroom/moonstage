@@ -4,6 +4,7 @@ import {
   resolveChatErrorTypeFromFailure,
   resolveChatErrorMessage,
   resolveChatErrorPresentation,
+  resolveContextCapacityAdvice,
 } from './chat-error-message.js'
 
 const translate = (key: string) => key
@@ -143,4 +144,41 @@ describe('resolveChatErrorMessage', () => {
 it('explains capacity failures without presenting them as a network retry', () => {
  expect(resolveChatErrorMessage('context_capacity_exceeded', translate)).toBe('error.contextCapacityExceeded')
  expect(resolveChatErrorPresentation('context_capacity_exceeded', translate).finishReason).toBe('context_capacity_exceeded')
+})
+
+// 第一輪就裝不下時，伺服器會說哪種玩法裝得下；同一個信封走 WebSocket error 事件與 HTTP 422。
+describe('resolveContextCapacityAdvice', () => {
+  const envelope = {
+    error: 'context_capacity_exceeded',
+    code: 'context_capacity_exceeded',
+    error_type: 'context_capacity_exceeded',
+    required_context_tier: 3,
+    required_context_tokens: 128000,
+    constant_lore_trim_fits: true,
+  }
+
+  it('keeps the recommended tier, its size and whether trimming fits', () => {
+    expect(resolveContextCapacityAdvice(envelope)).toEqual({ requiredTier: 3, requiredTokens: 128000, trimFits: true })
+  })
+
+  it('offers trimming alone when no tier fits the whole card', () => {
+    const { required_context_tier: _t, required_context_tokens: _k, ...trimOnly } = envelope
+    expect(resolveContextCapacityAdvice(trimOnly)).toEqual({ requiredTier: null, requiredTokens: null, trimFits: true })
+  })
+
+  it('offers raising alone when trimming does not fit', () => {
+    expect(resolveContextCapacityAdvice({ ...envelope, constant_lore_trim_fits: false }))
+      .toEqual({ requiredTier: 3, requiredTokens: 128000, trimFits: false })
+  })
+
+  it('reads the same envelope from an HTTP 422 body', () => {
+    expect(resolveContextCapacityAdvice({ statusCode: 422, data: envelope })).toEqual({ requiredTier: 3, requiredTokens: 128000, trimFits: true })
+  })
+
+  it('returns null for mid-conversation capacity errors and for other errors', () => {
+    expect(resolveContextCapacityAdvice({ error_type: 'context_capacity_exceeded', code: 'context_capacity_exceeded' })).toBe(null)
+    expect(resolveContextCapacityAdvice({ ...envelope, error_type: 'rate_limit', code: 'rate_limit', error: 'rate_limit' })).toBe(null)
+    expect(resolveContextCapacityAdvice({ ...envelope, required_context_tier: 9, constant_lore_trim_fits: false })).toBe(null)
+    expect(resolveContextCapacityAdvice(null)).toBe(null)
+  })
 })

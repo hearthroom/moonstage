@@ -48,6 +48,25 @@ export function resolveChatErrorTypeFromFailure(failure) {
   return 'connection_error'
 }
 
+// 第一輪就裝不下時，伺服器在同一個錯誤信封（WebSocket error 事件、HTTP 422）裡附上建議：
+// 裝得下整張卡的最小檔位，以及用目前檔位精簡常駐設定是否裝得下。對話中途的容量錯誤不帶建議，
+// 這裡回 null，畫面維持原本的說法。
+export function resolveContextCapacityAdvice(source) {
+  const data = source && typeof source === 'object' && source.data && typeof source.data === 'object'
+    ? source.data
+    : source
+  if (!data || typeof data !== 'object') return null
+  const type = String(data.error_type || data.errorCode || data.code || data.error || '').trim()
+  if (type !== 'context_capacity_exceeded') return null
+  const tier = Number(data.required_context_tier)
+  const requiredTier = Number.isInteger(tier) && tier >= 1 && tier <= 5 ? tier : null
+  const tokens = Number(data.required_context_tokens)
+  const requiredTokens = requiredTier && Number.isFinite(tokens) && tokens > 0 ? tokens : null
+  const trimFits = data.constant_lore_trim_fits === true
+  if (!requiredTier && !trimFits) return null
+  return { requiredTier, requiredTokens, trimFits }
+}
+
 const CHAT_ERROR_FINISH_REASONS = Object.freeze({
   service_unavailable: 'server_error',
   rate_limit: 'rate_limit',
