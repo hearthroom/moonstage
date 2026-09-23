@@ -9,7 +9,7 @@ import { createShell, type Shell } from '../shell'
 import { installCard, renderContent } from '../rules'
 import { stylePolicyFor, applyStylePolicyToHtml } from '@/common/author-style-policy'
 import type { SandboxHelloConfig } from '../protocol'
-import { createRuleRunner, type RuleExecutor, type ExecutorJob } from '@/common/author-rules'
+import { createRuleRunner, type RuleExecutor, type ExecutorJob, type RulePersist } from '@/common/author-rules'
 import { executeRuleJob, type RuleResult } from '@/common/author-rules/rule-job'
 
 function manualExecutor() {
@@ -46,9 +46,9 @@ function config(over: Partial<SandboxHelloConfig> = {}): SandboxHelloConfig {
 let shell: Shell | null = null
 afterEach(() => { shell?.dispose(); shell = null; delete (window as unknown as Record<string, unknown>).sdk; delete (window as unknown as Record<string, unknown>).__ran })
 
-function boot(cfg: SandboxHelloConfig, executor: RuleExecutor) {
+function boot(cfg: SandboxHelloConfig, executor: RuleExecutor, persist?: RulePersist) {
   document.body.innerHTML = '<div id="app"></div>'
-  const ruleRunner = createRuleRunner({ executor })
+  const ruleRunner = createRuleRunner({ executor, persist, engineVersion: persist ? 'v1' : '' })
   shell = createShell({ doc: document, win: window as Window & typeof globalThis, mount: document.getElementById('app')!, config: cfg, transport: { send: () => {} }, ruleRunner })
   return shell
 }
@@ -95,5 +95,26 @@ describe('殼的正文渲染：規則在 worker 裡跑', () => {
     finishAll()
     await settle()
     expect(s.refs.statusbar!.innerHTML).toContain('<div class="panel">狀態</div>')
+  })
+
+  it('串流最後一版就是定稿全文：定稿那一刻向排程器要定稿結果（寫進持久層，重整立刻命中），不重跑規則', async () => {
+    const { executor, started, finishAll } = manualExecutor()
+    const store = new Map<string, unknown>()
+    const persist: RulePersist = { get: async (k) => store.get(k) as any, set: (k, v) => { store.set(k, v) } }
+    const s = boot(config(), executor, persist)
+    s.handle({ type: 'messages', messages: [] })
+    s.handle({ type: 'message.new', message: { id: 'l1', role: 'ai', content: '', serverId: null } })
+    const content = '開場<zt>體力 10</zt>完'
+    s.handle({ type: 'message.stream', id: 'l1', content })
+    await nextTick()
+    finishAll()
+    await settle()
+    expect(body(s).innerHTML).toContain('<div class="panel">體力 10</div>')
+    expect(store.size).toBe(0)
+    s.handle({ type: 'message.done', id: 'l1', content, serverId: '9' })
+    await settle()
+    expect(started.length).toBe(0)
+    expect(store.size).toBe(1)
+    expect(body(s).innerHTML).toContain('<div class="panel">體力 10</div>')
   })
 })

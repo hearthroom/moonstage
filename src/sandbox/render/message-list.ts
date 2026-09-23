@@ -139,19 +139,22 @@ export function createMessageList(deps: MessageListDeps): MessageList {
 
   // 殼自己渲染正文時（宿主沒給 view）的快取：空殼重建、同內容重算狀態都不必再跑一次 markdown＋淨化。
   // provisional：作者規則的結果還沒回來，這份是暫時的——不當快取命中，refresh() 時重算。
-  const rendered = new Map<string, { content: string; html: string; provisional: boolean }>()
+  // streaming：這份是串流中要的。定稿時內容沒變也要再問一次（非串流）——排程器據此把它記成定稿、寫進持久層，
+  // 重整後才直接命中；結果已在排程器手上，不會重跑規則。
+  const rendered = new Map<string, { content: string; html: string; provisional: boolean; streaming: boolean }>()
   const renderCached = (m: SandboxMessage): string => {
     const hit = rendered.get(m.id)
-    if (hit && hit.content === m.content && !hit.provisional) return hit.html
-    const out = deps.render(m.content, { streaming: m.state === 'streaming' })
+    const streaming = m.state === 'streaming'
+    if (hit && hit.content === m.content && !hit.provisional && (streaming || !hit.streaming)) return hit.html
+    const out = deps.render(m.content, { streaming })
     const html = typeof out === 'string' ? out : out.html
     if (typeof out !== 'string' && out.provisional) {
       // 已定稿的先留著上一版畫面（有的話），不退回原文閃一下；串流中的照樣換上，字要立刻看得到。
       const shown = m.state === 'done' && hit && hit.html ? hit.html : html
-      rendered.set(m.id, { content: m.content, html: shown, provisional: true })
+      rendered.set(m.id, { content: m.content, html: shown, provisional: true, streaming })
       return shown
     }
-    rendered.set(m.id, { content: m.content, html, provisional: false })
+    rendered.set(m.id, { content: m.content, html, provisional: false, streaming })
     return html
   }
   const pendingRules = (entry: Entry) => {

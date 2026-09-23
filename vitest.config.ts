@@ -2,6 +2,7 @@ import { defineConfig, configDefaults } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import fs from 'node:fs'
 import path from 'node:path'
+import { authorRuleEngineDefine } from './build/engine-version'
 
 // 可信集 skip 口徑的單一事實來源 = scripts/gates.json 的
 // known_failures.vitest_suites。登記/清除債務 = 改 gates.json，
@@ -22,6 +23,7 @@ function knownRedVitestPatterns(): string[] {
 
 export default defineConfig({
   plugins: [vue()],
+  define: authorRuleEngineDefine(__dirname),
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
