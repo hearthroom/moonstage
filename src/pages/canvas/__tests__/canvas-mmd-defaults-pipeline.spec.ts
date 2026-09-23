@@ -44,7 +44,7 @@ function extractBraced(source: string, anchor: string): string {
 }
 
 function buildHighlightText(format: 'mmd' | 'tavern', rules: any[] = []) {
-  const fnSource = extractBraced(fs.readFileSync(CANVAS_VUE, 'utf8'), 'const highlightText = (content, type, cacheKey) => {')
+  const fnSource = extractBraced(fs.readFileSync(CANVAS_VUE, 'utf8'), 'const highlightText = (content, type, cacheKey, streaming) => {')
   const context = vm.createContext({
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines,
@@ -56,6 +56,8 @@ function buildHighlightText(format: 'mmd' | 'tavern', rules: any[] = []) {
     convertVisibleHtml: (html: string) => html,
     displayScript: (text: string) => text,
     activeAuthorAsset: { value: { rules, version: 0, crossLine: false } },
+    // 同步版的 authorRules：測試環境沒有 Worker，頁面裡的排程器也是這樣退回同步套用。
+    authorRules: { provisional: 0, display: (text: string) => applyTavernRules(text, rules, {}).html },
     console,
   })
   return new vm.Script(`(function(){\n${fnSource}\nreturn highlightText;\n})()`).runInContext(context)

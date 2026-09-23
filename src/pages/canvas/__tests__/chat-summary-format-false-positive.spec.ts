@@ -70,7 +70,7 @@ function extractBracedFunctionSource(source: string, anchor: string, label: stri
 function extractHighlightTextSource(chatVueSource: string): string {
   return extractBracedFunctionSource(
     chatVueSource,
-    'const highlightText = (content, type, cacheKey) => {',
+    'const highlightText = (content, type, cacheKey, streaming) => {',
     'highlightText',
   )
 }
@@ -113,6 +113,7 @@ function buildHighlightText(chatVueSource: string) {
     // 這裡給空資產，等價於「沒有作者資產的角色」——也就是既有卡的路徑。
     applyDisplayRules: (text: string) => ({ html: text, rollbacks: [] }),
     activeAuthorAsset: { value: { rules: [], version: 0, crossLine: false } },
+    authorRules: { provisional: 0, display: (text: string) => text },
     console,
   })
   const script = new vm.Script(wrapped, { filename: 'chat-vue-highlightText-extract.js' })
@@ -132,6 +133,7 @@ function buildRenderMarkdown(chatVueSource: string) {
     activateMessageScripts: (_item?: unknown, _html?: string) => {},
     activateFrontendBlocks: () => {},
     activeAuthorAsset: { value: { rules: [], version: 0, crossLine: false } },
+    authorRules: { provisional: 0, display: (text: string) => text },
     console,
   })
   const script = new vm.Script(wrapped, { filename: 'chat-vue-renderMarkdown-extract.js' })

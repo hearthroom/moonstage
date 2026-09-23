@@ -23,7 +23,7 @@
  *   誰在視窗附近由 deps.virtualize 決定（殼用 IntersectionObserver，測試用假的）；沒給就全量掛。
  *   量到的數字（300 則、4 倍 CPU 節流）：全量掛冷啟動 11 秒、每輪串流 1 秒（每一段都對 27k 個節點排一次版）。
  */
-import { createApp, h, reactive, type App } from 'vue'
+import { createApp, h, nextTick, reactive, type App } from 'vue'
 import CanvasMessage from '@/pages/canvas/components/canvas-message.vue'
 import type { MessageLabels, MessageMenuAnchor, MessageView, SandboxMessage, SandboxRole } from '../protocol'
 import type { EventBus } from '../sdk/events'
@@ -54,8 +54,11 @@ export interface MessageListDeps {
   doc: Document
   list: HTMLElement
   bus: EventBus
-  /** 宿主沒給 html 時（獨立殼、測試）自己渲染正文。 */
-  render(content: string): string
+  /**
+   * 宿主沒給 html 時（獨立殼、測試）自己渲染正文。作者規則還沒跑完時回 `{ html, provisional: true }`
+   * （暫時的畫面），結果到了殼會叫 refresh() 重畫。
+   */
+  render(content: string, opts?: { streaming?: boolean }): string | { html: string; provisional: boolean }
   strings: { generating: string }
   roleName: string
   roleAvatar: string
@@ -108,6 +111,8 @@ export interface MessageList {
   /** 目前真的掛著氣泡的 id（視窗化用；沒視窗化＝全部）。 */
   mountedIds(): string[]
   clear(): void
+  /** 作者規則有結果回來了：用暫時畫面的氣泡重算一次（沒掛著的等重建時自然會重算）。 */
+  refresh(): void
 }
 
 export function payloadOf(m: SandboxMessage): MessagePayload {
@@ -133,13 +138,26 @@ export function createMessageList(deps: MessageListDeps): MessageList {
   const learn = (h: number) => { if (h > 0) { heightSum += h; heightCount++ } }
 
   // 殼自己渲染正文時（宿主沒給 view）的快取：空殼重建、同內容重算狀態都不必再跑一次 markdown＋淨化。
-  const rendered = new Map<string, { content: string; html: string }>()
+  // provisional：作者規則的結果還沒回來，這份是暫時的——不當快取命中，refresh() 時重算。
+  const rendered = new Map<string, { content: string; html: string; provisional: boolean }>()
   const renderCached = (m: SandboxMessage): string => {
     const hit = rendered.get(m.id)
-    if (hit && hit.content === m.content) return hit.html
-    const html = deps.render(m.content)
-    rendered.set(m.id, { content: m.content, html })
+    if (hit && hit.content === m.content && !hit.provisional) return hit.html
+    const out = deps.render(m.content, { streaming: m.state === 'streaming' })
+    const html = typeof out === 'string' ? out : out.html
+    if (typeof out !== 'string' && out.provisional) {
+      // 已定稿的先留著上一版畫面（有的話），不退回原文閃一下；串流中的照樣換上，字要立刻看得到。
+      const shown = m.state === 'done' && hit && hit.html ? hit.html : html
+      rendered.set(m.id, { content: m.content, html: shown, provisional: true })
+      return shown
+    }
+    rendered.set(m.id, { content: m.content, html, provisional: false })
     return html
+  }
+  const pendingRules = (entry: Entry) => {
+    if (entry.message.view) return false
+    const hit = rendered.get(entry.message.id)
+    return !!hit && hit.provisional
   }
   const stateOf = (m: SandboxMessage): EntryState => {
     const generating = m.role === 'ai' && m.state !== 'done' && !m.content
@@ -164,6 +182,8 @@ export function createMessageList(deps: MessageListDeps): MessageList {
   // 視窗化拆掉再掛回來算「重建」：activatedHtml 清掉，前端區塊的 iframe 會重掛（跟 MMD 銷毀重建一致）。
   const activate = (entry: Entry) => {
     if (!deps.runScripts && !deps.mountFrontend) return
+    // 暫時的畫面（規則還沒跑完）不啟動：腳本與前端區塊等完整套用的結果。
+    if (pendingRules(entry)) return
     const html = String((entry.state && entry.state.view.html) || '')
     if (!html || entry.activatedHtml === html || entry.message.state !== 'done') return
     entry.activatedHtml = html
@@ -445,6 +465,14 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     bubbleOf: (id) => { const e = entries.get(String(id)); return e && e.app ? e.article : null },
     ids: () => Array.from(entries.keys()),
     mountedIds: () => order().filter((e) => !!e.app).map((e) => e.message.id),
+    refresh() {
+      for (const entry of entries.values()) {
+        if (!entry.app || !entry.state || !pendingRules(entry)) continue
+        applyState(entry, stateOf(entry.message))
+        // 定稿的氣泡換上完整結果後才啟動腳本與前端區塊（applyState 是非同步重繪，等它畫完）。
+        if (entry.message.state === 'done' && !pendingRules(entry)) nextTick(() => { if (entry.app) activate(entry) })
+      }
+    },
     clear() {
       for (const id of Array.from(entries.keys())) remove(id)
       if (batchTimer != null) { clearTimeout(batchTimer); batchTimer = null }
