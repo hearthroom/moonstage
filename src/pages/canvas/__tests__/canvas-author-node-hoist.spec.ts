@@ -85,7 +85,7 @@ describe('hoistFixedAuthorNodes', () => {
     expect(container.contains(staticEl)).toBe(false)
   })
 
-  it('沒有 id 的節點：即使是 fixed 也不處理——沒有穩定身分無法判斷是不是重複', () => {
+  it('沒有 id 的一般元素：即使是 fixed 也不處理——沒有穩定身分無法判斷是不是重複', () => {
     const { scanRoot, container } = makeDom()
     const anonymous = document.createElement('div')
     scanRoot.appendChild(anonymous)
@@ -94,6 +94,70 @@ describe('hoistFixedAuthorNodes', () => {
 
     expect(result).toEqual({ hoisted: 0, removed: 0 })
     expect(scanRoot.contains(anonymous)).toBe(true)
+  })
+
+  /*
+    自訂元素的標籤名就是穩定身分：作者把整個 Galgame 舞台寫成 <galgame-start-v6>，
+    :host 是 position:fixed; inset:0，沒有 id。留在氣泡裡（捲動容器底下）iOS Safari
+    會把它裁在訊息區裡、頁首與輸入區蓋在它上面（2026-09-24 社群回報，iPhone 截圖）。
+  */
+  it('沒有 id 的自訂元素（標籤帶連字號）：fixed 就搬進容器', () => {
+    const { scanRoot, container } = makeDom()
+    const stage = document.createElement('galgame-start-v6')
+    const bubble = document.createElement('div')
+    bubble.className = 'mes_text'
+    bubble.appendChild(stage)
+    scanRoot.appendChild(bubble)
+
+    const result = hoistFixedAuthorNodes(scanRoot, container, FIXED)
+
+    expect(result).toEqual({ hoisted: 1, removed: 0 })
+    expect(stage.parentNode).toBe(container)
+    expect(scanRoot.contains(stage)).toBe(false)
+  })
+
+  it('容器裡已有同標籤的自訂元素：訊息串裡新出現的那份丟掉，原本那份不動', () => {
+    const { scanRoot, container } = makeDom()
+    const original = document.createElement('galgame-start-v6')
+    original.setAttribute('data-marker', 'first')
+    container.appendChild(original)
+
+    const duplicate = document.createElement('galgame-start-v6')
+    duplicate.setAttribute('data-marker', 'second')
+    scanRoot.appendChild(duplicate)
+
+    const result = hoistFixedAuthorNodes(scanRoot, container, FIXED)
+
+    expect(result).toEqual({ hoisted: 0, removed: 1 })
+    expect(container.querySelectorAll('galgame-start-v6').length).toBe(1)
+    expect(container.querySelector('galgame-start-v6')?.getAttribute('data-marker')).toBe('first')
+    expect(document.body.contains(duplicate)).toBe(false)
+  })
+
+  it('自訂元素不是 fixed：不搬（例如流內的狀態欄元件）', () => {
+    const { scanRoot, container } = makeDom()
+    const statusbar = document.createElement('oracle-holo-status')
+    scanRoot.appendChild(statusbar)
+
+    const result = hoistFixedAuthorNodes(scanRoot, container, STATIC)
+
+    expect(result).toEqual({ hoisted: 0, removed: 0 })
+    expect(scanRoot.contains(statusbar)).toBe(true)
+  })
+
+  it('帶 id 的自訂元素：身分以 id 為準，同標籤不同 id 各自保留', () => {
+    const { scanRoot, container } = makeDom()
+    const a = document.createElement('hud-panel')
+    a.id = 'hud-a'
+    const b = document.createElement('hud-panel')
+    b.id = 'hud-b'
+    scanRoot.appendChild(a)
+    scanRoot.appendChild(b)
+
+    const result = hoistFixedAuthorNodes(scanRoot, container, FIXED)
+
+    expect(result).toEqual({ hoisted: 2, removed: 0 })
+    expect(container.querySelectorAll('hud-panel').length).toBe(2)
   })
 
   it('已經在容器裡的節點：再掃一次不會重複處理（冪等）', () => {
