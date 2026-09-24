@@ -124,14 +124,14 @@ describe('highlightText：規則不在這條執行緒上跑', () => {
     const para = '這是一段夠長的敘事文字，用來撐過兩百字的門檻。'.repeat(5)
     const content = `【甲】${para}\n\n${para}\n\n【乙】尾巴`
     highlightText(content, 0, 'm2:0:0')
-    expect(getStreamCacheEntry('m2:0:0')).toBeFalsy()
+    expect(getStreamCacheEntry(JSON.stringify(['m2:0:0', null]))).toBeFalsy()
     finishAll()
     await settle()
     highlightText(content, 0, 'm2:0:0')
     finishAll()
     await settle()
     highlightText(content, 0, 'm2:0:0')
-    const entry = getStreamCacheEntry('m2:0:0') as { html: string } | null
+    const entry = getStreamCacheEntry(JSON.stringify(['m2:0:0', null])) as { html: string } | null
     expect(entry && entry.html).toContain('<b class="tag">甲</b>')
   })
 

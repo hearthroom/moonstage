@@ -447,7 +447,7 @@ import CanvasIntro from './components/canvas-intro.vue'
 import CanvasMessage from './components/canvas-message.vue'
 import CanvasComposer from './components/canvas-composer.vue'
 import CanvasMessageMenu from './components/canvas-message-menu.vue'
-import { applyTavernRules, resolvePlayerName } from './canvas-rule-engine'
+import { applyTavernRules, resolvePlayerName, substituteMacros } from './canvas-rule-engine'
 import { decorateSpeakers, worldMembers, mentionShortcuts, mentionOf } from './canvas-world'
 import { getAuthorRuleRunner } from '@/common/author-rules'
 import { scopeCardHtml, normalizeCardFormat, type CardFormat } from './canvas-style-scope'
@@ -2345,6 +2345,7 @@ onUnmounted(() => {
 const authorRules = {
   provisional: 0,
   display(text: string, streaming: boolean): string {
+    if (!activeAuthorAsset.value.rules.length) return substituteMacros(text, authorRuleOptions().macros);
     const out = authorRuleRunner.display(
       { engine: 'tavern', text, rules: activeAuthorAsset.value.rules, options: authorRuleOptions() },
       { streaming },
@@ -3539,6 +3540,8 @@ const highlightText = (content, type, cacheKey, streaming) => {
   // streaming render cache 短路 (issue #5 · O(N²) 解法 · mirror mobile chat.vue)
   // 細節見 rich-text-renderer.js 的 stream cache 區塊註解
   if (cacheKey && !isHeavyHtml(content)) {
+    // 人設名稱變了，已展開成舊名字的 HTML 必須失效。
+    cacheKey = JSON.stringify([cacheKey, authorRuleOptions().macros]);
     const boundary = findStableBoundary(content, activeAuthorAsset.value.crossLine);
     let cache = getStreamCacheEntry(cacheKey);
     if (!cache || boundary < cache.boundary || cache.boundary > content.length) {
@@ -3583,8 +3586,8 @@ const highlightText = (content, type, cacheKey, streaming) => {
   // 「切開各自套」與「整段套」結果相同。會跨行的規則已在上面放棄快取。
   // 規則在 worker 裡跑（authorRules.display 不等它）：結果還沒回來時這裡拿到的是
   // 「上次套完的產物＋之後到的原文」，照樣走下面同一條渲染管線。
+  processedContent = authorRules.display(processedContent, !!cacheKey || !!streaming);
   if (activeAuthorAsset.value.rules.length) {
-    processedContent = authorRules.display(processedContent, !!cacheKey || !!streaming);
     // 酒館來源的卡在原平台是有沙盒的（它的 <style> 會被加訊息層前綴），
     // 所以它寫裸選擇器是安全的。這裡沒有沙盒，得替它補上那層前綴，
     // 否則同一張卡搬過來會把整頁弄壞。MMD 來源不加——那邊的作者就是靠

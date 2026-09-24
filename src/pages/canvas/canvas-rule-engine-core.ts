@@ -48,9 +48,9 @@ export function substituteMacros(text: string, macros: MacroContext): string {
   if (!text) return text
   const user = macros.user || ''
   const char = macros.char || ''
-  return text
-    .replace(/\{\{\s*user\s*\}\}/gi, user)
-    .replace(/\{\{\s*char\s*\}\}/gi, char)
+  return text.replace(/\{\{\s*(user|char)\s*\}\}/gi, (_whole, key: string) =>
+    key.toLowerCase() === 'user' ? user : char,
+  )
 }
 
 /**
@@ -243,10 +243,7 @@ export function applyTavernRules(
       reportSkipped(rule)
       continue
     }
-    const replace = substituteMacros(
-      rewriteNamedGroups(String(rule.find || ''), String(rule.replace == null ? '' : rule.replace)),
-      macros,
-    )
+    const replace = rewriteNamedGroups(String(rule.find || ''), String(rule.replace == null ? '' : rule.replace))
     const prepared = { ...rule, replace }
     if (Array.isArray(rule.trimStrings) && rule.trimStrings.length) {
       current = applyTrimRule(current, prepared, rollbacks)
@@ -260,5 +257,6 @@ export function applyTavernRules(
     for (const rb of out.rollbacks) rollbacks.push(rb)
   }
 
-  return { html: current, rollbacks }
+  // 規則先吃原文，捕獲及模板完成後才插入字面名稱。
+  return { html: substituteMacros(current, macros), rollbacks }
 }

@@ -317,3 +317,20 @@ describe('後備：沒有 worker 的環境（測試、SSR）或 worker 被擋', 
     await expect(runner.apply({ text: 'a', rules })).resolves.toEqual({ html: 'b', rollbacks: [] })
   })
 })
+
+
+describe('正文玩家名稱：非同步規則', () => {
+ it('等待 worker 時與完成後都展開正文，已完成名字不再被遞迴替換', async () => {
+  const manual = manualExecutor()
+  const runner = createRuleRunner({ executor: manual.executor })
+  const req = { text: '你好，{{user}}。', rules: [{ find: '你好', replace: '歡迎' }], options: { macros: { user: '小明 {{char}}', char: '星' } } }
+  expect(runner.display(req, { streaming: true }).html).toBe('你好，小明 {{char}}。')
+  await settle()
+  manual.finish()
+  await settle()
+  expect(runner.display(req, { streaming: true }).html).toBe('歡迎，小明 {{char}}。')
+  expect(runner.display({ ...req, text: req.text + '{{user}}回來了。' }, { streaming: true }).html)
+   .toBe('歡迎，小明 {{char}}。小明 {{char}}回來了。')
+  runner.dispose()
+ })
+})

@@ -11,7 +11,7 @@ import { createEventBus } from './sdk/events'
 import { createSdk, type Sdk, type SdkHost } from './sdk/create-sdk'
 import { SdkError, sdkErrorFromHost } from './sdk/errors'
 import { installMessageScope } from './scope'
-import { expandMacros, installCard, renderAppliedContent } from './rules'
+import { installCard, renderAppliedContent } from './rules'
 import { getAuthorRuleRunner, setAuthorRuleStorageScope, clearAuthorRuleStorage, type RuleRunner } from '@/common/author-rules'
 import { applyStylePolicyToHtml, stylePolicyFor } from '@/common/author-style-policy'
 import { mountFrontendBlocks } from '@/common/frontend-block'
@@ -233,10 +233,10 @@ export function createShell(options: CreateShellOptions): Shell {
   const ruleRunner = options.ruleRunner || getAuthorRuleRunner()
   const render = (content: string, opts: { streaming?: boolean } = {}): string | { html: string; provisional: true } => {
     const out = ruleRunner.display(
-      { engine: 'display', text: expandMacros(content, macros), rules: card.rules, options: { variants: config.variants || null } },
+      { engine: 'display', text: content, rules: card.rules, options: { variants: config.variants || null } },
       { streaming: !!opts.streaming },
     )
-    const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, fencedDocument: stylePolicy.fencedDocument }), stylePolicy)
+    const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, macros, fencedDocument: stylePolicy.fencedDocument }), stylePolicy)
     return out.provisional ? { html, provisional: true } : html
   }
   const htmlOf = (out: string | { html: string }) => (typeof out === 'string' ? out : out.html)
