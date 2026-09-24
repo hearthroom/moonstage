@@ -105,7 +105,13 @@
   --lt-canvas-actions-size: 22px;
 
   /* ── 輸入區 ── */
-  --lt-canvas-composer-bg: rgba(15, 18, 23, 0.82);
+  /* 快捷列與輸入區的底先讀頁面的 --background-color。
+     09-16 把底色從 .chat-bottom 搬到這兩塊上，解的是「作者畫了這兩塊」的卡；
+     另一種卡只畫整頁（.chat 的 background 與 --background-color），這兩塊沒動——
+     我們的深色蓋在兩塊上、中間 8px 露出作者的紫，底部變成深／紫／深三截
+     （owner 2026-09-25 截圖）。讀同一個頁面色，三截就是同一片。
+     不改成 transparent：作者若在頁面鋪滿圖，快捷鍵與輸入框會直接壓在圖上。 */
+  --lt-canvas-composer-bg: var(--background-color, rgba(15, 18, 23, 0.82));
   --lt-canvas-composer-field-bg: var(--input-background-color, rgba(255, 255, 255, 0.05));
   --lt-canvas-composer-border: rgba(255, 255, 255, 0.10);
   --lt-canvas-composer-radius: 18px;
