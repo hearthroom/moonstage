@@ -79,8 +79,16 @@
   --lt-canvas-row-gap: 14px;
   --lt-canvas-name-size: 12px;
   --lt-canvas-name-color: var(--lt-canvas-muted);
-  --lt-canvas-bubble-ai-bg: rgba(255, 255, 255, 0.05);
-  --lt-canvas-bubble-user-bg: rgba(255, 255, 255, 0.09);
+  /* 氣泡預設是深色的半透明底，不是白色的薄霧。
+     先前是白色 5%／9%，在素色背景上夠用；卡片一鋪上滿版插圖，淺色字就直接壓在圖的
+     亮面上，白色半透明調多少都救不了（owner 2026-09-24：多角色插圖上整段看不清）。
+     72%／78% 是量出來的：疊在純白上，預設字色仍有 4.5:1 以上
+     （canvas-bubble-readability.spec.ts）。不加 backdrop-filter——長對話每則都模糊，
+     手機合成器吃不消；作者要毛玻璃自己寫。
+     注意 syncCardTheme 會把 AI 氣泡量到的底色回寫成 --lt-canvas-block-bg，所以準備軌跡、
+     思考過程這些同樣壓在插圖上的塊也會跟著拿到這個深底。 */
+  --lt-canvas-bubble-ai-bg: rgba(15, 18, 23, 0.72);
+  --lt-canvas-bubble-user-bg: rgba(40, 44, 52, 0.78);
   --lt-canvas-bubble-fg: var(--lt-canvas-fg);
   --lt-canvas-bubble-radius: 14px;
   --lt-canvas-bubble-padding: 10px 14px;
