@@ -3368,6 +3368,10 @@ function syncCardTheme() {
     if (value) root.style.setProperty(name, value)
     else root.style.removeProperty(name)
   }
+  // 作者宣告了頁面色：快捷列與輸入區改透明，跟頁面連成一片（canvas-theme-vars.css 的 [data-lt-page-color]）。
+  // 用屬性不用 class：根節點的 class 由模板綁定，重繪時會被整串覆寫。
+  if (getComputedStyle(root).getPropertyValue('--background-color').trim()) root.setAttribute('data-lt-page-color', '')
+  else root.removeAttribute('data-lt-page-color')
   // 頂欄與彈層的底色被作者漆成亮色時，字要跟著變深（canvas-chrome-tone.ts）
   syncChromeTone(document)
   syncThemeColor()
@@ -3418,6 +3422,9 @@ function observeCardTheme() {
   if (document.head) cardThemeObserver.observe(document.head, { childList: true })
   const list = document.querySelector('.chat-body')
   if (list) cardThemeObserver.observe(list, { childList: true })
+  // 也有卡把日夜切換掛在畫布根（.chat.xxx）上。只聽 class：style 與 data-lt-page-color 是這裡自己寫的，聽了會自己觸發自己。
+  const root = document.querySelector('.canvas-root')
+  if (root) cardThemeObserver.observe(root, { attributes: true, attributeFilter: ['class'] })
   scheduleCardThemeSync()
 }
 

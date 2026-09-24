@@ -105,13 +105,8 @@
   --lt-canvas-actions-size: 22px;
 
   /* ── 輸入區 ── */
-  /* 快捷列與輸入區的底先讀頁面的 --background-color。
-     09-16 把底色從 .chat-bottom 搬到這兩塊上，解的是「作者畫了這兩塊」的卡；
-     另一種卡只畫整頁（.chat 的 background 與 --background-color），這兩塊沒動——
-     我們的深色蓋在兩塊上、中間 8px 露出作者的紫，底部變成深／紫／深三截
-     （owner 2026-09-25 截圖）。讀同一個頁面色，三截就是同一片。
-     不改成 transparent：作者若在頁面鋪滿圖，快捷鍵與輸入框會直接壓在圖上。 */
-  --lt-canvas-composer-bg: var(--background-color, rgba(15, 18, 23, 0.82));
+  /* 快捷列與輸入區自己的底。作者宣告了頁面色時改成透明，見下方 [data-lt-page-color]。 */
+  --lt-canvas-composer-bg: rgba(15, 18, 23, 0.82);
   --lt-canvas-composer-field-bg: var(--input-background-color, rgba(255, 255, 255, 0.05));
   --lt-canvas-composer-border: rgba(255, 255, 255, 0.10);
   --lt-canvas-composer-radius: 18px;
@@ -172,6 +167,23 @@
   /* 危險操作（刪除、超出上限）。狀態色不隨主題走：它講的是「這件事會出事」，
      不是外觀。 */
   --lt-canvas-danger: #ff6b6b;
+}
+
+/*
+  作者宣告了頁面色（MMD 的 --background-color）時，快捷列與輸入區不自己上底，直接透出作者的頁面。
+
+  09-16 把底色從 .chat-bottom 搬到這兩塊上，解的是「作者畫了這兩塊」的卡。另一種卡只畫整頁
+  （.chat 的 background 與 --background-color），這兩塊沒動：我們的深色蓋在兩塊上、中間 8px
+  露出作者的紫，底部變成深／紫／深三截（owner 2026-09-25 截圖）。
+  改讀 --background-color 再鋪一次也不行：作者的色常是半透明漸層，鋪在兩塊上等於疊兩層、
+  每塊又從頭起算漸層，跟中間那 8px 仍然對不上（同日第二張截圖）。只有透明才是同一片。
+  沒宣告頁面色的卡不變：作者若只在 .chat 鋪一張圖，快捷鍵與輸入框不該直接壓在圖上。
+  旗標由 canvas.vue 的 syncCardTheme 量到 --background-color 後掛上；作者直接畫這兩塊的
+  規則照樣贏過這裡（它們寫的是 background，不是這個變數）。
+*/
+.canvas-root[data-lt-page-color],
+.canvas-root.lt-theme-dark[data-lt-page-color] {
+  --lt-canvas-composer-bg: transparent;
 }
 
 /*
