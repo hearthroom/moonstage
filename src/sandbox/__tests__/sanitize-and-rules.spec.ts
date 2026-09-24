@@ -148,3 +148,16 @@ describe('作者腳本：頂層宣告回掛 window、非嚴格、this===window',
     expect((w.tap as () => number)()).toBe(1)
   })
 })
+
+describe('正則模板內的玩家名稱', () => {
+  it('正文、捕獲內容與替換模板一致使用玩家名稱', () => {
+    const html = renderContent('「{{user}}」', [{ id: 1, find: '/「([^」]+)」/g', replace: '<b>{{char}}：$1／{{USER}}</b>' }], { macros: { user: '小明', char: '星' } })
+    expect(html).toContain('<b>星：小明／小明</b>')
+    expect(html).not.toContain('{{')
+  })
+})
+
+ it('沙箱的名稱保持字面值，不被捕獲組展開', () => {
+  expect(renderContent('x', [{ id: 1, find: '/(x)/', replace: '<b>{{user}} $1</b>' }], { macros: { user: '$1 {{char}}', char: '星' } }))
+    .toContain('<b>$1 {{char}} x</b>')
+ })

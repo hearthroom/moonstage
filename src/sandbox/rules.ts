@@ -5,11 +5,12 @@
  * 樣式依卡片格式的政策落地（酒館卡加訊息層前綴、MMD 卡原樣）後合成一張全頁樣式表、
  * 腳本按規則順序整卡只跑一次。抽走之後規則本身照常參與替換。
  *
- * 渲染一則內容：巨集（{{user}}／{{char}}）→ 顯示規則（重用 display-rule-engine：同一份預算與
- * 回滾邏輯）→ Markdown（`*x*` 是斜體；四個空格不當程式碼塊）→ 對白引號上色 → 淨化。
+ * 渲染一則內容：顯示規則（重用 display-rule-engine：同一份預算與回滾邏輯）
+ * → 巨集（{{user}}／{{char}}，含捕獲內容）→ Markdown（`*x*` 是斜體；四個空格不當程式碼塊）→ 對白引號上色 → 淨化。
  * 這裡只作用在玩家看到的內容，送給模型的原文不經過這裡。
  */
 import MarkdownIt from 'markdown-it'
+import { substituteMacros } from '@/pages/canvas/canvas-rule-engine-core'
 import { applyDisplayRules } from '@/utils/display-rule-engine.js'
 import type { SandboxRule } from './protocol'
 import { sanitizeAuthorHtml, stripUnknownTags } from './sanitize'
@@ -79,9 +80,7 @@ const md = new MarkdownIt({ html: true, breaks: true, linkify: false, typographe
 md.disable(['code'])
 
 export function expandMacros(text: string, macros: RenderMacros): string {
-  return String(text == null ? '' : text)
-    .replace(/\{\{\s*user\s*\}\}/gi, macros.user)
-    .replace(/\{\{\s*char\s*\}\}/gi, macros.char)
+  return substituteMacros(String(text == null ? '' : text), macros)
 }
 
 /** 對白引號上色：只動文字節點，不碰 pre/code，也不碰標籤裡的引號。 */
@@ -108,18 +107,18 @@ export function colorDialogueQuotes(root: Element) {
 
 /** 一則內容（訊息正文或功能欄）→ 可放進 innerHTML 的 HTML。規則在呼叫端的執行緒上同步套用。 */
 export function renderContent(content: string, rules: SandboxRule[], options: RenderOptions): string {
-  const expanded = expandMacros(content, options.macros)
-  const applied = applyDisplayRules(expanded, rules, { variants: options.variants || null }).html as string
+  const applied = applyDisplayRules(content, rules, { variants: options.variants || null }).html as string
   return renderAppliedContent(applied, options)
 }
 
 /**
  * 規則套完之後的那一段（Markdown → 淨化 → 對白上色 → 前端區塊）。殼的訊息渲染把規則交給 worker
- * （common/author-rules，引擎 'display'、輸入是展開過巨集的全文），拿回產物——或結果還沒回來時的
+ * （common/author-rules，引擎 'display'、輸入是原始全文，巨集在結果回來後展開），拿回產物——或結果還沒回來時的
  * 「上次套完的產物＋之後到的原文」——再走這一段，跟 renderContent 同一條管線。
  */
-export function renderAppliedContent(applied: string, options: Pick<RenderOptions, 'doc' | 'fencedDocument'>): string {
+export function renderAppliedContent(applied: string, options: Pick<RenderOptions, 'doc' | 'fencedDocument'> & { macros?: RenderMacros }): string {
   const doc = options.doc || document
+  if (options.macros) applied = expandMacros(applied, options.macros)
   // 不在白名單的標籤（含中文尖括號那種）在進 markdown 之前就剝殼：markdown 會把它們跳脫成文字，
   // 之後的淨化就看不到、玩家會看到「<状态>」原樣印出來。反引號裡的原樣保留（stripUnknownTags 自己護）。
   const html = md.render(stripUnknownTags(applied))

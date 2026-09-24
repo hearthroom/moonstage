@@ -127,3 +127,22 @@ describe('{{user}} 換成誰', () => {
     expect(substituteMacros('{{USER}}／{{ char }}／{{random:A::B}}', { user: '阿強', char: '沈栀语' })).toBe('阿強／沈栀语／{{random:A::B}}')
   })
 })
+
+ describe('正文巨集', () => {
+  it('正文及捕獲組中的名稱都展開，未知巨集保留', () => {
+    const macros = { user: '小明', char: '星' }
+    expect(applyTavernRules('你好，{{ USER }}／{{char}}／{{unknown}}', [], { macros }).html)
+      .toBe('你好，小明／星／{{unknown}}')
+    expect(applyTavernRules('「你好，{{user}}」', [{ find: '/「([^」]+)」/g', replace: '<b>$1</b>' }], { macros }).html)
+      .toBe('<b>你好，小明</b>')
+  })
+  it('名稱中的替換符號與另一個巨集保持字面值', () => {
+    expect(substituteMacros('{{user}} / {{char}}', { user: '$& {{char}}', char: '星' }))
+      .toBe('$& {{char}} / 星')
+  })
+ })
+
+ it('玩家名稱不被當成捕獲組再替換', () => {
+  expect(applyTavernRules('x', [{ find: '/(x)/', replace: '{{user}} $1' }], { macros: { user: '$1 {{char}}', char: '星' } }).html)
+    .toBe('$1 {{char}} x')
+ })

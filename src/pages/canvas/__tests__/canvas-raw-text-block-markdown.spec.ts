@@ -1,3 +1,4 @@
+import { applyTavernRules } from '../canvas-rule-engine'
 // highlightText 現在也綁這兩支（圍欄保護與前端區塊標記），跟頁面裡一樣是真實函式。
 import { withFencesProtected } from '../../../common/markdown-fences'
 import { tagFrontendBlocks } from '../../../common/frontend-block'
@@ -50,9 +51,10 @@ function extractHighlightTextSource(): string {
   return source.slice(startIdx, i)
 }
 
-function buildHighlightText(): (content: string, type?: number, cacheKey?: string | null) => string {
+function buildHighlightText(macros = { user: '小明', char: '星' }): (content: string, type?: number, cacheKey?: string | null) => string {
   const wrapped = `(function () {\n${extractHighlightTextSource()}\nreturn highlightText;\n})()`
   const context = vm.createContext({
+    applyTavernRules, authorRuleOptions: () => ({ macros }),
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines, findStableBoundary,
     getStreamCacheEntry, setStreamCacheEntry, unwrapSingleHtmlFence, stripUnknownTags, wrapDialogue,
@@ -61,7 +63,7 @@ function buildHighlightText(): (content: string, type?: number, cacheKey?: strin
     displayScript: (text: string) => text,
     applyDisplayRules: (text: string) => ({ html: text, rollbacks: [] }),
     activeAuthorAsset: { value: { rules: [], version: 0, crossLine: false } },
-    authorRules: { provisional: 0, display: (text: string) => text },
+    authorRules: { provisional: 0, display: (text: string) => applyTavernRules(text, [], { macros }).html },
     console,
   })
   return new vm.Script(wrapped, { filename: 'chat-vue-highlightText-raw-text-extract.js' }).runInContext(context)
@@ -108,3 +110,26 @@ describe('畫布渲染管線：<style>／<script> 內容不被 markdown 動到',
     expect(container.querySelector('.jh style')!.textContent).toBe(CSS)
   })
 })
+
+
+describe('正文玩家名稱渲染', () => {
+  it('沒有作者正則也替換歷史正文，串流切段同樣生效', () => {
+    const render = buildHighlightText()
+    for (const key of [null, 'macro-stream']) {
+      const html = render('你好，{{user}}。\n\n{{char}}在門口。', 0, key)
+      expect(html).toContain('你好，小明。')
+      expect(html).toContain('星在門口。')
+      expect(html).not.toContain('{{')
+    }
+  })
+})
+
+ it('更換人設名稱後不沿用串流快取中的舊名字', () => {
+  const macros = { user: '小明', char: '星' }
+  const render = buildHighlightText(macros)
+  const content = '{{user}}在門口。' + '這是一段測試敘事。'.repeat(40) + '\n\n結尾。'
+  expect(findStableBoundary(content, false)).toBeGreaterThan(0)
+  expect(render(content, 0, 'persona-cache')).toContain('小明在門口。')
+  macros.user = '小華'
+  expect(render(content, 0, 'persona-cache')).toContain('小華在門口。')
+ })

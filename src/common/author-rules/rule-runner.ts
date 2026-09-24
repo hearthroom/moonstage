@@ -29,7 +29,7 @@
  * 後備：沒有執行器（測試、SSR、環境沒有 Worker）或執行器宣告不可用（worker 載入被擋）時，
  *   display／apply 直接在呼叫端同步套用，跟改動前的行為一樣。
  */
-import type { TavernRule } from '@/pages/canvas/canvas-rule-engine-core'
+import { substituteMacros, type TavernRule } from '@/pages/canvas/canvas-rule-engine-core'
 import { executeRuleJob, type RuleEngineKind, type RuleJobOptions, type RuleResult } from './rule-job'
 
 export interface RuleRequest {
@@ -237,8 +237,10 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
       if (best && c.text.length <= best.text.length) continue
       if (k.text.startsWith(c.text)) best = c
     }
-    if (!best) return hideIncompleteTrailingTag(k.text)
-    return best.result.html + hideIncompleteTrailingTag(k.text.slice(best.text.length))
+    // Only expand the raw tail; the completed prefix already contains literal names.
+    const tail = hideIncompleteTrailingTag(best ? k.text.slice(best.text.length) : k.text)
+    const expanded = k.engine === 'tavern' ? substituteMacros(tail, k.options.macros || {}) : tail
+    return (best?.result.html || '') + expanded
   }
 
   const persistKey = (k: Keyed) => `${k.prefixKey}\u0001${hash(k.text)}.${k.text.length}`

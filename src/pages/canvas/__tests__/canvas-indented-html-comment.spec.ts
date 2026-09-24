@@ -1,3 +1,4 @@
+import { applyTavernRules } from '../canvas-rule-engine'
 // @vitest-environment jsdom
 /**
  * 作者 HTML 裡縮排的註解（`        <!-- 常规事件面板 -->`）不能變成程式碼區塊。
@@ -49,6 +50,7 @@ function extractHighlightTextSource(): string {
 function buildHighlightText(format: string): (content: string, type?: number, cacheKey?: string | null) => string {
   const wrapped = `(function () {\n${extractHighlightTextSource()}\nreturn highlightText;\n})()`
   const context = vm.createContext({
+    applyTavernRules, authorRuleOptions: () => ({ macros: { user: '小明', char: '星' } }),
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines,
     findStableBoundary, getStreamCacheEntry, setStreamCacheEntry, unwrapSingleHtmlFence,
