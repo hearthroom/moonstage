@@ -16,7 +16,15 @@
  * 直接丟掉這一份——先出現的那份留著繼續用，因為它可能已經被使用者互動過
  * （展開/收合狀態、輸入框內容……），把它整個換掉反而會讓正在用的東西重置。
  *
- * 沒有 id 的節點不處理：沒有穩定身分就沒辦法判斷「這是不是同一個東西的第二份」，
+ * 身分有兩種：id，或是自訂元素的標籤名（帶連字號的 localName）。作者把整個舞台寫成
+ * 一個 Web Component（<galgame-start-v6>，:host 是 position:fixed; inset:0）時通常不給 id
+ * ——標籤本身就是他定位它的方式，跟 id 一樣穩定。這種節點留在氣泡裡的後果比面板更糟：
+ * 氣泡在 `.scroll-view`（overflow:auto 的捲動容器）底下，iOS Safari 會把捲動容器裡的
+ * fixed 後代裁在容器框內、當成貼著容器排，於是「滿版舞台」只鋪滿訊息區，頁首與輸入區
+ * 蓋在它上面；Android Chrome 照規範算到視窗，同一張卡看起來正常（2026-09-24 社群回報，
+ * iPhone 截圖）。搬進作者容器就脫離了捲動容器，兩端都照作者選的層級畫。
+ *
+ * 沒有 id 的一般元素不處理：沒有穩定身分就沒辦法判斷「這是不是同一個東西的第二份」，
  * 硬搬只會把普通內文也一起搬走。所有實測到的作者工具列／HUD 面板都有明確 id
  * （卡片自己也要用 id 定位才能操作它，這是它們原本就會做的事）。
  */
@@ -24,7 +32,7 @@
 export interface HoistResult {
   /** 第一次見到、搬進容器的節點數 */
   hoisted: number
-  /** 容器裡已有同 id、被丟棄的重複節點數 */
+  /** 容器裡已有同身分（同 id／同自訂元素標籤）、被丟棄的重複節點數 */
   removed: number
 }
 
@@ -37,9 +45,24 @@ function cssEscapeId(id: string): string {
   return id.replace(/[^a-zA-Z0-9_-]/g, (ch) => '\\' + ch)
 }
 
+/** 自訂元素：標籤名帶連字號（規範規定的自訂元素命名），是作者定位它的穩定身分。 */
+function isCustomElement(el: Element): boolean {
+  return el.localName.indexOf('-') > 0
+}
+
 /**
- * 掃 `scanRoot` 底下帶 id 且 `position: fixed` 的節點，搬進 `container`：
- * 容器裡還沒有同 id 的就搬過去；已經有的話，代表這是同一個面板第二次觸發，
+ * 節點的身分，寫成容器裡找同一份用的選擇器：有 id 用 id；沒有 id 但是自訂元素就用標籤；
+ * 其餘回傳 null（沒有穩定身分，不處理）。
+ */
+function identitySelector(el: Element): string | null {
+  if (el.id) return '#' + cssEscapeId(el.id)
+  if (isCustomElement(el)) return el.localName
+  return null
+}
+
+/**
+ * 掃 `scanRoot` 底下有身分（帶 id，或是自訂元素）且 `position: fixed` 的節點，搬進 `container`：
+ * 容器裡還沒有同身分的就搬過去；已經有的話，代表這是同一個面板第二次觸發，
  * 把 scanRoot 裡新出現的這份移除（容器裡先前那份保留原狀，不動它）。
  *
  * 冪等：對同一份已經搬完的 DOM 再呼叫一次不會有任何動作（`container.contains(el)` 短路）。
@@ -52,11 +75,13 @@ export function hoistFixedAuthorNodes(
   const result: HoistResult = { hoisted: 0, removed: 0 }
   if (!scanRoot || !container) return result
 
-  const candidates = Array.from(scanRoot.querySelectorAll('[id]'))
+  // 自訂元素沒有可用的屬性選擇器，只能掃全部再依標籤名篩；身分判斷很便宜，
+  // 真正花錢的 computeStyle 只對有身分的節點做。
+  const candidates = Array.from(scanRoot.querySelectorAll('*'))
 
   for (const el of candidates) {
-    const id = el.id
-    if (!id) continue
+    const selector = identitySelector(el)
+    if (!selector) continue
     if (container.contains(el)) continue // 已經在容器裡（例如上一輪搬過），不重複處理
 
     let position: string
@@ -73,7 +98,7 @@ export function hoistFixedAuthorNodes(
     // 面板時，最終只留一份的關鍵。
     let existing: Element | null = null
     try {
-      existing = container.querySelector('#' + cssEscapeId(id))
+      existing = container.querySelector(selector)
     } catch (e) {
       existing = null
     }
