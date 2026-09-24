@@ -26,6 +26,7 @@ const BRIDGE: Array<[string, string, string]> = [
   ['--lt-canvas-sheet-bg', '--card-background-color', 'rgba(24, 27, 33, 0.98)'],
   ['--lt-canvas-menu-bg', '--card-background-color', 'rgba(24, 27, 33, 0.98)'],
   ['--lt-canvas-composer-field-bg', '--input-background-color', 'rgba(255, 255, 255, 0.05)'],
+  ['--lt-canvas-composer-bg', '--background-color', 'rgba(15, 18, 23, 0.82)'],
   ['--lt-canvas-placeholder-color', '--input-tip-color', 'rgba(232, 234, 237, 0.38)'],
   ['--lt-canvas-line', '--border-color', 'rgba(255, 255, 255, 0.10)'],
 ]
