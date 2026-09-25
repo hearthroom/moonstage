@@ -35,3 +35,9 @@ describe('進場讀回的模型不被目錄蓋掉', () => {
     expect(source).toMatch(/ensureRoleSettings\(\)\.then\(loadMultiPassPreference\)/)
   })
 })
+
+describe('進場那一刻還沒登入', () => {
+  it('登入完成後補讀這張卡的遊玩設定，不留在空的模型上', () => {
+    expect(source).toMatch(/watch\(hasLogin,[\s\S]{0,200}?ensureRoleSettings\(\)/)
+  })
+})

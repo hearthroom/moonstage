@@ -9589,6 +9589,13 @@ function ensureRoleSettings() {
   return roleSettingsInFlight
 }
 
+// 進場那一刻還沒登入（登入疊層蓋在畫布上）時讀設定會被拒，畫面留在空的模型上。
+// 原地登入完成後補讀一次，跟玩家偏好那一份同一個補救。
+watch(hasLogin, (loggedIn) => {
+  if (!loggedIn || roleSettingsReady.value || !unref(roleId)) return
+  ensureRoleSettings().then(loadModelCatalog).then(() => loadMultiPassPreference())
+})
+
 async function persistRoleSettings() {
   const payload = buildRoleSettingsSavePayload(
     String(unref(roleId) || ''), roleSettingsSnapshot, currentRoleSettings(),
