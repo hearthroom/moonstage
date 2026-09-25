@@ -135,6 +135,31 @@ it('鍵盤矩形 top 為 0 但有高度：以視窗高減鍵盤高當鍵盤上�
   expect(visibleViewport(win)).toEqual({ top: 0, bottom: 282, height: 282 })
 })
 
+// owner 2026-09-25 Android App 全螢幕：矩形 top 為 0，但視窗已經為鍵盤縮短過了。拿縮短後的視窗高再減
+// 鍵盤高，就是扣兩次——輸入區被推到畫面頂端，中間一大塊黑。全螢幕時視窗上緣就是螢幕上緣，
+// 鍵盤貼著螢幕底，用螢幕高減鍵盤高才是它的上緣。
+it('全螢幕、矩形 top 為 0、視窗已先縮短：鍵盤不扣兩次', () => {
+  const { win, vv, vk, doc } = browser()
+  Object.assign(win as unknown as Record<string, unknown>, { screen: { height: 800 } })
+  doc.fullscreenElement = {}
+  vk.overlaysContent = true
+  Object.defineProperty(win, 'innerHeight', { value: 500, configurable: true })
+  vv.height = 500
+  vk.boundingRect = { top: 0, height: 300 }
+  expect(visibleViewport(win)).toEqual({ top: 0, bottom: 500, height: 500 })
+  // 視窗沒縮（原本 09-22 的情況）：照樣扣到鍵盤上緣
+  Object.defineProperty(win, 'innerHeight', { value: 800, configurable: true })
+  vv.height = 800
+  expect(visibleViewport(win)).toEqual({ top: 0, bottom: 500, height: 500 })
+  // Chrome 只縮視覺視窗、版面視窗不動：同樣不能再扣
+  vv.height = 500
+  expect(visibleViewport(win)).toEqual({ top: 0, bottom: 500, height: 500 })
+  // 瀏海讓全螢幕視窗比螢幕矮 30、鍵盤還沒被扣：仍以視窗高減鍵盤高
+  Object.defineProperty(win, 'innerHeight', { value: 770, configurable: true })
+  vv.height = 770
+  expect(visibleViewport(win)).toEqual({ top: 0, bottom: 470, height: 470 })
+})
+
 // 小米使用者 2026-09-25（classic 卡）：鍵盤收起後輸入區停在半空、下方空一塊鍵盤高，點畫面也縮不回去。
 // 鍵盤矩形只有輸入法蓋在頁面上時瀏覽器才會更新；離開全螢幕後它停在最後的值。非全螢幕時瀏覽器
 // 自己會縮視窗，再扣一次這個舊矩形就是永遠多扣一塊鍵盤高。
