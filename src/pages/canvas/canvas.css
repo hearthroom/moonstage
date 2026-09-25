@@ -867,6 +867,11 @@
      一整條，跟作者在 MMD 上調的樣子對不上（用戶 2026-09-12 回報「氣泡大小邏輯不一樣」）。
      寬度上限放在這一層、氣泡在裡面 100%——不然「百分比上限對著一個縮到內容寬的父層」
      會互相參照，氣泡被多縮一次。
+
+     下限是內容的最小寬度：作者用 vw／px 寫死寬度的面板（#100076 的 80vw 角色面板）比 94%
+     還寬時，外框跟著內容撐開，不讓面板伸出氣泡。一般文字有 overflow-wrap:anywhere，最小寬度
+     只有一個字，不會因此變寬。撐開沒有上限，所以撐到對話欄邊界就由 canvas-bubble-fit.ts 釘住
+     ——這個頁面沒有橫向捲動，任何內容都不准超出畫面。
   */
   .mes_turn {
     display: flex;
@@ -874,7 +879,7 @@
     align-items: flex-start;
     align-self: flex-start;
     gap: 4px;
-    min-width: 0;
+    min-width: min-content;
     max-width: 94%;
   }
 
