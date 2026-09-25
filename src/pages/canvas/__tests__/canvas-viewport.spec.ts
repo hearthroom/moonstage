@@ -128,10 +128,30 @@ describe('觸控裝置上輸入欄位字級不小於 16px（擋 iOS 自動放大
 it('鍵盤矩形 top 為 0 但有高度：以視窗高減鍵盤高當鍵盤上緣', () => {
   const { win, vk } = browser()
   Object.defineProperty(win, 'innerHeight', { value: 622, configurable: true })
+  vk.overlaysContent = true // 這個矩形只在輸入法蓋在頁面上（全螢幕）時才有意義
   vk.boundingRect = { top: 0, height: 340 }
   expect(visibleViewport(win)).toEqual({ top: 0, bottom: 282, height: 282 })
   vk.boundingRect = { top: 282, height: 340 }
   expect(visibleViewport(win)).toEqual({ top: 0, bottom: 282, height: 282 })
+})
+
+// 小米使用者 2026-09-25（classic 卡）：鍵盤收起後輸入區停在半空、下方空一塊鍵盤高，點畫面也縮不回去。
+// 鍵盤矩形只有輸入法蓋在頁面上時瀏覽器才會更新；離開全螢幕後它停在最後的值。非全螢幕時瀏覽器
+// 自己會縮視窗，再扣一次這個舊矩形就是永遠多扣一塊鍵盤高。
+it('離開全螢幕後殘留的鍵盤矩形不再扣：非覆蓋模式只看視窗', () => {
+  const { win, vv, vk, doc } = browser(), root = document.createElement('div')
+  Object.defineProperty(win, 'innerHeight', { value: 622, configurable: true })
+  vv.height = 622
+  const dispose = bindCanvasViewport(win, root)
+  doc.fullscreenElement = {}; doc.dispatchEvent(new Event('fullscreenchange'))
+  vk.boundingRect = { top: 0, height: 340 }; vk.dispatchEvent(new Event('geometrychange'))
+  expect(root.style.getPropertyValue('--lt-viewport-height')).toBe('282px')
+  // 鍵盤開著離開全螢幕；之後覆蓋關掉，瀏覽器不再更新矩形
+  doc.fullscreenElement = null; doc.dispatchEvent(new Event('fullscreenchange'))
+  vv.height = 622; vv.dispatchEvent(new Event('resize'))
+  expect(root.style.getPropertyValue('--lt-viewport-height')).toBe('622px')
+  expect(visibleViewport(win)).toEqual({ top: 0, bottom: 622, height: 622 })
+  dispose()
 })
 
 // owner 2026-09-22 Android：鍵盤開著切後台（系統收鍵盤）再切回來，後台收不到幾何事件，畫布卡在縮短狀態。
