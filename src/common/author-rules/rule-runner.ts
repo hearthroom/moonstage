@@ -188,8 +188,11 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
       jobOptions.macros = macros
       macroKey = JSON.stringify(macros)
     }
+    // 種子只在規則裡有 {{random}} 時才影響產物；沒有就不進鍵，定稿快取與持久層照舊跨訊息共用。
+    const seeded = typeof opts.seed === 'string' && opts.seed !== '' && rules.key !== 'r0' && JSON.stringify(rules.plain).includes('{{random:')
+    if (seeded) jobOptions.seed = opts.seed
     const text = typeof req.text === 'string' ? req.text : ''
-    const prefixKey = `${engineVersion}\u0001${engine}\u0001${rules.key}\u0001${variants.key}\u0001${macroKey}`
+    const prefixKey = `${engineVersion}\u0001${engine}\u0001${rules.key}\u0001${variants.key}\u0001${macroKey}${seeded ? `\u0001s${opts.seed}` : ''}`
     return { prefixKey, key: `${prefixKey}\u0001${text}`, text, engine, rulesKey: rules.key, rules: rules.plain, options: jobOptions }
   }
 

@@ -231,9 +231,10 @@ export function createShell(options: CreateShellOptions): Shell {
   // 持久層在這個子網域上，宿主刪不到：先照握手給的範圍對一次（不同就清掉；沒給就刪掉、只用記憶體）再用。
   setAuthorRuleStorageScope(config.storageScope ?? null)
   const ruleRunner = options.ruleRunner || getAuthorRuleRunner()
-  const render = (content: string, opts: { streaming?: boolean } = {}): string | { html: string; provisional: true } => {
+  const render = (content: string, opts: { streaming?: boolean; seed?: string } = {}): string | { html: string; provisional: true } => {
+    // seed＝訊息 id：{{random}} 在同一則訊息裡固定，串流每一跳不重抽。
     const out = ruleRunner.display(
-      { engine: 'display', text: content, rules: card.rules, options: { variants: config.variants || null } },
+      { engine: 'display', text: content, rules: card.rules, options: { variants: config.variants || null, seed: opts.seed } },
       { streaming: !!opts.streaming },
     )
     const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, macros, fencedDocument: stylePolicy.fencedDocument }), stylePolicy)
