@@ -693,6 +693,7 @@ async function loadMultiPassPreference(retryLeft = 1) {
       // 帶上這張卡現在挑的模型：支不支援是按模型算的，不是按已存檔的那個。
       data: { roleId: id, model: formData.selectModel || '' },
       showLoading: false,
+      quietTransport: true,
     })
     if (String(unref(roleId) || '') !== id) return
     applyMultiPassPreference(normalizeMultiPassPreference(res))
@@ -3176,6 +3177,7 @@ async function loadAuthorAsset(targetRoleId) {
     const res = await _this.http.get(_this.requestUrl.authorAssetServe, {
       data: { roleId: targetRoleId },
       showLoading: false,
+      quietTransport: true,
       timeout: 60000,
     });
     if (res.statusCode !== 200 || !res.data) return;
@@ -8647,6 +8649,7 @@ async function hasExistingConversation(): Promise<boolean> {
     const res = await _this.http.get(_this.requestUrl.chatList, {
       data: { pageNum: 1, pageSize: 100 },
       showLoading: false,
+      quietTransport: true,
       timeout: 8000,
     })
     if (res.statusCode !== 200) return true
@@ -9466,6 +9469,7 @@ async function loadModelCatalog(retryLeft = 1) {
     const res = await _this.http.get(_this.requestUrl.getModelListV2, {
       data: { contextLevel: formData.context, roleId: unref(roleId) },
       showLoading: false,
+      quietTransport: true,
       timeout: 10000,
     })
     if (res.statusCode === 200 && Array.isArray(res.data)) modelGroups.value = res.data
@@ -9592,6 +9596,7 @@ async function loadRoleSettings() {
     const res = await _this.http.get(_this.requestUrl.playerRoleSettings, {
       data: requestConversationId ? { roleId: targetRoleId, conversationId: requestConversationId } : { roleId: targetRoleId },
       showLoading: false,
+      quietTransport: true,
       timeout: 10000,
     })
     if (res.statusCode !== 200 || !res.data) return
@@ -9695,6 +9700,7 @@ async function loadConversationPersona(targetConversationId: string) {
     const res = await _this.http.get(_this.requestUrl.playerConversationPersona, {
       data: { conversationId: targetConversationId },
       showLoading: false,
+      quietTransport: true,
       timeout: 10000,
     })
     // 回來時已經換到別的存檔就丟掉，別把上一個存檔的人設寫到這一個上。
@@ -9901,6 +9907,7 @@ async function loadDirectives() {
     const res = await _this.http.get(_this.requestUrl.conversationDirectives, {
       data: { conversationId: id },
       showLoading: false,
+      quietTransport: true,
       timeout: 8000,
     })
     if (res.statusCode !== 200) throw new Error('unexpected status')
@@ -10079,6 +10086,7 @@ async function loadContextBreakdown() {
       // breakdownVersion=2：mod／手帳／長期指令各自成格，不再混進「系統」
       data: { conversationId: id, breakdownVersion: 2, ...(contextBreakdownChatId ? { chatId: contextBreakdownChatId } : {}) },
       showLoading: false,
+      quietTransport: true,
       timeout: 8000,
     })
     if (!contextBreakdownGate.isCurrent(token)) return
@@ -10172,6 +10180,7 @@ async function loadMemory(retryLeft = 1) {
   try {
     const res = await _this.http.get(memoryUrl(_this.requestUrl.memoryAtoms, { conversationId: id }), {
       showLoading: false,
+      quietTransport: true,
       timeout: 10000,
     })
     if (String(unref(conversationId) || '').trim() !== id) return
@@ -10276,6 +10285,7 @@ async function loadNotepadSourceRows() {
     const res = await _this.http.get(_this.requestUrl.chatList, {
       data: { pageNum: 1, pageSize: 50 },
       showLoading: false,
+      quietTransport: true,
       timeout: 8000,
     })
     if (res.statusCode !== 200) return
@@ -10354,6 +10364,7 @@ async function loadNotepad() {
     const res = await _this.http.get(_this.requestUrl.conversationNotepad, {
       data: { conversationId: id },
       showLoading: false,
+      quietTransport: true,
       timeout: 8000,
     })
     if (res.statusCode !== 200 || !res.data) throw new Error('unexpected status')
@@ -10442,6 +10453,7 @@ async function loadNotepadTemplates() {
   try {
     const res = await _this.http.get(_this.requestUrl.notepadTemplates, {
       showLoading: false,
+      quietTransport: true,
       timeout: 8000,
     })
     if (res.statusCode !== 200 || !res.data) return
@@ -10698,6 +10710,7 @@ async function loadArchives() {
     const res = await _this.http.get(_this.requestUrl.conversationArchives, {
       data: archiveRequestQuery(targetRoleId),
       showLoading: false,
+      quietTransport: true,
       timeout: 8000,
     })
     if (res.statusCode !== 200 || !res.data) return
@@ -10951,6 +10964,7 @@ async function findOpeningChatId(targetConversationId: string): Promise<string> 
     const page = (pageNum: number) => _this.http.get(_this.requestUrl.historyMessageList, {
       data: { conversationId: targetConversationId, pageNum, pageSize: 1 },
       showLoading: false,
+      quietTransport: true,
       timeout: 10000,
     })
     const first: any = await page(1)

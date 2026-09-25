@@ -45,6 +45,8 @@ class FIRSTUI_INNER {
 				this.loading = true
 			}
 			return new Promise((resolve, reject) => {
+				let timedOut = false
+				let timer = null
 				let requestTask = uni.request({
 					...options,
 					success: (res) => {
@@ -56,6 +58,7 @@ class FIRSTUI_INNER {
 						res._requestUrl = options.url
 						// HarperHarbor patch: 讓回應攔截器能在 401 換完 token 後原樣重送這一筆。
 						res._requestConfig = config
+						res._quietTransport = !!params.quietTransport
 						resolve(params.brief ? res.data : res)
 					},
 					fail: (err) => {
@@ -64,12 +67,18 @@ class FIRSTUI_INNER {
 							this.loading = false
 						}
 
-						if (params.errorMsg) {
+						// HarperHarbor patch: 逾時是我們自己中止的，那一筆已經以 -9999 交給攔截器
+						// 說「逾時」；這裡再彈「網路錯誤」就是同一件事講兩次。呼叫端宣告會自己處理
+						// 傳輸層失敗（quietTransport）時也不彈。
+						// 中止若同步觸發 fail，這裡先 reject 就會搶在 -9999 之前，攔截器永遠收不到逾時。
+						if (timedOut) return
+						if (params.errorMsg && !params.quietTransport) {
 							base.toast(params.errorMsg)
 						}
 						reject(err)
 					},
 					complete: () => {
+						if (timer) clearTimeout(timer)
 						store.removeRequestTask(task)
 						if (params.cancelToken && this.cancelToken[params
 								.cancelToken]) {
@@ -81,7 +90,8 @@ class FIRSTUI_INNER {
 					this.cancelToken[params.cancelToken] = requestTask;
 				}
 				if (params.timeout && typeof params.timeout === 'number' && params.timeout > 2000) {
-					setTimeout(() => {
+					timer = setTimeout(() => {
+						timedOut = true
 						try {
 							store.removeRequestTask(task)
 							if (params.cancelToken) {
@@ -91,7 +101,9 @@ class FIRSTUI_INNER {
 						} catch (e) {}
 						resolve({
 							statusCode: -9999,
-							errMsg: 'request:cancelled'
+							errMsg: 'request:cancelled',
+							_requestUrl: options.url,
+							_quietTransport: !!params.quietTransport
 						});
 					}, params.timeout)
 				}

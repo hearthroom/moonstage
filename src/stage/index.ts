@@ -119,9 +119,17 @@ export async function installMoonStage(app: App, options: InstallMoonStageOption
 }
 
 /** 攔截器用的提示物件：跟 playground 的 toastManager 同一組方法名，內容轉給宿主。 */
-function hostToast(host: StageHost) {
+export function hostToast(host: Pick<StageHost, 'ui' | 'locale'>) {
   const say = (text: unknown, kind: 'info' | 'success' | 'error' | 'warning') => host.ui.toast(String(text || ''), kind)
   const texts: Record<string, string> = {}
+  // 沒人呼叫 setTexts 時照宿主目前的語言讀舞台自己的語言包，不要在中文介面冒出英文錯誤。
+  const localized = (key: string): string => {
+    const table = messages as Record<string, Record<string, unknown>>
+    let locale = ''
+    try { locale = String(host.locale.get() || '') } catch { locale = '' }
+    const value = (table[locale] || table[locale.split('-')[0]] || table.en || {})[key]
+    return typeof value === 'string' ? value : ''
+  }
   return {
     setTexts: (t: Record<string, string>) => Object.assign(texts, t),
     success: (c?: unknown) => say(c || texts.success, 'success'),
@@ -129,10 +137,10 @@ function hostToast(host: StageHost) {
     warning: (c?: unknown) => say(c || texts.warning, 'warning'),
     info: (c?: unknown) => say(c, 'info'),
     loading: () => {},
-    networkError: (c?: unknown) => say(c || texts.networkError || 'Network error', 'error'),
-    timeout: (c?: unknown) => say(c || texts.timeout || 'Request timed out', 'error'),
-    serverError: (c?: unknown) => say(c || texts.serverError || 'Server error', 'error'),
-    unauthorized: (c?: unknown) => say(c || texts.unauthorized || 'Please sign in again', 'error'),
+    networkError: (c?: unknown) => say(c || texts.networkError || localized('main.network_error') || 'Network error', 'error'),
+    timeout: (c?: unknown) => say(c || texts.timeout || localized('main.request_timeout') || 'Request timed out', 'error'),
+    serverError: (c?: unknown) => say(c || texts.serverError || localized('main.server_error') || 'Server error', 'error'),
+    unauthorized: (c?: unknown) => say(c || texts.unauthorized || localized('main.unauthorized') || 'Please sign in again', 'error'),
   }
 }
 
