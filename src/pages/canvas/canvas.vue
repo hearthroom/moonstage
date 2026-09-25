@@ -430,6 +430,7 @@ import { createSandboxHost, type SandboxHost } from './canvas-sandbox-host'
 import { resolveSandbox } from '@/host/sandbox-host'
 import { adoptAuthorBodyNode, hoistFixedAuthorNodes } from './canvas-author-node-hoist'
 import { bindComposerOverhang } from './canvas-composer-overhang'
+import { bindAuthorSideDock, collectFixedRoots } from './canvas-author-side-dock'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
 import { clearPendingReplyPhase, insertBeforePendingReply, markPendingReplyPhase, pendingReplyLabel } from './canvas-pending-reply'
@@ -3269,6 +3270,7 @@ function applyAuthorAsset(asset) {
       measureAuthorColumn();
       observeAuthorColumn();
       observeComposerOverhang();
+      observeAuthorSideDock();
       observeCardTheme();
       window.addEventListener('resize', measureAuthorColumn);
 
@@ -3446,6 +3448,27 @@ function observeComposerOverhang() {
     target: document.documentElement,
   });
 }
+// 作者的側欄貼著畫面左右、壓到氣泡時，對話欄讓出空間（形狀判斷與上限見 canvas-author-side-dock.ts）。
+// 候選只看作者容器裡的 fixed 節點：訊息串裡的 fixed 面板與作者掛到 body 的都已經搬進來了。
+let disposeAuthorSideDockBinding = null;
+function observeAuthorSideDock() {
+  disposeAuthorSideDock();
+  const layers = () => Array.from(document.querySelectorAll('[data-stage-author-layer]'));
+  disposeAuthorSideDockBinding = bindAuthorSideDock({
+    doc: document,
+    win: window,
+    lane: document.querySelector('#chat'),
+    scroll: document.querySelector('.scroll-view'),
+    candidates: () => collectFixedRoots(layers().flatMap((layer) => Array.from(layer.children)), window),
+    observe: layers(),
+    target: document.documentElement,
+  });
+}
+function disposeAuthorSideDock() {
+  if (!disposeAuthorSideDockBinding) return;
+  try { disposeAuthorSideDockBinding(); } catch (e) { /* 收尾不得拋錯 */ }
+  disposeAuthorSideDockBinding = null;
+}
 function disposeComposerOverhang() {
   if (!disposeComposerOverhangBinding) return;
   try { disposeComposerOverhangBinding(); } catch (e) { /* 收尾不得拋錯 */ }
@@ -3508,6 +3531,7 @@ function disposeAuthorAsset() {
   disposeCardTheme()
   applyImmersiveMode(false);
   disposeComposerOverhang();
+  disposeAuthorSideDock();
   window.removeEventListener('resize', measureAuthorColumn);
   if (authorColumnObserver) {
     try { authorColumnObserver.disconnect(); } catch (e) { /* 收尾不得拋錯 */ }

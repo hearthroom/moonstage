@@ -24,6 +24,7 @@ import CanvasHeader from '@/pages/canvas/components/canvas-header.vue'
 import { chromeTopColor } from '@/pages/canvas/canvas-chrome-tone'
 import CanvasComposer from '@/pages/canvas/components/canvas-composer.vue'
 import { bindComposerOverhang } from '@/pages/canvas/canvas-composer-overhang'
+import { bindAuthorSideDock, collectFixedRoots } from '@/pages/canvas/canvas-author-side-dock'
 import { createFollowBottom } from './render/follow-bottom'
 import { mountGeometryDebug, rectText } from '@/common/geometry-debug'
 import { reactive, ref } from 'vue'
@@ -82,6 +83,7 @@ export function createShell(options: CreateShellOptions): Shell {
       composer: rectText(refs.composer.querySelector('.composer-scope') || refs.composer),
       textarea: rectText(refs.composer.querySelector('textarea')),
       overhang: doc.documentElement.style.getPropertyValue('--lt-canvas-composer-overhang') || '·',
+      dock: `${doc.documentElement.style.getPropertyValue('--lt-canvas-dock-left') || '·'}/${doc.documentElement.style.getPropertyValue('--lt-canvas-dock-right') || '·'}`,
       bodyScroll: `${Math.round(win.scrollY)}/${(doc.scrollingElement || doc.documentElement).scrollHeight}`,
     }), 300, 120)
     : null
@@ -428,6 +430,26 @@ export function createShell(options: CreateShellOptions): Shell {
     disposeComposerOverhang = bindComposerOverhang({ doc, win, scroll: scrollView, composer: refs.composer, target: doc.documentElement })
   }
 
+  // ── 作者側欄貼著畫面左右、壓到氣泡時，對話欄讓出空間：跟一般畫布同一套量法（canvas-author-side-dock.ts）。
+  //    殼沒有作者容器，作者的側欄可能在插槽、狀態欄、殼根節點底下或直接掛在 body 上；訊息串不掃——
+  //    串流時每跳都掃整串太貴，而貼邊側欄是常駐的東西，不會只活在某一則訊息裡。 ──
+  const platformNodes = new Set<Element>([refs.header, refs.messages, refs.stage, refs.composer])
+  const dockRoots = (): Element[] => [
+    refs.statusbar, refs.headerExtra, refs.left, refs.right,
+    ...Array.from(refs.root.children).filter((el) => !platformNodes.has(el) && el !== refs.statusbar && el !== refs.left && el !== refs.right),
+    ...Array.from(doc.body.children).filter((el) => !el.contains(refs.root)),
+  ].filter((el): el is HTMLElement => !!el)
+  const disposeAuthorSideDock = bindAuthorSideDock({
+    doc,
+    win,
+    lane: (scrollView.querySelector('#chat') as HTMLElement | null) || scrollView,
+    scroll: scrollView,
+    candidates: () => collectFixedRoots(dockRoots(), win),
+    observe: [refs.statusbar, refs.headerExtra, refs.left, refs.right],
+    observeShallow: [refs.root, doc.body],
+    target: doc.documentElement,
+  })
+
   // ── 返回：舞台開著先關舞台（平台關的，發 stage:close）；否則交給宿主。 ──
   const handleBack = (): boolean => {
     if (stageState !== 'closed') {
@@ -620,6 +642,7 @@ export function createShell(options: CreateShellOptions): Shell {
       try { stageApp.unmount() } catch { /* 已經拆掉 */ }
       for (const app of chromeApps) { try { app.unmount() } catch { /* 已經拆掉 */ } }
       if (disposeComposerOverhang) { try { disposeComposerOverhang() } catch { /* 已經拆掉 */ } disposeComposerOverhang = null }
+      try { disposeAuthorSideDock() } catch { /* 已經拆掉 */ }
       if (panels) panels.unmount()
       if (docObserver) docObserver.disconnect()
       if (headerResize) headerResize.disconnect()

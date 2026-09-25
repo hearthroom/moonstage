@@ -143,6 +143,8 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 
 變數：29 個 `--chat-*` 定義在 `[data-theme="dark"]`／`[data-theme="light"]`；`--rpx: calc(100vw / 750)`；
 `--chat-viewport-height` 由宿主 `viewport` 訊息維護。
+作者側欄貼邊壓到訊息時，殼把讓出的寬度寫進 `<html>` 的 `--lt-canvas-dock-left`／`-right`，`#chat` 左右內距取
+`max(原值, 變數)`；作者在側欄上寫 `--lt-dock: left|right|none` 可覆寫判斷（`canvas-author-side-dock.ts`，一般畫布同一套）。
 
 z-index：平台節點一律 `auto`；舞台 content 2000、full 3000；平台彈層 8000+；作者安全帶 3500–7999。
 

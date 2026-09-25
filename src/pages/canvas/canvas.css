@@ -718,9 +718,11 @@
   #chat {
     /* 欄寬與置中搬到 layer 外了，見檔頭說明。
        底部內距多加的那一段是輸入區被作者往上推時蓋住捲動區的量
-       （canvas-composer-overhang.ts）。 */
+       （canvas-composer-overhang.ts）。
+       左右內距取 max：作者側欄貼邊壓到氣泡時讓出的量（canvas-author-side-dock.ts），
+       比原內距小就等於沒變。 */
     --lt-chat-pad-bottom: calc(24px + var(--lt-canvas-composer-overhang, 0px));
-    padding: 12px 12px var(--lt-chat-pad-bottom);
+    padding: 12px max(12px, var(--lt-canvas-dock-right, 0px)) var(--lt-chat-pad-bottom) max(12px, var(--lt-canvas-dock-left, 0px));
     box-sizing: border-box;
   }
 
@@ -5277,7 +5279,7 @@
 
     #chat {
       --lt-chat-pad-bottom: calc(20px + var(--lt-canvas-composer-overhang, 0px));
-      padding: 10px 10px var(--lt-chat-pad-bottom);
+      padding: 10px max(10px, var(--lt-canvas-dock-right, 0px)) var(--lt-chat-pad-bottom) max(10px, var(--lt-canvas-dock-left, 0px));
     }
 
     /* 置中的對話框：上下各留得到遮罩，內距比桌機緊 */
