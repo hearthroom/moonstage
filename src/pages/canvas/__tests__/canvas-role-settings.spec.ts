@@ -168,3 +168,33 @@ describe('人設三檔', () => {
     expect(buildRoleSettingsSavePayload('r1', snapshot, { ...snapshot, sandboxLevel: 'deep' })).toEqual({ roleId: 'r1', sandboxLevel: 'deep' })
   })
 })
+
+describe('換模型時思考深度跟著模型走', () => {
+  const pro = { value: 'pro', thinkingDepthOptions: [{ value: 'off' }, { value: 'high' }, { value: 'max' }], defaultThinkingDepth: 'max' }
+  const flash = { value: 'flash', thinkingDepthOptions: [{ value: 'off' }, { value: 'high' }], defaultThinkingDepth: 'off' }
+  const plain = { value: 'plain' }
+
+  it('新模型支援原本的深度就保留', async () => {
+    const { thinkingDepthForVariant } = await import('../canvas-role-settings')
+    expect(thinkingDepthForVariant(flash, 'high')).toBe('high')
+  })
+
+  it('新模型不支援原本的深度就換成它的預設，而不是把舊值帶過去', async () => {
+    const { thinkingDepthForVariant } = await import('../canvas-role-settings')
+    expect(thinkingDepthForVariant(flash, 'max')).toBe('off')
+    expect(thinkingDepthForVariant(pro, '')).toBe('max')
+  })
+
+  it('沒有思考檔位的模型送空字串；查不到線路就不動', async () => {
+    const { thinkingDepthForVariant } = await import('../canvas-role-settings')
+    expect(thinkingDepthForVariant(plain, 'max')).toBe('')
+    expect(thinkingDepthForVariant(null, 'max')).toBe('max')
+  })
+})
+
+describe('自訂指令的兩個名字', () => {
+  it('伺服器回 customInstructions 時也讀得到（Harbor 用新名字）', () => {
+    expect(readRoleSettings({ customInstructions: '別跳出角色' }).jailbreak).toBe('別跳出角色')
+    expect(readRoleSettings({ jailbreak: '舊名字' }).jailbreak).toBe('舊名字')
+  })
+})

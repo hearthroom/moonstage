@@ -511,7 +511,7 @@ import {
 } from './canvas-context-breakdown'
 import type { MessageMenuAnchor } from './components/canvas-message.vue'
 import {
-  ROLE_SETTINGS_DEFAULTS, readRoleSettings, buildRoleSettingsSavePayload,
+  ROLE_SETTINGS_DEFAULTS, readRoleSettings, buildRoleSettingsSavePayload, thinkingDepthForVariant,
   type RoleSettings,
 } from './canvas-role-settings'
 import { asPersonaMode } from './canvas-role-settings'
@@ -9503,13 +9503,19 @@ function onApplyModelSettings(payload: any) {
     玩家只是進來看了一眼上下文檔位，他存的代號就被悄悄換掉了。
   */
   const resolvedNow = selectedVariantValue.value
-  if (typeof next.selectModel === 'string' && next.selectModel && next.selectModel !== resolvedNow) {
+  const modelChanged = typeof next.selectModel === 'string' && next.selectModel && next.selectModel !== resolvedNow
+  if (modelChanged) {
     formData.selectModel = next.selectModel
   }
   const variant = findVariant(modelGroups.value, next.selectModel)
   if (variant) formData.selectModelName = composeModelDisplayName(variant, variant.family)
   if (Number.isFinite(Number(next.context))) formData.context = Number(next.context)
-  if (typeof next.thinkingDepth === 'string') formData.thinkingDepth = next.thinkingDepth
+  if (typeof next.thinkingDepth === 'string') {
+    formData.thinkingDepth = next.thinkingDepth
+  } else if (modelChanged) {
+    // 只交回模型（沙盒卡的 HUD）：深度按新模型換算，跟模型一起存，免得舊深度對新模型沒意義。
+    formData.thinkingDepth = thinkingDepthForVariant(variant, formData.thinkingDepth || '')
+  }
   persistRoleSettings()
   // 目錄的標價是按上下文檔位算的，換了檔位就重抓一次，否則玩家在決定的那一刻
   // 看到的是舊價。
