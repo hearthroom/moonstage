@@ -11,7 +11,11 @@ export function visibleViewport(win: Window) {
   const useVisual = vv && (vv.scale == null || vv.scale === 1) && vv.height > 0
   const top = useVisual ? Math.max(0, vv.offsetTop || 0) : 0
   let bottom = useVisual ? Math.min(win.innerHeight, top + vv.height) : win.innerHeight
-  const keyboard = keyboardOf(win)?.boundingRect
+  // 鍵盤矩形只在輸入法蓋在頁面上時才由瀏覽器維護；不覆蓋時瀏覽器自己縮視窗，矩形停在離開全螢幕前的
+  // 最後值。照扣就是永遠多扣一塊鍵盤高（小米 2026-09-25：收鍵盤後輸入區停在半空、點畫面也縮不回去）。
+  const vk = keyboardOf(win)
+  const overlaying = !!vk && (vk.overlaysContent || !!win.document?.fullscreenElement)
+  const keyboard = overlaying ? vk.boundingRect : undefined
   if (keyboard && keyboard.height > 0) {
     // Android Chrome 全螢幕實測（owner 2026-09-22 面板數值 kb=top0 h340 ov1）：高度對、top 卻是 0。
     // 鍵盤永遠貼在視窗底部，top 不可信時用「視窗高 − 鍵盤高」推回來。
