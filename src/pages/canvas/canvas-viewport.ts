@@ -17,13 +17,13 @@ export function visibleViewport(win: Window) {
   const overlaying = !!vk && (vk.overlaysContent || !!win.document?.fullscreenElement)
   const keyboard = overlaying ? vk.boundingRect : undefined
   if (keyboard && keyboard.height > 0) {
-    // Android Chrome 全螢幕實測（owner 2026-09-22 面板數值 kb=top0 h340 ov1）：高度對、top 卻是 0。
-    // 鍵盤貼在螢幕底部，top 不可信時用「視窗高 − 鍵盤高」推回來——前提是視窗還沒為鍵盤縮短。
-    // owner 2026-09-25（Android App 與 Chrome 全螢幕）：視窗已經縮過、矩形仍報 top 0，照減就扣兩次，
-    // 輸入區被推到頂、中間一大塊黑。可見底已經比「螢幕高 − 半個鍵盤」還矮，就當鍵盤已被扣掉。
+    // 鍵盤貼在螢幕底部，只有高度可信：Android 全螢幕的上緣見過報 0（owner 2026-09-22：kb=top0 h340）、
+    // 也見過報錯的非零值（2026-09-26：inner 859、kb=top220 h319，實際在 540）。上緣一律用
+    // 「視窗高 − 鍵盤高」算。防呆：若可見底已比「螢幕高 − 半個鍵盤」矮，代表瀏覽器已經自己為鍵盤
+    // 縮過視窗，再扣就是扣兩次（目前沒有面板數值見過，只是保護）。
     const screenHeight = Number(win.screen?.height) || 0
-    const alreadyExcluded = keyboard.top <= top && screenHeight > 0 && bottom <= screenHeight - keyboard.height / 2
-    const keyboardTop = keyboard.top > top ? keyboard.top : win.innerHeight - keyboard.height
+    const alreadyExcluded = screenHeight > 0 && bottom <= screenHeight - keyboard.height / 2
+    const keyboardTop = win.innerHeight - keyboard.height
     if (!alreadyExcluded && keyboardTop > top) bottom = Math.min(bottom, keyboardTop)
   }
   return { top, bottom, height: Math.max(0, bottom - top) }
