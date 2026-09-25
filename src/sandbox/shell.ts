@@ -25,6 +25,7 @@ import { chromeTopColor } from '@/pages/canvas/canvas-chrome-tone'
 import CanvasComposer from '@/pages/canvas/components/canvas-composer.vue'
 import { bindComposerOverhang } from '@/pages/canvas/canvas-composer-overhang'
 import { bindAuthorSideDock, collectFixedRoots } from '@/pages/canvas/canvas-author-side-dock'
+import { bindBubbleFit } from '@/pages/canvas/canvas-bubble-fit'
 import { createFollowBottom } from './render/follow-bottom'
 import { mountGeometryDebug, rectText } from '@/common/geometry-debug'
 import { reactive, ref } from 'vue'
@@ -461,6 +462,18 @@ export function createShell(options: CreateShellOptions): Shell {
     },
   })
 
+  // ── 氣泡撐開後不准超出對話欄：跟一般畫布同一支（canvas-bubble-fit.ts）。 ──
+  const disposeBubbleFit = bindBubbleFit({
+    doc,
+    win,
+    chat: scrollView.querySelector('#chat') as HTMLElement | null,
+    observe: refs.list,
+    subscribe: (refresh) => {
+      bus.on('message:mount', refresh)
+      bus.on('message:done', refresh)
+    },
+  })
+
   // ── 返回：舞台開著先關舞台（平台關的，發 stage:close）；否則交給宿主。 ──
   const handleBack = (): boolean => {
     if (stageState !== 'closed') {
@@ -654,6 +667,7 @@ export function createShell(options: CreateShellOptions): Shell {
       for (const app of chromeApps) { try { app.unmount() } catch { /* 已經拆掉 */ } }
       if (disposeComposerOverhang) { try { disposeComposerOverhang() } catch { /* 已經拆掉 */ } disposeComposerOverhang = null }
       try { disposeAuthorSideDock() } catch { /* 已經拆掉 */ }
+      try { disposeBubbleFit() } catch { /* 已經拆掉 */ }
       if (panels) panels.unmount()
       if (docObserver) docObserver.disconnect()
       if (headerResize) headerResize.disconnect()

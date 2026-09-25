@@ -431,6 +431,7 @@ import { resolveSandbox } from '@/host/sandbox-host'
 import { adoptAuthorBodyNode, hoistFixedAuthorNodes } from './canvas-author-node-hoist'
 import { bindComposerOverhang } from './canvas-composer-overhang'
 import { bindAuthorSideDock, collectFixedRoots } from './canvas-author-side-dock'
+import { bindBubbleFit } from './canvas-bubble-fit'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
 import { clearPendingReplyPhase, insertBeforePendingReply, markPendingReplyPhase, pendingReplyLabel } from './canvas-pending-reply'
@@ -2435,8 +2436,17 @@ const fullscreenSupported = ref(false);
 const fullscreenLabel = computed(() => t(fullscreenActive.value ? 'canvas.fullscreen.exit' : 'canvas.fullscreen.enter'));
 let fullscreenControl: ReturnType<typeof createFullscreenController> | undefined;
 let disposeGeometryDebug: (() => void) | undefined;
+// 氣泡撐開後不准超出對話欄（canvas-bubble-fit.ts）。#chat 跟著 sandboxCard 出現／消失，換了就重綁。
+let disposeBubbleFit: (() => void) | undefined;
+function rebindBubbleFit() {
+  disposeBubbleFit?.();
+  const chat = document.querySelector('#chat') as HTMLElement | null;
+  disposeBubbleFit = bindBubbleFit({ doc: document, win: window, chat, observe: chat });
+}
 onMounted(() => {
   if (canvasRoot.value) disposeViewport = bindCanvasViewport(window, canvasRoot.value);
+  rebindBubbleFit();
+  watch(sandboxCard, () => { nextTick(rebindBubbleFit); });
   // ?sdkDebug=1：疊一塊幾何數值面板（common/geometry-debug.ts），手機截圖就能回報版面問題。
   if (/[?&]sdkDebug=1\b/.test(String(window.location.search || ''))) {
     disposeGeometryDebug = mountGeometryDebug(document, window, 'host', () => {
@@ -2454,7 +2464,7 @@ onMounted(() => {
     () => uni.showToast({ title: t('canvas.fullscreen.failed'), icon: 'none' }));
   fullscreenSupported.value = fullscreenControl.supported;
 });
-onUnmounted(() => { fullscreenControl?.dispose(); disposeViewport?.(); disposeGeometryDebug?.(); });
+onUnmounted(() => { fullscreenControl?.dispose(); disposeViewport?.(); disposeGeometryDebug?.(); disposeBubbleFit?.(); });
 function toggleFullscreen() { void fullscreenControl?.toggle(); }
 
 // 頁首與輸入區的呈現資料：跟模板上綁給 CanvasHeader／CanvasComposer 的是同一批值，殼那邊用同一套元件畫。
