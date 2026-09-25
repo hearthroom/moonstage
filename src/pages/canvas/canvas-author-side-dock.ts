@@ -85,17 +85,19 @@ export function sideDockClearance(input: DockInput): DockClearance {
     const overlap = Math.min(box.bottom, lane.bottom) - Math.max(box.top, lane.top)
     if (!(overlap >= Math.min(MIN_VERTICAL_OVERLAP, height)) || !(overlap > 0)) continue
 
-    let side: 'left' | 'right' | null
+    let side: 'left' | 'right' | null = null
     if (c.declared === 'left' || c.declared === 'right') {
-      side = c.declared
-      // 宣告的那一側要真的在那一半：寫了 right 卻畫在左邊，照宣告讓會讓錯邊。
+      // 宣告的那一側要真的在那一半。對不上多半是繼承來的（--lt-dock 是 CSS 變數，寫在包住
+      // 左右兩條欄的外層，右邊那條也會拿到 left）：當沒宣告，交給下面的猜測，不照宣告讓錯邊。
       const center = (box.left + box.right) / 2
-      if (side === 'left' ? center > laneCenter : center < laneCenter) continue
-      if (intrusionOf(side, box, lane) > laneWidth * DECLARED_MAX_INTRUSION_RATIO) continue
-    } else {
-      side = guessSide(box, lane)
-      if (!side) continue
+      const onDeclaredSide = c.declared === 'left' ? center <= laneCenter : center >= laneCenter
+      if (onDeclaredSide) {
+        if (intrusionOf(c.declared, box, lane) > laneWidth * DECLARED_MAX_INTRUSION_RATIO) continue
+        side = c.declared
+      }
     }
+    if (!side) side = guessSide(box, lane)
+    if (!side) continue
     const intrusion = intrusionOf(side, box, lane)
     if (!(intrusion > 0)) continue
     out[side] = Math.max(out[side], Math.round(intrusion + GAP))
@@ -185,6 +187,8 @@ function declarationOf(el: Element, win: Window): DockDeclaration {
 export const SIDE_DOCK_LEFT_VAR = '--lt-canvas-dock-left'
 export const SIDE_DOCK_RIGHT_VAR = '--lt-canvas-dock-right'
 
+export type DockTarget = { el: Element; side: 'left' | 'right' }
+
 export type BindSideDockOptions = {
   doc: Document
   win: Window
@@ -192,8 +196,11 @@ export type BindSideDockOptions = {
   lane: HTMLElement | null
   /** 捲動區：取它看得到的上下範圍 */
   scroll: HTMLElement | null
-  /** 每次量的時候重新收候選（作者的節點會增減） */
-  candidates: () => Element[]
+  /**
+   * 每次量的時候重新收候選（作者的節點會增減）。帶 side 的是平台給的側欄位置（殼的左右插槽）：
+   * 放進去就等於宣告了那一側，作者自己寫了 --lt-dock 則以作者的為準。
+   */
+  candidates: () => Array<Element | DockTarget>
   /** 盯這些節點的子樹變化（新增節點、style／class 改變）來重量 */
   observe: Array<Node | null | undefined>
   /** 只盯直接子節點的增減（例如 body：作者腳本往上掛側欄，但訊息串流的改動不必每次都重量） */
@@ -221,7 +228,11 @@ export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
     const viewport = { width: win.innerWidth, height: win.innerHeight }
     let list: DockCandidate[] = []
     try {
-      list = candidates().map((el) => ({ box: paintedBox(subtreeRects(el, win), viewport), declared: declarationOf(el, win) }))
+      list = candidates().map((c) => {
+        const slot = 'side' in c ? c : null
+        const el = slot ? slot.el : (c as Element)
+        return { box: paintedBox(subtreeRects(el, win), viewport), declared: declarationOf(el, win) || (slot ? slot.side : '') }
+      })
     } catch { list = [] }
     const out = sideDockClearance({ lane: { left: l.left, right: l.right, top: s.top, bottom: s.bottom }, candidates: list })
     // 差不到 2px 不重寫：側欄動畫、次像素抖動不該讓整條對話欄跟著重排。

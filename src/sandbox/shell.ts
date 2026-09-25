@@ -432,11 +432,12 @@ export function createShell(options: CreateShellOptions): Shell {
 
   // ── 作者側欄貼著畫面左右、壓到氣泡時，對話欄讓出空間：跟一般畫布同一套量法（canvas-author-side-dock.ts）。
   //    殼沒有作者容器，作者的側欄可能在插槽、狀態欄、殼根節點底下或直接掛在 body 上；訊息串不掃——
-  //    串流時每跳都掃整串太貴，而貼邊側欄是常駐的東西，不會只活在某一則訊息裡。 ──
-  const platformNodes = new Set<Element>([refs.header, refs.messages, refs.stage, refs.composer])
+  //    串流時每跳都掃整串太貴，而貼邊側欄是常駐的東西，不會只活在某一則訊息裡。
+  //    左右插槽是殼替側欄留的位置：插槽本身 0 寬，作者放進去的東西不必是 fixed，整個插槽當一條側欄量。 ──
+  const platformNodes = new Set<Element>([refs.header, refs.messages, refs.stage, refs.composer, refs.left, refs.right])
   const dockRoots = (): Element[] => [
-    refs.statusbar, refs.headerExtra, refs.left, refs.right,
-    ...Array.from(refs.root.children).filter((el) => !platformNodes.has(el) && el !== refs.statusbar && el !== refs.left && el !== refs.right),
+    refs.statusbar, refs.headerExtra,
+    ...Array.from(refs.root.children).filter((el) => !platformNodes.has(el) && el !== refs.statusbar),
     ...Array.from(doc.body.children).filter((el) => !el.contains(refs.root)),
   ].filter((el): el is HTMLElement => !!el)
   const disposeAuthorSideDock = bindAuthorSideDock({
@@ -444,7 +445,11 @@ export function createShell(options: CreateShellOptions): Shell {
     win,
     lane: (scrollView.querySelector('#chat') as HTMLElement | null) || scrollView,
     scroll: scrollView,
-    candidates: () => collectFixedRoots(dockRoots(), win),
+    candidates: () => [
+      { el: refs.left, side: 'left' as const },
+      { el: refs.right, side: 'right' as const },
+      ...collectFixedRoots(dockRoots(), win),
+    ],
     observe: [refs.statusbar, refs.headerExtra, refs.left, refs.right],
     observeShallow: [refs.root, doc.body],
     target: doc.documentElement,
