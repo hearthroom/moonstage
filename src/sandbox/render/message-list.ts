@@ -58,7 +58,7 @@ export interface MessageListDeps {
    * 宿主沒給 html 時（獨立殼、測試）自己渲染正文。作者規則還沒跑完時回 `{ html, provisional: true }`
    * （暫時的畫面），結果到了殼會叫 refresh() 重畫。
    */
-  render(content: string, opts?: { streaming?: boolean }): string | { html: string; provisional: boolean }
+  render(content: string, opts?: { streaming?: boolean; seed?: string }): string | { html: string; provisional: boolean }
   strings: { generating: string }
   roleName: string
   roleAvatar: string
@@ -146,7 +146,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     const hit = rendered.get(m.id)
     const streaming = m.state === 'streaming'
     if (hit && hit.content === m.content && !hit.provisional && (streaming || !hit.streaming)) return hit.html
-    const out = deps.render(m.content, { streaming })
+    const out = deps.render(m.content, { streaming, seed: m.id })
     const html = typeof out === 'string' ? out : out.html
     if (typeof out !== 'string' && out.provisional) {
       // 已定稿的先留著上一版畫面（有的話），不退回原文閃一下；串流中的照樣換上，字要立刻看得到。

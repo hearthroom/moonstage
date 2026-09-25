@@ -2344,10 +2344,13 @@ onUnmounted(() => {
 });
 const authorRules = {
   provisional: 0,
+  // 正在渲染的訊息 id（renderMarkdown 同步設定）：讓 {{random}} 在這則訊息裡固定，串流每一跳不重抽。
+  seed: '',
   display(text: string, streaming: boolean): string {
     if (!activeAuthorAsset.value.rules.length) return substituteMacros(text, authorRuleOptions().macros);
+    const options = authorRules.seed ? { ...authorRuleOptions(), seed: authorRules.seed } : authorRuleOptions();
     const out = authorRuleRunner.display(
-      { engine: 'tavern', text, rules: activeAuthorAsset.value.rules, options: authorRuleOptions() },
+      { engine: 'tavern', text, rules: activeAuthorAsset.value.rules, options },
       { streaming },
     );
     if (out.provisional) authorRules.provisional++;
@@ -4203,7 +4206,12 @@ const renderMarkdown = (item) => {
   // 看的是套完規則的結果，不是原文（見 activateMessageScripts）。
   const cacheKey = (!item.chatFinish && item.id != null) ? (item.id + ':' + item.type + ':' + activeAuthorAsset.value.version) : null;
   // 腳本與前端區塊的啟動在 renderMessage：規則結果還沒回來的暫時畫面不啟動。
-  return highlightText(processedContent, item.type, cacheKey);
+  authorRules.seed = item.id != null ? String(item.id) : '';
+  try {
+    return highlightText(processedContent, item.type, cacheKey);
+  } finally {
+    authorRules.seed = '';
+  }
 
 };
 
