@@ -346,6 +346,15 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       post({ type: 'viewport', height: h })
     })
   }
+  // 事件當下量到的可能還是動畫途中的值（Android 收鍵盤時先發事件、最終高度到位後不一定再發；
+  // 小米 2026-09-25 回報輸入區停在半空、下方空白、點畫面也縮不回去）。跟一般畫布一樣，
+  // 事件後 60／300ms 各補量一次；同值不重送，所以多量不會多推。
+  const settleTimers: ReturnType<typeof setTimeout>[] = []
+  const onViewportEvent = () => {
+    pushViewport()
+    for (const timer of settleTimers.splice(0)) clearTimeout(timer)
+    for (const delay of [60, 300]) settleTimers.push(setTimeout(pushViewport, delay))
+  }
   let stopViewport: (() => void) | undefined
   // 登出（clearAuthorRuleStorage）：叫還開著的殼也清掉它那個子網域上的持久層。盡力而為，下次握手殼也會比對範圍。
   const stopStorageWatch = onStorageScopeChange((event) => {
@@ -529,7 +538,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   return {
     start() {
       win.addEventListener('message', onMessage)
-      stopViewport = observeViewport(win, pushViewport)
+      stopViewport = observeViewport(win, onViewportEvent)
       const timeout = deps.handshakeTimeoutMs ?? 20_000
       if (deps.onHandshakeTimeout && timeout > 0) {
         handshakeTimer = setTimeout(() => { if (!helloSent && !destroyed) { handshakeTimedOut = true; deps.onHandshakeTimeout!() } }, timeout)
@@ -584,6 +593,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       destroyed = true
       win.removeEventListener('message', onMessage)
       stopViewport?.()
+      for (const timer of settleTimers.splice(0)) clearTimeout(timer)
       stopStorageWatch()
     },
   }

@@ -483,6 +483,28 @@ describe('視窗高度與連結', () => {
     }
   })
 
+  // 小米 2026-09-25 回報：鍵盤收起後輸入區停在半空、下方一大塊空白，點畫面也縮不回去。
+  // 收鍵盤動畫途中送出的那次事件量到的是半開的高度，最終高度到位時不一定再來事件；
+  // 一般畫布在事件後 60／300ms 會補量（canvas-viewport），殼這條路也要補，不然就卡在半開。
+  it('收鍵盤途中量到半開高度、最終值沒有事件：稍後補量把整高送給殼', async () => {
+    const vv = Object.assign(new EventTarget(), { offsetTop: 0, height: window.innerHeight, scale: 1 })
+    Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true })
+    const host = await handshake()
+    try {
+      vv.height = 447; vv.dispatchEvent(new Event('resize'))
+      await settle()
+      vv.height = 600; vv.dispatchEvent(new Event('resize'))
+      await settle()
+      expect(h.posted.filter((m) => m.type === 'viewport').at(-1)).toEqual({ ms: 1, type: 'viewport', height: 600 })
+      vv.height = window.innerHeight // 動畫結束，沒有再發事件
+      await new Promise((r) => setTimeout(r, 400))
+      expect(h.posted.filter((m) => m.type === 'viewport').at(-1)).toEqual({ ms: 1, type: 'viewport', height: window.innerHeight })
+    } finally {
+      host.destroy()
+      Object.defineProperty(window, 'visualViewport', { value: null, configurable: true })
+    }
+  })
+
   it('全螢幕鍵盤覆蓋時，把鍵盤上方高度送給跨來源殼', async () => {
     const keyboard = Object.assign(new EventTarget(), { boundingRect: { top: 430, height: 338 } })
     Object.defineProperty(window.navigator, 'virtualKeyboard', { value: keyboard, configurable: true })

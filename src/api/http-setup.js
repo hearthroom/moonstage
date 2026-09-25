@@ -90,8 +90,10 @@ export function setupHttp(http, deps) {
 		// 根本沒走到 server 回應那一步，沒有任何替代呈現。無條件靜默的結果是
 		// 按下去毫無反應，使用者只會重複按（對計費型產品是實害），我們在日誌裡
 		// 也看不到。2026-08-01 兩位使用者回報「按了沒反應、重整就好」即卡在此。
+		// 唯一的例外是呼叫端逐筆宣告 quietTransport：它自己會重試或退回預設值／面板上的重試鈕，
+		// 內部已經處理好的失敗再彈「逾時」只會讓人困惑（owner 2026-09-25）。
 		if (statusCode === -9999) {
-			toast.timeout();
+			if (!response._quietTransport) toast.timeout();
 			return Promise.reject(response);
 		}
 
@@ -102,7 +104,7 @@ export function setupHttp(http, deps) {
 
 		// 网络错误（傳輸層，理由同上：一律呈現）
 		if (statusCode === -1 || !statusCode) {
-			toast.networkError();
+			if (!response._quietTransport) toast.networkError();
 			return Promise.reject(response);
 		}
 

@@ -48,6 +48,9 @@ const base = {
 			//加载中提示文本，showLoading为true时有效
 			loadingText: '',
 			errorMsg: getNetworkErrorMsg(),
+			// HarperHarbor patch: 呼叫端自己處理逾時／斷線（重試、退回預設值、面板上的重試鈕）時設 true，
+			// 請求層就不再彈「網路錯誤」或「逾時」。使用者按下去的動作不要設：沒有替代呈現就等於沒反應。
+			quietTransport: false,
 			//跨域请求时是否携带凭证（cookies）仅H5支持（HBuilderX 2.6.15+）
 			withCredentials: false,
 			//DNS解析时优先使用ipv4,仅 App-Android 支持 (HBuilderX 2.8.0+)
@@ -61,7 +64,7 @@ const base = {
 			...config
 		};
 		const keys = ['host', 'timeout', 'prevent', 'keys', 'brief', 'cancelToken', 'showLoading', 'loadingText',
-			'errorMsg', 'arrayFormat'
+			'errorMsg', 'arrayFormat', 'quietTransport'
 		];
 		keys.forEach(item => {
 			delete options[item];
