@@ -108,7 +108,8 @@ export function readRoleSettings(raw: any): RoleSettings {
     context: asContext(src.context),
     thinkingDepth: asText(src.thinkingDepth),
     sandboxLevel: asText(src.sandboxLevel),
-    jailbreak: asText(src.jailbreak),
+    // 舊主站叫 jailbreak；Harbor 回的是 customInstructions。兩個都讀，寫的時候照舊送 jailbreak（兩邊都收）。
+    jailbreak: asText(src.jailbreak ?? src.customInstructions),
     trimConstantLore: src.trimConstantLore === true,
   }
 }
@@ -167,4 +168,28 @@ export function buildRoleSettingsSavePayload(
     if (mode) (changed as any).personaMode = mode
   }
   return { roleId, ...changed }
+}
+
+interface DepthVariantLike {
+  thinkingDepthOptions?: Array<{ value?: unknown }> | null
+  defaultThinkingDepth?: unknown
+}
+
+/**
+ * 換了模型之後這一輪該用哪個思考深度。跟模型選單同一套挑法：
+ * 新模型支援原本的深度就留著；不支援就用它自己的預設（沒有預設時挑最深的那一檔）；
+ * 沒有思考檔位的模型一律空字串。查不到線路時不動——猜一個比留著原值更糟。
+ */
+export function thinkingDepthForVariant(variant: DepthVariantLike | null | undefined, current: string): string {
+  if (!variant) return current
+  const options = (Array.isArray(variant.thinkingDepthOptions) ? variant.thinkingDepthOptions : [])
+    .map((o) => asText(o && o.value))
+  if (options.length === 0) return ''
+  if (current && options.includes(current)) return current
+  const fallback = asText(variant.defaultThinkingDepth)
+  if (fallback && options.includes(fallback)) return fallback
+  for (const preferred of ['max', 'on', 'high']) {
+    if (options.includes(preferred)) return preferred
+  }
+  return options.find((v) => v && v !== 'off') || options[0]
 }
