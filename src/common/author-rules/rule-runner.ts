@@ -124,7 +124,7 @@ function hash(text: string): string {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)
 }
 
-interface Plain<T> { key: string; plain: T }
+interface Plain<T> { key: string; plain: T; hasRandom?: boolean }
 
 interface Keyed {
   /** 引擎＋規則＋選項：同一個 prefixKey 的結果才能互相接續。 */
@@ -169,7 +169,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
     const hit = plainCache.get(value as object)
     if (hit) return hit
     const json = JSON.stringify(value)
-    const entry = { key: `${tag}${hash(json)}.${json.length}`, plain: JSON.parse(json) as T }
+    const entry = { key: `${tag}${hash(json)}.${json.length}`, plain: JSON.parse(json) as T, hasRandom: json.includes('{{random:') }
     plainCache.set(value as object, entry)
     return entry
   }
@@ -189,7 +189,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
       macroKey = JSON.stringify(macros)
     }
     // 種子只在規則裡有 {{random}} 時才影響產物；沒有就不進鍵，定稿快取與持久層照舊跨訊息共用。
-    const seeded = typeof opts.seed === 'string' && opts.seed !== '' && rules.key !== 'r0' && JSON.stringify(rules.plain).includes('{{random:')
+    const seeded = typeof opts.seed === 'string' && opts.seed !== '' && !!rules.hasRandom
     if (seeded) jobOptions.seed = opts.seed
     const text = typeof req.text === 'string' ? req.text : ''
     const prefixKey = `${engineVersion}\u0001${engine}\u0001${rules.key}\u0001${variants.key}\u0001${macroKey}${seeded ? `\u0001s${opts.seed}` : ''}`
