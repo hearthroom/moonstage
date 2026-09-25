@@ -119,8 +119,15 @@ describe('作者宣告（CSS 變數 --lt-dock）', () => {
       .toEqual({ left: 0, right: 0 })
   })
 
-  it('宣告 right 但東西其實在左邊（沒伸進右側）就不讓', () => {
-    expect(sideDockClearance({ lane: phoneLane, candidates: [rail(leftRail, 'right')] })).toEqual({ left: 0, right: 0 })
+  it('宣告的一側跟畫的位置不符（多半是從外層繼承來的）：當沒宣告，照形狀猜', () => {
+    // 作者把 --lt-dock: left 寫在包住左右兩條欄的外層，右邊那條繼承到 left
+    expect(sideDockClearance({ lane: phoneLane, candidates: [rail(leftRail, 'left'), rail(galleryTab, 'left')] }))
+      .toEqual({ left: 34, right: 35 })
+  })
+
+  it('宣告的一側不符、形狀也不像側欄：不讓', () => {
+    expect(sideDockClearance({ lane: phoneLane, candidates: [rail({ left: 350, right: 430, top: 200, bottom: 600 }, 'left')] }))
+      .toEqual({ left: 0, right: 0 })
   })
 })
 
@@ -171,6 +178,27 @@ describe('DOM：候選節點與綁定', () => {
       expect(target.style.getPropertyValue(SIDE_DOCK_RIGHT_VAR)).toBe('')
       dispose()
       expect(target.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('')
+    } finally {
+      window.requestAnimationFrame = raf
+    }
+  })
+
+  it('殼的左右插槽：插槽本身 0 寬，裡面放的東西不必是 fixed，放進左插槽就當宣告了 left', () => {
+    document.body.innerHTML = '<div id="lane"></div><div id="slot"><div id="btn"></div></div>'
+    const lane = document.getElementById('lane')!
+    const slot = document.getElementById('slot')!
+    const btn = document.getElementById('btn')!
+    lane.getBoundingClientRect = () => ({ left: 0, right: 430, top: 53, bottom: 824, width: 430, height: 771 }) as DOMRect
+    slot.getBoundingClientRect = () => ({ left: 0, right: 0, top: 45, bottom: 932, width: 0, height: 887 }) as DOMRect
+    // 離邊 8px、寬 56px：猜測會跳過，插槽等於宣告，照讓
+    btn.getBoundingClientRect = () => ({ left: 8, right: 64, top: 200, bottom: 600, width: 56, height: 400 }) as DOMRect
+    const target = document.documentElement
+    const raf = window.requestAnimationFrame
+    ;(window as unknown as { requestAnimationFrame: (fn: () => void) => number }).requestAnimationFrame = (fn) => { fn(); return 1 }
+    try {
+      const dispose = bindAuthorSideDock({ doc: document, win: window, lane, scroll: lane, candidates: () => [{ el: slot, side: 'left' }], observe: [], target })
+      expect(target.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('70px')
+      dispose()
     } finally {
       window.requestAnimationFrame = raf
     }
