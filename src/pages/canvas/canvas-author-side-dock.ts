@@ -207,6 +207,11 @@ export type BindSideDockOptions = {
   observeShallow?: Array<Node | null | undefined>
   /** 變數寫在哪：一般畫布是 documentElement，殼是它自己 iframe 的 documentElement */
   target: HTMLElement
+  /**
+   * DOM 觀察器盯不到的時機由呼叫端通知（殼：訊息掛上、定稿）。殼的事件匯流排沒有退訂，
+   * 所以拆掉之後這裡收到的通知一律不理。
+   */
+  subscribe?: (refresh: () => void) => void
 }
 
 /*
@@ -214,9 +219,10 @@ export type BindSideDockOptions = {
   （sandbox/shell.ts）共用：殼在跨源 iframe 裡，畫布那邊看不到殼裡的作者節點。
 */
 export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
-  const { win, lane, scroll, candidates, observe, observeShallow = [], target } = opts
+  const { win, lane, scroll, candidates, observe, observeShallow = [], target, subscribe } = opts
   if (!lane || !scroll) return () => {}
   let raf = 0
+  let disposed = false
   let last = { left: -1, right: -1 }
   const write = (name: string, px: number) => {
     if (px > 0) target.style.setProperty(name, px + 'px')
@@ -241,12 +247,12 @@ export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
     last = out
   }
   const schedule = () => {
-    if (raf) return
+    if (raf || disposed) return
     const next = typeof win.requestAnimationFrame === 'function'
       ? (fn: () => void) => win.requestAnimationFrame(fn)
       : (fn: () => void) => win.setTimeout(fn, 16) as unknown as number
     raf = -1
-    const id = next(() => { raf = 0; measure() })
+    const id = next(() => { raf = 0; if (!disposed) measure() })
     if (raf === -1) raf = id
   }
   let observer: MutationObserver | null = null
@@ -259,8 +265,10 @@ export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
     for (const node of observeShallow) if (node) observer.observe(node, { childList: true })
   }
   win.addEventListener('resize', schedule)
+  if (subscribe) { try { subscribe(schedule) } catch { /* 訂不到就只靠觀察器 */ } }
   schedule()
   return () => {
+    disposed = true
     if (observer) { try { observer.disconnect() } catch { /* 收尾不得拋錯 */ } observer = null }
     win.removeEventListener('resize', schedule)
     try { target.style.removeProperty(SIDE_DOCK_LEFT_VAR); target.style.removeProperty(SIDE_DOCK_RIGHT_VAR) } catch { /* 同上 */ }

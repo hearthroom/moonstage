@@ -204,6 +204,34 @@ describe('DOM：候選節點與綁定', () => {
     }
   })
 
+  it('外部事件（殼的訊息定稿）觸發重量；拆掉之後事件再來也不寫變數', () => {
+    document.body.innerHTML = '<div id="lane"></div><div id="r"></div>'
+    const lane = document.getElementById('lane')!
+    const r = document.getElementById('r')!
+    lane.getBoundingClientRect = () => ({ left: 0, right: 430, top: 53, bottom: 824, width: 430, height: 771 }) as DOMRect
+    let railBox = { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 }
+    r.getBoundingClientRect = () => railBox as DOMRect
+    const target = document.documentElement
+    const raf = window.requestAnimationFrame
+    ;(window as unknown as { requestAnimationFrame: (fn: () => void) => number }).requestAnimationFrame = (fn) => { fn(); return 1 }
+    let refresh: () => void = () => {}
+    try {
+      const dispose = bindAuthorSideDock({
+        doc: document, win: window, lane, scroll: lane, candidates: () => [r], observe: [], target,
+        subscribe: (fn) => { refresh = fn },
+      })
+      expect(target.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('')
+      railBox = { left: 0, right: 28, top: 233, bottom: 649, width: 28, height: 416 }
+      refresh()
+      expect(target.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('34px')
+      dispose()
+      refresh()
+      expect(target.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('')
+    } finally {
+      window.requestAnimationFrame = raf
+    }
+  })
+
   it('作者在元素 style 上寫 --lt-dock: none，就算形狀像側欄也不讓（寫卡指南的寫法）', () => {
     document.body.innerHTML = '<div id="lane"></div><div id="r" style="position:fixed;--lt-dock: none"></div>'
     const lane = document.getElementById('lane')!
@@ -236,5 +264,10 @@ describe('接線', () => {
   it('一般畫布與沙箱殼都綁上', () => {
     expect(vue).toMatch(/bindAuthorSideDock\(\{/)
     expect(shell).toMatch(/bindAuthorSideDock\(\{/)
+  })
+
+  it('殼掃最後幾則訊息裡的 fixed 節點，並在訊息掛上／定稿時重量（殼沒有把它們搬出訊息）', () => {
+    expect(shell).toMatch(/collectFixedRoots\(Array\.from\(refs\.list\.children\)\.slice\(-\d\)/)
+    expect(shell).toMatch(/bus\.on\('message:done'/)
   })
 })

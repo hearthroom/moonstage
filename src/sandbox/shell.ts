@@ -432,7 +432,8 @@ export function createShell(options: CreateShellOptions): Shell {
 
   // ── 作者側欄貼著畫面左右、壓到氣泡時，對話欄讓出空間：跟一般畫布同一套量法（canvas-author-side-dock.ts）。
   //    殼沒有作者容器，作者的側欄可能在插槽、狀態欄、殼根節點底下或直接掛在 body 上；訊息串不掃——
-  //    串流時每跳都掃整串太貴，而貼邊側欄是常駐的東西，不會只活在某一則訊息裡。
+  //    訊息串只掃最後三則，而且只在訊息掛上與定稿時重量：MMD 卡常讓 AI 每輪重吐一次面板觸發標記，
+  //    一般畫布會把展開出的 fixed 面板搬出訊息，殼不搬，面板就留在最新那則裡；串流每一跳都掃整串太貴。
   //    左右插槽是殼替側欄留的位置：插槽本身 0 寬，作者放進去的東西不必是 fixed，整個插槽當一條側欄量。 ──
   const platformNodes = new Set<Element>([refs.header, refs.messages, refs.stage, refs.composer, refs.left, refs.right])
   const dockRoots = (): Element[] => [
@@ -449,10 +450,15 @@ export function createShell(options: CreateShellOptions): Shell {
       { el: refs.left, side: 'left' as const },
       { el: refs.right, side: 'right' as const },
       ...collectFixedRoots(dockRoots(), win),
+      ...collectFixedRoots(Array.from(refs.list.children).slice(-3), win),
     ],
     observe: [refs.statusbar, refs.headerExtra, refs.left, refs.right],
     observeShallow: [refs.root, doc.body],
     target: doc.documentElement,
+    subscribe: (refresh) => {
+      bus.on('message:mount', refresh)
+      bus.on('message:done', refresh)
+    },
   })
 
   // ── 返回：舞台開著先關舞台（平台關的，發 stage:close）；否則交給宿主。 ──
