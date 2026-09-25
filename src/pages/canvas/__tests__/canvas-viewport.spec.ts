@@ -135,9 +135,7 @@ it('鍵盤矩形 top 為 0 但有高度：以視窗高減鍵盤高當鍵盤上�
   expect(visibleViewport(win)).toEqual({ top: 0, bottom: 282, height: 282 })
 })
 
-// owner 2026-09-25 Android App 全螢幕：矩形 top 為 0，但視窗已經為鍵盤縮短過了。拿縮短後的視窗高再減
-// 鍵盤高，就是扣兩次——輸入區被推到畫面頂端，中間一大塊黑。全螢幕時視窗上緣就是螢幕上緣，
-// 鍵盤貼著螢幕底，用螢幕高減鍵盤高才是它的上緣。
+// 防呆：瀏覽器若已經為鍵盤縮過視窗，拿縮短後的視窗高再減鍵盤高就是扣兩次。
 it('全螢幕、矩形 top 為 0、視窗已先縮短：鍵盤不扣兩次', () => {
   const { win, vv, vk, doc } = browser()
   Object.assign(win as unknown as Record<string, unknown>, { screen: { height: 800 } })
@@ -158,6 +156,20 @@ it('全螢幕、矩形 top 為 0、視窗已先縮短：鍵盤不扣兩次', () 
   Object.defineProperty(win, 'innerHeight', { value: 770, configurable: true })
   vv.height = 770
   expect(visibleViewport(win)).toEqual({ top: 0, bottom: 470, height: 470 })
+})
+
+// owner 2026-09-26 面板數值（Android 全螢幕，視窗沒縮）：inner 859、kb=top220 h319 ov1、root 0..220。
+// 高度對、上緣卻是錯的非零值（鍵盤實際在 540）；信了它輸入區只剩 220 高、下面一大塊黑。
+// 上緣報 0 與報錯值都見過，只有高度一直對：鍵盤貼底，上緣一律用「視窗高 − 鍵盤高」算。
+it('全螢幕矩形上緣是錯的非零值：只信高度', () => {
+  const { win, vv, vk, doc } = browser()
+  Object.assign(win as unknown as Record<string, unknown>, { screen: { height: 859 } })
+  doc.fullscreenElement = {}
+  vk.overlaysContent = true
+  Object.defineProperty(win, 'innerHeight', { value: 859, configurable: true })
+  vv.height = 860
+  vk.boundingRect = { top: 220, height: 319 }
+  expect(visibleViewport(win)).toEqual({ top: 0, bottom: 540, height: 540 })
 })
 
 // 小米使用者 2026-09-25（classic 卡）：鍵盤收起後輸入區停在半空、下方空一塊鍵盤高，點畫面也縮不回去。
