@@ -7,6 +7,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
+import { createStreamRenderThrottle, streamRenderKey } from '../canvas-stream-render'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { withFencesProtected } from '../../../common/markdown-fences'
 import { tagFrontendBlocks } from '../../../common/frontend-block'
@@ -167,7 +168,8 @@ function buildRenderMessage(authorRules: unknown, renderMarkdown: (item: any) =>
     activeAuthorAsset: { value: { rules: [], version: 0 } },
     displayScript: { value: 'none' },
     streamRenderTick: { value: 0 },
-    STREAM_RENDER_INTERVAL_MS: 150,
+    streamRenderThrottle: createStreamRenderThrottle(),
+    streamRenderKey,
     streamRenderTimer: 0,
     activateMessageScripts: (_item: unknown, html: string) => { activated.push(html) },
     activateFrontendBlocks: () => {},

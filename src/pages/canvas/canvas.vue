@@ -524,6 +524,7 @@ import { asPersonaMode } from './canvas-role-settings'
 // V1.1: 引入 WebSocket 心跳管理和 SSE 解析工具
 import { createHeartbeatManager } from '@/utils/websocketHeartbeat';
 import { createSSEParser } from '@/utils/sseParser';
+import { createStreamRenderThrottle, streamRenderKey } from './canvas-stream-render';
 // isSummaryFormat 這個名字在那支模組裡並不存在——舊頁面一直帶著這個匯入，
 // 打包器只是靜默給了 undefined。沒有呼叫點，拿掉。
 import { renderSummary } from '@/utils/messageRenderer';
@@ -2991,7 +2992,11 @@ function hudMessageHtml(item: any): string {
   if (hit && hit.content === content && (hit.ruleEpoch == null || hit.ruleEpoch === authorRuleEpoch.value)) return hit.html;
   let html = '';
   try { html = String(renderMessage(item) || ''); } catch (e) { html = ''; }
-  hudHtmlCache.set(key, { content, html, ruleEpoch: renderIsProvisional(item) ? authorRuleEpoch.value : null });
+  // 串流中的那一則交給 renderMessage 自己節流：它在間隔內回的是上一版畫面，記在這裡的話，
+  // 間隔到期、字沒再變的那一次會一直拿到舊畫面。
+  if (item.chatFinish || item.chatLoading) {
+    hudHtmlCache.set(key, { content, html, ruleEpoch: renderIsProvisional(item) ? authorRuleEpoch.value : null });
+  }
   return html;
 }
 
@@ -4033,7 +4038,7 @@ function injectThemeCss(theme) {
   === 是 O(1)；串流中的那一則每次都不同，走下面的節流。
 */
 const renderMemo = new WeakMap()
-const STREAM_RENDER_INTERVAL_MS = 150
+const streamRenderThrottle = createStreamRenderThrottle()
 const streamRenderTick = ref(0)
 let streamRenderTimer = 0
 
@@ -4075,33 +4080,42 @@ function cardHandlesTag(tagName) {
 
 const renderMessage = (item) => {
   if (!item) return ''
+  // 先查記住的結果：已完成的歷史訊息每次重繪都會經過這裡，命中就不必再掃一遍思考標籤。
+  // 記住的 content 是拆完思考之後的字，相同就代表這一則已經拆過。
+  let key = renderMemoKey(item)
+  let entry = renderMemo.get(item)
+  if (renderMemoHit(entry, key)) return entry.html
   const split = splitThinkingContent(item.content || '', { keep: cardHandlesTag })
   if (split.hasThinking) {
     item.thinkingContent = item.thinkingContent || split.thinkingContent
     item.content = split.visibleContent
+    key = renderMemoKey(item)
+    if (renderMemoHit(entry, key)) return entry.html
   }
-  const key = renderMemoKey(item)
-  const entry = renderMemo.get(item)
-  if (renderMemoHit(entry, key)) return entry.html
 
-  // 串流中的那一則：最多每 150ms 換一次畫面。上游每秒送幾十個 chunk，每個都整則
-  // 重建 innerHTML 的話，作者的美化腳本剛套上就被拆掉。畫面看起來仍是連續的，
-  // 只是一次多幾個字。
-  if (!item.chatFinish && !item.chatLoading && entry && entry.streamAt) {
+  // 串流中的那一則：照上一次排版的成本決定多久換一次畫面（見 canvas-stream-render.ts）。
+  // 上游每秒送幾十個 chunk，每個都整則重建 innerHTML 的話，長回覆會把主執行緒佔滿，
+  // 作者的美化腳本也剛套上就被拆掉。畫面看起來仍是連續的，只是一次多幾個字。
+  const streaming = !item.chatFinish && !item.chatLoading
+  const throttleKey = streamRenderKey(item)
+  if (streaming && throttleKey) {
     // 讀一下 tick 讓這一列在下一次節流到期時重新渲染
     void streamRenderTick.value
-    const elapsed = Date.now() - entry.streamAt
-    if (elapsed < STREAM_RENDER_INTERVAL_MS) {
+    const held = streamRenderThrottle.cached(throttleKey, Date.now())
+    if (held) {
       if (!streamRenderTimer) {
         streamRenderTimer = setTimeout(() => {
           streamRenderTimer = 0
           streamRenderTick.value++
-        }, STREAM_RENDER_INTERVAL_MS - elapsed)
+        }, held.waitMs)
       }
-      return entry.html
+      return held.html
     }
+  } else if (throttleKey) {
+    streamRenderThrottle.forget(throttleKey)
   }
 
+  const renderStartedAt = Date.now()
   const provisionalBefore = authorRules.provisional
   // 世界卡：發言者區塊的名字列補頭像（名冊來自 /role/detail 的 world）。普通卡沒有區塊，原樣回傳。
   const html = decorateSpeakers(renderMarkdown(item), worldMembers(roleView.value))
@@ -4109,12 +4123,14 @@ const renderMessage = (item) => {
     // 規則結果還沒回來。串流中的照樣換上（字要立刻看得到）；已定稿的先留著上一版畫面（有的話），
     // 不讓它退回原文閃一下。worker 回來 epoch 一變，記錄就失效、重算成完整套用的結果。
     const shown = item.chatFinish && entry && entry.html ? entry.html : html
-    renderMemo.set(item, { key, html: shown, streamAt: item.chatFinish ? 0 : Date.now(), ruleEpoch: authorRuleEpoch.value })
+    renderMemo.set(item, { key, html: shown, ruleEpoch: authorRuleEpoch.value })
+    if (streaming && throttleKey) streamRenderThrottle.record(throttleKey, shown, Date.now() - renderStartedAt, Date.now())
     return shown
   }
   activateMessageScripts(item, html)
   activateFrontendBlocks(item, html)
-  renderMemo.set(item, { key, html, streamAt: item.chatFinish ? 0 : Date.now() })
+  renderMemo.set(item, { key, html })
+  if (streaming && throttleKey) streamRenderThrottle.record(throttleKey, html, Date.now() - renderStartedAt, Date.now())
   return html
 }
 
@@ -7012,7 +7028,8 @@ function releaseExpiredChatOperationOwnership(recorded: any, reason: string): vo
   const operationId = String(
     recorded?.operationId || pending?.operationId || readLsEntry()?.operationId || '',
   ).trim();
-  // 伺服器最近說「還在跑」就不放手。權威在後端，碼表只是問不到時的退路。
+  // 伺服器最近說「還在跑」、或串流連線還在送東西，就不放手。權威在後端，碼表只是
+  // 問不到、連線也安靜下來時的退路。一則長回覆跑五分鐘以上是正常的，跟 agent 一樣。
   // 守衛放在這裡而不是每一個判定點：放手一律走這條路，堵住這裡就堵住全部，
   // 將來多一個判定點也不會漏。
   const liveState = recorded ? recorded.state : pending?.operationState;
@@ -7020,6 +7037,7 @@ function releaseExpiredChatOperationOwnership(recorded: any, reason: string): vo
   if (isChatOperationBackendStillWorking({
     state: liveState,
     observedAt: liveObservedAt,
+    streamActivityAt: pending?.streamActivityAt,
     now: Date.now(),
   })) {
     // 繼續問。不重排的話這一輪會停在沒有人推進的狀態。
@@ -7109,7 +7127,8 @@ function requestAuthoritativeOperationReconciliation(
   const capturedConversationId = String(unref(conversationId) || '');
   operationStatusRequestKey = operationId;
   const endpoint = `${_this.requestUrl.chatOperationStatus}/${encodeURIComponent(operationId)}`;
-  _this.http.get(endpoint, { showLoading: false }).then((res: any) => {
+  // 背景對帳：失敗時下面自己重排或放手，使用者沒有要處理的事，傳輸層逾時不彈提示。
+  _this.http.get(endpoint, { showLoading: false, quietTransport: true }).then((res: any) => {
     operationStatusRequestKey = '';
     if (
       !isConversationGenerationCurrent(capturedGeneration)
@@ -7630,7 +7649,7 @@ function probePendingTurnAfterDurableAckTimeout(
     return;
   }
   const endpoint = `${_this.requestUrl.chatOperationStatus}${probeQuery}`;
-  _this.http.get(endpoint, { showLoading: false }).then((res: any) => {
+  _this.http.get(endpoint, { showLoading: false, quietTransport: true }).then((res: any) => {
     if (!isCurrentProbe()) return;
     durableAckProbeKey = '';
     const capability = classifyOperationCapabilityResponse(res);
@@ -8136,9 +8155,11 @@ function sendWebSocketMessage(data) {
 // 票證用完即失效，每一次連線（含重連與續跑）都要重新換。
 async function fetchChatWsTicket(): Promise<string> {
   try {
+    // 換不到票證時由連線收尾那條路決定要重連、對帳還是還原草稿；再彈一個「逾時」只會讓人困惑。
     const res: any = await _this.http.post(_this.requestUrl.chatWsTicket, {
       header: { 'content-type': 'application/json' },
       showLoading: false,
+      quietTransport: true,
       data: {},
     });
     if (res?.statusCode === 200 && res.data?.ticket) return String(res.data.ticket);
@@ -8226,7 +8247,7 @@ async function connectWebSocket(
   };
   const onMessage = (res: any) => {
     if (!isOwnedSocketCallback(socketToken, capturedGeneration)) return;
-    heartbeatManager.updateLastMessageTime();
+    if (pendingChatTurn) pendingChatTurn.streamActivityAt = Date.now();
     handlerMessage(res, capturedGeneration, socketToken);
   };
   const onClose = (res: any) => {
