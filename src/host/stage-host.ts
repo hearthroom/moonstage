@@ -24,7 +24,6 @@ export interface StageHost {
      * 對話頁頂欄目前的實際底色（rgb(...)），給宿主塗到系統狀態列（theme-color）；作者換了配色會再叫一次。
      * bottom 是輸入區底邊看到的底色，給底部工具列（iOS Safari）；舊的舞台或殼不給就是 undefined。
      * null＝離開對話頁，宿主把狀態列還原成自己的顏色。不實作就不塗。
-     * iOS 26 起的 Safari 不看 theme-color：宿主可以呼叫 paintBrowserChrome（本套件匯出）一併處理。
      */
     themeColor?(color: string | null, bottom?: string | null): void
   }
@@ -57,8 +56,6 @@ export interface StageHost {
   scrollTo(el: Element | null, options?: { offset?: number }): void
 }
 
-import { paintBrowserChrome } from './browser-chrome'
-
 type UniLike = Record<string, any>
 
 function uniGlobal(): UniLike | null {
@@ -77,13 +74,18 @@ export function browserHost(overrides: Partial<StageHost> = {}): StageHost {
       toast: (text) => { if (text) console.info('[stage] ' + text) },
       confirm: async (o) => (typeof window !== 'undefined' && typeof window.confirm === 'function' ? window.confirm(o.content) : false),
       loading: () => {},
-      themeColor: (color, bottom) => {
+      themeColor: (color) => {
         if (typeof document === 'undefined') return
-        paintBrowserChrome(document, color, bottom)
         const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
         if (!meta) return
         if (themeColorDefault === null) themeColorDefault = meta.content
-        meta.content = color ?? themeColorDefault
+        const next = color ?? themeColorDefault
+        if (meta.content === next) return
+        // 換掉整個標籤而不是改 content：有些瀏覽器（iOS Safari）對既有標籤改屬性不會重新染色。
+        const fresh = document.createElement('meta')
+        fresh.name = 'theme-color'
+        fresh.content = next
+        meta.replaceWith(fresh)
       },
     },
     storage: {
