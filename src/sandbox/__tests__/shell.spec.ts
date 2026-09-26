@@ -143,7 +143,8 @@ describe('殼：冷啟動與事件順序', () => {
     document.documentElement.classList.add('ba-day')
     await new Promise((r) => setTimeout(r, 80))
     const after = sent.filter((m) => m.type === 'chrome-color')
-    expect(after[after.length - 1]).toEqual({ type: 'chrome-color', color: 'rgb(200, 220, 240)' })
+    // 底部工具列用的輸入區底色也一起送（iOS Safari 看這個，不看 theme-color）。
+    expect(after[after.length - 1]).toMatchObject({ type: 'chrome-color', color: 'rgb(200, 220, 240)', bottom: expect.stringMatching(/^rgb\(\d+, \d+, \d+\)$/) })
     s.dispose()
     document.documentElement.classList.remove('ba-day')
     style.remove()

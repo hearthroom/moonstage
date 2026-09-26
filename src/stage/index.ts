@@ -25,6 +25,7 @@ import loading from '@/utils/loadingManager.js'
 import { setAuthorRuleStorageScope } from '@/common/author-rules'
 
 export { browserHost, setStageHost, useStageHost } from '@/host/stage-host'
+export { paintBrowserChrome } from '@/host/browser-chrome'
 export type { StageHost } from '@/host/stage-host'
 export type { SandboxHostOptions, SandboxSavesStore } from '@/host/sandbox-host'
 export { sandboxOriginFor } from '@/sandbox/protocol'

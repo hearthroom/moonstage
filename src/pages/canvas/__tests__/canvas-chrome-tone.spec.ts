@@ -7,6 +7,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   blendOver,
+  bottomGradientColor,
+  chromeBottomColor,
   chromeTopColor,
   effectiveBackground,
   firstGradientColor,
@@ -89,5 +91,27 @@ describe('漸層頂欄', () => {
     document.body.innerHTML = '<div style="background: rgb(255, 255, 255)"><div class="topTabbar" style="background-image: linear-gradient(rgb(139, 195, 74), rgb(104, 159, 56))"></div></div>'
     expect(chromeTopColor(document)).toBe('rgb(139, 195, 74)')
     expect(toneForBackground(effectiveBackground(document.querySelector('.topTabbar')!))).toBe('dark')
+  })
+})
+
+describe('底部工具列的顏色（輸入區底邊）', () => {
+  it('漸層取靠底邊的那一端：往下的取最後一個色標，往上的取第一個', () => {
+    const g = (head: string) => `linear-gradient(${head}rgb(10, 20, 30) 0%, rgb(200, 100, 50) 100%)`
+    expect(bottomGradientColor(g(''))).toEqual({ r: 200, g: 100, b: 50, a: 1 })
+    expect(bottomGradientColor(g('180deg, '))).toEqual({ r: 200, g: 100, b: 50, a: 1 })
+    expect(bottomGradientColor(g('135deg, '))).toEqual({ r: 200, g: 100, b: 50, a: 1 })
+    expect(bottomGradientColor(g('to bottom, '))).toEqual({ r: 200, g: 100, b: 50, a: 1 })
+    expect(bottomGradientColor(g('to top, '))).toEqual({ r: 10, g: 20, b: 30, a: 1 })
+    expect(bottomGradientColor(g('0deg, '))).toEqual({ r: 10, g: 20, b: 30, a: 1 })
+    expect(bottomGradientColor(g('-20deg, '))).toEqual({ r: 10, g: 20, b: 30, a: 1 })
+    expect(bottomGradientColor('none')).toBeNull()
+  })
+
+  it('透明的輸入區量到的是外層背景漸層的尾端；頂欄量的仍是第一個色標', () => {
+    document.body.innerHTML = '<div class="root" style="background-image: linear-gradient(135deg, rgb(68, 44, 76) 0%, rgb(120, 80, 140) 100%)"><div class="topTabbar"></div><div class="composer-scope"></div></div>'
+    expect(chromeBottomColor(document)).toBe('rgb(120, 80, 140)')
+    expect(chromeTopColor(document)).toBe('rgb(68, 44, 76)')
+    document.body.innerHTML = ''
+    expect(chromeBottomColor(document)).toBeNull()
   })
 })
