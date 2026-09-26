@@ -4,7 +4,7 @@
 	"canvas.fullscreen.failed": "全螢幕沒有開啟，你可以繼續遊玩或再試一次。",
 
 	"error.contextCapacityTitle": "內容超過模型容量",
-	"error.contextCapacityExceeded": "目前的內容超過模型可用容量，請縮短這次訊息或切換容量較大的模型，既有對話已保留。",
+	"error.contextCapacityExceeded": "這段對話已經放不進目前的上下文容量，調大容量或換一個容量更大的模型就能繼續，對話都還保留著。",
 	"error.contextCapacitySettingsTitle": "這張卡需要更大的容量",
 	"error.contextCapacitySettings": "這張卡的設定放不進目前的容量，這次沒有扣積分，你的訊息也還在。",
 	"canvas.capacity.title": "這張卡需要更大的容量",

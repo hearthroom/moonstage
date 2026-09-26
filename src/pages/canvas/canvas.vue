@@ -4436,7 +4436,7 @@ function getSystemMsgSub(finishReason) {
   };
   return map[finishReason] || '';
 }
-function getSystemMsgCtaLabel(action: ChatOperationUIAction | 'refresh_history' | 'capacity_choice' | '') {
+function getSystemMsgCtaLabel(action: ChatOperationUIAction | 'refresh_history' | 'capacity_choice' | 'open_model_settings' | '') {
   if (
     action === 'retry'
     || action === 'retry_rewrite'
@@ -4451,12 +4451,15 @@ function getSystemMsgCtaLabel(action: ChatOperationUIAction | 'refresh_history' 
   if (action === 'switch_model') return t('chat.switchModel') || '切換模型';
   if (action === 'refresh_history') return t('chat.refreshConversation') || '重新整理對話';
   if (action === 'capacity_choice') return t('canvas.capacity.choose');
+  if (action === 'open_model_settings') return t('contextFootprint.action');
   return '';
 }
 
 function getSystemMsgCta(finishReason, item, index) {
   // 容量選擇是改設定再送出，不是「繼續」那一類操作，不受那個能力開關管。
   if (finishReason === 'context_capacity_choice') return getSystemMsgCtaLabel('capacity_choice');
+  // 對話中途裝不下：打開模型設定調大上下文容量，同樣是改設定，不是重跑這一輪。
+  if (finishReason === 'context_capacity_exceeded') return getSystemMsgCtaLabel('open_model_settings');
   if (!allowsStageAction(stageHost.capabilities, 'continue')) return ''
   return getSystemMsgCtaLabel(
     getSystemMsgCtaAction(finishReason, item, index),
@@ -4477,6 +4480,7 @@ function getSystemMsgCtas(item, index) {
 function getSystemMsgCtaAction(finishReason, item, index) {
   if (finishReason === 'history_load_error') return 'refresh_history';
   if (finishReason === 'context_capacity_choice') return 'capacity_choice';
+  if (finishReason === 'context_capacity_exceeded') return 'open_model_settings';
   // 逃生口必須留在 App 內：refresh_history 是重載這段對話,不是叫用戶自己
   // 重新整理瀏覽器——PWA 與原生 App 根本沒有那個動作。
   if (finishReason === 'outcome_unconfirmed') return 'refresh_history';
@@ -4540,6 +4544,10 @@ function startRetryGenerationFromAuthoritativeTerminal(item): boolean {
 }
 
 function onSystemMsgCta(action, item, index) {
+  if (action === 'open_model_settings') {
+    openModelSelect();
+    return;
+  }
   if (action === 'capacity_choice') {
     askCapacityChoice(item?.capacityAdvice || null, String(item?.capacityDraft || ''), String(item?.id ?? ''));
     return;

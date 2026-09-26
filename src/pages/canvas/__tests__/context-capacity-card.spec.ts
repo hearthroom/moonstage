@@ -15,19 +15,21 @@ function renderValue(name: string, reason: string) {
 }
 
 describe('capacity rejection card', () => {
-  it('shows capacity guidance instead of a network failure and offers no blind retry', () => {
+  it('tells the player to raise the context capacity instead of retrying blindly', () => {
     const reason = resolveChatErrorPresentation('context_capacity_exceeded', t).finishReason
     const card = mount(ChatSystemMessage, { props: {
       kind: renderValue('getSystemMsgKind', reason),
       label: renderValue('getSystemMsgLabel', reason),
       sub: renderValue('getSystemMsgSub', reason),
-      cta: '',
+      cta: t('contextFootprint.action'),
+      ctaAction: 'open_model_settings',
     } })
-    expect(card.text()).toContain('容量')
-    expect(card.text()).toContain('縮短這次訊息')
-    expect(card.text()).toContain('既有對話已保留')
+    expect(card.text()).toContain('上下文容量')
+    expect(card.text()).toContain('調大容量')
+    expect(card.text()).toContain('對話都還保留著')
     expect(card.text()).not.toContain('連線失敗')
-    expect(card.find('.sys-cta').exists()).toBe(false)
+    expect(card.text()).not.toContain('伺服器暫時不穩定')
+    expect(card.find('.sys-cta').text()).toBe('調整上下文容量')
   })
 })
 
