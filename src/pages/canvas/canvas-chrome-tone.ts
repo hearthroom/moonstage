@@ -65,34 +65,13 @@ export function firstGradientColor(backgroundImage: string | null | undefined): 
   return m ? parseComputedColor(m[1]) : null
 }
 
-/**
- * 漸層靠底邊那一端的色標。往下的漸層（預設、to bottom、多數斜向角度）是最後一個色標；
- * 往上的（to top、0deg 附近）是第一個。給底部工具列取色用：輸入區常是透明的，看到的是背景漸層的尾端。
- */
-export function bottomGradientColor(backgroundImage: string | null | undefined): RGBA | null {
-  const v = String(backgroundImage || '')
-  if (!/gradient\(/i.test(v)) return null
-  const stops = v.match(new RegExp(GRADIENT_COLOR.source, 'gi'))
-  if (!stops || !stops.length) return null
-  const head = v.slice(v.indexOf('(') + 1).split(',')[0].trim().toLowerCase()
-  let upward = /^to\s+top\b/.test(head)
-  const angle = head.match(/^(-?\d+(?:\.\d+)?)deg$/)
-  if (angle) {
-    const a = ((Number(angle[1]) % 360) + 360) % 360
-    upward = a < 90 || a > 270
-  }
-  return parseComputedColor(upward ? stops[0] : stops[stops.length - 1])
-}
-
-export type ChromeEdge = 'top' | 'bottom'
-
-/** 一層的底：background-color 疊上漸層靠這一邊的色標（漸層畫在底色之上）。都沒有就 null。 */
-function layerBackground(view: Window, el: Element, pseudo?: string, edge: ChromeEdge = 'top'): RGBA | null {
+/** 一層的底：background-color 疊上漸層的第一個色標（漸層畫在底色之上）。都沒有就 null。 */
+function layerBackground(view: Window, el: Element, pseudo?: string): RGBA | null {
   const cs = view.getComputedStyle(el, pseudo)
   // 偽元素沒有 content 就不存在（jsdom 對偽元素回的是元素本身的樣式，content 也會是 normal，一樣略過）
   if (pseudo && (!cs.content || cs.content === 'none' || cs.content === 'normal')) return null
   const bg = parseComputedColor(cs.backgroundColor)
-  const grad = edge === 'bottom' ? bottomGradientColor(cs.backgroundImage) : firstGradientColor(cs.backgroundImage)
+  const grad = firstGradientColor(cs.backgroundImage)
   let acc: RGBA | null = bg && bg.a > 0 ? bg : null
   if (grad && grad.a > 0) acc = acc ? blendOver(grad, acc) : grad
   return acc
@@ -102,18 +81,18 @@ function layerBackground(view: Window, el: Element, pseudo?: string, edge: Chrom
  * 這個節點實際看到的底色：從最外層往內，每一層的底色照 alpha 疊上去（含漸層的第一個色標）；
  * 節點自己的 ::before／::after 有底的話也疊上去（作者常拿偽元素當頂欄的底）。全透明就是頁面預設底。
  */
-export function effectiveBackground(el: Element, fallback: RGBA = DEFAULT_PAGE_BG, edge: ChromeEdge = 'top'): RGBA {
+export function effectiveBackground(el: Element, fallback: RGBA = DEFAULT_PAGE_BG): RGBA {
   const chain: Element[] = []
   for (let node: Element | null = el; node; node = node.parentElement) chain.push(node)
   let acc: RGBA = { ...fallback }
   const view = el.ownerDocument?.defaultView
   if (!view) return acc
   for (let i = chain.length - 1; i >= 0; i -= 1) {
-    const layer = layerBackground(view, chain[i], undefined, edge)
+    const layer = layerBackground(view, chain[i])
     if (layer) acc = blendOver(layer, acc)
   }
   for (const pseudo of ['::before', '::after']) {
-    const layer = layerBackground(view, el, pseudo, edge)
+    const layer = layerBackground(view, el, pseudo)
     if (layer) acc = blendOver(layer, acc)
   }
   return acc
@@ -127,17 +106,6 @@ export function chromeTopColor(scope: ParentNode | null | undefined = typeof doc
   const el = (scope && scope.querySelector('.topTabbar')) || fallbackEl || null
   if (!el) return null
   const c = effectiveBackground(el)
-  return `rgb(${c.r}, ${c.g}, ${c.b})`
-}
-
-/**
- * 輸入區底邊實際看到的底色，給宿主塗到底部工具列。輸入區多半透明，量到的是背景漸層靠底的那一端。
- * 沒有輸入區（還沒掛、或作者把它收起來）就 null。
- */
-export function chromeBottomColor(scope: ParentNode | null | undefined = typeof document === 'undefined' ? null : document, fallbackEl?: Element | null): string | null {
-  const el = (scope && scope.querySelector('.composer-scope')) || fallbackEl || null
-  if (!el) return null
-  const c = effectiveBackground(el, DEFAULT_PAGE_BG, 'bottom')
   return `rgb(${c.r}, ${c.g}, ${c.b})`
 }
 

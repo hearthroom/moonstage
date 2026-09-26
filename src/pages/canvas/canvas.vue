@@ -476,7 +476,7 @@ import { captureBodySnapshot, restoreBodySnapshot, sweepForeignNodes } from './c
 import CanvasPopup from './components/canvas-popup.vue'
 import CanvasModelPanel from './components/canvas-model-panel.vue'
 import { computeCardThemeVars, CARD_THEME_VAR_NAMES } from './canvas-card-theme'
-import { chromeBottomColor, chromeTopColor, syncChromeTone } from './canvas-chrome-tone'
+import { chromeTopColor, syncChromeTone } from './canvas-chrome-tone'
 import CanvasConfirm from './components/canvas-confirm.vue'
 import CanvasCapacityChoice from './components/canvas-capacity-choice.vue'
 import {
@@ -2814,7 +2814,7 @@ function mountSandbox(asset: any) {
       onMessageSwipe: (_hostId, delta) => { onGreetingSwipe(delta); },
       onPanelUi: (panelName, event, args) => onSandboxPanelUi(panelName, event, args),
       onDocState: (state) => { sandboxDocState.value = state; if (sandboxSkinOn.value) applySandboxSkin(); },
-      onChromeColor: (color, bottom) => { stageHost.ui.themeColor?.(color, bottom); },
+      onChromeColor: (color) => { stageHost.ui.themeColor?.(color); },
       // 殼裡標準頁首與輸入區的按鍵：跟這一頁自己的元件綁的是同一批函式。
       onUi: (event, key) => {
         switch (event) {
@@ -3398,18 +3398,15 @@ function syncCardTheme() {
 
 // 系統狀態列跟頂欄同色（host.ui.themeColor）。不掛在卡片主題的同步底下：那條只在有作者主題的卡才跑，
 // 這裡每張卡都要。沙箱卡的頂欄在殼裡，由殼回報（onChromeColor），這裡不量。
-// 底部工具列跟輸入區同色（第二個參數）：iOS Safari 的底部工具列、以及宿主願意的話。
 let themeColorLast: string | null | undefined
 let themeColorObserver: MutationObserver | null = null
 let themeColorRaf = 0
 function syncThemeColor() {
   if (typeof document === 'undefined' || !stageHost.ui.themeColor || sandboxCard.value) return
   const color = chromeTopColor(document)
-  const bottom = chromeBottomColor(document)
-  const key = `${color}|${bottom}`
-  if (key === themeColorLast) return
-  themeColorLast = key
-  stageHost.ui.themeColor(color, bottom)
+  if (color === themeColorLast) return
+  themeColorLast = color
+  stageHost.ui.themeColor(color)
 }
 function scheduleThemeColorSync() {
   if (typeof window === 'undefined') return
