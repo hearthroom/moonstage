@@ -365,6 +365,8 @@ import { cfImageDesktop } from "@/utils/image-transform.js"
 import { createFullscreenController } from './canvas-fullscreen';
 import { bindCanvasViewport } from './canvas-viewport';
 import { mountGeometryDebug, rectText } from '@/common/geometry-debug';
+import { instructionsFromAPI } from '@/api/instruction-fields'
+import { usableFirstPage } from './canvas-first-page'
 import {computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, unref, getCurrentInstance, nextTick, watch, watchEffect} from 'vue';
 import {
   onLoad,
@@ -4999,11 +5001,13 @@ function chatStart(greetingIndex?: number) {
     // 2026-05-08: chatStart 服务端会做 conversation 创建 / 历史拉取 / theme V3 state hydrate,
     // 偶尔耗时 30s+ 会被默认 timeout 截断. 显式延长到 60s 留充足边际.
     timeout: 60000,
+    // firstPageSize：接續既有對話時，伺服器順便帶回第一頁歷史（firstPage），開場少等一趟 messages。
+    // 舊版伺服器不認這個欄位也不會回 firstPage，下面照常自己去問。
     data: greetingIndex === undefined
-      ? { roleId: unref(roleId) }
+      ? { roleId: unref(roleId), firstPageSize: ajax.value.rows }
       // 伺服器是在這一刻建立對話並落下開場白的，所以選到哪一條要在這裡講。
       // 舊版伺服器沒有這個欄位，只有真的有替代開場白時才帶。
-      : { roleId: unref(roleId), greetingIndex },
+      : { roleId: unref(roleId), greetingIndex, firstPageSize: ajax.value.rows },
   }).then(res => {
     if (res.statusCode == 200) {
       responseSettingsVersion.value = res.data.responseSettingsVersion === 1 ? 1 : 0;
@@ -5015,9 +5019,10 @@ function chatStart(greetingIndex?: number) {
       // 存檔數要在面板打開前就知道：「＋」面板裡的兩顆鍵滿了要停用。
       loadArchives();
       if (unref(historyConversation)) {
-        ajax.flag = true;
-        ajax.page = 1;
-        getHistoryMsg();
+        // ajax 是 ref：要改 .value。之前寫成 ajax.flag，第一次進來剛好是初始值才沒出事。
+        ajax.value.flag = true;
+        ajax.value.page = 1;
+        getHistoryMsg(res.data.firstPage);
       } else {
         const welcomeContent = res.data.defaultRelay;
         let data: any = {
@@ -6260,7 +6265,9 @@ function recoverEmptyHistory(reason: HistoryRecoveryReason, request: {
 }
 
 //获取历史对话
-function getHistoryMsg() {
+// preloadedFirstPage：conversation/start 順便帶回的第一頁（跟 messages 同一份回應）。
+// 只在要的正是這個對話的第一頁時拿來用，省掉開場再問一次 messages；其餘情況照常發請求。
+function getHistoryMsg(preloadedFirstPage?: any) {
   if (!ajax.value.flag) {
     return;
   }
@@ -6286,10 +6293,13 @@ function getHistoryMsg() {
   };
   if (supportsOperationOutcome) historyRequestData.supportsOperationOutcome = true;
   const pendingAtHistoryRequest = pendingChatTurn;
-  _this.http.get(_this.requestUrl.historyMessageList, {
-    showLoading: false,
-    data: historyRequestData,
-  }).then(res => {
+  const historyRequest = usableFirstPage(preloadedFirstPage, pageAtHistoryRequest, conversationIdAtHistoryRequest)
+    ? Promise.resolve({ statusCode: 200, data: instructionsFromAPI(preloadedFirstPage) })
+    : _this.http.get(_this.requestUrl.historyMessageList, {
+      showLoading: false,
+      data: historyRequestData,
+    });
+  historyRequest.then(res => {
     if (!isConversationGenerationCurrent(generationAtHistoryRequest)) {
       const recoveryScheduled = recoverEmptyHistory('stale_generation', {
         conversationId: conversationIdAtHistoryRequest,

@@ -12,13 +12,13 @@ describe('chat operation history ownership regressions', () => {
       path.resolve(process.cwd(), 'src/pages/canvas/canvas.vue'),
       'utf8',
     )
-    const historyStart = chat.indexOf('function getHistoryMsg() {')
+    const historyStart = chat.indexOf('function getHistoryMsg(')
     const historyEnd = chat.indexOf('\nfunction hideLoadTips(', historyStart)
     expect(historyStart).toBeGreaterThanOrEqual(0)
     expect(historyEnd).toBeGreaterThan(historyStart)
 
     const history = chat.slice(historyStart, historyEnd)
-    const response = history.slice(history.indexOf('}).then(res => {'))
+    const response = history.slice(history.indexOf('historyRequest.then(res => {'))
     expect(history).toContain('const pageAtHistoryRequest = ajax.value.page;')
     expect(history).toContain(
       'const generationAtHistoryRequest = conversationGeneration.value;',
