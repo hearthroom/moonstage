@@ -8153,13 +8153,14 @@ function sendWebSocketMessage(data) {
 // 串流連線不能帶 Authorization 標頭，所以身分改成兩步：先用 Bearer 換一張
 // 短效一次性票證，連線後的第一幀交出票證，伺服器回 ready 之後才收聊天幀。
 // 票證用完即失效，每一次連線（含重連與續跑）都要重新換。
-async function fetchChatWsTicket(): Promise<string> {
+async function fetchChatWsTicket(quiet: boolean): Promise<string> {
   try {
-    // 換不到票證時由連線收尾那條路決定要重連、對帳還是還原草稿；再彈一個「逾時」只會讓人困惑。
     const res: any = await _this.http.post(_this.requestUrl.chatWsTicket, {
       header: { 'content-type': 'application/json' },
       showLoading: false,
-      quietTransport: true,
+      // 重連／續跑時換不到票證，由連線收尾那條路自己重試或對帳，畫面上的回覆還在，
+      // 再彈「逾時」只會讓人困惑。第一次送出換不到就照常提示：那時沒有別的東西告訴使用者出了事。
+      quietTransport: quiet,
       data: {},
     });
     if (res?.statusCode === 200 && res.data?.ticket) return String(res.data.ticket);
@@ -8183,7 +8184,7 @@ async function connectWebSocket(
   activeSocketToken = socketToken;
   const capturedGeneration = conversationGeneration.value;
 
-  const ticket = await fetchChatWsTicket();
+  const ticket = await fetchChatWsTicket(!!resumeParams);
   // 換票期間可能已經有別的連線接手，或者這一輪被取消了。
   if (!chatTransport.isCurrentSocket(socketToken)) return;
   if (!ticket) {
