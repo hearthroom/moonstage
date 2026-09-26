@@ -17,6 +17,8 @@ export interface PendingChatTurn {
   clientOperationId?: string
   operationId?: string
   operationState?: string
+  /** 這一輪的串流連線最後一次收到任何東西的時間，當作後端還活著的證據。 */
+  streamActivityAt?: number
   operationVersion?: number
   serverOperationKind?: string
   assistantChatId?: string
@@ -103,10 +105,23 @@ export const CHAT_OPERATION_LIVE_STATES = ['accepted', 'generating']
 export function isChatOperationBackendStillWorking(input: {
   state?: string | null
   observedAt?: number | null
+  /** 這一輪的串流連線最後一次收到任何東西的時間。 */
+  streamActivityAt?: number | null
   now: number
 }): boolean {
   const state = String(input?.state ?? '').trim()
-  if (CHAT_OPERATION_LIVE_STATES.indexOf(state) < 0) return false
+  const liveState = CHAT_OPERATION_LIVE_STATES.indexOf(state) >= 0
+  // 串流連線本身就是心跳：還在收到東西，這一輪就還活著，與開始了多久無關。
+  // 伺服器已經說過終態的話，後面的收尾幀不算。
+  const activityAt = Number(input?.streamActivityAt)
+  const nowForActivity = Number(input?.now)
+  if (
+    (state === '' || liveState)
+    && Number.isFinite(activityAt)
+    && Number.isFinite(nowForActivity)
+    && nowForActivity - activityAt <= CHAT_OPERATION_LIVE_STATUS_TRUST_MS
+  ) return true
+  if (!liveState) return false
   const observedAt = Number(input?.observedAt)
   const now = Number(input?.now)
   if (!Number.isFinite(observedAt) || !Number.isFinite(now)) return false

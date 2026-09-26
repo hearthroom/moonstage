@@ -54,3 +54,36 @@ describe('後端才是權威', () => {
     })).toBe(true)
   })
 })
+
+// 串流連線本身就是心跳：字還在一直送進來，這一輪就還活著，不管從開始算過了幾分鐘。
+// 一則長回覆（思考加正文上萬 token）跑五分鐘以上是正常的，跟 agent 一樣不該被碼表殺掉；
+// 只有連線斷了、而且過了信任窗都沒再收到任何東西，才算真的中斷。
+describe('串流還在送就是還活著', () => {
+  const now = 1_000_000_000
+
+  it('狀態只在開頭說過一次，但字剛剛還在進來 → 不准放手', () => {
+    expect(isChatOperationBackendStillWorking({
+      state: 'accepted',
+      observedAt: now - CHAT_OPERATION_LIVE_STATUS_TRUST_MS - 60_000,
+      streamActivityAt: now - 2_000,
+      now,
+    })).toBe(true)
+  })
+
+  it('從沒問到狀態，但串流剛剛還有東西 → 不准放手', () => {
+    expect(isChatOperationBackendStillWorking({ state: '', observedAt: null, streamActivityAt: now - 2_000, now })).toBe(true)
+  })
+
+  it('串流也安靜超過信任窗 → 退回碼表', () => {
+    expect(isChatOperationBackendStillWorking({
+      state: 'accepted',
+      observedAt: null,
+      streamActivityAt: now - CHAT_OPERATION_LIVE_STATUS_TRUST_MS - 1,
+      now,
+    })).toBe(false)
+  })
+
+  it('伺服器已經說結束了，收尾幀不算還在跑', () => {
+    expect(isChatOperationBackendStillWorking({ state: 'completed', observedAt: now - 1_000, streamActivityAt: now - 1_000, now })).toBe(false)
+  })
+})
