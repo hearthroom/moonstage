@@ -1147,7 +1147,7 @@ describe('desktop chat operation product contract', () => {
 
   it('requests capable history and merges top-level operation projections before rendering the timeline', () => {
     const chat = readChat()
-    const history = sliceBetween(chat, 'function getHistoryMsg()', '// 隐藏加载提示')
+    const history = sliceBetween(chat, 'function getHistoryMsg(', '// 隐藏加载提示')
 
     expect(history).toContain('if (supportsOperationOutcome) historyRequestData.supportsOperationOutcome = true')
     expect(history).toContain('filter(shouldKeepPersistedHistoryBubble)')
@@ -1161,7 +1161,7 @@ describe('desktop chat operation product contract', () => {
   it('settles authoritative stale loading before history can reinsert a typing bubble', () => {
     const history = sliceBetween(
       readChat(),
-      'function getHistoryMsg()',
+      'function getHistoryMsg(',
       '// 隐藏加载提示',
     )
     expect(history).toContain('authoritativePendingOperationDisposition')
