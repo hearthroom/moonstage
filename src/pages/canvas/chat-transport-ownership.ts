@@ -741,6 +741,11 @@ export function projectionFinishReason(
   if (status.state === 'stopped') {
     return 'user_stop'
   }
+  // 裝不下目前的上下文容量、積分不夠：伺服器已經講了原因，照實呈現才知道該去調容量
+  // 或補積分。說成伺服器不穩定，玩家只會一直換模型重送（每次都失敗）。
+  if (status.reasonCode === 'context_capacity_exceeded' || status.reasonCode === 'insufficient_credits') {
+    return status.reasonCode
+  }
   if (status.state === 'failed_retryable' || status.state === 'failed_terminal') {
     return 'server_error'
   }

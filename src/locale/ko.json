@@ -4,7 +4,7 @@
 	"canvas.fullscreen.failed": "전체 화면으로 전환하지 못했어요. 그대로 플레이하거나 다시 시도할 수 있어요.",
 
 	"error.contextCapacityTitle": "모델의 컨텍스트 용량을 초과했습니다",
-	"error.contextCapacityExceeded": "내용이 모델의 사용 가능한 컨텍스트 용량을 초과했습니다. 이번 메시지를 줄이거나 용량이 더 큰 모델로 변경해 주세요. 기존 대화는 보존되어 있습니다.",
+	"error.contextCapacityExceeded": "이 대화가 지금의 컨텍스트 용량에 다 들어가지 않아서, 용량을 늘리거나 용량이 더 큰 모델로 바꾸면 지금까지의 대화 그대로 이어갈 수 있어요.",
 	"error.contextCapacitySettingsTitle": "이 카드는 더 큰 용량이 필요해요",
 	"error.contextCapacitySettings": "이 카드의 설정이 현재 용량에 들어가지 않아요. 이번에는 포인트가 차감되지 않았고 메시지도 그대로 있어요.",
 	"canvas.capacity.title": "이 카드는 더 큰 용량이 필요해요",

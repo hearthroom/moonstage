@@ -795,6 +795,22 @@ describe('desktop chat operation product contract', () => {
     expect(source).toContain("'rewrite_below_threshold': 'model-error'")
   })
 
+  it('keeps the real reason of a failed turn instead of calling it a server problem', () => {
+    // 伺服器把「放不進目前的上下文容量」「積分不夠」這類失敗都標成不可重試；
+    // 畫面若一律說伺服器不穩定，玩家只會一直換模型，永遠不會去調容量。
+    expect(projectionFinishReason({
+      kind: 'send', state: 'failed_terminal', reasonCode: 'context_capacity_exceeded',
+    })).toBe('context_capacity_exceeded')
+    expect(projectionFinishReason({
+      kind: 'send', state: 'failed_terminal', reasonCode: 'insufficient_credits',
+    })).toBe('insufficient_credits')
+    expect(projectionFinishReason({ kind: 'send', state: 'failed_retryable', reasonCode: 'temporary_failure' })).toBe('server_error')
+    expect(projectionFinishReason({ kind: 'send', state: 'failed_terminal' })).toBe('server_error')
+    const source = readChat()
+    expect(source).toContain("if (finishReason === 'context_capacity_exceeded') return getSystemMsgCtaLabel('open_model_settings');")
+    expect(source).toContain("if (action === 'open_model_settings') {")
+  })
+
   it('maps frozen rewrite/contine flags to one operation kind with rewrite precedence', () => {
     expect(operationKindFromPayload({
       operationKind: 'retry_generation',
