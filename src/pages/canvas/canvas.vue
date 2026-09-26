@@ -9026,10 +9026,11 @@ function onMenuPick(key: string) {
       break
     case 'delete':
       closeMessageMenu()
+      // 刪提問時伺服器會連它的回覆一起刪（留下沒有提問的回覆會卡住記憶整理），確認框要先講清楚。
       Modal.confirm({
-        title: t('main.tip'),
-        content: t('chat.delete_chat_tips'),
-        okText: t('main.sure'),
+        title: t('chat.deleteMessageTitle'),
+        content: item.type == 1 ? t('chat.deleteQuestionBody') : t('chat.deleteMessageBody'),
+        okText: t('main.delete'),
         cancelText: t('main.cancel'),
         onOk() { chatDelete(item.id) },
       })
