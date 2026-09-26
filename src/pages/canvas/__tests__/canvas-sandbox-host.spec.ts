@@ -336,21 +336,6 @@ describe('沙箱宿主橋', () => {
     host.destroy()
   })
 
-  it('輸入區底色一起轉給宿主；舊的殼沒送 bottom 就是 undefined（宿主不動底部）', async () => {
-    const state = { current: makeState({ messages: [msg({ id: '10', text: '你好', opening: true })] }) }
-    const { hud } = fakeHud(state)
-    const got: unknown[] = []
-    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '1', hello, onChromeColor: (c, b) => got.push([c, b]) })
-    host.start()
-    h.fromShell({ type: 'ready-shell' })
-    await flush()
-    h.fromShell({ type: 'chrome-color', color: 'rgb(32, 28, 40)', bottom: 'rgb(60, 40, 70)' })
-    h.fromShell({ type: 'chrome-color', color: 'rgb(32, 28, 40)', bottom: null })
-    h.fromShell({ type: 'chrome-color', color: 'rgb(32, 28, 40)' })
-    expect(got).toEqual([['rgb(32, 28, 40)', 'rgb(60, 40, 70)'], ['rgb(32, 28, 40)', null], ['rgb(32, 28, 40)', undefined]])
-    host.destroy()
-  })
-
   it('殼文件根節點狀態轉給宿主：docstate → onDocState', async () => {
     const state = { current: makeState({ messages: [msg({ id: '10', text: '你好', opening: true })] }) }
     const { hud } = fakeHud(state)

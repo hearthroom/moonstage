@@ -21,7 +21,7 @@ import { createPanels } from './render/panels'
 import { createApp, h } from 'vue'
 import CanvasStage from '@/pages/canvas/components/canvas-stage.vue'
 import CanvasHeader from '@/pages/canvas/components/canvas-header.vue'
-import { chromeBottomColor, chromeTopColor } from '@/pages/canvas/canvas-chrome-tone'
+import { chromeTopColor } from '@/pages/canvas/canvas-chrome-tone'
 import CanvasComposer from '@/pages/canvas/components/canvas-composer.vue'
 import { bindComposerOverhang } from '@/pages/canvas/canvas-composer-overhang'
 import { bindAuthorSideDock, collectFixedRoots } from '@/pages/canvas/canvas-author-side-dock'
@@ -504,15 +504,12 @@ export function createShell(options: CreateShellOptions): Shell {
   }
   // 頁首實際看到的底色：宿主拿去塗系統狀態列。作者的樣式多半在 html／body 換 class 或直接改頁首的
   // style，所以跟文件狀態走同一個節流；主題訊息與規則套完也會再量一次。
-  let chromeColorSent: string | undefined
+  let chromeColorSent: string | null | undefined
   const postChromeColor = () => {
     const color = chromeTopColor(refs.root, refs.header)
-    // 輸入區底邊的底色：宿主拿去塗 iOS Safari 的底部工具列。
-    const bottom = chromeBottomColor(refs.root, refs.composer.querySelector('.composer-scope') || refs.composer)
-    const key = `${color}|${bottom}`
-    if (key === chromeColorSent) return
-    chromeColorSent = key
-    transport.send({ type: 'chrome-color', color, bottom })
+    if (color === chromeColorSent) return
+    chromeColorSent = color
+    transport.send({ type: 'chrome-color', color })
   }
   let docStateQueued = false
   const queueDocState = () => {

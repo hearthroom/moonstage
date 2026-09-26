@@ -22,10 +22,9 @@ export interface StageHost {
     loading(on: boolean): void
     /**
      * 對話頁頂欄目前的實際底色（rgb(...)），給宿主塗到系統狀態列（theme-color）；作者換了配色會再叫一次。
-     * bottom 是輸入區底邊看到的底色，給底部工具列（iOS Safari）；舊的舞台或殼不給就是 undefined。
      * null＝離開對話頁，宿主把狀態列還原成自己的顏色。不實作就不塗。
      */
-    themeColor?(color: string | null, bottom?: string | null): void
+    themeColor?(color: string | null): void
   }
   storage: {
     get(key: string): string | null
