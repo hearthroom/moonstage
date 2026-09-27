@@ -803,6 +803,7 @@
     border-radius: var(--lt-canvas-bubble-radius);
     background: var(--lt-canvas-bubble-ai-bg);
     color: var(--lt-canvas-bubble-fg);
+    line-height: var(--lt-canvas-bubble-line-height, 1.75);
     overflow-wrap: anywhere;
   }
 
