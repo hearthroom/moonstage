@@ -92,6 +92,12 @@
   --lt-canvas-bubble-fg: var(--lt-canvas-fg);
   --lt-canvas-bubble-radius: 14px;
   --lt-canvas-bubble-padding: 10px 14px;
+  /* 氣泡正文的行高。頁面本身照 MMD 維持 normal，但 normal 在中文系統字體下只有
+     1.2–1.35 倍，行距跟字距差不多寬，長段落讀起來很吃力（owner 2026-09-27：作者沒美化
+     的回覆「讀起來比較累」）。有美化的卡正文行高多寫 1.7–1.8（2026-09-27 線上 237 張
+     作者資產統計），取中間值。只加在氣泡上，頁首、輸入區、面板不跟著放大。
+     canvas.css 用到它時自帶同一個值：沙箱殼只帶 canvas.css、不帶這份檔。 */
+  --lt-canvas-bubble-line-height: 1.75;
   --lt-canvas-bubble-max-width: 100%;
   --lt-canvas-msg-avatar-size: 32px;
 
