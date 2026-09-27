@@ -86,7 +86,7 @@ function mountRegion(region: string) {
       } })
     case 'header':
       return mount(CanvasHeader, {
-        props: { roleName: '示範角色', avatar: '', modelName: 'Luna', fullscreenSupported: true, fullscreenLabel: 'Enter fullscreen' },
+        props: { roleName: '示範角色', avatar: '', fullscreenSupported: true, fullscreenLabel: 'Enter fullscreen', favoriteSupported: true, favoriteLabel: 'Favorite', commentsSupported: true, commentsLabel: 'Comments' },
       })
     case 'stage':
       return mount(CanvasStage, { props: { backgroundUrl: '' } })

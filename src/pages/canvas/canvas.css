@@ -518,12 +518,14 @@
     color: inherit;
   }
 
-  .fullscreen-toggle {
+  /* 頁首的圖示鍵（收藏、留言、全螢幕）：跟頂欄一樣高、40 寬，三顆並排時窄螢幕上角色名還留得住幾個字。
+     顏色跟頂欄字色走，作者換了頂欄字色就跟著換。 */
+  .header-action {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: var(--lt-canvas-header-height);
+    width: 40px;
     height: var(--lt-canvas-header-height);
     padding: 0;
     border: 0;
@@ -533,12 +535,8 @@
     font: inherit;
     cursor: pointer;
   }
-  .fullscreen-toggle svg { width: 20px; height: 20px; }
-  .fullscreen-toggle:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
-
-  .header-meun-rating {
-    display: none;
-  }
+  .header-action svg { width: 20px; height: 20px; }
+  .header-action:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
 
   .preview-badge {
     padding: 4px 10px;
@@ -548,42 +546,6 @@
     font-size: 12px;
     color: #F5C542;
     white-space: nowrap;
-  }
-
-  /*
-     模型指示器跟著頂欄的字色走，不用自己的顏色。
-
-     作者把頂欄漆成淺色時，這顆藥丸原本讀的是我們的「暗底用淡字」變數，
-     結果淡字落在淺底上，整顆消失（owner 2026-09-06 截圖）。改成一切從
-     currentColor 派生：頂欄什麼字色，它就什麼字色，邊框與底色是同一個色的
-     淡版。作者仍可直接對 .model-chip 寫規則蓋掉。
-  */
-  .model-chip {
-    box-sizing: border-box;
-    min-width: 0;
-    max-width: 40vw;
-    padding: 4px 10px;
-    border-radius: 9999px;
-    border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
-    background: color-mix(in srgb, currentColor 7%, transparent);
-    font-size: 12px;
-    color: inherit;
-    opacity: 0.82;
-    cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .model-chip:hover,
-  .model-chip:focus-visible {
-    opacity: 1;
-  }
-
-  .model-chip-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   /* ── 舞台 ─────────────────────────────────────────────────────── */

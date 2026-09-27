@@ -53,6 +53,16 @@ export interface StageHost {
     emit(name: string, payload?: any): void
   }
   scrollTo(el: Element | null, options?: { offset?: number }): void
+  /**
+   * 這張卡在宿主站上的收藏與留言（頁首那兩顆）。卡片的社群資料在宿主站，舞台只認得 roleId，
+   * 所以查、改、開留言區全交給宿主。不實作，或 social() 回 null（沒上架、預覽、審核中），兩顆都不畫。
+   */
+  card?: {
+    social(roleId: string): Promise<{ favorite: boolean; favorited: boolean; comments: boolean } | null>
+    /** 回收藏後的實際狀態；失敗就丟，舞台還原並提示。 */
+    setFavorite(roleId: string, on: boolean): Promise<boolean>
+    openComments(roleId: string): void
+  }
 }
 
 type UniLike = Record<string, any>

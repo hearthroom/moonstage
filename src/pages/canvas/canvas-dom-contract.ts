@@ -70,7 +70,6 @@ export interface CanvasSelectorEntry {
 export const ALWAYS_PRESENT_SELECTORS = [
   '.item.Ai.avatar-body',
   '.ai-assistant',
-  '.header-badge',
   // 一條指令都沒有時作者仍然會對這句話寫外觀；節點被 v-if 拿掉的話那條規則
   // 命中零個，作者只看得到「引擎壞了」。收起來用 hidden，不要拿掉節點。
   '.empty-default-show',
@@ -79,6 +78,8 @@ export const ALWAYS_PRESENT_SELECTORS = [
 
 export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '[data-lt="fullscreen"]', region: 'header', origin: 'lt', why: '全螢幕按鈕沿用 header-meun，美化可用穩定鉤子覆寫' },
+  { selector: '[data-lt="favorite"]', region: 'header', origin: 'lt', why: '收藏鍵沿用 header-meun，美化可用穩定鉤子覆寫（宿主站有這張卡才畫）' },
+  { selector: '[data-lt="comments"]', region: 'header', origin: 'lt', why: '留言鍵沿用 header-meun，美化可用穩定鉤子覆寫（宿主站有這張卡才畫）' },
   // ── 頂欄 ────────────────────────────────────────────────────────────
   { selector: '.topTabbar', region: 'header', origin: 'mmd', why: '卡片寫 .kg .topTabbar 換頂欄底色' },
   { selector: '#top-bar', region: 'header', origin: 'st', why: '酒館主題移植' },
@@ -95,8 +96,6 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '[data-lt="title"]', region: 'header', origin: 'lt', why: '我方穩定鉤子' },
   { selector: '.header-icon-meun', region: 'header', origin: 'mmd', why: '頂欄功能鍵列' },
   { selector: '.header-meun', region: 'header', origin: 'mmd', why: '卡片替功能鍵上色' },
-  { selector: '.header-meun-rating', region: 'header', origin: 'mmd', why: '分級鍵，卡片用它找 .header-badge' },
-  { selector: '.header-badge', region: 'header', origin: 'mmd', why: '作者常整顆隱藏；節點必須在' },
   { selector: '[data-lt="header-actions"]', region: 'header', origin: 'lt', why: '我方穩定鉤子' },
 
   // ── 舞台（背景／捲動／訊息列容器）──────────────────────────────────

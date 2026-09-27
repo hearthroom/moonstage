@@ -183,9 +183,10 @@ export function createShell(options: CreateShellOptions): Shell {
     setCursor: (n: number) => { const el = standardChrome ? standardTextarea() : refs.input; if (!el) return; const p = Math.min(n, input.get().length); try { el.setSelectionRange(p, p) } catch { /* 沒聚焦時部分瀏覽器會丟 */ } },
   }
   // 會花玩家點數的動作（送出、繼續、幫答）只在真的手勢裡轉給宿主；作者腳本要送訊息走 sdk.message.send（有確認框）。
-  const COSTLY_UI = new Set<ChromeUiEvent>(['send', 'continue', 'assist'])
+  // 收藏也是：它記在玩家帳上、算進卡的收藏數，卡片腳本代按不能算。
+  const GESTURE_ONLY_UI = new Set<ChromeUiEvent>(['send', 'continue', 'assist', 'favorite'])
   const sendUi = (event: ChromeUiEvent, key?: string) => {
-    if (COSTLY_UI.has(event) && !gesture) { debug.warn('ignored: not a user gesture', event); return }
+    if (GESTURE_ONLY_UI.has(event) && !gesture) { debug.warn('ignored: not a user gesture', event); return }
     transport.send(key == null ? { type: 'ui', event } : { type: 'ui', event, key })
   }
 
@@ -398,8 +399,9 @@ export function createShell(options: CreateShellOptions): Shell {
       render: () => h(CanvasHeader as unknown as Parameters<typeof h>[0], {
         ...chromeState.header,
         onBack: () => { if (!handleBack()) sendUi('back') },
-        onModel: () => sendUi('model'),
         onFullscreen: () => sendUi('fullscreen'),
+        onFavorite: () => sendUi('favorite'),
+        onComments: () => sendUi('comments'),
       } as Record<string, unknown>),
     })
     headerApp.config.warnHandler = () => {}
