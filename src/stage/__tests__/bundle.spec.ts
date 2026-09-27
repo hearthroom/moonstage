@@ -22,6 +22,16 @@ it('ships reusable dictionaries, locales and model images outside the player chu
   for (const stable of chunks.filter((file: any) => file.name === 'chinese-dictionary' || file.name.startsWith('stage-locale-'))) {
     expect(stable.imports).toEqual([])
   }
+  // 社群站轉標題用的小入口：共用同一塊字典，不能把舞台本體帶進來。
+  const script = chunks.find((file: any) => file.isEntry && file.name === 'display-script')
+  expect(script, 'display-script entry for hosts that only convert titles').toBeDefined()
+  const reachable = new Set<string>()
+  const visit = (name: string) => { if (reachable.has(name)) return; reachable.add(name); chunks.find((file: any) => file.fileName === name)?.imports.forEach(visit) }
+  visit(script.fileName)
+  expect(reachable.has(dictionary.fileName), 'shares the dictionary chunk with the player').toBe(true)
+  const playerChunk = chunks.find((file: any) => Object.keys(file.modules).some(id => id.endsWith('/src/stage/index.ts')))
+  expect(reachable.has(playerChunk.fileName), 'title conversion must not pull the player').toBe(false)
+  expect(script.exports).toEqual(expect.arrayContaining(['directionForLocale', 'createDisplayScriptConverter', 'convertPlainText']))
   const changed: any = await build({ configFile: path.resolve('vite.stage.config.ts'), build: { write: false }, plugins: [{
     name: 'simulate-player-release', enforce: 'pre',
     transform(code, id) { if (id.endsWith('/src/stage/index.ts')) return code + '\nexport const releaseCacheProbe = 1;'; },
