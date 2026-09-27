@@ -48,6 +48,7 @@
   "description": "Open chat stage for HarperHarbor character cards. SillyTavern / MMD compatible rendering, talks only to the public /open/v1 API.",
   "exports": {
     "./stage": "./dist-stage/moonstage-stage.js",
+    "./display-script": "./dist-stage/display-script.js",
     "./stage.css": "./dist-stage/moonstage-stage.css"
   },
   "files": [

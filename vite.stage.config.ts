@@ -127,9 +127,13 @@ export default defineConfig(({ mode }) => {
       // 模型圖示由 stageModelAssets 獨立輸出，跟隨 dist-stage 一起發佈；其餘小素材沿用內嵌。
       assetsInlineLimit: 512 * 1024,
       lib: {
-        entry: path.resolve(__dirname, 'src/stage/index.ts'),
+        // display-script：宿主只要轉幾個標題時用的小入口，跟舞台共用字典那一塊。
+        entry: {
+          'moonstage-stage': path.resolve(__dirname, 'src/stage/index.ts'),
+          'display-script': path.resolve(__dirname, 'src/stage/display-script.ts'),
+        },
         formats: ['es'],
-        fileName: () => 'moonstage-stage.js',
+        fileName: (_format, name) => `${name}.js`,
         cssFileName: 'moonstage-stage',
       },
       rollupOptions: {
