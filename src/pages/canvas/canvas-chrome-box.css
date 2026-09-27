@@ -23,6 +23,9 @@
 .conv-style-modal .response-reset {
     padding: 0 var(--luna-s-2, 8px)
 }
+.conv-style-modal .response-note-add {
+    padding: 0 var(--luna-s-2, 8px)
+}
 .conv-style-modal .response-custom {
     margin-top: var(--luna-s-2, 8px)
 }

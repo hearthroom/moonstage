@@ -6,7 +6,12 @@ export const responseAxes = {
  pace: ['natural', 'linger', 'advance'],
 } as const
 export type ResponseAxis = keyof typeof responseAxes
-export type ResponseDraft = Partial<Record<ResponseAxis | 'customStyle', string>>
+// 每一項選項之後的補充說明（進階微調）：只作用在那一項，和選項不同時以補充為準。
+export const responseNoteKeys = {agency:'agencyNote',style:'styleNote',perspective:'perspectiveNote',length:'lengthNote',pace:'paceNote'} as const satisfies Record<ResponseAxis,string>
+export type ResponseNoteKey = typeof responseNoteKeys[ResponseAxis]
+export const maxResponseNoteLength = 200
+export type ResponseDraft = Partial<Record<ResponseAxis | 'customStyle' | ResponseNoteKey, string>>
+const noteKeys:readonly string[] = Object.values(responseNoteKeys)
 export const responseDefaults: Record<ResponseAxis, string> = {agency:'protect',style:'card',perspective:'card',length:'auto',pace:'natural'}
 export interface ResponseSettings {
  conversationId: string
@@ -24,6 +29,7 @@ export function readResponseSettings(raw: unknown, conversationId: string): Resp
  }
  for(const [key,value] of Object.entries(r.overrides)) {
   if(key==='customStyle') {if(typeof value!=='string' || [...value].length>1000) throw new Error('Invalid style');continue}
+  if(noteKeys.includes(key)) {if(typeof value!=='string' || !value.trim() || [...value].length>maxResponseNoteLength) throw new Error('Invalid note');continue}
   if(!Object.prototype.hasOwnProperty.call(responseAxes,key) || !(responseAxes[key as ResponseAxis] as readonly string[]).includes(value as string)) throw new Error('Unsupported override')
  }
  return r
@@ -31,6 +37,8 @@ export function readResponseSettings(raw: unknown, conversationId: string): Resp
 export function responsePatch(draft: ResponseDraft): Record<string,string|null> {
  const patch:Record<string,string|null>={}
  for(const key of [...Object.keys(responseAxes),'customStyle']) patch[key]=draft[key as keyof ResponseDraft] ?? null
+ for(const key of noteKeys) patch[key]=draft[key as ResponseNoteKey]?.trim() || null
  if(draft.style!=='custom') patch.customStyle=null
+ else patch.styleNote=null
  return patch
 }
