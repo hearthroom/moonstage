@@ -2,6 +2,10 @@
 	"canvas.fullscreen.enter": "전체 화면으로 보기",
 	"canvas.fullscreen.exit": "전체 화면 종료",
 	"canvas.fullscreen.failed": "전체 화면으로 전환하지 못했어요. 그대로 플레이하거나 다시 시도할 수 있어요.",
+	"canvas.favorite.add": "즐겨찾기에 추가",
+	"canvas.favorite.remove": "즐겨찾기에서 삭제",
+	"canvas.favorite.failed": "즐겨찾기를 변경하지 못했어요. 다시 시도해 주세요.",
+	"canvas.comments.open": "댓글 보기",
 
 	"error.contextCapacityTitle": "모델의 컨텍스트 용량을 초과했습니다",
 	"error.contextCapacityExceeded": "이 대화가 지금의 컨텍스트 용량에 다 들어가지 않아서, 용량을 늘리거나 용량이 더 큰 모델로 바꾸면 지금까지의 대화 그대로 이어갈 수 있어요.",

@@ -2,6 +2,10 @@
 	"canvas.fullscreen.enter": "全画面表示",
 	"canvas.fullscreen.exit": "全画面表示を終了",
 	"canvas.fullscreen.failed": "全画面表示に切り替えられませんでした。そのまま続けるか、もう一度お試しください。",
+	"canvas.favorite.add": "お気に入りに追加",
+	"canvas.favorite.remove": "お気に入りから外す",
+	"canvas.favorite.failed": "お気に入りを更新できませんでした。もう一度お試しください。",
+	"canvas.comments.open": "コメントを見る",
 
 	"error.contextCapacityTitle": "モデルのコンテキスト容量を超えています",
 	"error.contextCapacityExceeded": "この会話は今のコンテキスト容量に収まらなくなったので、容量を上げるか容量の大きいモデルに切り替えれば、これまでの会話のまま続けられます。",

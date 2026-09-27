@@ -41,13 +41,14 @@ describe('player fullscreen', () => {
   })
   it('exposes the action inside the author-styled header, including exit state', async () => {
     const wrapper = mount(CanvasHeader, { props: {
-      roleName: 'Example', avatar: '', modelName: 'Provider / A very long model name', fullscreenSupported: true,
+      roleName: 'Example', avatar: '', fullscreenSupported: true,
       fullscreenActive: false, fullscreenLabel: 'Enter fullscreen',
+      favoriteSupported: true, favoriteLabel: 'Favorite', commentsSupported: true, commentsLabel: 'Comments',
     } })
     const button = wrapper.get('[data-lt="header-actions"] .header-meun[data-lt="fullscreen"]')
     expect(button.attributes('aria-label')).toBe('Enter fullscreen')
     expect(button.attributes('aria-pressed')).toBe('false')
-    // The fullscreen action stays at the trailing edge, regardless of model-name length.
+    // The fullscreen action stays at the trailing edge, after favorite and comments.
     expect(wrapper.findAll('[data-lt="header-actions"] [role="button"]').at(-1)?.attributes('data-lt')).toBe('fullscreen')
     await button.trigger('click')
     expect(wrapper.emitted('fullscreen')).toHaveLength(1)
@@ -56,6 +57,28 @@ describe('player fullscreen', () => {
     expect(button.attributes('aria-label')).toBe('Exit fullscreen')
     await wrapper.setProps({ fullscreenSupported: false })
     expect(wrapper.find('[data-lt="fullscreen"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+  it('offers favorite and comments in the author-styled header only when the host has the card', async () => {
+    const wrapper = mount(CanvasHeader, { props: { roleName: 'Example', avatar: '' } })
+    expect(wrapper.find('[data-lt="favorite"]').exists()).toBe(false)
+    expect(wrapper.find('[data-lt="comments"]').exists()).toBe(false)
+    // The rating slot and the model chip are gone from the header.
+    expect(wrapper.find('.header-meun-rating').exists()).toBe(false)
+    expect(wrapper.find('.model-chip').exists()).toBe(false)
+    await wrapper.setProps({ favoriteSupported: true, favoriteActive: false, favoriteLabel: 'Favorite', commentsSupported: true, commentsLabel: 'Comments' })
+    const order = wrapper.findAll('[data-lt="header-actions"] [role="button"]').map(b => b.attributes('data-lt'))
+    expect(order).toEqual(['favorite', 'comments'])
+    const favorite = wrapper.get('.header-meun[data-lt="favorite"]')
+    expect(favorite.attributes('aria-pressed')).toBe('false')
+    expect(favorite.attributes('aria-label')).toBe('Favorite')
+    await favorite.trigger('click')
+    await wrapper.get('.header-meun[data-lt="comments"]').trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('favorite')).toHaveLength(1)
+    expect(wrapper.emitted('comments')).toHaveLength(1)
+    await wrapper.setProps({ favoriteActive: true, favoriteLabel: 'Remove from favorites' })
+    expect(favorite.attributes('aria-pressed')).toBe('true')
+    expect(favorite.get('svg').attributes('fill')).toBe('currentColor')
     wrapper.unmount()
   })
 })

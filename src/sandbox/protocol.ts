@@ -139,12 +139,18 @@ export interface MessageLabels {
  */
 export interface ChromeState {
   header: {
-    roleName: string; avatar: string; modelName: string; badge: string; showModel: boolean; backLabel: string; modelLabel: string
+    roleName: string; avatar: string; badge: string; backLabel: string
     /** 宿主沒有上一頁可回時 false：返回鍵不畫（見 host/stage-host.ts 的 nav.canBack）。省略視同 true。 */
     showBack?: boolean
     fullscreenSupported?: boolean
     fullscreenActive?: boolean
     fullscreenLabel?: string
+    /** 宿主站上有這張卡才畫收藏與留言（見 host/stage-host.ts 的 card）。 */
+    favoriteSupported?: boolean
+    favoriteActive?: boolean
+    favoriteLabel?: string
+    commentsSupported?: boolean
+    commentsLabel?: string
   }
   composer: {
     placeholder: string
@@ -186,7 +192,7 @@ export interface PanelsState {
 }
 
 /** 標準頁首與輸入區上的按鍵，交給宿主做。 */
-export type ChromeUiEvent = 'send' | 'stop' | 'continue' | 'more' | 'assist' | 'more-pick' | 'model' | 'shortcut' | 'back' | 'fullscreen' | 'prologue'
+export type ChromeUiEvent = 'send' | 'stop' | 'continue' | 'more' | 'assist' | 'more-pick' | 'model' | 'shortcut' | 'back' | 'fullscreen' | 'favorite' | 'comments' | 'prologue'
 
 /** 三個點選單從哪裡呼出（座標是 iframe 內的；宿主自己換算）。 */
 export type MessageMenuAnchor =

@@ -14,13 +14,10 @@
 .header-box {
     padding: 0 10px
 }
-.fullscreen-toggle {
+.header-action {
     padding: 0
 }
 .preview-badge {
-    padding: 4px 10px
-}
-.model-chip {
     padding: 4px 10px
 }
 .lt-prep-live {

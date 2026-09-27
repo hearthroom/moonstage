@@ -19,17 +19,20 @@
       :show-back="showBack"
       :role-name="convertPlainText(roleView.roleName || '', displayScript)"
       :avatar="cfImage(roleView.roleAvatar, 'avatarMedium')"
-      :model-name="formData.selectModelName"
       :badge="previewDraft ? t('openChat.preview.badge') : (trialCard ? t('openChat.trial.badge') : '')"
-      :show-model="!previewOnly"
       :back-label="t('common.back')"
-      :model-label="t('chat.modelSelectAria')"
       :fullscreen-supported="fullscreenSupported"
       :fullscreen-active="fullscreenActive"
       :fullscreen-label="fullscreenLabel"
+      :favorite-supported="!!social?.favorite"
+      :favorite-active="!!social?.favorited"
+      :favorite-label="favoriteLabel"
+      :comments-supported="!!social?.comments"
+      :comments-label="t('canvas.comments.open')"
       @fullscreen="toggleFullscreen"
+      @favorite="toggleFavorite"
+      @comments="openComments"
       @back="onHeaderBack"
-      @model="openModelSelect"
     />
 
     <!-- 沙箱卡（pageMode=sandbox）：整個聊天頁交給殼，跑在跨源 iframe 裡。殼用的是跟這一頁同一套標準元件
@@ -2471,21 +2474,60 @@ onMounted(() => {
 onUnmounted(() => { fullscreenControl?.dispose(); disposeViewport?.(); disposeGeometryDebug?.(); disposeBubbleFit?.(); });
 function toggleFullscreen() { void fullscreenControl?.toggle(); }
 
+// ── 收藏與留言（頁首）────────────────────────────────────────────────
+// 卡片的社群資料在宿主站：這張卡有沒有上架、玩家收藏了沒，都問宿主。預覽、草稿、試玩不問——
+// 那不是公開那一張，按了也是記到別張上。換卡時先收起兩顆，舊卡的答案晚到不能蓋到新卡上。
+const social = ref<{ favorite: boolean; favorited: boolean; comments: boolean } | null>(null);
+const favoriteBusy = ref(false);
+let socialSeq = 0;
+watch([roleId, previewOnly, previewDraft, trialCard], async ([id]) => {
+  const seq = ++socialSeq;
+  social.value = null;
+  const card = stageHost.card;
+  if (!card || !id || previewOnly.value || previewDraft.value || trialCard.value) return;
+  try {
+    const got = await card.social(String(id));
+    if (seq === socialSeq) social.value = got;
+  } catch { /* 查不到就不畫，不影響遊玩 */ }
+}, { immediate: true });
+const favoriteLabel = computed(() => t(social.value?.favorited ? 'canvas.favorite.remove' : 'canvas.favorite.add'));
+async function toggleFavorite() {
+  const card = stageHost.card;
+  const now = social.value;
+  if (!card || !now?.favorite || favoriteBusy.value) return;
+  const seq = socialSeq;
+  const next = !now.favorited;
+  favoriteBusy.value = true;
+  social.value = { ...now, favorited: next };
+  try {
+    const saved = await card.setFavorite(String(roleId.value), next);
+    if (seq === socialSeq && social.value) social.value = { ...social.value, favorited: saved };
+  } catch {
+    if (seq === socialSeq && social.value) social.value = { ...social.value, favorited: now.favorited };
+    stageHost.ui.toast(t('canvas.favorite.failed'), 'error');
+  } finally { favoriteBusy.value = false; }
+}
+function openComments() {
+  if (social.value?.comments) stageHost.card?.openComments(String(roleId.value));
+}
+
 // 頁首與輸入區的呈現資料：跟模板上綁給 CanvasHeader／CanvasComposer 的是同一批值，殼那邊用同一套元件畫。
 function buildChromeState() {
   return {
     header: {
       roleName: convertPlainText(roleView.value.roleName || '', displayScript),
       avatar: String(cfImage(roleView.value.roleAvatar, 'avatarMedium') || ''),
-      modelName: String(formData.selectModelName || ''),
       badge: previewDraft.value ? t('openChat.preview.badge') : (trialCard.value ? t('openChat.trial.badge') : ''),
-      showModel: !previewOnly.value,
       showBack,
       backLabel: t('common.back'),
-      modelLabel: t('chat.modelSelectAria'),
       fullscreenSupported: fullscreenSupported.value,
       fullscreenActive: fullscreenActive.value,
       fullscreenLabel: fullscreenLabel.value,
+      favoriteSupported: !!social.value?.favorite,
+      favoriteActive: !!social.value?.favorited,
+      favoriteLabel: favoriteLabel.value,
+      commentsSupported: !!social.value?.comments,
+      commentsLabel: t('canvas.comments.open'),
     },
     composer: {
       placeholder: t('canvas.placeholder'),
@@ -2826,6 +2868,8 @@ function mountSandbox(asset: any) {
           case 'more-pick': onPanelPick(String(key || '')); return;
           case 'model': openModelSelect(); return;
           case 'fullscreen': toggleFullscreen(); return;
+          case 'favorite': void toggleFavorite(); return;
+          case 'comments': openComments(); return;
           case 'shortcut': onShortcut(String(key || '')); return;
           case 'back': goBackToEntry(); return;
           case 'prologue': onProloguePick(Number(key)); return;
@@ -9227,7 +9271,8 @@ const isGenerating = computed(() => {
 const shortcutItems = computed(() => previewOnly.value ? [] : [
   // 世界卡：每個成員一顆「@名字」，點了就是這一句指名他先開口；再點一次取消。
   ...mentionShortcuts(worldMembers(roleView.value), mention.value),
-  { key: 'model', label: t('canvas.panel.model') },
+  // 頁首不再放模型，玩家從這顆看得到自己現在用的是哪個模型。
+  { key: 'model', label: String(formData.selectModelName || '') || t('canvas.panel.model') },
   { key: 'persona', label: t('canvas.panel.persona') },
   { key: 'directives', label: t('directive.entry') },
   { key: 'notepad', label: t('notepad.entry') },

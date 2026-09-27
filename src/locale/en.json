@@ -2,6 +2,10 @@
 	"canvas.fullscreen.enter": "Enter fullscreen",
 	"canvas.fullscreen.exit": "Exit fullscreen",
 	"canvas.fullscreen.failed": "Fullscreen could not open; you can keep playing or try again.",
+	"canvas.favorite.add": "Add to favorites",
+	"canvas.favorite.remove": "Remove from favorites",
+	"canvas.favorite.failed": "Couldn’t update your favorites. Try again.",
+	"canvas.comments.open": "View comments",
 
 	"error.contextCapacityTitle": "Context capacity exceeded",
 	"error.contextCapacityExceeded": "This conversation no longer fits the current context capacity, so raise the capacity or pick a model with more room to keep playing with your history intact.",

@@ -2,6 +2,10 @@
 	"canvas.fullscreen.enter": "進入全螢幕",
 	"canvas.fullscreen.exit": "退出全螢幕",
 	"canvas.fullscreen.failed": "全螢幕沒有開啟，你可以繼續遊玩或再試一次。",
+	"canvas.favorite.add": "收藏",
+	"canvas.favorite.remove": "取消收藏",
+	"canvas.favorite.failed": "收藏沒有成功，請再試一次。",
+	"canvas.comments.open": "查看評論",
 
 	"error.contextCapacityTitle": "內容超過模型容量",
 	"error.contextCapacityExceeded": "這段對話已經放不進目前的上下文容量，調大容量或換一個容量更大的模型就能繼續，對話都還保留著。",

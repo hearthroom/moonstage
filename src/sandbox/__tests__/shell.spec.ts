@@ -115,8 +115,20 @@ describe('殼：冷啟動與事件順序', () => {
     expect(t.refs.root.getAttribute('data-chrome')).toBe('shell')
   })
 
+  it('header favorite needs a real gesture; comments goes straight to the host', async () => {
+    const header = { roleName: 'Example', avatar: '', badge: '', backLabel: 'Back', favoriteSupported: true, favoriteActive: false, favoriteLabel: 'Favorite', commentsSupported: true, commentsLabel: 'Comments' }
+    const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Assist', perTurn: 'Per turn' } }
+    const s = boot(config({ chromeState: { header, composer }, card: { rules: [], statusbar: '' } }))
+    // 腳本合成的 click（isTrusted=false）不算玩家按的：收藏不轉給宿主。
+    s.refs.root.querySelector<HTMLElement>('.header-meun[data-lt="favorite"]')!.click()
+    expect(sent).not.toContainEqual({ type: 'ui', event: 'favorite' })
+    s.refs.root.querySelector<HTMLElement>('.header-meun[data-lt="comments"]')!.click()
+    expect(sent).toContainEqual({ type: 'ui', event: 'comments' })
+    s.dispose()
+  })
+
   it('the themed fullscreen header action goes to the host and reflects host exit state', async () => {
-    const header = { roleName: 'Example', avatar: '', modelName: 'M', badge: '', showModel: true, backLabel: 'Back', modelLabel: 'Model', fullscreenSupported: true, fullscreenActive: false, fullscreenLabel: 'Enter fullscreen' }
+    const header = { roleName: 'Example', avatar: '', badge: '', backLabel: 'Back', fullscreenSupported: true, fullscreenActive: false, fullscreenLabel: 'Enter fullscreen' }
     const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Assist', perTurn: 'Per turn' } }
     const s = boot(config({ chromeState: { header, composer }, card: { rules: [], statusbar: '' } }))
     const button = s.refs.root.querySelector<HTMLElement>('.header-meun[data-lt="fullscreen"]')!
@@ -131,7 +143,7 @@ describe('殼：冷啟動與事件順序', () => {
   })
 
   it('殼一掛好就回報頁首底色；作者換了 html 的 class 之後再量一次', async () => {
-    const header = { roleName: '露娜', avatar: '', modelName: 'M', badge: '', showModel: true, backLabel: '返回', modelLabel: '模型' }
+    const header = { roleName: '露娜', avatar: '', badge: '', backLabel: '返回' }
     const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: '停止', more: '更多', send: '送出', paste: '貼上', clear: '清除', model: '模型', assist: '幫答', perTurn: '每輪' } }
     const s = boot(config({ chromeState: { header, composer }, card: { rules: [], statusbar: '' } }))
     const first = sent.filter((m) => m.type === 'chrome-color')
@@ -150,7 +162,7 @@ describe('殼：冷啟動與事件順序', () => {
   })
 
   it('宿主說沒有上一頁（獨立的卡片 App）：標準頁首不畫返回鍵；陽春頁首的返回鍵也藏起來', () => {
-    const header = { roleName: '露娜', avatar: '', modelName: 'M', badge: '', showModel: true, backLabel: '返回', modelLabel: '模型' }
+    const header = { roleName: '露娜', avatar: '', badge: '', backLabel: '返回' }
     const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: '停止', more: '更多', send: '送出', paste: '貼上', clear: '清除', model: '模型', assist: '幫答', perTurn: '每輪' } }
     const withBack = boot(config({ chromeState: { header, composer }, card: { rules: [], statusbar: '' } }))
     expect(withBack.refs.root.querySelector('.icon-back[data-lt="back"]')).not.toBeNull()
@@ -162,7 +174,7 @@ describe('殼：冷啟動與事件順序', () => {
 
   it('標準輸入區：作者腳本合成的 click 按不動送出鍵（不是真的手勢）；確認框的「允許」也只認真的點擊', async () => {
     const chromeState = {
-      header: { roleName: '露娜', avatar: '', modelName: 'M', badge: '', showModel: true, backLabel: '返回', modelLabel: '模型' },
+      header: { roleName: '露娜', avatar: '', badge: '', backLabel: '返回' },
       composer: { placeholder: '說點什麼', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: '停止', more: '更多', send: '送出', paste: '貼上', clear: '清除', model: '模型', assist: '幫答', perTurn: '每輪' } },
     }
     const s = boot(config({ chromeState, card: { rules: [SCRIPT_RULE(`sdk.input.set('嗨'); document.querySelector('.lt-send').click();`)], statusbar: '' } }))
@@ -388,7 +400,7 @@ describe('殼：載入更早的歷史', () => {
 describe('assist paid confirmation in sandbox', () => {
   it('does not allow a scripted click to approve spending', async () => {
     const chromeState = {
-      header: { roleName: '露娜', avatar: '', modelName: 'M', badge: '', showModel: true, backLabel: '返回', modelLabel: '模型' },
+      header: { roleName: '露娜', avatar: '', badge: '', backLabel: '返回' },
       composer: { placeholder: '說點什麼', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: '停止', more: '更多', send: '送出', paste: '貼上', clear: '清除', model: '模型', assist: '幫答', perTurn: '每輪' } },
     }
     const s=boot(config({chrome:'shell',chromeState}))
@@ -445,7 +457,7 @@ describe('殼：容量不夠時的選擇', () => {
       menu: { open: false, editing: false, draft: '', message: null, actions: [], labels: { cancel: 'Cancel', confirm: 'OK' }, anchor: null } },
   })
   const chromeState = {
-    header: { roleName: '露娜', avatar: '', modelName: 'M', badge: '', showModel: true, backLabel: '返回', modelLabel: '模型' },
+    header: { roleName: '露娜', avatar: '', badge: '', backLabel: '返回' },
     composer: { placeholder: '說點什麼', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: '停止', more: '更多', send: '送出', paste: '貼上', clear: '清除', model: '模型', assist: '幫答', perTurn: '每輪' } },
   }
   const props = { content: '說明', cancelText: '取消', saving: false, error: '', options: [

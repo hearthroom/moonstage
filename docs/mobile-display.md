@@ -13,8 +13,11 @@ SVG, and puts its defaults in `@layer lt-base`. Authors can target the existing 
 class or the stable `data-lt` selector. Do not move it into a host-only overlay or add
 unlayered styles that defeat card beautification.
 
-The fullscreen action is the trailing header action, after the model chip. Long model
-names truncate inside the chip instead of pushing fullscreen toward the center.
+The fullscreen action is the trailing header action, after favorite and comments (drawn
+only when the host site lists the card, via `StageHost.card`). All three share
+`.header-meun.header-action`, so card beautification written for header actions applies to
+each of them. The header has no model chip; the model shortcut in the function bar shows the
+current model name.
 
 `canvas-viewport.ts` sizes the host canvas to the visible viewport, including its offset.
 While fullscreen is active, supported VirtualKeyboard APIs use explicit overlay geometry;
