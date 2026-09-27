@@ -4146,6 +4146,7 @@
 	"responseSettings.axes.pace": "Story pace",
 	"responseSettings.options.agency.protect": "Don’t write for me",
 	"responseSettings.options.agency.assist": "Expand my actions only",
+	"responseSettings.options.agency.lines": "Write my lines only",
 	"responseSettings.options.agency.coauthor": "Allow AI to write for me",
 	"responseSettings.options.style.card": "Follow character",
 	"responseSettings.options.style.plain": "Plain",
@@ -4165,5 +4166,6 @@
 	"responseSettings.options.pace.advance": "Move forward",
 	"responseSettings.agencyHints.protect": "The AI writes other characters and the world, leaving your character’s dialogue, thoughts, actions, and decisions to you.",
 	"responseSettings.agencyHints.assist": "The AI can add detail to actions you type in chat, such as describing how you open a door after you write “I open the door.”",
+	"responseSettings.agencyHints.lines": "The AI can give your character lines, reactions, and thoughts, but where you go, what you choose, and whether you agree stay up to you.",
 	"responseSettings.agencyHints.coauthor": "The AI can write your character’s dialogue, thoughts, actions, and decisions based on the character setup and current scene."
 }

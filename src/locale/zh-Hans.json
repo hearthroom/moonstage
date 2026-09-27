@@ -4146,6 +4146,7 @@
 	"responseSettings.axes.pace": "剧情节奏",
 	"responseSettings.options.agency.protect": "不代写（防抢话）",
 	"responseSettings.options.agency.assist": "只补充动作细节",
+	"responseSettings.options.agency.lines": "只代写台词",
 	"responseSettings.options.agency.coauthor": "允许 AI 代写",
 	"responseSettings.options.style.card": "跟随角色卡",
 	"responseSettings.options.style.plain": "自然简洁",
@@ -4165,5 +4166,6 @@
 	"responseSettings.options.pace.advance": "积极推进",
 	"responseSettings.agencyHints.protect": "AI 只写其他角色与环境，不替你扮演的角色添加台词、想法、行动或决定。",
 	"responseSettings.agencyHints.assist": "AI 只补充你在聊天中已写出的动作细节，例如你写“推开门”，AI 可以描写推门的过程。",
+	"responseSettings.agencyHints.lines": "AI 可以替你扮演的角色说话、写出反应和想法，但去哪里、选哪个、答不答应，都留给你决定。",
 	"responseSettings.agencyHints.coauthor": "AI 可以根据角色设定与当前剧情，替你扮演的角色写台词、想法、行动与决定。"
 }
