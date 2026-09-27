@@ -17,11 +17,11 @@ it('exposes the MMD response preference styling hooks and active option state', 
  wrapper.unmount()
 })
 
-it('explains all three player-writing choices before the player selects one', async () => {
+it('explains every player-writing choice before the player selects one', async () => {
  const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k}})
  await flushPromises()
  expect(wrapper.text()).toContain('responseSettings.agencyHint')
- for(const value of ['protect','assist','coauthor']) {
+ for(const value of ['protect','assist','lines','coauthor']) {
   const option=wrapper.get(`[data-axis="agency"][data-value="${value}"]`)
   expect(option.text()).toContain(`responseSettings.agencyHints.${value}`)
   expect(wrapper.get('#'+option.attributes('aria-describedby')).text()).toContain(`responseSettings.agencyHints.${value}`)

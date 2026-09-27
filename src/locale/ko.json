@@ -4146,6 +4146,7 @@
 	"responseSettings.axes.pace": "이야기 속도",
 	"responseSettings.options.agency.protect": "대필하지 않음",
 	"responseSettings.options.agency.assist": "입력한 행동만 자세히",
+	"responseSettings.options.agency.lines": "대사만 맡기기",
 	"responseSettings.options.agency.coauthor": "대사와 행동도 맡기기",
 	"responseSettings.options.style.card": "캐릭터에 맞춤",
 	"responseSettings.options.style.plain": "자연스럽고 간결하게",
@@ -4165,5 +4166,6 @@
 	"responseSettings.options.pace.advance": "적극적으로 진행",
 	"responseSettings.agencyHints.protect": "AI는 다른 등장인물과 주변 상황만 쓰고, 내가 맡은 역할의 대사·생각·행동·결정은 추가하지 않습니다.",
 	"responseSettings.agencyHints.assist": "AI는 채팅에 직접 쓴 행동만 자세히 묘사하며, 예를 들어 “문을 연다”라고 쓰면 문을 여는 과정을 덧붙일 수 있습니다.",
+	"responseSettings.agencyHints.lines": "AI는 내가 맡은 역할의 대사·반응·생각을 쓸 수 있지만, 어디로 갈지, 무엇을 고를지, 받아들일지는 내가 정합니다.",
 	"responseSettings.agencyHints.coauthor": "AI는 캐릭터 설정과 현재 장면을 바탕으로 내가 맡은 역할의 대사·생각·행동·결정도 쓸 수 있습니다."
 }
