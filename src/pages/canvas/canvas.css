@@ -442,6 +442,14 @@
     min-height: 44px;
     padding: 0 var(--luna-s-2, 8px);
   }
+  .conv-style-modal .response-note-add {
+    border-color: transparent;
+    background: transparent;
+    color: var(--tip-font-color, color-mix(in srgb, currentColor 78%, transparent));
+    font-size: .8125rem;
+    min-height: 44px;
+    padding: 0 var(--luna-s-2, 8px);
+  }
   .conv-style-modal .response-custom {
     display: flex;
     flex-direction: column;

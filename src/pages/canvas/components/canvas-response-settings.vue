@@ -44,10 +44,20 @@
         <textarea v-model="draft.customStyle" class="cs-custom-textarea" rows="3" :aria-invalid="customTooLong" />
         <span class="char-count" :class="{ 'response-error': customTooLong }">{{ t('responseSettings.customCount', { count: [...(draft.customStyle || '')].length }) }}</span>
        </label>
+       <div v-if="!(axis === 'style' && draft.style === 'custom')" class="response-note">
+        <button v-if="!noteOpen(axis)" type="button" class="response-note-add" data-action="add-note" :data-axis="axis" @click="openNote(axis)"><span aria-hidden="true">+ </span>{{ t('responseSettings.noteToggle') }}</button>
+        <label v-else class="response-custom cs-custom-input">
+         <span>{{ t('responseSettings.noteLabel') }}</span>
+         <textarea v-model="draft[responseNoteKeys[axis]]" class="cs-custom-textarea response-note-input" :data-axis="axis" rows="2"
+          :placeholder="t(`responseSettings.noteExamples.${axis}.${draft[axis] ?? responseDefaults[axis]}`)" :aria-invalid="noteTooLong(axis)" />
+         <span class="response-hint">{{ t('responseSettings.noteHint') }}</span>
+         <span class="char-count" :class="{ 'response-error': noteTooLong(axis) }">{{ t('responseSettings.noteCount', { count: [...(draft[responseNoteKeys[axis]] || '')].length }) }}</span>
+        </label>
+       </div>
       </div></div></div>
       <p v-if="axis === 'length'" class="response-hint">{{ t('responseSettings.lengthHint') }}</p>
       <p v-if="axis === 'perspective' && draft.perspective === 'first_character'" class="response-hint">{{ t('responseSettings.firstPersonHint') }}</p>
-      <button v-if="draft[axis] !== undefined" type="button" class="response-reset" @click="reset(axis)">{{ t('responseSettings.reset') }}</button>
+      <button v-if="draft[axis] !== undefined || draft[responseNoteKeys[axis]] !== undefined" type="button" class="response-reset" @click="reset(axis)">{{ t('responseSettings.reset') }}</button>
      </fieldset>
     </div>
    </div></div>
@@ -58,7 +68,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { readResponseSettings, responseAxes, responseDefaults, responsePatch, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
+import { maxResponseNoteLength, readResponseSettings, responseAxes, responseDefaults, responseNoteKeys, responsePatch, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
 const props=defineProps<{
  conversationId:string
  load:(id:string)=>Promise<unknown>
@@ -75,9 +85,13 @@ function answerDiscard(ok:boolean){discardAsked.value=false;const resolve=discar
 onBeforeUnmount(()=>{alive=false;answerDiscard(false)})
 const dirty=computed(()=>JSON.stringify(responsePatch(draft.value))!==JSON.stringify(responsePatch(saved.value?.overrides || {})))
 const customTooLong=computed(()=>[...(draft.value.customStyle || '')].length>1000)
-const invalid=computed(()=>draft.value.style==='custom' && (!draft.value.customStyle?.trim() || customTooLong.value))
-function choose(axis:ResponseAxis,value:string){draft.value[axis]=value;if(axis==='style' && value!=='custom')delete draft.value.customStyle;savedNotice.value=false}
-function reset(axis:ResponseAxis){delete draft.value[axis];if(axis==='style')delete draft.value.customStyle;savedNotice.value=false}
+const openNotes=ref(new Set<ResponseAxis>())
+function noteOpen(axis:ResponseAxis){return openNotes.value.has(axis) || !!draft.value[responseNoteKeys[axis]]}
+function openNote(axis:ResponseAxis){openNotes.value=new Set(openNotes.value).add(axis)}
+function noteTooLong(axis:ResponseAxis){return [...(draft.value[responseNoteKeys[axis]] || '')].length>maxResponseNoteLength}
+const invalid=computed(()=>(draft.value.style==='custom' && (!draft.value.customStyle?.trim() || customTooLong.value)) || (Object.keys(responseAxes) as ResponseAxis[]).some(noteTooLong))
+function choose(axis:ResponseAxis,value:string){draft.value[axis]=value;if(axis==='style' && value!=='custom')delete draft.value.customStyle;if(axis==='style' && value==='custom')delete draft.value.styleNote;savedNotice.value=false}
+function reset(axis:ResponseAxis){delete draft.value[axis];delete draft.value[responseNoteKeys[axis]];if(axis==='style')delete draft.value.customStyle;const open=new Set(openNotes.value);open.delete(axis);openNotes.value=open;savedNotice.value=false}
 async function mayClose(){return !saving.value && (!dirty.value || await askDiscard())}
 async function reload(){
  if(loading.value || saving.value || (dirty.value && !await mayClose()))return
