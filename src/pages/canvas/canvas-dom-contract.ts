@@ -278,16 +278,16 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   // 這份表是「作者打得到的名字」，不是「我們想過的名字」。
 
   // ── 回覆偏好：MMD 公開 ConvStyleSetting 組件的美化掛點 ───────────────
-  { selector: '.conv-style-modal[data-host="style"]', region: 'response-settings', origin: 'mmd', why: '卡片的對話設定面板底色與字色' },
+  // 回覆偏好跟「用戶人設」同一套版面：作者替人設頁寫的卡片、標題、輸入框外觀在這裡同樣生效。
+  { selector: '.role-setting.response-settings', region: 'response-settings', origin: 'mmd', why: '沿用人設頁（.role-setting）的卡片美化' },
   { selector: '[data-lt="response-settings"]', region: 'response-settings', origin: 'lt', why: '我方穩定鉤子' },
-  { selector: '.cs-modal-header .cs-header-left', region: 'response-settings', origin: 'mmd', why: '關閉面板' },
-  { selector: '.cs-modal-header .cs-header-center .cs-header-title', region: 'response-settings', origin: 'mmd', why: '面板標題' },
-  { selector: '.cs-modal-header .cs-header-right .confirm-btn', region: 'response-settings', origin: 'mmd', why: '儲存鍵' },
-  { selector: '.cs-modal-content > .outer-scroll-view', region: 'response-settings', origin: 'mmd', why: '設定捲動區' },
-  { selector: '.cs-group-card .section.behavior-section .cs-section-header .cs-title-row .cs-section-title', region: 'response-settings', origin: 'mmd', why: '各設定軸的標題' },
-  { selector: '.cs-group-card .cs-section-subtitle', region: 'response-settings', origin: 'mmd', why: '設定軸說明' },
-  { selector: '.cs-collapsible.is-open .cs-content-inner .cs-style-section .style-scroll-view .cs-style-grid .cs-style-item.active .style-label', region: 'response-settings', origin: 'mmd', why: '選項與選中狀態沿用卡片美化' },
-  { selector: '.cs-custom-input .cs-custom-textarea', region: 'response-settings', origin: 'mmd', why: '自訂文風輸入區' },
+  { selector: '.response-settings .header-scope .header-box .page-title', region: 'response-settings', origin: 'mmd', why: '面板標題' },
+  { selector: '.response-settings .card.mode-box .label', region: 'response-settings', origin: 'mmd', why: '每一項的標題' },
+  { selector: '.response-settings .radio-group .mode-item.selected', region: 'response-settings', origin: 'lt', why: '選項與選中狀態' },
+  { selector: '.response-settings .mode-hint', region: 'response-settings', origin: 'lt', why: '只解釋目前選的那一個' },
+  { selector: '.response-settings .advanced-scope .advanced-body', region: 'response-settings', origin: 'lt', why: '補充說明收在進階；收起來時節點仍在' },
+  { selector: '.response-settings .textarea-dark', region: 'response-settings', origin: 'mmd', why: '補充說明輸入框，跟人設頁的輸入框同一個外觀' },
+  { selector: '.response-settings .role-setting__actions .complete-btn', region: 'response-settings', origin: 'mmd', why: '儲存鍵' },
   { selector: '.response-discard', region: 'response-settings', origin: 'lt', why: '關掉前問一次有沒存的修改；只在問的時候出現' },
 
   // ── 用戶人設 ────────────────────────────────────────────────────────

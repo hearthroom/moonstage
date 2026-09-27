@@ -1,14 +1,15 @@
 <template>
- <section class="response-settings conv-style-modal" data-host="style" data-lt="response-settings" :aria-busy="loading || saving">
-  <header class="cs-modal-header">
-   <button type="button" class="cs-header-left response-reset" :disabled="saving" @click="$emit('close')">{{ t('main.cancel') }}</button>
-   <div class="cs-header-center"><h2 class="cs-header-title">{{ t('responseSettings.title') }}</h2></div>
-   <div class="cs-header-right">
-    <button v-if="saved" type="button" class="confirm-btn response-save" data-action="save" :disabled="!dirty || invalid || loading || saving || error === 'conflict'" @click="submit">
-     {{ t(saving ? 'responseSettings.saving' : 'responseSettings.save') }}
-    </button>
-   </div>
-  </header>
+ <div class="role-setting response-settings" data-lt="response-settings" :aria-busy="loading || saving">
+  <!--
+    回覆偏好：跟「用戶人設」同一套版面（.role-setting）。每一項一張卡：標題、一排藥丸、
+    底下一句只解釋「目前選的那個」。先前四個代寫選項各是一張兩行說明的大卡、每一項
+    都掛「補充說明」與「恢復預設」，整頁擠成一片，玩家看不出重點（owner 2026-09-27 截圖）。
+    補充說明是進階用法，收進底部的「進階」，跟人設頁的破限詞同一個位置。
+  -->
+  <div class="header-scope">
+   <div class="header-box"><div class="page-title">{{ t('responseSettings.title') }}</div></div>
+  </div>
+  <div class="mode-hint response-scope">{{ t('responseSettings.scope') }}</div>
   <!-- 有沒存的修改時關掉：問一次，問在面板裡。面板開著時在瀏覽器 top layer，系統對話框
        （uni.showModal）z-index 再大也畫在它底下，玩家看不到也按不到，只能按儲存才脫身。 -->
   <div class="response-discard" role="alertdialog" :hidden="!discardAsked">
@@ -16,54 +17,57 @@
    <button type="button" class="response-discard-keep" data-action="keep-editing" @click="answerDiscard(false)">{{ t('responseSettings.keepEditing') }}</button>
    <button type="button" class="response-discard-ok" data-action="discard" @click="answerDiscard(true)">{{ t('responseSettings.discardButton') }}</button>
   </div>
-  <p class="response-hint">{{ t('responseSettings.scope') }}</p>
-  <p v-if="loading" role="status">{{ t('responseSettings.loading') }}</p>
-  <div v-if="error" role="alert" class="response-error">
-   <p>{{ t(`responseSettings.${error}`) }}</p>
-   <button type="button" data-action="reload" :disabled="loading || saving" @click="reload">{{ t('responseSettings.reload') }}</button>
+  <p v-if="loading" class="mode-hint" role="status">{{ t('responseSettings.loading') }}</p>
+  <div v-if="error" role="alert" class="role-setting-error response-error">
+   <span>{{ t(`responseSettings.${error}`) }}</span>
+   <button type="button" class="advanced-reset" data-action="reload" :disabled="loading || saving" @click="reload">{{ t('responseSettings.reload') }}</button>
   </div>
   <template v-if="saved">
-   <div class="cs-modal-content"><div class="response-fields outer-scroll-view">
-    <div v-for="(options, axis) in responseAxes" :key="axis" class="cs-group-card">
-     <fieldset class="section behavior-section" :disabled="loading || saving">
-      <legend class="cs-section-header"><span class="cs-title-row"><span class="cs-section-title">{{ t(`responseSettings.axes.${axis}`) }}</span></span></legend>
-      <p v-if="axis === 'agency'" class="response-hint cs-section-subtitle">{{ t('responseSettings.agencyHint') }}</p>
-      <div class="cs-collapsible is-open"><div class="cs-content-inner"><div class="sub-section cs-style-section">
-       <div class="style-scroll-view"><div class="response-options cs-style-grid" :class="{ 'response-agency-options': axis === 'agency' }">
-        <button v-for="option in options" :key="option" type="button" class="cs-style-item" :data-axis="axis" :data-value="option"
-         :class="{ active: (draft[axis] ?? responseDefaults[axis]) === option }"
-         :aria-label="t(`responseSettings.options.${axis}.${option}`)"
-         :aria-describedby="axis === 'agency' ? `response-agency-${conversationId}-${option}` : undefined"
-         :aria-pressed="(draft[axis] ?? responseDefaults[axis]) === option" @click="choose(axis, option)">
-         <span class="style-label">{{ t(`responseSettings.options.${axis}.${option}`) }}</span>
-         <span v-if="axis === 'agency'" :id="`response-agency-${conversationId}-${option}`" class="response-option-hint">{{ t(`responseSettings.agencyHints.${option}`) }}</span>
-        </button>
-       </div></div>
-       <label v-if="axis === 'style' && draft.style === 'custom'" class="response-custom cs-custom-input">
-        <span>{{ t('responseSettings.customLabel') }}</span>
-        <textarea v-model="draft.customStyle" class="cs-custom-textarea" rows="3" :aria-invalid="customTooLong" />
-        <span class="char-count" :class="{ 'response-error': customTooLong }">{{ t('responseSettings.customCount', { count: [...(draft.customStyle || '')].length }) }}</span>
-       </label>
-       <div v-if="!(axis === 'style' && draft.style === 'custom')" class="response-note">
-        <button v-if="!noteOpen(axis)" type="button" class="response-note-add" data-action="add-note" :data-axis="axis" @click="openNote(axis)"><span aria-hidden="true">+ </span>{{ t('responseSettings.noteToggle') }}</button>
-        <label v-else class="response-custom cs-custom-input">
-         <span>{{ t('responseSettings.noteLabel') }}</span>
-         <textarea v-model="draft[responseNoteKeys[axis]]" class="cs-custom-textarea response-note-input" :data-axis="axis" rows="2"
-          :placeholder="t(`responseSettings.noteExamples.${axis}.${draft[axis] ?? responseDefaults[axis]}`)" :aria-invalid="noteTooLong(axis)" />
-         <span class="response-hint">{{ t('responseSettings.noteHint') }}</span>
-         <span class="char-count" :class="{ 'response-error': noteTooLong(axis) }">{{ t('responseSettings.noteCount', { count: [...(draft[responseNoteKeys[axis]] || '')].length }) }}</span>
-        </label>
-       </div>
-      </div></div></div>
-      <p v-if="axis === 'length'" class="response-hint">{{ t('responseSettings.lengthHint') }}</p>
-      <p v-if="axis === 'perspective' && draft.perspective === 'first_character'" class="response-hint">{{ t('responseSettings.firstPersonHint') }}</p>
-      <button v-if="draft[axis] !== undefined || draft[responseNoteKeys[axis]] !== undefined" type="button" class="response-reset" @click="reset(axis)">{{ t('responseSettings.reset') }}</button>
-     </fieldset>
+   <div v-for="(options, axis) in responseAxes" :key="axis" class="card mode-box response-axis" :data-axis="axis">
+    <div class="label">{{ t(`responseSettings.axes.${axis}`) }}</div>
+    <div class="radio-group" role="radiogroup" :aria-label="t(`responseSettings.axes.${axis}`)">
+     <button v-for="option in options" :key="option" type="button" class="mode-item" :data-axis="axis" :data-value="option"
+      :class="{ selected: current(axis) === option }" role="radio" :aria-checked="current(axis) === option ? 'true' : 'false'"
+      :disabled="loading || saving" @click="choose(axis, option)">{{ t(`responseSettings.options.${axis}.${option}`) }}</button>
     </div>
-   </div></div>
-   <footer class="response-footer"><p class="response-hint" role="status">{{ t(savedNotice ? 'responseSettings.saved' : 'responseSettings.nextReply') }}</p></footer>
+    <div v-if="hint(axis)" class="mode-hint" :data-hint="axis">{{ hint(axis) }}</div>
+    <div v-if="axis === 'style' && draft.style === 'custom'" class="textarea-wrapper response-custom">
+     <textarea v-model="draft.customStyle" class="textarea-dark response-custom-input" rows="3" :aria-label="t('responseSettings.customLabel')"
+      :placeholder="t('responseSettings.customLabel')" :aria-invalid="customTooLong" />
+     <div class="char-count" :class="{ 'response-error': customTooLong }">{{ t('responseSettings.customCount', { count: [...(draft.customStyle || '')].length }) }}</div>
+    </div>
+   </div>
+
+   <div class="advanced-scope">
+    <div class="advanced-toggle" role="button" tabindex="0" data-action="toggle-notes" :aria-expanded="notesOpen ? 'true' : 'false'"
+     @click="notesOpen = !notesOpen" @keydown.enter.prevent="notesOpen = !notesOpen">
+     <span class="advanced-title">{{ t('responseSettings.advanced') }}</span>
+     <span class="advanced-caret" aria-hidden="true">{{ notesOpen ? '−' : '+' }}</span>
+    </div>
+    <div class="card advanced-body response-notes" :hidden="!notesOpen">
+     <div class="advanced-desc">{{ t('responseSettings.noteHint') }}</div>
+     <template v-for="axis in noteAxes" :key="axis">
+      <label class="textarea-wrapper response-note">
+       <span class="label">{{ t(`responseSettings.axes.${axis}`) }}</span>
+       <textarea v-model="draft[responseNoteKeys[axis]]" class="textarea-dark response-note-input" :data-axis="axis" rows="2"
+        :placeholder="t(`responseSettings.noteExamples.${axis}.${current(axis)}`)" :aria-invalid="noteTooLong(axis)" />
+       <span class="char-count" :class="{ 'response-error': noteTooLong(axis) }">{{ t('responseSettings.noteCount', { count: [...(draft[responseNoteKeys[axis]] || '')].length }) }}</span>
+      </label>
+     </template>
+     <div class="advanced-actions">
+      <button type="button" class="advanced-reset" data-action="reset-all" :hidden="!customized" @click="resetAll">{{ t('responseSettings.resetAll') }}</button>
+     </div>
+    </div>
+   </div>
   </template>
- </section>
+
+  <div class="role-setting__actions">
+   <button type="button" class="icon-back" data-action="cancel" :disabled="saving" @click="$emit('close')">{{ t('main.cancel') }}</button>
+   <button v-if="saved" type="button" class="complete-btn" data-action="save" :disabled="!dirty || invalid || loading || saving || error === 'conflict'" @click="submit">
+    {{ t(saving ? 'responseSettings.saving' : 'responseSettings.save') }}
+   </button>
+  </div>
+ </div>
 </template>
 
 <script setup lang="ts">
@@ -75,8 +79,8 @@ const props=defineProps<{
  save:(id:string,revision:number,patch:Record<string,string|null>)=>Promise<unknown>
  t:(key:string, values?:Record<string,unknown>)=>string
 }>()
-defineEmits<{ (e: 'close'): void }>()
-const saved=ref<ResponseSettings|null>(null),draft=ref<ResponseDraft>({}),loading=ref(false),saving=ref(false),error=ref(''),savedNotice=ref(false)
+const emit=defineEmits<{ (e: 'close'): void }>()
+const saved=ref<ResponseSettings|null>(null),draft=ref<ResponseDraft>({}),loading=ref(false),saving=ref(false),error=ref('')
 let alive=true
 const discardAsked=ref(false)
 let discardAnswer:((ok:boolean)=>void)|null=null
@@ -85,24 +89,33 @@ function answerDiscard(ok:boolean){discardAsked.value=false;const resolve=discar
 onBeforeUnmount(()=>{alive=false;answerDiscard(false)})
 const dirty=computed(()=>JSON.stringify(responsePatch(draft.value))!==JSON.stringify(responsePatch(saved.value?.overrides || {})))
 const customTooLong=computed(()=>[...(draft.value.customStyle || '')].length>1000)
-const openNotes=ref(new Set<ResponseAxis>())
-function noteOpen(axis:ResponseAxis){return openNotes.value.has(axis) || !!draft.value[responseNoteKeys[axis]]}
-function openNote(axis:ResponseAxis){openNotes.value=new Set(openNotes.value).add(axis)}
+const axes=Object.keys(responseAxes) as ResponseAxis[]
+// 文風選「自訂」時已經能整段寫，不再給文風補充。
+const noteAxes=computed(()=>axes.filter(axis=>!(axis==='style' && draft.value.style==='custom')))
+const notesOpen=ref(false)
+const customized=computed(()=>Object.keys(responsePatch(draft.value)).some(key=>responsePatch(draft.value)[key]!==null))
+function current(axis:ResponseAxis){return draft.value[axis] ?? responseDefaults[axis]}
+// 底下那句只解釋目前選的那一個；篇幅是一句固定的提醒，文風的選項名已經說明自己。
+function hint(axis:ResponseAxis){
+ if(axis==='agency' || axis==='perspective' || axis==='pace') return props.t(`responseSettings.${axis}Hints.${current(axis)}`)
+ if(axis==='length') return props.t('responseSettings.lengthHint')
+ return ''
+}
 function noteTooLong(axis:ResponseAxis){return [...(draft.value[responseNoteKeys[axis]] || '')].length>maxResponseNoteLength}
-const invalid=computed(()=>(draft.value.style==='custom' && (!draft.value.customStyle?.trim() || customTooLong.value)) || (Object.keys(responseAxes) as ResponseAxis[]).some(noteTooLong))
-function choose(axis:ResponseAxis,value:string){draft.value[axis]=value;if(axis==='style' && value!=='custom')delete draft.value.customStyle;if(axis==='style' && value==='custom')delete draft.value.styleNote;savedNotice.value=false}
-function reset(axis:ResponseAxis){delete draft.value[axis];delete draft.value[responseNoteKeys[axis]];if(axis==='style')delete draft.value.customStyle;const open=new Set(openNotes.value);open.delete(axis);openNotes.value=open;savedNotice.value=false}
+const invalid=computed(()=>(draft.value.style==='custom' && (!draft.value.customStyle?.trim() || customTooLong.value)) || axes.some(noteTooLong))
+function choose(axis:ResponseAxis,value:string){draft.value[axis]=value;if(axis==='style' && value!=='custom')delete draft.value.customStyle;if(axis==='style' && value==='custom')delete draft.value.styleNote}
+function resetAll(){draft.value={}}
 async function mayClose(){return !saving.value && (!dirty.value || await askDiscard())}
 async function reload(){
  if(loading.value || saving.value || (dirty.value && !await mayClose()))return
  loading.value=true;error.value=''
- try{const value=readResponseSettings(await props.load(props.conversationId),props.conversationId);if(alive){saved.value=value;draft.value={...value.overrides}}}
+ try{const value=readResponseSettings(await props.load(props.conversationId),props.conversationId);if(alive){saved.value=value;draft.value={...value.overrides};notesOpen.value=axes.some(axis=>!!value.overrides[responseNoteKeys[axis]])}}
  catch{if(alive)error.value='loadFailed'}finally{if(alive)loading.value=false}
 }
 async function submit(){
  if(!saved.value || !dirty.value || invalid.value || loading.value || saving.value || error.value==='conflict')return
  saving.value=true;error.value=''
- try{const value=readResponseSettings(await props.save(props.conversationId,saved.value.revision,responsePatch(draft.value)),props.conversationId);if(alive){saved.value=value;draft.value={...value.overrides};savedNotice.value=true}}
+ try{const value=readResponseSettings(await props.save(props.conversationId,saved.value.revision,responsePatch(draft.value)),props.conversationId);if(alive){saved.value=value;draft.value={...value.overrides};emit('close')}}
  catch(e){if(alive)error.value=((e as {status?:number})?.status ?? (e as {statusCode?:number})?.statusCode)===409?'conflict':'saveFailed'}finally{if(alive)saving.value=false}
 }
 onMounted(reload)
