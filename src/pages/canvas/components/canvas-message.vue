@@ -86,7 +86,7 @@
         <!-- 中斷之後的出路（照 mobile）：上面的軌跡說「發生了什麼」，這張說「現在能做什麼」。 -->
         <div v-if="message.agentInterrupted" class="agent-resume-card" data-lt="agent-resume">
           <div class="agent-resume-card__body">
-            <div class="agent-resume-card__text">{{ labels.interruptedNotice }}</div>
+            <div class="agent-resume-card__text">{{ message.interruptedNotice || labels.interruptedNotice }}</div>
             <div class="agent-resume-card__sub">{{ labels.interruptedNoticeSub }}</div>
           </div>
           <div class="agent-resume-card__btn" role="button" tabindex="0"
@@ -254,6 +254,7 @@ const props = withDefaults(defineProps<{
     prepTrail?: string[] | null
     /** Agent 準備到一半被停下：軌跡已固定，底下給一張「進度留著／繼續」的卡 */
     agentInterrupted?: boolean
+    interruptedNotice?: string
     /** 列表的最後一則（酒館的 last_mes），可能是使用者說的 */
     latest?: boolean
     /** 最新的那一則 AI 回覆——只有它能重新生成、改寫、繼續 */

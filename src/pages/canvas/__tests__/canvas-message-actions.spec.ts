@@ -291,3 +291,11 @@ describe('長按放開不會誤點到選單', () => {
     }
   })
 })
+
+ it('shows a tool failure while keeping the saved progress and continue action', async () => {
+   const w = mountMessage({agentInterrupted:true, interruptedNotice:'模型的工具操作無法完成', finished:false, loading:false, prepTrail:['Drafting'], html:''}, {labels:{copy:'',edit:'',regenerate:'',reasoning:'',prepTrail:'Steps',prev:'',next:'',interruptedNotice:'Generic interruption',interruptedNoticeSub:'Progress is saved; continue or switch models.',continueAction:'Continue'}})
+   expect(w.find('[data-lt="agent-resume"]').text()).toContain('模型的工具操作無法完成')
+   expect(w.text()).toContain('Progress is saved')
+   await w.find('.agent-resume-card__btn').trigger('click')
+   expect(w.emitted('action')).toEqual([['resume-agent']])
+ })

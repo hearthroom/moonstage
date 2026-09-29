@@ -32,6 +32,7 @@ export interface PendingChatTurn {
   finishReason?: string
   allowedActions?: string[]
   reasonCode?: string
+  failureCause?: string
   messageKey?: string
   preAdmissionErrorType?: string
   preAdmissionErrorAt?: number
@@ -353,6 +354,7 @@ export interface ChatOperationStatus {
   outputDisposition?: string
   finishReason?: string
   reasonCode?: string
+  failureCause?: string
   messageKey?: string
   allowedActions?: string[]
   retryable?: boolean
@@ -435,6 +437,7 @@ export function normalizeChatOperationStatus(input: any): ChatOperationStatus | 
     'outputDisposition',
     'finishReason',
     'reasonCode',
+    'failureCause',
     'messageKey',
     'acceptedAt',
     'terminalAt',
@@ -772,6 +775,7 @@ function operationProjectionMetadata(status: ChatOperationStatus) {
     outputDisposition: status.outputDisposition || '',
     allowedActions: status.allowedActions ? [...status.allowedActions] : [],
     reasonCode: status.reasonCode || '',
+    failureCause: status.failureCause || '',
     messageKey: status.messageKey || '',
     retryable: status.retryable === true,
   }
@@ -808,6 +812,7 @@ function operationStatusFromProjectionRow(row: any): ChatOperationStatus | null 
     outputDisposition: row.outputDisposition,
     finishReason: row.finishReason,
     reasonCode: row.reasonCode,
+    failureCause: row.failureCause,
     messageKey: row.messageKey,
     allowedActions: row.allowedActions,
     retryable: row.retryable,
@@ -1150,6 +1155,7 @@ export function mergeOperationStatusIntoStreamEntry(
       ? [...status.allowedActions]
       : (Array.isArray(current.allowedActions) ? [...current.allowedActions] : undefined),
     reasonCode: status.reasonCode || current.reasonCode || '',
+    failureCause: status.failureCause || current.failureCause || '',
     messageKey: status.messageKey || current.messageKey || '',
     updatedAt: now,
   }
@@ -1179,6 +1185,7 @@ function operationResumeIdentity(entry: any) {
       ? [...entry.allowedActions]
       : undefined,
     reasonCode: String(entry?.reasonCode || '').trim(),
+    failureCause: String(entry?.failureCause || '').trim(),
     messageKey: String(entry?.messageKey || '').trim(),
   }
 }
