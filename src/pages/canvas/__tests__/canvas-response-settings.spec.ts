@@ -49,10 +49,10 @@ it('saves independent axes, clears hidden custom text and closes after the serve
  await pill(wrapper,'perspective','second_user').trigger('click')
  await pill(wrapper,'style','custom').trigger('click')
  await wrapper.get('.response-custom-input').setValue('Sparse prose')
- await pill(wrapper,'style','plain').trigger('click')
+ await pill(wrapper,'style','guided').trigger('click')
  expect(wrapper.find('.response-custom-input').exists()).toBe(false)
  await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
- expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({agency:'coauthor',perspective:'second_user',style:'plain',customStyle:null}))
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({agency:'coauthor',perspective:'second_user',style:'guided',customStyle:null}))
  expect(wrapper.emitted('close')).toHaveLength(1)
 })
 
