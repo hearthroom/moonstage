@@ -113,6 +113,7 @@ export interface MessageView {
   prepSteps?: string[] | null
   prepTrail?: string[] | null
   agentInterrupted?: boolean
+  interruptedNotice?: string
   latest?: boolean
   latestAI?: boolean
   contextUsage?: { label: string; tip: string; level: string } | null

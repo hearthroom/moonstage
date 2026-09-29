@@ -1328,3 +1328,12 @@ describe('agent 中斷的那一輪', () => {
     expect(card.prepTrail).toEqual(['寫這則回覆的草稿'])
   })
 })
+
+ it('preserves the failure cause through live status, reconnect and history', () => {
+   const status = {operationId:'op-cause', kind:'send', state:'failed_retryable', reasonCode:'agent_progress_preserved', failureCause:'tool_rejections', sourceChatId:'u-cause', allowedActions:['continue','switch_model']}
+   expect(normalizeChatOperationStatus(status).failureCause).toBe('tool_rejections')
+   const entry = mergeOperationStatusIntoStreamEntry({}, status)
+   expect(entry.failureCause).toBe('tool_rejections')
+   const rows = mergeChatHistoryOperationProjections([{id:'u-cause',chatId:'u-cause',type:1,content:'Hi'}], {schemaVersion:'outcome_v1',operationStatusAvailable:true,operations:[status]}, {agentPrepTrail:['Drafting']} as any)
+   expect(rows.find((row:any) => row.agentInterrupted)?.failureCause).toBe('tool_rejections')
+ })

@@ -75,7 +75,7 @@
         <chat-system-message
           v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason)"
           :kind="getSystemMsgKind(item.finishReason)"
-          :label="getSystemMsgLabel(item.finishReason)"
+          :label="operationFailureTitle(item.failureCause, t) || getSystemMsgLabel(item.finishReason)"
           :sub="getSystemMsgSub(item.finishReason)"
           :cta="getSystemMsgCta(item.finishReason, item, index)"
           :cta-action="getSystemMsgCtaAction(item.finishReason, item, index)"
@@ -363,6 +363,7 @@
 
 <script lang="ts" setup>
 import { cardPortrait } from './canvas-portrait'
+import { operationFailureTitle } from '@/utils/operation-failure-copy'
 import { cfImageDesktop } from "@/utils/image-transform.js"
 
 import { createFullscreenController } from './canvas-fullscreen';
@@ -1004,6 +1005,7 @@ type OperationResumeFields = {
   finishReason?: string;
   allowedActions?: string[];
   reasonCode?: string;
+  failureCause?: string;
   messageKey?: string;
 };
 type PendingEntry = OperationResumeFields & {
@@ -1207,6 +1209,7 @@ function persistAcceptedStreamState() {
       finishReason: pendingChatTurn.finishReason || '',
       allowedActions: pendingChatTurn.allowedActions || [],
       reasonCode: pendingChatTurn.reasonCode || '',
+      failureCause: pendingChatTurn.failureCause || '',
       messageKey: pendingChatTurn.messageKey || '',
     })
     : readLsEntry();
@@ -1714,6 +1717,7 @@ function tryResumeOnMount() {
         finishReason: pending.finishReason,
         allowedActions: pending.allowedActions,
         reasonCode: pending.reasonCode,
+      failureCause: pending.failureCause,
         messageKey: pending.messageKey,
       });
     } else if (pending.operationId) {
@@ -1735,6 +1739,7 @@ function tryResumeOnMount() {
         finishReason: pending.finishReason,
         allowedActions: pending.allowedActions,
         reasonCode: pending.reasonCode,
+      failureCause: pending.failureCause,
         messageKey: pending.messageKey,
         operationKind: operationKindFromServer(pending.serverOperationKind),
       });
@@ -1842,6 +1847,7 @@ function tryResumeOnMount() {
       finishReason: pending.finishReason,
       allowedActions: pending.allowedActions,
       reasonCode: pending.reasonCode,
+      failureCause: pending.failureCause,
       messageKey: pending.messageKey,
       operationKind: operationKindFromServer(pending.serverOperationKind),
       startedAt: pending.pendingSince,
@@ -4408,7 +4414,7 @@ function getSystemMsgLabel(finishReason) {
     'reasoning_only_timeout': t('chat.noFinalAnswerTimeout') || '模型回應太慢，這則被中斷了',
     'empty_response':   t('error.emptyResponse')    || '模型沒有產生回覆',
     'rewrite_below_threshold': t('chat.rewriteBelowThreshold') || '重新生成沒有產生足夠內容，原回覆已保留',
-    'error':            t('systemMsg.modelError')   || 'AI 模型連線失敗',
+    'error':            t('systemMsg.modelError')   || '模型未能完成這次回覆',
     'pause_turn':       t('systemMsg.stopped')      || '已停止生成',
     'user_stop':        t('systemMsg.stopped')      || '已停止生成',
     'agent_progress_preserved': t('multiPass.interruptedNotice') || '這一輪還沒跑完，進度已經留著',
@@ -4432,7 +4438,7 @@ function getSystemMsgLabel(finishReason) {
     'rewrite_target_not_latest': t('chat.editLatestAIOnly') || '只能編輯目前最新的 AI 回覆',
     'rewrite_target_invalid': t('chat.rewriteTargetChanged') || '這則回覆已無法編輯',
   };
-  return map[finishReason] || (t('systemMsg.modelError') || 'AI 模型連線失敗');
+  return map[finishReason] || (t('systemMsg.modelError') || '模型未能完成這次回覆');
 }
 function getSystemMsgSub(finishReason) {
   const map = {
@@ -4451,7 +4457,7 @@ function getSystemMsgSub(finishReason) {
     'reasoning_only_timeout': t('chat.retryLaterOrSwitchModel') || '可以換一個模型，或過一陣子再試',
     'empty_response':   t('chat.turnRetryable')         || '本次沒有可用回覆，可再試一次',
     'rewrite_below_threshold': t('chat.turnRetryable')  || '原回覆仍保留，可再試一次',
-    'error':            t('systemMsg.modelErrorSub')   || '模型服務暫時無法回應',
+    'error':            t('systemMsg.modelErrorSub')   || '可以重試，或換一個模型再試',
     'pause_turn':       t('systemMsg.stoppedSub')      || '你中斷了這次生成',
     'user_stop':        t('systemMsg.stoppedSub')      || '你中斷了這次生成',
     'outcome_unconfirmed': t('chat.operationStatusUnavailableSub') || '不用重送，完成後會自動更新。若已產生回覆，會照原規則計費。',
@@ -4459,8 +4465,7 @@ function getSystemMsgSub(finishReason) {
     // 還能換模型。實測模型整條掛掉時(上游 100% 失敗),他會一直按繼續,而那個模型
     // 不會好。副標把兩條路都講出來,按鈕維持不變。
     //
-    // 逐一原因的提示(限流 / 不可用 / 斷線各自不同)要伺服器把分類落盤才做得到,
-    // 另案;在那之前這一句對所有情況都成立。
+    // failureCause 另行顯示原因；reasonCode 保留斷點續跑語義。
     'agent_progress_preserved': t('multiPass.interruptedNoticeSub'),
     'rate_limit':       t('systemMsg.rateLimitSub')    || '請稍等一會再試',
     'server_error':     t('systemMsg.serverErrorSub')  || '可能過載中，稍候再試',
@@ -6870,6 +6875,7 @@ function recordAuthoritativeOperationStatus(input: any) {
     if (status.finishReason) pendingChatTurn.finishReason = status.finishReason;
     if (status.allowedActions) pendingChatTurn.allowedActions = status.allowedActions;
     if (status.reasonCode) pendingChatTurn.reasonCode = status.reasonCode;
+    if (status.failureCause) pendingChatTurn.failureCause = status.failureCause;
     if (status.messageKey) pendingChatTurn.messageKey = status.messageKey;
   }
 
@@ -6901,6 +6907,7 @@ function recordAuthoritativeOperationStatus(input: any) {
     if (status.outputDisposition) operationBubble.outputDisposition = status.outputDisposition;
     operationBubble.allowedActions = status.allowedActions ? [...status.allowedActions] : [];
     if (status.reasonCode) operationBubble.reasonCode = status.reasonCode;
+    if (status.failureCause) operationBubble.failureCause = status.failureCause;
     if (status.messageKey) operationBubble.messageKey = status.messageKey;
   }
 
@@ -6943,6 +6950,7 @@ function refreshHistoryAfterAuthoritativeOperation(status: any) {
     if (status.outputDisposition) operationBubble.outputDisposition = status.outputDisposition;
     operationBubble.allowedActions = status.allowedActions ? [...status.allowedActions] : [];
     if (status.reasonCode) operationBubble.reasonCode = status.reasonCode;
+    if (status.failureCause) operationBubble.failureCause = status.failureCause;
     if (status.messageKey) operationBubble.messageKey = status.messageKey;
     operationBubble.finishReason = projectionFinishReason(
       status,
@@ -8915,6 +8923,7 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     // 「有沒有在幹活」的依據，不該隨氣泡出現而消失。
     prepTrail: Array.isArray(item.prepTrail) ? item.prepTrail : null,
     agentInterrupted: item.agentInterrupted === true,
+    interruptedNotice: operationFailureTitle(item.failureCause, t),
     reasoning: (!isUser && item.thinkingContent && formData.showThinkingProcess !== false)
       ? item.thinkingContent : '',
     finished: !!item.chatFinish,
