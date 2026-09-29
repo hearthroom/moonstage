@@ -4175,6 +4175,7 @@
 	"responseSettings.options.agency.assist": "只補充動作細節",
 	"responseSettings.options.agency.lines": "只代寫台詞",
 	"responseSettings.options.agency.coauthor": "允許 AI 代寫",
+	"responseSettings.options.style.default": "預設",
 	"responseSettings.options.style.card": "跟隨角色卡",
 	"responseSettings.options.style.plain": "自然簡潔",
 	"responseSettings.options.style.dialogue": "對話為主",
