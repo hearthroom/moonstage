@@ -4175,6 +4175,7 @@
 	"responseSettings.options.agency.assist": "入力した行動だけ詳しく",
 	"responseSettings.options.agency.lines": "セリフだけ任せる",
 	"responseSettings.options.agency.coauthor": "セリフや行動も任せる",
+	"responseSettings.options.style.default": "標準",
 	"responseSettings.options.style.card": "キャラクターに合わせる",
 	"responseSettings.options.style.plain": "自然で簡潔",
 	"responseSettings.options.style.dialogue": "会話中心",

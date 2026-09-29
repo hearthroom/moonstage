@@ -4175,6 +4175,7 @@
 	"responseSettings.options.agency.assist": "Expand my actions only",
 	"responseSettings.options.agency.lines": "Write my lines only",
 	"responseSettings.options.agency.coauthor": "Allow AI to write for me",
+	"responseSettings.options.style.default": "Default",
 	"responseSettings.options.style.card": "Follow character",
 	"responseSettings.options.style.plain": "Plain",
 	"responseSettings.options.style.dialogue": "Dialogue focused",
