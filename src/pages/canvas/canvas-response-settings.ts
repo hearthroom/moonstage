@@ -33,7 +33,7 @@ export function lengthTargetOf(draft:ResponseDraft):number {
 }
 const noteKeys:readonly string[] = Object.values(responseNoteKeys)
 const lengthValues:readonly string[] = [...responseAxes.length, ...Object.keys(legacyLengthTargets)]
-export const responseDefaults: Record<ResponseAxis, string> = {agency:'protect',style:'card',perspective:'card',length:'auto',pace:'natural'}
+export const responseDefaults: Record<ResponseAxis, string> = {agency:'protect',style:'default',perspective:'card',length:'auto',pace:'natural'}
 export interface ResponseSettings {
  conversationId: string
  scope: 'conversation'

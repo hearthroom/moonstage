@@ -115,9 +115,10 @@ function slide(event:Event){
  if(value===undefined)return
  draft.value.length='target';draft.value.lengthTarget=String(value)
 }
-// 底下那句只解釋目前選的那一個；篇幅照落在哪個區解釋，文風的選項名已經說明自己。
+// 底下那句只解釋目前選的那一個；篇幅照落在哪個區解釋。文風四個選項名字看不出差別在哪
+//（預設與精簡指引都有平台指引，差在留給模型多少發揮），所以也要一句說明。
 function hint(axis:ResponseAxis){
- if(axis==='agency' || axis==='perspective' || axis==='pace') return props.t(`responseSettings.${axis}Hints.${current(axis)}`)
+ if(axis==='agency' || axis==='perspective' || axis==='pace' || axis==='style') return props.t(`responseSettings.${axis}Hints.${current(axis)}`)
  if(axis==='length') return props.t(`responseSettings.lengthHints.${selected('length')==='auto' ? 'auto' : lengthZone(lengthTarget.value)}`)
  return ''
 }

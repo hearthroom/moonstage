@@ -37,7 +37,9 @@ it('explains only the selected option under each setting', async () => {
  expect(wrapper.get('[data-hint="perspective"]').text()).toBe('responseSettings.perspectiveHints.third_limited')
  expect(wrapper.get('[data-hint="pace"]').text()).toBe('responseSettings.paceHints.natural')
  expect(wrapper.get('[data-hint="length"]').text()).toBe('responseSettings.lengthHints.auto')
- expect(wrapper.find('[data-hint="style"]').exists()).toBe(false)
+ expect(wrapper.get('[data-hint="style"]').text()).toBe('responseSettings.styleHints.default')
+ await pill(wrapper,'style','guided').trigger('click')
+ expect(wrapper.get('[data-hint="style"]').text()).toBe('responseSettings.styleHints.guided')
  expect(wrapper.findAll('.response-option-hint')).toHaveLength(0)
 })
 
