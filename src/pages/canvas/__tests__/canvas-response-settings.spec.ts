@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import Panel from '../components/canvas-response-settings.vue'
+import { lengthTargetLadder, lengthTargetOf, readResponseSettings } from '../canvas-response-settings'
 
 const initial = () => ({conversationId:'c1',scope:'conversation',schemaVersion:1,revision:0,overrides:{},effective:{agency:'protect',style:'card',perspective:'card',length:'auto',pace:'natural'}})
 const echo = () => vi.fn().mockImplementation(async (_id, rev, patch)=>({...initial(),revision:rev+1,overrides:Object.fromEntries(Object.entries(patch).filter(([,v])=>v!==null))}))
@@ -35,7 +36,7 @@ it('explains only the selected option under each setting', async () => {
  await pill(wrapper,'perspective','third_limited').trigger('click')
  expect(wrapper.get('[data-hint="perspective"]').text()).toBe('responseSettings.perspectiveHints.third_limited')
  expect(wrapper.get('[data-hint="pace"]').text()).toBe('responseSettings.paceHints.natural')
- expect(wrapper.get('[data-hint="length"]').text()).toBe('responseSettings.lengthHint')
+ expect(wrapper.get('[data-hint="length"]').text()).toBe('responseSettings.lengthHints.auto')
  expect(wrapper.find('[data-hint="style"]').exists()).toBe(false)
  expect(wrapper.findAll('.response-option-hint')).toHaveLength(0)
 })
@@ -151,4 +152,55 @@ it('resets every setting and note back to default in one step', async()=>{
  expect(wrapper.get('[data-action="reset-all"]').attributes('hidden')).toBeDefined()
  await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
  expect(save).toHaveBeenLastCalledWith('c1',1,expect.objectContaining({agency:null,length:null,lengthNote:null}))
+})
+
+// 篇幅要麼自動，要麼拖滑桿指定字數。滑桿只停在刻度上，存下去的是刻度值；
+// 切回自動就不再送字數。
+it('offers automatic length or a slider on the ladder', async()=>{
+ const save=echo()
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save,t:(k:string,v?:Record<string,unknown>)=>v?`${k}:${JSON.stringify(v)}`:k}})
+ await flushPromises()
+ expect(wrapper.find('.response-length-slider').exists()).toBe(false)
+ expect(wrapper.get('[data-hint="length"]').text()).toBe('responseSettings.lengthHints.auto')
+ await pill(wrapper,'length','target').trigger('click')
+ const slider=wrapper.get('.response-length-slider')
+ expect((slider.element as HTMLInputElement).value).toBe(String(lengthTargetLadder.indexOf(800)))
+ expect(wrapper.get('.response-length-value').text()).toBe('responseSettings.lengthValue:{"count":800}')
+ expect(wrapper.get('[data-hint="length"]').text()).toBe('responseSettings.lengthHints.balanced')
+ await slider.setValue(String(lengthTargetLadder.indexOf(2000)))
+ expect(wrapper.get('.response-length-value').text()).toBe('responseSettings.lengthValue:{"count":2000}')
+ expect(wrapper.get('[data-hint="length"]').text()).toBe('responseSettings.lengthHints.detailed')
+ await slider.setValue(String(lengthTargetLadder.indexOf(10000)))
+ expect(wrapper.get('[data-hint="length"]').text()).toBe('responseSettings.lengthHints.long')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).toHaveBeenLastCalledWith('c1',0,expect.objectContaining({length:'target',lengthTarget:'10000'}))
+ await pill(wrapper,'length','auto').trigger('click')
+ expect(wrapper.find('.response-length-slider').exists()).toBe(false)
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).toHaveBeenLastCalledWith('c1',1,expect.objectContaining({length:'auto',lengthTarget:null}))
+})
+
+// 舊存檔的「簡短／適中／詳細」顯示成滑桿上對應的字數；一拖就換成指定字數。
+it('shows a legacy length option as its slider position', async()=>{
+ const save=echo()
+ const legacy={...initial(),revision:1,overrides:{length:'detailed'},effective:{...initial().effective,length:'detailed'}}
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>legacy,save,t:(k:string)=>k}})
+ await flushPromises()
+ expect(pill(wrapper,'length','target').attributes('aria-checked')).toBe('true')
+ expect((wrapper.get('.response-length-slider').element as HTMLInputElement).value).toBe(String(lengthTargetLadder.indexOf(1500)))
+ expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeDefined()
+ await wrapper.get('.response-length-slider').setValue(String(lengthTargetLadder.indexOf(3000)))
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).toHaveBeenLastCalledWith('c1',1,expect.objectContaining({length:'target',lengthTarget:'3000'}))
+})
+
+it('validates length targets in settings responses', ()=>{
+ const ok={...initial(),overrides:{length:'target',lengthTarget:'800'},effective:{...initial().effective,length:'target',lengthTarget:800}}
+ expect(readResponseSettings(ok,'c1').effective.lengthTarget).toBe(800)
+ expect(()=>readResponseSettings({...ok,effective:{...ok.effective,lengthTarget:850}},'c1')).toThrow()
+ expect(()=>readResponseSettings({...ok,overrides:{lengthTarget:'800'}},'c1')).toThrow()
+ expect(()=>readResponseSettings({...ok,overrides:{length:'target'}},'c1')).toThrow()
+ expect(readResponseSettings({...initial(),effective:{...initial().effective,length:'brief'}},'c1').effective.length).toBe('brief')
+ expect(lengthTargetOf({length:'balanced'})).toBe(800)
+ expect(lengthTargetOf({length:'target',lengthTarget:'2500'})).toBe(2500)
 })

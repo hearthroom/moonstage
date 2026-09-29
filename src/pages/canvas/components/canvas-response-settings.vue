@@ -27,8 +27,19 @@
     <div class="label">{{ t(`responseSettings.axes.${axis}`) }}</div>
     <div class="radio-group" role="radiogroup" :aria-label="t(`responseSettings.axes.${axis}`)">
      <button v-for="option in options" :key="option" type="button" class="mode-item" :data-axis="axis" :data-value="option"
-      :class="{ selected: current(axis) === option }" role="radio" :aria-checked="current(axis) === option ? 'true' : 'false'"
+      :class="{ selected: selected(axis) === option }" role="radio" :aria-checked="selected(axis) === option ? 'true' : 'false'"
       :disabled="loading || saving" @click="choose(axis, option)">{{ t(`responseSettings.options.${axis}.${option}`) }}</button>
+    </div>
+    <!-- 篇幅：指定字數時是一條停在刻度上的滑桿。拇指上方直接顯示字數，軌道下方標三個區，
+         底下那句照目前落在哪個區解釋。 -->
+    <div v-if="axis === 'length' && selected('length') === 'target'" class="response-length" data-axis="length">
+     <div class="response-length-value" aria-live="polite">{{ t('responseSettings.lengthValue', { count: lengthTarget }) }}</div>
+     <input type="range" class="response-length-slider" data-axis="length" min="0" :max="lengthTargetLadder.length - 1" step="1"
+      :value="lengthTargetLadder.indexOf(lengthTarget as typeof lengthTargetLadder[number])" :aria-label="t('responseSettings.axes.length')"
+      :aria-valuetext="t('responseSettings.lengthValue', { count: lengthTarget })" :disabled="loading || saving" @input="slide" />
+     <div class="response-length-zones" aria-hidden="true">
+      <span v-for="zone in lengthZones" :key="zone" class="response-length-zone" :class="{ selected: lengthZone(lengthTarget) === zone }">{{ t(`responseSettings.lengthZones.${zone}`) }}</span>
+     </div>
     </div>
     <div v-if="hint(axis)" class="mode-hint" :data-hint="axis">{{ hint(axis) }}</div>
     <div v-if="axis === 'style' && draft.style === 'custom'" class="textarea-wrapper response-custom">
@@ -50,7 +61,7 @@
       <label class="textarea-wrapper response-note">
        <span class="label">{{ t(`responseSettings.axes.${axis}`) }}</span>
        <textarea v-model="draft[responseNoteKeys[axis]]" class="textarea-dark response-note-input" :data-axis="axis" rows="2"
-        :placeholder="t(`responseSettings.noteExamples.${axis}.${current(axis)}`)" :aria-invalid="noteTooLong(axis)" />
+        :placeholder="t(`responseSettings.noteExamples.${axis}.${selected(axis)}`)" :aria-invalid="noteTooLong(axis)" />
        <span class="char-count" :class="{ 'response-error': noteTooLong(axis) }">{{ t('responseSettings.noteCount', { count: [...(draft[responseNoteKeys[axis]] || '')].length }) }}</span>
       </label>
      </template>
@@ -72,7 +83,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { maxResponseNoteLength, readResponseSettings, responseAxes, responseDefaults, responseNoteKeys, responsePatch, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
+import { lengthMode, lengthTargetLadder, lengthTargetOf, lengthZone, maxResponseNoteLength, readResponseSettings, responseAxes, responseDefaults, responseNoteKeys, responsePatch, type LengthZone, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
 const props=defineProps<{
  conversationId:string
  load:(id:string)=>Promise<unknown>
@@ -95,15 +106,31 @@ const noteAxes=computed(()=>axes.filter(axis=>!(axis==='style' && draft.value.st
 const notesOpen=ref(false)
 const customized=computed(()=>Object.keys(responsePatch(draft.value)).some(key=>responsePatch(draft.value)[key]!==null))
 function current(axis:ResponseAxis){return draft.value[axis] ?? responseDefaults[axis]}
-// 底下那句只解釋目前選的那一個；篇幅是一句固定的提醒，文風的選項名已經說明自己。
+// 藥丸上亮的是哪一個：篇幅的舊三檔值算「指定字數」。
+function selected(axis:ResponseAxis){return axis==='length' ? lengthMode(draft.value.length) : current(axis)}
+const lengthZones:LengthZone[]=['brief','balanced','detailed','long']
+const lengthTarget=computed(()=>lengthTargetOf(draft.value))
+function slide(event:Event){
+ const value=lengthTargetLadder[Number((event.target as HTMLInputElement).value)]
+ if(value===undefined)return
+ draft.value.length='target';draft.value.lengthTarget=String(value)
+}
+// 底下那句只解釋目前選的那一個；篇幅照落在哪個區解釋，文風的選項名已經說明自己。
 function hint(axis:ResponseAxis){
  if(axis==='agency' || axis==='perspective' || axis==='pace') return props.t(`responseSettings.${axis}Hints.${current(axis)}`)
- if(axis==='length') return props.t('responseSettings.lengthHint')
+ if(axis==='length') return props.t(`responseSettings.lengthHints.${selected('length')==='auto' ? 'auto' : lengthZone(lengthTarget.value)}`)
  return ''
 }
 function noteTooLong(axis:ResponseAxis){return [...(draft.value[responseNoteKeys[axis]] || '')].length>maxResponseNoteLength}
 const invalid=computed(()=>(draft.value.style==='custom' && (!draft.value.customStyle?.trim() || customTooLong.value)) || axes.some(noteTooLong))
-function choose(axis:ResponseAxis,value:string){draft.value[axis]=value;if(axis==='style' && value!=='custom')delete draft.value.customStyle;if(axis==='style' && value==='custom')delete draft.value.styleNote}
+function choose(axis:ResponseAxis,value:string){
+ if(axis==='length'){
+  if(value==='target'){const target=lengthTargetOf(draft.value);draft.value.length='target';draft.value.lengthTarget=String(target)}
+  else{draft.value.length=value;delete draft.value.lengthTarget}
+  return
+ }
+ draft.value[axis]=value;if(axis==='style' && value!=='custom')delete draft.value.customStyle;if(axis==='style' && value==='custom')delete draft.value.styleNote
+}
 function resetAll(){draft.value={}}
 async function mayClose(){return !saving.value && (!dirty.value || await askDiscard())}
 async function reload(){
@@ -121,3 +148,11 @@ async function submit(){
 onMounted(reload)
 defineExpose({mayClose})
 </script>
+
+<style scoped>
+.response-length{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.response-length-value{font-size:14px;font-weight:600}
+.response-length-slider{width:100%;margin:0;accent-color:var(--luna-gold, #F5C542)}
+.response-length-zones{display:flex;justify-content:space-between;font-size:12px;opacity:.6}
+.response-length-zone.selected{opacity:1;font-weight:600}
+</style>
