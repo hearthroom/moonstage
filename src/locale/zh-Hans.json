@@ -4161,7 +4161,7 @@
 	"responseSettings.lengthZones.balanced": "适中",
 	"responseSettings.lengthZones.detailed": "详细",
 	"responseSettings.lengthZones.long": "超长",
-	"responseSettings.lengthHints.auto": "AI 会按角色卡的要求决定每次回复的长度。",
+	"responseSettings.lengthHints.auto": "没有指定时，AI 会按角色卡的要求决定长度；卡没写的话，大约写 2 到 5 段、2500 字上下。",
 	"responseSettings.lengthHints.brief": "回复会停在目标字数附近，适合快节奏的对话。",
 	"responseSettings.lengthHints.balanced": "回复会在目标字数上下三成内浮动，状态栏不算在内。",
 	"responseSettings.lengthHints.detailed": "回复会在目标字数上下三成内浮动，越长的目标写得越慢。",
