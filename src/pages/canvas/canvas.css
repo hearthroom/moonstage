@@ -73,11 +73,20 @@
 }
 
 #chat,
-.header-box,
-.chat-bottom-wapper,
-.shortcut-bar-wrapper {
+.header-box {
   max-width: var(--lt-canvas-column-width);
   margin: 0 auto;
+}
+
+/*
+  快捷列與輸入區自己帶底色，所以不能跟上面一樣限寬再用 margin 置中：欄比視窗窄時
+  （桌機、摺疊機攤開這種超過 768px 的寬度），兩側的 margin 不上色，底色停在欄邊，
+  露出一截卡片背景（owner 2026-10-01 摺疊機截圖）。改成盒子滿寬、欄距用左右內距收，
+  按鈕位置跟欄對齊不變，底色一路鋪到視窗邊。手機欄寬 100%，內距算出來是 0。
+*/
+.chat-bottom-wapper,
+.shortcut-bar-wrapper {
+  padding-inline: calc((100% - min(100%, var(--lt-canvas-column-width, 100%))) / 2);
 }
 
 /*
@@ -1293,7 +1302,7 @@
     padding-top: 8px;
   }
 
-  /* .chat-bottom-wapper / .shortcut-bar-wrapper 的欄寬與置中搬到 layer 外了，
+  /* .chat-bottom-wapper / .shortcut-bar-wrapper 的欄距（左右內距）在 layer 外，
      見檔頭說明。 */
 
   /* 橫向捲動一律 edge-to-edge：內容滑到螢幕邊緣才消失，內距交給 inner。 */

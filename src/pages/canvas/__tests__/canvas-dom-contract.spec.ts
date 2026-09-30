@@ -572,7 +572,7 @@ describe('畫布契約：PC 欄寬與置中規則', () => {
     expect(at, '#chat 開頭的置中規則不在 @layer 外面').toBeGreaterThan(-1)
     const openBrace = outside.indexOf('{', at)
     const rule = outside.slice(at, outside.indexOf('}', openBrace))
-    for (const selector of ['#chat', '.header-box', '.chat-bottom-wapper', '.shortcut-bar-wrapper']) {
+    for (const selector of ['#chat', '.header-box']) {
       expect(rule, `置中規則沒有一起帶到 ${selector}`).toContain(selector)
     }
     expect(rule, '沒有用 --lt-canvas-column-width').toContain('var(--lt-canvas-column-width)')
@@ -580,6 +580,19 @@ describe('畫布契約：PC 欄寬與置中規則', () => {
     expect(rule, '不該用 transform 位移置中——會讓這個節點變成 fixed 子孫的 containing block')
       .not.toMatch(/transform\s*:/)
     expect(rule, '不該用 position/left 位移置中').not.toMatch(/\bleft\s*:\s*50%/)
+  })
+
+  // 快捷列與輸入區自己帶底色：限寬＋margin 置中時，欄比視窗窄（桌機、攤開的摺疊機）
+  // 兩側的 margin 不上色，底色停在欄邊、露出卡片背景（owner 2026-10-01）。
+  // 所以這兩塊滿寬，欄距改成左右內距；一樣寫在 layer 外，卡片的 `* { padding: 0 }` 清不掉。
+  it('快捷列與輸入區滿寬、欄距用左右內距收，底色鋪到視窗邊', () => {
+    const outside = css.slice(0, css.indexOf('@layer lt-base'))
+    const at = outside.indexOf('.chat-bottom-wapper,\n.shortcut-bar-wrapper {')
+    expect(at, '輸入區的欄距規則不在 @layer 外面').toBeGreaterThan(-1)
+    const rule = outside.slice(at, outside.indexOf('}', at))
+    expect(rule).toMatch(/padding-inline:\s*calc\(\(100% - min\(100%, var\(--lt-canvas-column-width, 100%\)\)\) \/ 2\)/)
+    expect(rule, '不該限寬——限寬後兩側不上色').not.toContain('max-width')
+    expect(rule, '不該用 margin 置中').not.toMatch(/\bmargin\s*:/)
   })
 
   it('@layer 裡同名選擇器不再重複宣告欄寬／置中／transform（避免兩處各說各話）', () => {
