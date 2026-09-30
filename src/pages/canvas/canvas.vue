@@ -465,7 +465,7 @@ import { stylePolicyFor } from '@/common/author-style-policy'
 import { detectAuthorOwnedRegions } from './canvas-author-regions'
 import { resolveStageBackground, resolveStageLandscapeBackground } from './canvas-background'
 import { stripUnknownTags, wrapDialogue } from './canvas-platform-defaults'
-import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue } from './canvas-greetings'
+import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
 import { archiveRequestQuery, buildArchiveRows, isArchiveFull, nextArchiveAfterDelete } from './canvas-archives'
 import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
 import type { ArchiveRow } from './canvas-archives'
@@ -8735,6 +8735,22 @@ const pendingGreetingStart = ref(false)
 async function hasExistingConversation(): Promise<boolean> {
   const targetRoleId = String(unref(roleId) || '')
   if (!targetRoleId) return true
+  // 有存檔清單的宿主問存檔清單：它列這張卡（連同同一作品的其他版本）的每一段，包括剛開、
+  // 還只有開場白的那段。下面那條路由只列發過訊息的卡，開了新對話再重新整理就會被當成
+  // 「沒玩過」而押後，對話沒開，回覆偏好這類掛在對話上的設定也跟著不見。
+  if (allowsStagePanel(stageHost.capabilities, 'conversations')) {
+    try {
+      const res = await _this.http.get(_this.requestUrl.conversationArchives, {
+        data: archiveRequestQuery(targetRoleId),
+        showLoading: false,
+        quietTransport: true,
+        timeout: 8000,
+      })
+      return archivesShowStartedCard(res)
+    } catch (e) {
+      return true
+    }
+  }
   try {
     // 這條路由回的是「我真的聊過的卡」（沒發過訊息的不算），沒有依角色過濾的參數，
     // 所以拿一頁最近的自己比對。玩得很久以前的卡可能落在後面幾頁：那時會多給一次
@@ -9297,6 +9313,9 @@ const shortcutItems = computed(() => previewOnly.value ? [] : [
 const panel = ref<CanvasPanelState>(createPanelState())
 const responseSettingsVersion = ref(0)
 const responseSettingsSupported = computed(() => responseSettingsVersion.value === 1 && Boolean(conversationId.value) && !previewOnly.value)
+// 有替代開場白的卡在第一次送出前還沒開對話；回覆偏好掛在對話上，所以這時也列出來，
+// 點了先用畫面上這條開場白開對話，再打開設定（見 openResponseSettings）。
+const responseSettingsOffered = computed(() => offersResponseSettings(responseSettingsSupported.value, pendingGreetingStart.value, previewOnly.value))
 const responseSettingsPanel = ref<InstanceType<typeof CanvasResponseSettings> | null>(null)
 async function loadResponseSettings(id: string) {
   const res = await _this.http.get('/open/v1/conversation/response-settings', { data: { conversationId: id }, showLoading: false })
@@ -9320,7 +9339,7 @@ const moreItems = computed(() => previewOnly.value ? [
   { key: 'persona', label: t('canvas.panel.persona') },
   { key: 'directives', label: t('directive.entry') },
   { key: 'notepad', label: t('notepad.entry') },
-  ...(responseSettingsSupported.value ? [{ key: 'response-settings', label: t('responseSettings.title') }] : []),
+  ...(responseSettingsOffered.value ? [{ key: 'response-settings', label: t('responseSettings.title') }] : []),
   // AI 自己每輪記下的記錄（owner 2026-09-05：「AI 自己記的記錄，我們都看不到」）。
   // 身分跟 mobile 同一條判準：Agent 開著是「AI 記事本」，沒開是「永久記憶」。
   { key: 'memory', label: deepPrepOn.value ? t('chat.aiNotebookEntry') : t('chat.permanentMemory') },
@@ -9368,7 +9387,7 @@ async function onShortcut(key: string) {
   if (key === 'conversations') { openConversationList(); return }
   if (key === 'persona') { openPersonaSheet(); return }
   if (key === 'directives') { openDirectivesSheet(); return }
-  if (key === 'response-settings') { if (responseSettingsSupported.value) panel.value = openSheet(panel.value, 'response-settings'); return }
+  if (key === 'response-settings') { openResponseSettings(); return }
   if (key === 'notepad') { openNotepadSheet(); return }
   if (key === 'memory') { openMemorySheet(); return }
   if (key === 'background') { panel.value = openSheet(panel.value, 'background'); return }
@@ -11155,30 +11174,43 @@ function downloadConversationFile(text: string) {
 }
 
 /**
+ * 有替代開場白、還沒開對話的卡：用畫面上這條開場白開對話。開不成就回到選開場白的畫面。
+ */
+async function startPendingGreeting(): Promise<boolean> {
+  if (!pendingGreetingStart.value) return true
+  const index = greetingIndexForStart(greeting)
+  const draft = content.value
+  pendingGreetingStart.value = false
+  talkList.value = []
+  try {
+    await chatStart(index)
+  } catch (e) {
+    // 請求層自己吞錯誤，這裡多半走不到；留著是為了真的丟出來的那種。
+  }
+  // 開對話成不成功看的是有沒有拿到對話——請求層對失敗也是 resolve，
+  // 用 try/catch 判定會在沒有對話的情況下把訊息送進虛空。
+  if (!unref(conversationId)) {
+    pendingGreetingStart.value = true
+    content.value = draft
+    renderGreetingPreview()
+    uni.showToast({ title: t('main.network_error'), icon: 'none' })
+    return false
+  }
+  return true
+}
+
+/**
  * 送出。有替代開場白的卡在這一刻才真的開對話——選到哪一條要跟著這一次請求走。
  */
 async function onCanvasSend() {
-  if (pendingGreetingStart.value) {
-    const index = greetingIndexForStart(greeting)
-    const draft = content.value
-    pendingGreetingStart.value = false
-    talkList.value = []
-    try {
-      await chatStart(index)
-    } catch (e) {
-      // 請求層自己吞錯誤，這裡多半走不到；留著是為了真的丟出來的那種。
-    }
-    // 開對話成不成功看的是有沒有拿到對話——請求層對失敗也是 resolve，
-    // 用 try/catch 判定會在沒有對話的情況下把訊息送進虛空。
-    if (!unref(conversationId)) {
-      pendingGreetingStart.value = true
-      content.value = draft
-      renderGreetingPreview()
-      uni.showToast({ title: t('main.network_error'), icon: 'none' })
-      return
-    }
-  }
+  if (!await startPendingGreeting()) return
   onActionBtnClick()
+}
+
+// 回覆偏好存在對話上：還沒開對話就先開（選定畫面上這條開場白），第一句送出前就能設定。
+async function openResponseSettings() {
+  if (!await startPendingGreeting()) return
+  if (responseSettingsSupported.value) panel.value = openSheet(panel.value, 'response-settings')
 }
 
 function onCanvasStop() {
