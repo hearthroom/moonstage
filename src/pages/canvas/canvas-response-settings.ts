@@ -2,7 +2,7 @@ export const responseAxes = {
  agency: ['protect', 'assist', 'lines', 'coauthor'],
  style: ['default', 'guided', 'card', 'custom'],
  perspective: ['card', 'first_character', 'second_user', 'third_limited'],
- length: ['auto', 'target'],
+ length: ['auto', 'recommended', 'target'],
  pace: ['natural', 'linger', 'advance'],
 } as const
 export type ResponseAxis = keyof typeof responseAxes
@@ -10,7 +10,7 @@ export type ResponseAxis = keyof typeof responseAxes
 export const responseNoteKeys = {agency:'agencyNote',style:'styleNote',perspective:'perspectiveNote',length:'lengthNote',pace:'paceNote'} as const satisfies Record<ResponseAxis,string>
 export type ResponseNoteKey = typeof responseNoteKeys[ResponseAxis]
 export const maxResponseNoteLength = 200
-// 篇幅：要麼自動，要麼用滑桿指定字數。刻度是對數間距，伺服器只收刻度上的值——
+// 篇幅：自動（完全交給 AI）、推薦（2 到 5 段、約 2500 字），或用滑桿指定字數。刻度是對數間距，伺服器只收刻度上的值——
 // 模型分不出 700 與 800，連續數值只是假精確。上限停在 10000：公開評測顯示更長的
 // 目標沒有模型穩定達標，再往上只會得到中途收尾。
 export const lengthTargetLadder = [200, 300, 400, 500, 600, 800, 1000, 1200, 1500, 2000, 2500, 3000, 4000, 5000, 7000, 10000] as const
@@ -25,7 +25,7 @@ export function lengthZone(target:number):LengthZone {
  return 'long'
 }
 export function isLengthTarget(value:unknown):value is number {return (lengthTargetLadder as readonly number[]).includes(value as number)}
-export function lengthMode(value:string|undefined):'auto'|'target' {return !value || value==='auto' ? 'auto' : 'target'}
+export function lengthMode(value:string|undefined):'auto'|'recommended'|'target' {return !value || value==='auto' ? 'auto' : value==='recommended' ? 'recommended' : 'target'}
 export type ResponseDraft = Partial<Record<ResponseAxis | 'customStyle' | 'lengthTarget' | ResponseNoteKey, string>>
 export function lengthTargetOf(draft:ResponseDraft):number {
  if(draft.length==='target') {const n=Number(draft.lengthTarget);return isLengthTarget(n) ? n : defaultLengthTarget}
