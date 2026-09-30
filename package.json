@@ -11,7 +11,7 @@
     "test": "vitest run",
     "build:stage": "vite build --config vite.stage.config.ts --mode production",
     "check:stage-boundary": "node scripts/check-stage-boundary.mjs",
-    "build:sandbox": "vite build --config vite.sandbox.config.ts && node scripts/check-sandbox-boundary.mjs",
+    "build:sandbox": "vite build --config vite.sandbox.config.ts && vite build --config vite.sandbox-zh.config.ts && node scripts/check-sandbox-boundary.mjs",
     "check:sandbox-boundary": "node scripts/check-sandbox-boundary.mjs"
   },
   "dependencies": {

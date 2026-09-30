@@ -34,6 +34,7 @@ import '@/pages/canvas/canvas.css'
 import { buildShell, confirmDialog, setComposerVisible, setStage, setTheme, setViewportHeight, type ShellRefs } from './render/shell-dom'
 import { createDebugPanel } from './debug'
 import { shellStrings } from './strings'
+import { createScriptTagLoader, scriptDirectionFor, type DisplayScriptLoader, type TextConverter } from './display-script'
 
 export interface ShellTransport {
   send(message: ShellToHost): void
@@ -49,6 +50,8 @@ export interface CreateShellOptions {
   debugFromUrl?: boolean
   /** 作者規則的排程器（測試注入）；沒給用頁面共用的那個（規則在 worker 裡跑）。 */
   ruleRunner?: RuleRunner
+  /** 簡繁字典的載入器（測試注入）；沒給用 <script src="./sandbox-zh.js">。 */
+  displayScript?: DisplayScriptLoader
 }
 
 export interface Shell {
@@ -61,6 +64,11 @@ export interface Shell {
 export function createShell(options: CreateShellOptions): Shell {
   const { doc, win, mount, config, transport } = options
   const strings = shellStrings(config.locale)
+  // 顯示字形：方向由玩家介面語言決定；字典載好之前 convert 是 null（照原文畫），載好後整個列表重畫。
+  const scriptDirection = scriptDirectionFor(config.locale)
+  let convert: TextConverter | null = null
+  let markTextReady: () => void = () => {}
+  const textReady = new Promise<void>((resolve) => { markTextReady = resolve })
   const debug = createDebugPanel(doc, mount, !!config.debug || !!options.debugFromUrl, (level, args) => transport.send({ type: 'debug', level, args }))
 
   const refs = buildShell(doc, mount, {
@@ -212,7 +220,8 @@ export function createShell(options: CreateShellOptions): Shell {
       visible: () => stageState !== 'closed',
     },
     role: () => ({ name: config.role.name, avatarUrl: config.role.avatarUrl }),
-    user: () => ({ nickname: config.user.nickname, avatarUrl: config.user.avatarUrl }),
+    user: () => ({ nickname: config.user.nickname, avatarUrl: config.user.avatarUrl, locale: config.locale || '' }),
+    text: { convert: (text) => (convert && text ? convert(text) : text), ready: () => textReady },
     capabilities: { saves: !!config.capabilities.saves, edit: !!config.capabilities.edit, send: config.capabilities.send !== false },
     request,
     inGesture: () => gesture,
@@ -241,7 +250,7 @@ export function createShell(options: CreateShellOptions): Shell {
       { engine: 'display', text: content, rules: card.rules, options: { variants: config.variants || null, seed: opts.seed } },
       { streaming: !!opts.streaming },
     )
-    const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, macros, fencedDocument: stylePolicy.fencedDocument }), stylePolicy)
+    const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, macros, fencedDocument: stylePolicy.fencedDocument, convert }), stylePolicy)
     return out.provisional ? { html, provisional: true } : html
   }
   const htmlOf = (out: string | { html: string }) => (typeof out === 'string' ? out : out.html)
@@ -332,6 +341,27 @@ export function createShell(options: CreateShellOptions): Shell {
     }
     list.refresh()
   })
+
+  // 字典載好（或確定不需要）：狀態欄與列表用轉過的字重畫一次，再讓 sdk.text.ready() 完成。
+  let disposed = false
+  if (scriptDirection === 'none') markTextReady()
+  else {
+    const loader = options.displayScript || createScriptTagLoader(doc, win)
+    loader(scriptDirection).then((fn) => {
+      if (disposed) return
+      if (fn) {
+        convert = fn
+        if (refs.statusbar && !(config.card.statusbarHtml != null && config.card.statusbarHtml !== '')) {
+          const out = render(config.card.statusbar)
+          statusbarPending = typeof out !== 'string'
+          refs.statusbar.innerHTML = htmlOf(out)
+          mountFrontend(refs.statusbar)
+        }
+        list.rerenderAll()
+      }
+      markTextReady()
+    }, () => { markTextReady() })
+  }
 
   // ── 更早的歷史：捲到頂附近就向宿主要下一頁；宿主用 message.new + before 插進來，列表補償捲動位置。 ──
   const history = { more: false, loading: false }
@@ -660,6 +690,7 @@ export function createShell(options: CreateShellOptions): Shell {
     refs,
     sdk: controller.sdk,
     dispose() {
+      disposed = true
       offRuleSettled()
       bus.emit('dispose')
       for (const waiter of pending.values()) waiter.reject(new SdkError('HOST_DENIED', 'shell disposed'))

@@ -113,6 +113,11 @@ export interface MessageList {
   clear(): void
   /** 作者規則有結果回來了：用暫時畫面的氣泡重算一次（沒掛著的等重建時自然會重算）。 */
   refresh(): void
+  /**
+   * 渲染結果整體失效（例如簡繁字典載好了）：清掉快取，掛著的氣泡照虛擬化同一條路拆掉再重建——
+   * 發 unmount／mount，卡片腳本才會重讀新的正文。沒掛著的等重建時自然用新結果。
+   */
+  rerenderAll(): void
 }
 
 export function payloadOf(m: SandboxMessage): MessagePayload {
@@ -474,6 +479,14 @@ export function createMessageList(deps: MessageListDeps): MessageList {
         applyState(entry, stateOf(entry.message))
         // 定稿的氣泡換上完整結果後才啟動腳本與前端區塊（applyState 是非同步重繪，等它畫完）。
         if (entry.message.state === 'done' && !pendingRules(entry)) nextTick(() => { if (entry.app) activate(entry) })
+      }
+    },
+    rerenderAll() {
+      rendered.clear()
+      for (const entry of order()) {
+        if (!entry.app) continue
+        hollow(entry)
+        rebuild(entry)
       }
     },
     clear() {

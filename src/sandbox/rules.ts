@@ -9,6 +9,7 @@
  * → 巨集（{{user}}／{{char}}，含捕獲內容）→ Markdown（`*x*` 是斜體；四個空格不當程式碼塊）→ 對白引號上色 → 淨化。
  * 這裡只作用在玩家看到的內容，送給模型的原文不經過這裡。
  */
+import { convertTextNodes } from '@/common/display-script-walk'
 import MarkdownIt from 'markdown-it'
 import { substituteMacros } from '@/pages/canvas/canvas-rule-engine-core'
 import { applyDisplayRules } from '@/utils/display-rule-engine.js'
@@ -116,7 +117,7 @@ export function renderContent(content: string, rules: SandboxRule[], options: Re
  * （common/author-rules，引擎 'display'、輸入是原始全文，巨集在結果回來後展開），拿回產物——或結果還沒回來時的
  * 「上次套完的產物＋之後到的原文」——再走這一段，跟 renderContent 同一條管線。
  */
-export function renderAppliedContent(applied: string, options: Pick<RenderOptions, 'doc' | 'fencedDocument'> & { macros?: RenderMacros }): string {
+export function renderAppliedContent(applied: string, options: Pick<RenderOptions, 'doc' | 'fencedDocument'> & { macros?: RenderMacros; convert?: ((text: string) => string) | null }): string {
   const doc = options.doc || document
   if (options.macros) applied = expandMacros(applied, options.macros)
   // 不在白名單的標籤（含中文尖括號那種）在進 markdown 之前就剝殼：markdown 會把它們跳脫成文字，
@@ -126,6 +127,8 @@ export function renderAppliedContent(applied: string, options: Pick<RenderOption
   const holder = doc.createElement('div')
   holder.innerHTML = clean
   colorDialogueQuotes(holder)
+  // 顯示字形（簡↔繁）：排在正則、markdown、淨化之後，只轉文字節點——跟一般聊天頁同一個位置（見 display-script.ts）。
+  if (options.convert) convertTextNodes(holder, options.convert)
   // 圍欄裡裝著整份 HTML 文件的區塊標起來，定稿後由殼掛成各自的 iframe（前端區塊協議）——只在格式政策這麼說時。
   return options.fencedDocument === 'iframe' ? tagFrontendBlocks(holder.innerHTML) : holder.innerHTML
 }

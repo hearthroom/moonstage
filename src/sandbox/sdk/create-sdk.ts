@@ -57,7 +57,9 @@ export interface SdkHost {
   composer: SdkComposerHost
   stage: SdkStageHost
   role(): { name: string; avatarUrl: string }
-  user(): { nickname: string; avatarUrl: string }
+  user(): { nickname: string; avatarUrl: string; locale?: string }
+  /** 顯示字形轉換（簡↔繁），方向由玩家介面語言決定；字典還沒載好或不需要轉時原樣回。 */
+  text?: { convert(text: string): string; ready(): Promise<void> }
   capabilities: { saves: boolean; edit: boolean; send: boolean }
   /** 宿主代辦：送出、改寫、存檔寫入。 */
   request(op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove', args: unknown[]): Promise<unknown>
@@ -82,7 +84,9 @@ export interface Sdk {
   save: { get(key: string): unknown; set(key: string, value: unknown): Promise<void>; remove(key: string): Promise<void>; keys(): string[] }
   stage: { open(mode?: 'content' | 'full'): void; close(): void; el(): HTMLElement | null; visible(): boolean }
   role: { get(): { name: string; avatarUrl: string } }
-  user: { get(): { nickname: string; avatarUrl: string } }
+  user: { get(): { nickname: string; avatarUrl: string; locale: string } }
+  /** 卡片自己畫的字也跟著玩家的簡繁：convert 同步轉一段純文字；ready 在字典載好（或確定不需要）時完成。 */
+  text: { convert(text: string): string; ready(): Promise<void> }
   on(event: string, cb: (payload?: unknown) => void): void
   debug: { log(...args: unknown[]): void }
   version: string
@@ -227,7 +231,14 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
       visible: () => host.stage.visible(),
     },
     role: { get: () => ({ ...host.role() }) },
-    user: { get: () => ({ ...host.user() }) },
+    user: { get: () => { const u = host.user(); return { nickname: u.nickname, avatarUrl: u.avatarUrl, locale: u.locale || '' } } },
+    text: {
+      convert: (text) => {
+        const s = typeof text === 'string' ? text : String(text ?? '')
+        return host.text ? host.text.convert(s) : s
+      },
+      ready: () => (host.text ? host.text.ready() : Promise.resolve()),
+    },
     on: (event, cb) => bus.on(event, cb),
     debug: { log: (...args) => host.debug(...args) },
     version: '1',

@@ -101,7 +101,8 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 | `cache.get/set/remove` | 實作 | 殼內記憶體，換頁即失 |
 | `save.get/set/remove/keys` | 分階段 | 宿主沒宣告 `saves` 能力時 `HOST_DENIED`；key 只許 `[A-Za-z0-9_-]{1,64}`，否則 `INVALID_ARGS`；最多 10 個 key、單值 64 KB |
 | `stage.open(mode)/close/el/visible` | 實作 | `content`（蓋訊息區，z 2000）／`full`（整屏，z 3000）；`el()` 關著也回節點，開關只看 `visible()`；作者自己 `close()` 不發 `stage:close` |
-| `role.get()` / `user.get()` | 實作 | 來自 `hello.config.role/user`，欄位封閉：`{name, avatarUrl}`／`{nickname, avatarUrl}` |
+| `role.get()` / `user.get()` | 實作 | 來自 `hello.config.role/user`，欄位封閉：`{name, avatarUrl}`／`{nickname, avatarUrl, locale}`（`locale` 是玩家介面語言，來自 `hello.config.locale`） |
+| `text.convert(text)` / `text.ready()` | 實作 | 顯示字形（簡↔繁），方向跟一般聊天頁一樣由玩家介面語言決定；字典另成 `sandbox-zh.js`，只在需要轉時載入。`ready()` 在字典載好或確定不需要時完成；之前 `convert` 原樣回 |
 | `on(event, fn)` | 實作 | 見事件表 |
 | `debug.log(...)` | 實作 | 殼內面板 + 轉宿主 console |
 | `version` | `'1'` | |
@@ -257,3 +258,11 @@ z-index：平台節點一律 `auto`；舞台 content 2000、full 3000；平台�
 - `bench/sandbox-list/`（不是測試、不進 build）：假宿主餵 N 則合成訊息量冷啟動、DOM 節點、堆積、捲動幀時間；
   `npm run build:sandbox && python3 -m http.server 4173` → `/bench/sandbox-list/?n=300&format=mmd`，主控台 `await __bench.run()`。
 - Hearthroom：匯入 `chatVersion` → `pageMode`、匯出還原、Worker 子網域路由與 CSP 標頭、saves API。
+
+## 顯示字形（簡↔繁）
+
+跟一般聊天頁同一套規則：儲存與傳輸永遠是原文，轉換排在卡片正則之後、只轉看得到的文字節點；屬性、class、`<script>`／`<style>`、`translate="no"`／`class="notranslate"` 的子樹不碰。
+
+- 宿主算好的訊息（`view.html`）與功能欄（`statusbarHtml`）由宿主轉。
+- 殼自己渲染的內容（沒有 `view` 時）由殼轉：字典在 `sandbox-zh.js`，玩家介面語言需要轉時才載入；載好之前照原文畫，載好後整個列表經虛擬化同一條路拆掉重建（重發 `message:unmount`／`message:mount`）。
+- 卡片腳本自己畫的字用 `sdk.text.convert()`；要在字典載好後重畫，等 `sdk.text.ready()`。

@@ -47,21 +47,22 @@ const expectCode = async (p: Promise<unknown> | (() => unknown), code: string) =
 }
 
 describe('sdk 的形狀', () => {
-  it('恰好 11 個鍵、30 個能力、version 是值 "1"、沒有 once/off', () => {
+  it('恰好 12 個鍵、32 個能力、version 是值 "1"、沒有 once/off', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
-    expect(Object.keys(sdk).sort()).toEqual(['cache', 'composer', 'debug', 'input', 'message', 'on', 'role', 'save', 'stage', 'user', 'version'])
+    expect(Object.keys(sdk).sort()).toEqual(['cache', 'composer', 'debug', 'input', 'message', 'on', 'role', 'save', 'stage', 'text', 'user', 'version'])
     const caps = [
       ...Object.keys(sdk.input).map((k) => `input.${k}`), ...Object.keys(sdk.composer).map((k) => `composer.${k}`),
       ...Object.keys(sdk.message).map((k) => `message.${k}`), ...Object.keys(sdk.cache).map((k) => `cache.${k}`),
       ...Object.keys(sdk.save).map((k) => `save.${k}`), ...Object.keys(sdk.stage).map((k) => `stage.${k}`),
+      ...Object.keys(sdk.text).map((k) => `text.${k}`),
       'role.get', 'user.get', 'on', 'debug.log', 'version',
     ]
-    expect(caps.length).toBe(30)
+    expect(caps.length).toBe(32)
     expect(sdk.version).toBe('1')
     expect((sdk as unknown as { once?: unknown }).once).toBeUndefined()
     expect((sdk as unknown as { off?: unknown }).off).toBeUndefined()
     expect(sdk.role.get()).toEqual({ name: '露娜', avatarUrl: 'r.png' })
-    expect(sdk.user.get()).toEqual({ nickname: '小明', avatarUrl: 'u.png' })
+    expect(sdk.user.get()).toEqual({ nickname: '小明', avatarUrl: 'u.png', locale: '' })
   })
 })
 
@@ -174,5 +175,22 @@ describe('save／cache', () => {
     expect(sdk.cache.get('k')).toEqual({ a: 1 })
     sdk.cache.remove('k')
     expect(sdk.cache.get('k')).toBeUndefined()
+  })
+})
+
+describe('text：玩家介面語言的簡繁', () => {
+  it('宿主沒給轉換器時原樣回，ready 立刻完成', async () => {
+    const { sdk } = createSdk(fakeHost(), createEventBus())
+    expect(sdk.text.convert('仙傳卷宗')).toBe('仙傳卷宗')
+    await expect(sdk.text.ready()).resolves.toBeUndefined()
+  })
+  it('交給宿主的轉換器；locale 從 user.get 讀得到', async () => {
+    const { sdk } = createSdk(fakeHost({
+      user: () => ({ nickname: '小明', avatarUrl: 'u.png', locale: 'zh-Hans' }),
+      text: { convert: (t) => t.replace('傳', '传'), ready: () => Promise.resolve() },
+    }), createEventBus())
+    expect(sdk.user.get().locale).toBe('zh-Hans')
+    expect(sdk.text.convert('仙傳')).toBe('仙传')
+    expect(sdk.text.convert(undefined as unknown as string)).toBe('')
   })
 })
