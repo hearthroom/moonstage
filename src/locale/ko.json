@@ -4161,7 +4161,7 @@
 	"responseSettings.lengthZones.balanced": "적당히",
 	"responseSettings.lengthZones.detailed": "길게",
 	"responseSettings.lengthZones.long": "아주 길게",
-	"responseSettings.lengthHints.auto": "답변 길이는 캐릭터 카드의 지시를 따릅니다.",
+	"responseSettings.lengthHints.auto": "지정하지 않으면 캐릭터 설정의 길이 지시를 따르고, 지시가 없으면 2~5문단, 2500자 안팎으로 씁니다.",
 	"responseSettings.lengthHints.brief": "답변이 목표 글자 수 근처에서 끝나 빠른 대화에 알맞습니다.",
 	"responseSettings.lengthHints.balanced": "답변은 목표의 앞뒤 30% 안에 들어오며 상태창은 포함하지 않습니다.",
 	"responseSettings.lengthHints.detailed": "답변은 목표의 앞뒤 30% 안에 들어오며 길수록 생성이 오래 걸립니다.",

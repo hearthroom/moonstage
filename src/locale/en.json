@@ -4161,7 +4161,7 @@
 	"responseSettings.lengthZones.balanced": "Medium",
 	"responseSettings.lengthZones.detailed": "Long",
 	"responseSettings.lengthZones.long": "Very long",
-	"responseSettings.lengthHints.auto": "The character card decides how long each reply runs.",
+	"responseSettings.lengthHints.auto": "Without a target, the card’s own length rule decides; when the card has none, replies run about 2 to 5 paragraphs and roughly 1500 words.",
 	"responseSettings.lengthHints.brief": "Replies stay close to the target, which suits fast dialogue.",
 	"responseSettings.lengthHints.balanced": "Replies land within about 30% of the target, and status panels are not counted.",
 	"responseSettings.lengthHints.detailed": "Replies land within about 30% of the target, and longer targets take longer to write.",

@@ -4161,7 +4161,7 @@
 	"responseSettings.lengthZones.balanced": "標準",
 	"responseSettings.lengthZones.detailed": "長め",
 	"responseSettings.lengthZones.long": "超長文",
-	"responseSettings.lengthHints.auto": "返答の長さはキャラクターカードの指示に従います。",
+	"responseSettings.lengthHints.auto": "指定がないときはキャラクター設定の長さ指定に従い、指定がなければ 2〜5 段落、2500 字前後で書きます。",
 	"responseSettings.lengthHints.brief": "返答は目標の文字数の近くで止まり、テンポの速い会話に向いています。",
 	"responseSettings.lengthHints.balanced": "返答は目標の前後3割ほどに収まります。ステータス欄は含みません。",
 	"responseSettings.lengthHints.detailed": "返答は目標の前後3割ほどに収まり、長いほど生成に時間がかかります。",

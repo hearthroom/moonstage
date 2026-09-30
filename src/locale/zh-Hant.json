@@ -4161,7 +4161,7 @@
 	"responseSettings.lengthZones.balanced": "適中",
 	"responseSettings.lengthZones.detailed": "詳細",
 	"responseSettings.lengthZones.long": "超長",
-	"responseSettings.lengthHints.auto": "AI 會照角色卡的要求決定每次回覆的長度。",
+	"responseSettings.lengthHints.auto": "沒有指定時，AI 會照角色卡的要求決定長度；卡沒寫的話，大約寫 2 到 5 段、2500 字上下。",
 	"responseSettings.lengthHints.brief": "回覆會停在目標字數附近，適合快節奏的對話。",
 	"responseSettings.lengthHints.balanced": "回覆會在目標字數上下三成內浮動，狀態欄不算在內。",
 	"responseSettings.lengthHints.detailed": "回覆會在目標字數上下三成內浮動，越長的目標寫得越慢。",
