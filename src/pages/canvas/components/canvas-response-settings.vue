@@ -119,7 +119,7 @@ function slide(event:Event){
 //（預設與精簡指引都有平台指引，差在留給模型多少發揮），所以也要一句說明。
 function hint(axis:ResponseAxis){
  if(axis==='agency' || axis==='perspective' || axis==='pace' || axis==='style') return props.t(`responseSettings.${axis}Hints.${current(axis)}`)
- if(axis==='length') return props.t(`responseSettings.lengthHints.${selected('length')==='auto' ? 'auto' : lengthZone(lengthTarget.value)}`)
+ if(axis==='length') return props.t(`responseSettings.lengthHints.${selected('length')==='target' ? lengthZone(lengthTarget.value) : selected('length')}`)
  return ''
 }
 function noteTooLong(axis:ResponseAxis){return [...(draft.value[responseNoteKeys[axis]] || '')].length>maxResponseNoteLength}

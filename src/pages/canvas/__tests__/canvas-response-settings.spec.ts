@@ -182,6 +182,25 @@ it('offers automatic length or a slider on the ladder', async()=>{
  expect(save).toHaveBeenLastCalledWith('c1',1,expect.objectContaining({length:'auto',lengthTarget:null}))
 })
 
+// 篇幅三個選項：自動（預設，完全交給 AI）、推薦（2 到 5 段、約 2500 字）、指定字數。
+// 推薦不是滑桿的一格：選它不顯示滑桿、不送字數，說明換成推薦那句。
+it('offers automatic, recommended and a set length in that order', async()=>{
+ const save=echo()
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save,t:(k:string,v?:Record<string,unknown>)=>v?`${k}:${JSON.stringify(v)}`:k}})
+ await flushPromises()
+ expect(wrapper.findAll('.mode-item[data-axis="length"]').map((b:any)=>b.attributes('data-value'))).toEqual(['auto','recommended','target'])
+ expect(pill(wrapper,'length','auto').attributes('aria-checked')).toBe('true')
+ await pill(wrapper,'length','recommended').trigger('click')
+ expect(pill(wrapper,'length','recommended').attributes('aria-checked')).toBe('true')
+ expect(pill(wrapper,'length','target').attributes('aria-checked')).toBe('false')
+ expect(wrapper.find('.response-length-slider').exists()).toBe(false)
+ expect(wrapper.get('[data-hint="length"]').text()).toBe('responseSettings.lengthHints.recommended')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).toHaveBeenLastCalledWith('c1',0,expect.objectContaining({length:'recommended',lengthTarget:null}))
+ const saved={...initial(),revision:1,overrides:{length:'recommended'},effective:{...initial().effective,length:'recommended'}}
+ expect(readResponseSettings(saved,'c1').effective.length).toBe('recommended')
+})
+
 // 舊存檔的「簡短／適中／詳細」顯示成滑桿上對應的字數；一拖就換成指定字數。
 it('shows a legacy length option as its slider position', async()=>{
  const save=echo()
