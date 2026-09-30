@@ -23,6 +23,8 @@ import {
   shouldShowPrologue,
   MAX_GREETINGS,
   MAX_PROLOGUE,
+  archivesShowStartedCard,
+  offersResponseSettings,
 } from '../canvas-greetings'
 
 const BASE = { mesid: 0, role: 'ai' as const, name: '示範角色', html: '<p>開場</p>', latest: true }
@@ -157,5 +159,32 @@ describe('切換的畫面', () => {
       props: { message: { ...BASE, swipes: { index: 0, total: 1 } } },
     })
     expect((wrapper.element as HTMLElement).querySelector('.swipeRightBlock')!.classList.contains('is-empty')).toBe(true)
+  })
+})
+
+describe('archivesShowStartedCard', () => {
+  it('counts a conversation that only has its opening line', () => {
+    expect(archivesShowStartedCard({ statusCode: 200, data: { archives: [{ conversationId: 'c1', messageCount: 1, isCurrent: true }], count: 1 } })).toBe(true)
+  })
+  it('defers only when the card has no conversation at all', () => {
+    expect(archivesShowStartedCard({ statusCode: 200, data: { archives: [], count: 0 } })).toBe(false)
+  })
+  it('treats an unreadable answer as started', () => {
+    expect(archivesShowStartedCard({ statusCode: 503, data: {} })).toBe(true)
+    expect(archivesShowStartedCard({ statusCode: 200, data: {} })).toBe(true)
+    expect(archivesShowStartedCard(null)).toBe(true)
+  })
+})
+
+describe('offersResponseSettings', () => {
+  it('lists reply preferences before the first send on a card waiting for an opening choice', () => {
+    expect(offersResponseSettings(false, true, false)).toBe(true)
+  })
+  it('follows server support once a conversation is open', () => {
+    expect(offersResponseSettings(true, false, false)).toBe(true)
+    expect(offersResponseSettings(false, false, false)).toBe(false)
+  })
+  it('never lists it in a preview', () => {
+    expect(offersResponseSettings(true, true, true)).toBe(false)
   })
 })

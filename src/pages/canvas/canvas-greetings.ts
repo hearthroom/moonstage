@@ -103,3 +103,24 @@ export function shouldShowPrologue(prologue: string[], messages: Array<{ type?: 
   if (!prologue.length) return false
   return !messages.some((m) => m && String(m.type) === '1')
 }
+
+/**
+ * 存檔清單的回應說不說得出「這張卡已經開過對話」。只有開場白、還沒送過一句的那段也算：
+ * 它已經在伺服器上，再押後就是在它上面蓋一個選開場白的畫面，而對話沒開。
+ * 看不懂的回應當成「開過」：照舊開對話、載歷史，最壞只是少一次選開場白的機會。
+ */
+export function archivesShowStartedCard(res: { statusCode?: number; data?: any } | null | undefined): boolean {
+  if (!res || res.statusCode !== 200 || !res.data) return true
+  const archives = res.data.archives
+  if (!Array.isArray(archives)) return true
+  return archives.length > 0
+}
+
+/**
+ * 「＋」裡要不要列回覆偏好。它存在對話上：已開的對話看伺服器支不支援；
+ * 押後開對話的卡也列，點了先開對話再打開。純預覽不會有對話，不列。
+ */
+export function offersResponseSettings(supported: boolean, awaitingFirstSend: boolean, previewOnly: boolean): boolean {
+  if (previewOnly) return false
+  return supported || awaitingFirstSend
+}
