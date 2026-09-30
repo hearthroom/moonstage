@@ -2831,8 +2831,9 @@ function mountSandbox(asset: any) {
             rules: Array.isArray(sandboxAsset?.rules) ? sandboxAsset.rules : [],
             statusbar: String(sandboxAsset?.mountTrigger || ''),
             // 狀態欄也用一般卡的管線算（跟訊息同一套規則引擎與範圍處理），殼直接掛。
+            // 顯示字形跟訊息一樣在正則之後轉（只轉文字節點）：否則功能欄是原文、正文是玩家的簡繁，同一頁兩種字。
             statusbarHtml: sandboxAsset?.mountTrigger
-              ? scopeCardHtml(applyTavernRules(String(sandboxAsset.mountTrigger), activeAuthorAsset.value.rules, authorRuleOptions()).html, cardFormat.value)
+              ? convertVisibleHtml(scopeCardHtml(applyTavernRules(String(sandboxAsset.mountTrigger), activeAuthorAsset.value.rules, authorRuleOptions()).html, cardFormat.value), displayScript)
               : '',
           },
           variants: sandboxAsset?.variants || null,

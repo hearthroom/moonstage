@@ -24,26 +24,9 @@ import { convertChinese } from '@/common/chinese-converter'
 import TradOrSimp from '@/common/TradOrSimp'
 import { isAmbiguousChar } from '@/common/ambiguous-chars'
 
-export type ScriptDirection = 'none' | 's2t' | 't2s'
+import { directionForLocale, convertTextNodes, HAS_CJK, type ScriptDirection } from '@/common/display-script-walk'
 
-/** 玩家介面語言決定方向：正體看簡體卡→轉繁；簡體看繁體卡→轉簡；其他語言不動。 */
-export function directionForLocale(locale: string | null | undefined): ScriptDirection {
-  const l = String(locale || '').toLowerCase()
-  if (l === 'zh-hant' || l.startsWith('zh-tw') || l.startsWith('zh-hk')) return 's2t'
-  if (l === 'zh-hans' || l === 'zh-cn' || l === 'zh') return 't2s'
-  return 'none'
-}
-
-const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'CODE', 'PRE', 'TEXTAREA', 'TEMPLATE', 'KBD', 'SAMP'])
-const HAS_CJK = /[㐀-䶿一-鿿豈-﫿]/
-
-function isVerbatimElement(el: Element): boolean {
-  const translate = (el.getAttribute('translate') || '').toLowerCase()
-  if (translate === 'no') return true
-  if (el.hasAttribute('data-lt-verbatim')) return true
-  if (el.classList && el.classList.contains('notranslate')) return true
-  return false
-}
+export { directionForLocale, type ScriptDirection }
 
 /**
  * 逐文字節點轉換一段 HTML。converter 只收純文字、回純文字。
@@ -55,18 +38,7 @@ export function convertVisibleHtml(html: string, convert: (text: string) => stri
   const doc = new DOMParser().parseFromString('<body>' + html + '</body>', 'text/html')
   const body = doc.body
   if (!body) return html
-  const walk = (node: Node) => {
-    if (node.nodeType === 3) {
-      const text = node.nodeValue || ''
-      if (HAS_CJK.test(text)) node.nodeValue = convert(text)
-      return
-    }
-    if (node.nodeType !== 1) return
-    const el = node as Element
-    if (SKIP_TAGS.has(el.tagName) || isVerbatimElement(el)) return
-    for (let child = el.firstChild; child; child = child.nextSibling) walk(child)
-  }
-  walk(body)
+  convertTextNodes(body, convert)
   return body.innerHTML
 }
 
