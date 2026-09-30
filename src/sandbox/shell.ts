@@ -31,6 +31,9 @@ import { mountGeometryDebug, rectText } from '@/common/geometry-debug'
 import { reactive, ref } from 'vue'
 // 標準播放器的樣式表整份帶進殼：訊息區的每一條規則跟一般卡同一份。頁首與輸入區的規則在殼裡沒有對應節點，不礙事。
 import '@/pages/canvas/canvas.css'
+// 殼的內距在 layer 外的副本，跟一般卡同一份、同一個先後：卡片的 `* { margin: 0; padding: 0 }` 不分層，
+// 少了這份，殼裡的頁首、快捷列、輸入區內距在沙箱卡上會被整批清掉，一般卡卻不會。
+import '@/pages/canvas/canvas-chrome-box.css'
 import { buildShell, confirmDialog, setComposerVisible, setStage, setTheme, setViewportHeight, type ShellRefs } from './render/shell-dom'
 import { createDebugPanel } from './debug'
 import { shellStrings } from './strings'
