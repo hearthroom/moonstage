@@ -20,6 +20,14 @@ describe('輸入區的間距與對齊', () => {
     expect(box).toMatch(/\.chat-bottom-wapper \{\s*padding-top: 8px\s*\}/)
   })
 
+  it('沙箱殼跟一般卡載入同一份 layer 外內距，而且排在 canvas.css 之後', () => {
+    const shell = readFileSync(resolve(__dirname, '../../../sandbox/shell.ts'), 'utf8')
+    const base = shell.indexOf("import '@/pages/canvas/canvas.css'")
+    const box = shell.indexOf("import '@/pages/canvas/canvas-chrome-box.css'")
+    expect(base).toBeGreaterThan(-1)
+    expect(box).toBeGreaterThan(base)
+  })
+
   it('收起時 .send-msg 置中對齊，展開才貼底', () => {
     expect(css).toMatch(/\.send-msg:not\(:has\(\.uni-textarea\.is-expanded\)\) \{\s*align-items: center;/)
     const start = css.indexOf('  .ai-assistant {')
