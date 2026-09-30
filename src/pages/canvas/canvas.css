@@ -81,15 +81,6 @@
 }
 
 /*
-  快捷列與輸入框之間要有 margin，而且只能寫在 layer 外：uni 的 `*{margin:0}` 不在
-  layer 裡，layer 內任何 margin 都輸給它。兩個元件只靠 padding 頂著的話，作者一給
-  它們各畫一條邊框，兩條線就貼在一起（owner 2026-09-05 截圖）。
-*/
-.shortcut-bar-wrapper {
-  margin-bottom: 8px;
-}
-
-/*
   彈層裡「淡一階的字」是相對的，不是一個固定的顏色。
 
   寫死一個淺灰只在深色底上成立：作者的卡把彈層漆成亮色時，說明文字、欄位標題、
@@ -1281,8 +1272,8 @@
   /*
     容器本身不上色：MMD 的 .chat-bottom 是透明的，畫面上看得到的是快捷列與輸入區
     這兩塊，作者的美化也只畫這兩塊（跟 .chat／.topTabbar）。容器一有底色，桌機欄寬
-    兩側的留白、快捷列與輸入區之間那 8px，就會露出我們的深色，作者把整頁塗成粉色
-    之後那三處還是灰的（owner 2026-09-16 截圖）。所以底色搬到兩塊上面。
+    兩側的留白就會露出我們的深色，作者把整頁塗成粉色之後那裡還是灰的
+    （owner 2026-09-16 截圖）。所以底色搬到兩塊上面。
   */
   .chat-bottom {
     padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px));
@@ -1291,6 +1282,15 @@
   .shortcut-bar-wrapper,
   .chat-bottom-wapper {
     background: var(--lt-canvas-composer-bg);
+  }
+
+  /*
+    快捷列與輸入框之間的 8px 是輸入區自己的上內距，不是 margin。容器透明，margin 那
+    一條會露出卡片的背景圖，在兩塊底色中間切出一條亮縫（owner 2026-09-30 截圖）。
+    代價：作者替兩塊各畫一條邊框時，兩條線會貼在一起（09-05 的情形），owner 選擇接受。
+  */
+  .chat-bottom-wapper {
+    padding-top: 8px;
   }
 
   /* .chat-bottom-wapper / .shortcut-bar-wrapper 的欄寬與置中搬到 layer 外了，
