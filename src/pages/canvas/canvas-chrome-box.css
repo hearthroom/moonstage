@@ -39,6 +39,9 @@
 .chat-bottom {
     padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px))
 }
+.chat-bottom-wapper {
+    padding-top: 8px
+}
 .shortcut-bar {
     padding: 8px 12px 0
 }

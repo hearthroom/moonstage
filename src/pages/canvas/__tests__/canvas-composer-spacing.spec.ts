@@ -1,7 +1,7 @@
 /**
  * 輸入區兩個小細節（owner 2026-09-05）：
- * 1. 快捷列與輸入框之間要有 margin——只靠 padding 頂著，作者一畫邊框兩條線就貼在一起；
- *    而 margin 只能寫在 layer 外（uni 的 *{margin:0} 不在 layer 裡）。
+ * 1. 快捷列與輸入框之間的 8px 是輸入區的上內距，不是 margin：容器透明，margin 會露出
+ *    卡片背景，在兩塊底色中間切出一條縫（owner 2026-09-30）。
  * 2. 收起（單行）時幫答鍵跟那一行字垂直置中，不是貼底。
  */
 import { describe, it, expect } from 'vitest'
@@ -11,9 +11,13 @@ import { resolve } from 'node:path'
 const css = readFileSync(resolve(__dirname, '../canvas.css'), 'utf8')
 
 describe('輸入區的間距與對齊', () => {
-  it('快捷列的 margin-bottom 寫在 layer 外', () => {
-    const outside = css.slice(0, css.indexOf('@layer lt-base'))
-    expect(outside).toMatch(/\.shortcut-bar-wrapper \{\s*margin-bottom: 8px;\s*\}/)
+  it('快捷列與輸入區之間沒有透明的 margin，間距是輸入區的上內距', () => {
+    expect(css).not.toMatch(/\.shortcut-bar-wrapper \{[^}]*margin-bottom/)
+    expect(css).not.toMatch(/\.chat-bottom-wapper \{[^}]*margin-top/)
+    expect(css).toMatch(/\.chat-bottom-wapper \{\s*padding-top: 8px;\s*\}/)
+    // 殼的內距也要在 layer 外再宣告一次，卡片的 `* { padding: 0 }` 才清不掉。
+    const box = readFileSync(resolve(__dirname, '../canvas-chrome-box.css'), 'utf8')
+    expect(box).toMatch(/\.chat-bottom-wapper \{\s*padding-top: 8px\s*\}/)
   })
 
   it('收起時 .send-msg 置中對齊，展開才貼底', () => {
