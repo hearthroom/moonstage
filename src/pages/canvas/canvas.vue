@@ -563,6 +563,7 @@ import {
   isChatOperationVisibleOutcomeExpired,
   resolveAgentTurnForOwnership as resolveAgentTurnFromSources,
   isChatSendInFlight,
+  resolveTimelineMutationGate,
   markExplicitPreAdmissionError,
   markStreamEntryAccepted,
   mergeChatHistoryOperationProjections,
@@ -2218,7 +2219,7 @@ const sseParser = createSSEParser();
 
 const rollbackPending = ref(false);
 
-function isTimelineMutationBlocked() {
+function timelineMutationState() {
   const storedOperation = readLsEntry();
   const hasPersistedOperationIdentity = !!String(
     storedOperation?.operationId
@@ -2230,18 +2231,39 @@ function isTimelineMutationBlocked() {
   const hasPersistedBackward = !!(
     currentConversationId && readPendingBackwardOperation(currentConversationId)
   );
-  return isChatSendInFlight({
+  return {
     isStreamActive: unref(isStreamActive),
     isConnecting: unref(isConnecting),
     pendingResendPayload: unref(pendingResendPayload),
     pendingChatTurn: pendingChatTurn || (hasPersistedOperationIdentity ? { persisted: true } : null),
     isCompacting: unref(isCompacting),
     rollbackPending: unref(rollbackPending) || hasPersistedBackward,
-  });
+  };
+}
+
+function isTimelineMutationBlocked() {
+  return isChatSendInFlight(timelineMutationState());
 }
 
 function notifyTimelineMutationBlocked() {
   message.warning(t('chat.operationPending') || t('chat.rollbackPending') || 'Please wait for the current operation.');
+}
+
+// 回覆還在產生時按回溯／刪除＝先停止、再做（owner 2026-10-01）。
+//
+// 回報的形狀：模型送了幾個字就沒下文，玩家按回溯被「請等待目前的聊天操作完成」擋住，
+// F5 接回同一輪，兩分鐘內什麼都不能做。停止永遠可用，而「回溯」對他來說本來就包含
+// 「停止」。這裡先走既有的停止路徑（WS stop ＋ HTTP 後援，畫面立刻放手），再讓
+// 操作本身送出；伺服器那頭改歷史前也會自己把還在跑的回合停掉、等它收尾，所以
+// 這裡不等停止 ACK。只有另一個回溯還在送的時候才真的要等。
+function stopRunningTurnForTimelineMutation(): boolean {
+  const gate = resolveTimelineMutationGate(timelineMutationState());
+  if (gate === 'wait') {
+    message.warning(t('chat.rollbackInProgressNotice') || t('chat.rollbackPending') || 'Please wait for the current operation.');
+    return false;
+  }
+  if (gate === 'stop_then_proceed') sendStop();
+  return true;
 }
 
 //对话请求参数
@@ -4959,10 +4981,7 @@ function loadConversation(chatId) {
     message.warning(t('chat.backwardUnavailable'));
     return;
   }
-  if (isTimelineMutationBlocked()) {
-    uni.showToast({ title: t('chat.rollbackPending') || 'Rollback is still processing', icon: 'none' });
-    return;
-  }
+  if (!stopRunningTurnForTimelineMutation()) return;
   const currentConversationId = String(unref(conversationId) || '');
   const existing = readPendingBackwardOperation(currentConversationId);
   if (existing) {
@@ -4985,10 +5004,7 @@ function loadConversation(chatId) {
 }
 
 function chatDelete(chatId) {
-  if (isTimelineMutationBlocked()) {
-    notifyTimelineMutationBlocked();
-    return;
-  }
+  if (!stopRunningTurnForTimelineMutation()) return;
   _this.http.post(_this.requestUrl.chatDelete, {
     header: {
       'content-type': 'application/json'
@@ -9091,7 +9107,8 @@ function onMenuPick(key: string) {
         content: t('canvas.menu.rewindConfirm'),
         okText: t('main.sure'),
         cancelText: t('main.cancel'),
-        onOk() { loadConversation(item.id) },
+        // 這一輪正在送的那句：本地 id 是時間戳，伺服器 id 在 chatId（accepted 事件寫上去的）。
+        onOk() { loadConversation(item.chatId || item.id) },
       })
       break
     case 'delete':
@@ -9102,7 +9119,7 @@ function onMenuPick(key: string) {
         content: item.type == 1 ? t('chat.deleteQuestionBody') : t('chat.deleteMessageBody'),
         okText: t('main.delete'),
         cancelText: t('main.cancel'),
-        onOk() { chatDelete(item.id) },
+        onOk() { chatDelete(item.chatId || item.id) },
       })
       break
     default:
@@ -9216,6 +9233,9 @@ function onMenuConfirmEdit() {
  * restoreRewriteCandidate 從快照換回去。
  */
 function doEditResendPlayer(index: number, draft: string) {
+  // 不走「先停再做」：能改字重送的只有玩家最新那一句，回覆還在產生時它就是這一輪
+  // 正在送的那句。停止在零輸出時會把這一輪的本地氣泡整組移除，index 指的列就不見了，
+  // 而伺服器那頭這句還在；在這裡接著做會送錯列或多送一句。維持原本的等待。
   if (isTimelineMutationBlocked()) {
     notifyTimelineMutationBlocked();
     return;
