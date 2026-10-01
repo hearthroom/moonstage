@@ -70,15 +70,15 @@
 						v-for="item in contextBudgetLevelOptions"
 						:key="item.value"
 						class="ms-pill token"
-						:class="{ 'is-on': item.value === formData.context, 'selected': item.value === formData.context, 'has-quote': item.quoteMax && !deepPrepOn }"
+						:class="{ 'is-on': item.value === formData.context, 'selected': item.value === formData.context, 'has-quote': item.quoteMin && !deepPrepOn }"
 						@click="contextBudgetLevelChange(item.value)">
 						<span class="ms-pill-text">
 							{{ item.text }}<span v-if="item.isFloor" class="ms-pill-tag">{{ t('modelSelect.contextTierRecommended') }}</span>
 						</span>
-						<!-- 這一檔一輪大約最多扣多少。用我們自己的分詞估算，實際照模型回報的用量扣，
-							 不封頂。Agent 模式一輪會呼叫多次模型，估算對它沒意義，那時不顯示。 -->
-						<span v-if="item.quoteMax && !deepPrepOn" class="ms-pill-sub">
-							{{ t('modelSelect.contextTierQuoteMax', { n: item.quoteMax }) }}
+						<!-- 這段對話下一輪在這一檔大約扣多少（伺服器依模型實際的回報口徑估），
+							 實際照模型回報的用量扣。Agent 模式一輪會呼叫多次模型，那時不顯示。 -->
+						<span v-if="item.quoteMin && !deepPrepOn" class="ms-pill-sub">
+							{{ t('modelSelect.contextTierQuote', { n: item.quoteMin }) }}
 						</span>
 					</div>
 				</div>
@@ -1733,6 +1733,9 @@ const truncationText = (completionRate: number) => {
 		if (!variant || variant.billingType !== 'dynamic') return '';
 		if (variant.estSource === 'conversation') {
 			return t('chat.price_est_hint_conversation');
+		}
+		if (variant.estSource === 'model') {
+			return t('chat.price_est_hint_model');
 		}
 		if (variant.estSource === 'role') {
 			return t('chat.price_est_hint_role');

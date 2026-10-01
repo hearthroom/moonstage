@@ -80,7 +80,7 @@ it('hides a model whose every lane is dead, unless the player is using it', asyn
   } finally { using.unmount() }
 })
 
-it('shows each tier ceiling and prices the lane at the chosen tier', async () => {
+it('shows each tier estimate and prices the lane at the chosen tier', async () => {
   const live = JSON.parse(JSON.stringify((await import('../../pages/canvas/__tests__/fixtures/model-catalog-live.json')).default))
   const deepseek = live[0].families.find((f: any) => f.family === 'DeepSeek V4 Flash')
   const lane = deepseek.variants[2]
