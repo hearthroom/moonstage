@@ -128,6 +128,43 @@ describe('手機長按', () => {
       vi.useRealTimers()
     }
   })
+
+  // 手指沒動但畫面在捲（按住停下慣性捲動、串流中內容自己捲過手指底下），或卡片元素擋掉了
+  // 放開的冒泡：都不是長按。
+  it('按著期間有任何捲動、或放開只到得了文件層：不開選單', () => {
+    vi.useFakeTimers()
+    try {
+      const w = mountMessage({}, {}) as any
+      document.body.appendChild(w.element)
+      const bubble = w.find('.mes_text')
+      const start = () => bubble.element.dispatchEvent(Object.assign(new Event('touchstart', { bubbles: true }), { touches: [{ clientX: 120, clientY: 500 }] }))
+
+      start()
+      vi.advanceTimersByTime(200)
+      document.body.dispatchEvent(new Event('scroll'))
+      vi.advanceTimersByTime(LONG_PRESS_MS)
+      expect(w.emitted('menu')).toBeUndefined()
+
+      start()
+      vi.advanceTimersByTime(200)
+      // 卡片自己的元素吃掉了冒泡：氣泡收不到，文件的捕獲階段仍看得到
+      const card = document.createElement('div')
+      document.body.appendChild(card)
+      card.addEventListener('touchend', (e) => e.stopPropagation())
+      card.dispatchEvent(new Event('touchend', { bubbles: true }))
+      vi.advanceTimersByTime(LONG_PRESS_MS)
+      expect(w.emitted('menu')).toBeUndefined()
+
+      // 正常長按不受影響
+      start()
+      vi.advanceTimersByTime(LONG_PRESS_MS + 5)
+      expect(w.emitted('menu')).toHaveLength(1)
+      card.remove()
+      w.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 /*
