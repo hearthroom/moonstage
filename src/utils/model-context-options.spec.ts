@@ -194,3 +194,17 @@ describe('model context options', () => {
     expect(getNoLimitCoverageState(activeUser, unsupported, 1)).toBe('unavailable')
   })
 })
+
+describe('context tier quotes', () => {
+  it('keeps the server quotes on each stable tier option', () => {
+    const options = getContextBudgetLevelOptions({
+      isCacheStable: true,
+      contextBudgetOptions: [
+        { value: 1, tokens: 64000, text: '64K', quoteMin: 12, quoteMax: 186 },
+        { value: 2, tokens: 96000, text: '96K' },
+      ],
+    } as any)
+    expect(options[0]).toMatchObject({ value: 1, quoteMin: 12, quoteMax: 186, isFloor: true })
+    expect(options[1].quoteMax).toBeUndefined()
+  })
+})

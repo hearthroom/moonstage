@@ -175,6 +175,20 @@ export function fixedThinkingSurcharge(variant: ModelVariantLike, thinkingDepth?
  */
 export function variantPrice(variant: ModelVariantLike, opts: ScoreContext = {}): VariantPrice {
   if (variant.billingType === 'dynamic') {
+    // 伺服器替每一檔都報了價（quoteMin＝這段對話下一輪約多少、quoteMax＝這一檔最多扣
+    // 多少）。有的話用選中那一檔的，畫面上的數字才會跟著檔位走，不必等重新抓目錄。
+    const level = Number(opts.context) === 100 ? 5 : Number(opts.context)
+    const options = Array.isArray((variant as any).contextBudgetOptions) ? (variant as any).contextBudgetOptions : []
+    const quoted = options.find((o: any) => Number(o && o.value) === level && Number(o.quoteMax) > 0)
+    if (quoted) {
+      return {
+        isDynamic: true,
+        min: Number(quoted.quoteMin) || 0,
+        max: Number(quoted.quoteMax) || 0,
+        source: (variant as any).estSource || 'formula',
+        sampleCount: Number((variant as any).estSampleCount) || 0,
+      }
+    }
     return {
       isDynamic: true,
       min: Number(variant.estMinScore) || 0,

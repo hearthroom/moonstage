@@ -70,11 +70,19 @@
 						v-for="item in contextBudgetLevelOptions"
 						:key="item.value"
 						class="ms-pill token"
-						:class="{ 'is-on': item.value === formData.context, 'selected': item.value === formData.context }"
+						:class="{ 'is-on': item.value === formData.context, 'selected': item.value === formData.context, 'has-quote': item.quoteMax && !deepPrepOn }"
 						@click="contextBudgetLevelChange(item.value)">
-						<span class="ms-pill-text">{{ item.text }}</span>
+						<span class="ms-pill-text">
+							{{ item.text }}<span v-if="item.isFloor" class="ms-pill-tag">{{ t('modelSelect.contextTierRecommended') }}</span>
+						</span>
+						<!-- 這一檔一輪最多扣多少。一般對話以它封頂，所以它是承諾，不是估計。
+							 Agent 模式一輪會呼叫多次模型，不受這個上限限制，那時不顯示。 -->
+						<span v-if="item.quoteMax && !deepPrepOn" class="ms-pill-sub">
+							{{ t('modelSelect.contextTierQuoteMax', { n: item.quoteMax }) }}
+						</span>
 					</div>
 				</div>
+				<span class="ms-hint">{{ deepPrepOn ? t('modelSelect.contextTierAgentNote') : t('modelSelect.contextTierExplain') }}</span>
 			</div>
 
 			<div v-if="hasThinkingDepthOptions" class="ms-card">
@@ -1723,6 +1731,9 @@ const truncationText = (completionRate: number) => {
 
 	const getPriceEstHint = (variant) => {
 		if (!variant || variant.billingType !== 'dynamic') return '';
+		if (variant.estSource === 'conversation') {
+			return t('chat.price_est_hint_conversation');
+		}
 		if (variant.estSource === 'role') {
 			return t('chat.price_est_hint_role');
 		}
