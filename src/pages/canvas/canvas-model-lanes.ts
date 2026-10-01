@@ -12,6 +12,7 @@
  */
 
 import { flattenVariants } from './canvas-model-catalog'
+import { UPTIME_MIN_SAMPLES_24H } from '../../utils/model-select-presentation'
 import type { FlatVariant, ModelGroupLike, ModelVariantLike } from './canvas-model-catalog'
 
 /**
@@ -104,11 +105,32 @@ export function laneTagOf(variant: any): 'official' | 'value' | '' {
   return tag === 'official' || tag === 'value' ? tag : ''
 }
 
-/** 自己接的在前、名冊那一批在後；兩段內部都照伺服器給的次序（名冊那段由便宜到貴）。 */
-function ordered<T>(all: T[]): { manual: T[]; listed: T[] } {
+/** 近 24 小時可用率低於這個百分比、而且樣本夠多，就當這條線路已經壞了。 */
+export const DEAD_LANE_MAX_PERCENT = 1
+
+/**
+ * 這條線路是不是已經壞了：近 24 小時幾乎沒有一次成功。
+ *
+ * 壞掉的線路不列出來（owner 2026-10-01）：它擺在選單上只會被點到、然後失敗。
+ * 樣本不足時不下結論——剛接進來的線路還沒有資料，不能因此被藏起來。
+ */
+export function isDeadLane(variant: any): boolean {
+  const up = variant && variant.status && variant.status.uptime
+  if (!up) return false
+  const pct = Number(up.percent24h)
+  const samples = Number(up.samples24h) || 0
+  return Number.isFinite(pct) && samples >= UPTIME_MIN_SAMPLES_24H && pct < DEAD_LANE_MAX_PERCENT
+}
+
+/**
+ * 自己接的在前、名冊那一批在後；兩段內部都照伺服器給的次序（名冊那段由便宜到貴）。
+ * 壞掉的線路不算在內，玩家正在用的那條例外。
+ */
+function ordered<T>(all: T[], selectedValue = ''): { manual: T[]; listed: T[] } {
+  const alive = all.filter((v: any) => !isDeadLane(v) || (selectedValue && v.value === selectedValue))
   return {
-    manual: all.filter((v) => !isAutoListed(v)),
-    listed: all.filter((v) => isAutoListed(v)),
+    manual: alive.filter((v) => !isAutoListed(v)),
+    listed: alive.filter((v) => isAutoListed(v)),
   }
 }
 
@@ -148,7 +170,7 @@ export function visibleLanes<T>(
   expanded = false,
 ): T[] {
   const all = Array.isArray(variants) ? variants : []
-  const { manual, listed } = ordered(all)
+  const { manual, listed } = ordered(all, selectedValue)
   if (expanded) return manual.concat(listed)
   const keep = listedPicks(manual, listed)
   const selected = listed.find((v: any) => v.value === selectedValue)
@@ -166,7 +188,7 @@ export function hiddenLaneCount<T>(
   expanded = false,
 ): number {
   const all = Array.isArray(variants) ? variants : []
-  const { manual, listed } = ordered(all)
+  const { manual, listed } = ordered(all, selectedValue)
   if (expanded) return listed.length - listedPicks(manual, listed).size
   const shown = visibleLanes(all, selectedValue, false).length - manual.length
   return listed.length - shown

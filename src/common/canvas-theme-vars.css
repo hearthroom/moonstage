@@ -149,6 +149,9 @@
   --lt-canvas-sheet-max-height: 76vh;
   --lt-canvas-accent: #f5c542;
   --lt-canvas-accent-bg: rgba(245, 197, 66, 0.14);
+  /* 模型選單上「官方」線路的標籤色。跟金色的「實惠」並排時要一眼分得開。 */
+  --lt-canvas-official: #8b9bff;
+  --lt-canvas-official-bg: rgba(139, 155, 255, 0.14);
 
   /*
     彈層「裡面那一層」的取值。
