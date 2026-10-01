@@ -1682,6 +1682,8 @@
   }
 
   .lt-send .is-spinning {
+    display: flex;
+    will-change: transform;
     animation: lt-canvas-spin 900ms linear infinite;
   }
 

@@ -371,7 +371,7 @@ import { bindCanvasViewport } from './canvas-viewport';
 import { mountGeometryDebug, rectText } from '@/common/geometry-debug';
 import { instructionsFromAPI } from '@/api/instruction-fields'
 import { usableFirstPage } from './canvas-first-page'
-import {computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, unref, getCurrentInstance, nextTick, watch, watchEffect} from 'vue';
+import {computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, toRaw, unref, getCurrentInstance, nextTick, watch, watchEffect} from 'vue';
 import {
   onLoad,
   onShow,
@@ -508,7 +508,7 @@ import {
   type CanvasPanelState, type CanvasSheet,
 } from './canvas-panel-state'
 import { findVariant, resolveVariant, scoreParts } from './canvas-model-catalog'
-import { resolveStoredModel, composeModelDisplayName } from './canvas-model-lanes'
+import { resolveStoredModel, composeModelDisplayName, createModelLookup } from './canvas-model-lanes'
 import { contextUsageDisplayForRow, contextBudgetTokens } from './canvas-context-usage'
 import {
   BREAKDOWN_META,
@@ -9143,10 +9143,12 @@ function onMessageAction(key: string, index: number) {
 // 分子是那一則 AI 回覆存下來的輸入 token（歷史列有、串流終態沒有——所以每一輪
 // 收尾後另外去讀一次歷史，只補這個欄位），分母是它所用模型在玩家目前檔位下的
 // 容量。口徑、脫敏、等級門檻都在 canvas-context-usage.ts。
+//
+// 每則都查一次模型、串流中每個 chunk 整串重畫：查表按目錄記住（見 createModelLookup）。
+const variantForModel = computed(() => createModelLookup(toRaw(modelGroups.value)))
+
 function contextUsageForRow(item: any) {
-  const modelValue = String(item?.model || '')
-  const variant = resolveVariant(modelGroups.value, modelValue)
-    || resolveStoredModel(modelGroups.value, modelValue).variant
+  const variant = variantForModel.value(String(item?.model || ''))
   const budget = contextBudgetTokens(variant?.contextBudgetOptions, formData.context)
   return contextUsageDisplayForRow(item || {}, budget, t)
 }

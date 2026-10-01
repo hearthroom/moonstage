@@ -36,6 +36,19 @@ interface LongPressOptions {
   clearTimer?: (handle: any) => void
 }
 
+/*
+  計時器到了不立刻開，先讓出一個 tick 再開。
+
+  串流中主執行緒常被一整段排版佔住幾百毫秒。玩家輕點一下（100ms 就放開），放開的 touchend
+  卻排在那段長任務後面；長任務一結束，450ms 的計時器也早就到期——兩個都在排隊時，計時器有機會
+  先跑，於是一個輕點變成了長按（owner 2026-10-01：輸出時特別容易誤觸長按選單）。
+  讓出一個 tick，排隊中的觸控事件（瀏覽器的輸入佇列優先於計時器）先派送：手指其實已經放開或
+  已經滑開，就在那裡取消，選單不開。正常長按只多等一個 tick，感覺不到。
+*/
+function defaultDefer(fn: () => void): any {
+  return setTimeout(fn, 0)
+}
+
 function pointOf(event: any): { x: number; y: number } | null {
   if (!event) return null
   if (event.touches && event.touches.length) return { x: event.touches[0].clientX, y: event.touches[0].clientY }
@@ -61,6 +74,7 @@ export function createLongPress(options: LongPressOptions): LongPressHandle {
   const vibrate = options.vibrate || defaultVibrate
   const setTimer = options.setTimer || ((fn: () => void, ms: number) => setTimeout(fn, ms))
   const clearTimer = options.clearTimer || ((handle: any) => clearTimeout(handle))
+  const defer = options.setTimer ? (fn: () => void) => setTimer(fn, 0) : defaultDefer
 
   let timer: any = null
   let origin: { x: number; y: number } | null = null
@@ -79,7 +93,12 @@ export function createLongPress(options: LongPressOptions): LongPressHandle {
       origin = pointOf(event)
       const pressedAt = origin
       timer = setTimer(() => {
-        timer = null
+        timer = defer(() => {
+          timer = null
+          fire()
+        })
+      }, delayMs)
+      function fire() {
         fired = true
         // 震動在部分瀏覽器（非使用者手勢期間、或使用者關掉了）會拋例外。
         // 那不該把選單一起帶走——觸覺回饋是加分，選單是功能本身。
@@ -87,7 +106,7 @@ export function createLongPress(options: LongPressOptions): LongPressHandle {
           vibrate(LONG_PRESS_VIBRATE_MS)
         } catch (e) { /* 震不了就算了 */ }
         options.onTrigger(pressedAt ? { x: pressedAt.x, y: pressedAt.y } : null)
-      }, delayMs)
+      }
     },
     move(event) {
       if (timer == null || !origin) return

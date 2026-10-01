@@ -104,6 +104,30 @@ describe('手機長按', () => {
       vi.useRealTimers()
     }
   })
+
+  // owner 2026-10-01：輸出時特別容易誤觸。主執行緒忙的時候，早就放開的 touchend 跟到期的計時器
+  // 一起排隊；計時器先跑也不能開選單——排在它後面的放開／滑開要先算。
+  it('計時器到期時放開的 touchend 還在排隊：輕點不會變成長按', () => {
+    vi.useFakeTimers()
+    try {
+      const w = mountMessage()
+      const bubble = w.find('.mes_text')
+      const start = () => bubble.element.dispatchEvent(Object.assign(new Event('touchstart', { bubbles: true }), { touches: [{ clientX: 120, clientY: 500 }] }))
+      start()
+      vi.advanceTimersToNextTimer()
+      bubble.element.dispatchEvent(new Event('touchend', { bubbles: true, cancelable: true }))
+      vi.advanceTimersByTime(LONG_PRESS_MS)
+      expect(w.emitted('menu')).toBeUndefined()
+
+      start()
+      vi.advanceTimersToNextTimer()
+      bubble.element.dispatchEvent(Object.assign(new Event('touchmove', { bubbles: true }), { touches: [{ clientX: 120, clientY: 540 }] }))
+      vi.advanceTimersByTime(LONG_PRESS_MS)
+      expect(w.emitted('menu')).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 /*
