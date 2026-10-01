@@ -281,7 +281,7 @@
 	"modelSelect.tryAnotherFilter": "Try another category, or a different search term",
 	"modelSelect.priceCredits": "{n} credits",
 	"modelSelect.priceCreditsFrom": "from {n} credits",
-	"modelSelect.tierFull": "Once the chat fills {tier}, each turn costs about {n} credits.",
+	"modelSelect.tierFull": "When the chat fills {tier}, each turn costs about {n} credits.",
 	"modelSelect.tierFirstTurn": "This card has no chat yet; from recent usage across the site, the first turn costs about {n} credits.",
 	"modelSelect.tierNextTurn": "At the current chat length, the next turn costs about {n} credits.",
 	"modelSelect.priceAgent": "Billed by usage",

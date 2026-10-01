@@ -432,7 +432,7 @@
 	"modelSelect.tryAnotherFilter": "他のカテゴリや別のキーワードで探してみてください",
 	"modelSelect.priceCredits": "{n} ポイント",
 	"modelSelect.priceCreditsFrom": "{n} ポイントから",
-	"modelSelect.tierFull": "会話が{tier}いっぱいになると、1ターンあたり約{n}ポイントです。",
+	"modelSelect.tierFull": "会話が{tier}いっぱいのときは、1ターンあたり約{n}ポイントです。",
 	"modelSelect.tierFirstTurn": "このカードはまだ会話がないため、サイト全体の最近の使用量から、最初のターンは約{n}ポイントと見積もっています。",
 	"modelSelect.tierNextTurn": "今の会話の長さだと、次のターンは約{n}ポイントです。",
 	"modelSelect.priceAgent": "使用量に応じて課金",

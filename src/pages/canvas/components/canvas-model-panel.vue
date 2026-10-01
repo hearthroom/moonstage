@@ -35,12 +35,12 @@
       </template>
       <template v-else>
         <div class="mp-info-row is-was">
-          <div class="mp-model-name">{{ modelName }}</div>
+          <div class="mp-model-name">{{ modelName }}<template v-if="tierChanged && draft && draft.fromTier"> · {{ draft.fromTier }}</template></div>
           <div class="mp-energy-pill"><span class="mp-ev"><span>{{ scoreLabel || scoreText || '—' }}</span></span></div>
         </div>
         <div class="mp-info-arrow" aria-hidden="true">↓ {{ labels.switchTo }}</div>
         <div class="mp-info-row is-next">
-          <div class="mp-model-name">{{ draft && draft.name }}</div>
+          <div class="mp-model-name">{{ draft && draft.name }}<template v-if="tierChanged && draft && draft.tier"> · {{ draft.tier }}</template></div>
           <div class="mp-energy-pill is-dynamic"><span class="mp-ev"><span>{{ draft && draft.price }}</span></span></div>
         </div>
       </template>
@@ -119,7 +119,8 @@ const emit = defineEmits<{
 const picker = ref<any>(null)
 
 /** 選單裡還沒確認的選擇（模型、檔位、價格），由 ModelSelectPanel 回報。 */
-const draft = ref<{ value: string; name: string; price: string; context?: number } | null>(null)
+const draft = ref<{ value: string; name: string; price: string; context?: number; tier?: string; fromTier?: string } | null>(null)
+const tierChanged = computed(() => !!draft.value && draft.value.context != null && draft.value.context !== props.contextValue)
 const switching = computed(() => {
   const d = draft.value
   if (!d || !d.value) return false

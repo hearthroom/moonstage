@@ -508,7 +508,7 @@
 	const emit = defineEmits<{
 		(e: 'select', payload: Record<string, unknown>): void
 		(e: 'close'): void
-		(e: 'draft', payload: { value: string; name: string; price: string; context: number }): void
+		(e: 'draft', payload: { value: string; name: string; price: string; context: number; tier: string; fromTier: string }): void
 	}>();
 
 	const formData = reactive({
@@ -2081,6 +2081,8 @@ function composeModelDisplayName(variant, familyName) {
 	watch(() => [selectItem.value && selectItem.value.value, formData.context, deepPrepOn.value, selectItem.value && selectItem.value.estMinScore], () => {
 		const variant = selectItem.value;
 		if (!variant) return;
-		emit('draft', { value: variant.value, name: composeModelDisplayName(variant, variant.family), price: variantPriceText(variant), context: formData.context });
+		// 檔位的字（64K）也一起給：只換檔位時，頂欄兩列的模型名一樣，要靠它分出前後。
+		const tierText = (value) => (contextBudgetLevelOptions.value.find(o => o.value === value) || {}).text || '';
+		emit('draft', { value: variant.value, name: composeModelDisplayName(variant, variant.family), price: variantPriceText(variant), context: formData.context, tier: tierText(formData.context), fromTier: tierText(props.context) });
 	}, { immediate: true });
 </script>

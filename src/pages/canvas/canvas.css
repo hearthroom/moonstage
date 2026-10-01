@@ -2166,6 +2166,14 @@
     min-width: 0;
   }
 
+  /* 價格寫成「下一輪約 …」之後比較寬，模型名改成可以折行，不要被截成「Claude Opus 5.5 · …」。 */
+  .mp-info-bar .mp-model-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
   .mp-info-row.is-was {
     color: var(--lt-canvas-muted);
     text-decoration: line-through;
