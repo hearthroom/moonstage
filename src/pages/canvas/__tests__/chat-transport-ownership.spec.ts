@@ -109,7 +109,8 @@ describe('desktop chat transport ownership', () => {
     const chat = readChat()
     const handler = sliceBetween(chat, 'const handlerMessage =', '// 滚动节流定时器')
     const send = sliceBetween(chat, 'function send()', '// 发送WebSocket消息')
-    const mutationFence = sliceBetween(chat, 'function isTimelineMutationBlocked()', 'function notifyTimelineMutationBlocked()')
+    // 守衛讀的狀態抽成 timelineMutationState()，回溯／刪除的「先停再做」閘跟它共用同一份。
+    const mutationFence = sliceBetween(chat, 'function timelineMutationState()', 'function notifyTimelineMutationBlocked()')
 
     expect(handler).toContain("terminateStreamForChatError(errorType, () => clearStreamState())")
     expect(handler).toContain('pendingChatTurn = null')
@@ -123,7 +124,7 @@ describe('desktop chat transport ownership', () => {
     expect(chat).toContain('@confirm="send"')
     expect(send).toContain('isTimelineMutationBlocked()')
     expect(send.indexOf('isTimelineMutationBlocked()')).toBeLessThan(send.indexOf('content.value = unref(content).trim()'))
-    expect(mutationFence).toContain('isChatSendInFlight({')
+    expect(mutationFence).toContain('isChatSendInFlight(timelineMutationState())')
     expect(mutationFence).toContain('isCompacting: unref(isCompacting)')
     expect(mutationFence).toContain('pendingChatTurn')
   })

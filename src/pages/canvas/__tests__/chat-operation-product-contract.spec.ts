@@ -918,7 +918,9 @@ describe('desktop chat operation product contract', () => {
 
     expect(send).toContain('isTimelineMutationBlocked()')
     expect(send).toContain('notifyTimelineMutationBlocked()')
-    expect(backward).toContain('isTimelineMutationBlocked()')
+    // 回溯在回覆還在產生時改成「先停止、再回溯」（owner 2026-10-01），只有另一個
+    // 回溯還在送才等；見 timeline-mutation-stops-turn.spec.ts。
+    expect(backward).toContain('stopRunningTurnForTimelineMutation()')
     expect(manualEdit).toContain('isTimelineMutationBlocked()')
     // Reiteration, legacy Continue, and capable exact-source Continue each own
     // a mutation fence before reaching the shared send core.

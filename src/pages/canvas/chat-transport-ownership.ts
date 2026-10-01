@@ -1211,6 +1211,19 @@ export function isChatSendInFlight(state: any): boolean {
     || current.rollbackPending === true
 }
 
+// 玩家在回覆還在產生時按回溯／刪除／改字重送，等同「先停止、再做」：那一輪多半正卡在
+// 上游沒下文，而「回溯」對他來說本來就包含「停止」。不該被「請等待目前的聊天操作完成」
+// 擋在外面（owner 2026-10-01，chat-operation-reliability I-2：停止永遠可用）。
+// 只有另一個回溯還在送的時候才真的要等——那不是能停的東西，是同一種操作在排隊。
+export type TimelineMutationGate = 'proceed' | 'stop_then_proceed' | 'wait'
+
+export function resolveTimelineMutationGate(state: any): TimelineMutationGate {
+  const current = state && typeof state === 'object' ? state : {}
+  if (current.rollbackPending === true) return 'wait'
+  if (isChatSendInFlight(current)) return 'stop_then_proceed'
+  return 'proceed'
+}
+
 export function shouldAwaitDurableStopTerminal(pending: PendingChatTurn | null): boolean {
   if (!pending || pending.operationOutcomeCapability === 'legacy') return false
   return pending.payload?.supportsOperationOutcome === true
