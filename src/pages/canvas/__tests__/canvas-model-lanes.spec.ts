@@ -8,8 +8,9 @@
 import { describe, it, expect } from 'vitest'
 import live from './fixtures/model-catalog-live.json'
 import {
-  LANE_COLLAPSE_LIMIT,
+  LANE_VISIBLE_LIMIT,
   buildFamilyList,
+  laneTagOf,
   isFamilySelected,
   primaryVariant,
   visibleLanes,
@@ -65,8 +66,13 @@ describe('模型清單攤成一顆一列', () => {
   })
 })
 
-describe('線路收合', () => {
+describe('線路收合：自己接的在前，名冊補位到四條', () => {
   const deepseek = () => familyNamed('DeepSeek V4 Flash')
+  const listedOf = () => deepseek().variants.filter((v) => (v as any).laneAutoListed)
+  const manual = (value: string, laneTag = '') => ({ value, laneTag }) as any
+  const withOfficialAt = (i: number) =>
+    listedOf().map((v, j) => (j === i ? { ...v, laneTag: 'official' } : v)) as any[]
+  const values = (xs: any[]) => xs.map((v) => v.value)
 
   it('線路少的家族全部露出來，也沒有展開鍵', () => {
     const claude = familyNamed('Claude Sonnet 4.5')
@@ -74,48 +80,80 @@ describe('線路收合', () => {
     expect(hiddenLaneCount(claude.variants, CLAUDE_RIPPLE, false)).toBe(0)
   })
 
-  it('我們自己配的線路全留，照名冊長出來的那批只留最便宜的六條', () => {
+  it('手配兩條、名冊沒有官方：補最便宜的兩條', () => {
     const family = deepseek()
     const shown = visibleLanes(family.variants, 'deepseek-v4-flash-ripple', false)
-    const ours = shown.filter((v) => !(v as any).laneAutoListed)
-    const listed = shown.filter((v) => (v as any).laneAutoListed)
-    expect(ours.map((v) => v.value)).toEqual(['deepseek-v4-flash-ripple', 'deepseek-v4-flash-mist'])
-    expect(listed.length).toBe(LANE_COLLAPSE_LIMIT)
-    expect(shown.length).toBe(2 + LANE_COLLAPSE_LIMIT)
+    expect(values(shown)).toEqual([
+      'deepseek-v4-flash-ripple', 'deepseek-v4-flash-mist', family.variants[2].value, family.variants[3].value,
+    ])
+    expect(hiddenLaneCount(family.variants, 'deepseek-v4-flash-ripple', false)).toBe(family.variants.length - LANE_VISIBLE_LIMIT)
   })
 
-  it('收起來的是比較貴的那幾條——清單本身由便宜排到貴', () => {
-    const family = deepseek()
-    const shown = visibleLanes(family.variants, '', false)
-    const hidden = family.variants.filter((v) => !shown.some((s) => s.value === v.value))
-    expect(hidden.length).toBeGreaterThan(0)
-    const maxShown = Math.max(...shown.map((v) => v.costScore || 0))
-    expect(Math.min(...hidden.map((v) => v.costScore || 0))).toBeGreaterThanOrEqual(maxShown)
+  it('手配兩條都不是官方、名冊有官方：補一條官方加一條最便宜的', () => {
+    const listed = withOfficialAt(5)
+    const shown = visibleLanes([manual('a', 'value'), manual('b', 'value'), ...listed], '', false)
+    expect(values(shown)).toEqual(['a', 'b', listed[0].value, listed[5].value])
   })
 
-  it('玩家現在用的那條就算排在收合線之後也一定看得到', () => {
+  it('手配裡已經有官方：名冊不再補官方，只補最便宜的', () => {
+    const listed = withOfficialAt(5)
+    const shown = visibleLanes([manual('a', 'value'), manual('o', 'official'), ...listed], '', false)
+    expect(values(shown)).toEqual(['a', 'o', listed[0].value, listed[1].value])
+  })
+
+  it('手配一條：補一條官方加兩條最便宜的', () => {
+    const listed = withOfficialAt(7)
+    const shown = visibleLanes([manual('a', 'value'), ...listed], '', false)
+    expect(values(shown)).toEqual(['a', listed[0].value, listed[1].value, listed[7].value])
+  })
+
+  it('沒有手配：名冊自己補四條；供應商不夠就有幾條補幾條', () => {
+    const listed = withOfficialAt(0)
+    expect(values(visibleLanes(listed, '', false))).toEqual(values(listed.slice(0, 4)))
+    expect(values(visibleLanes(listed.slice(0, 3), '', false))).toEqual(values(listed.slice(0, 3)))
+    expect(hiddenLaneCount(listed.slice(0, 3), '', false)).toBe(0)
+  })
+
+  it('手配已經滿四條：名冊一條都不露，自己接的也不收', () => {
+    const shown = visibleLanes([manual('a'), manual('b'), manual('c'), manual('d'), manual('e'), ...listedOf()], '', false)
+    expect(values(shown)).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+
+  it('自己接的永遠排在最前面，就算伺服器把它排在名冊後面', () => {
+    const listed = listedOf()
+    const shown = visibleLanes([...listed, manual('bare', 'official')], '', false)
+    expect(shown[0].value).toBe('bare')
+    expect(values(visibleLanes([...listed, manual('bare')], '', true))[0]).toBe('bare')
+  })
+
+  it('玩家現在用的那條就算不在補位名單裡也一定看得到', () => {
     const family = deepseek()
     const last = family.variants[family.variants.length - 1]
     const shown = visibleLanes(family.variants, last.value, false)
     expect(shown.some((v) => v.value === last.value)).toBe(true)
+    expect(shown.length).toBe(LANE_VISIBLE_LIMIT + 1)
   })
 
-  it('展開就全部給', () => {
+  it('展開就全部給，展開鍵在展開之後還在', () => {
     const family = deepseek()
     expect(visibleLanes(family.variants, '', true).length).toBe(family.variants.length)
-  })
-
-  it('展開鍵在展開之後還在——它是回去的唯一路', () => {
-    const family = deepseek()
-    const collapsed = hiddenLaneCount(family.variants, '', false)
-    const expanded = hiddenLaneCount(family.variants, '', true)
-    expect(collapsed).toBeGreaterThan(0)
-    expect(expanded).toBeGreaterThan(0)
+    expect(hiddenLaneCount(family.variants, '', false)).toBeGreaterThan(0)
+    expect(hiddenLaneCount(family.variants, '', true)).toBe(family.variants.length - LANE_VISIBLE_LIMIT)
   })
 
   it('沒有線路也不炸', () => {
     expect(visibleLanes(null, '', false)).toEqual([])
     expect(hiddenLaneCount(undefined, '', false)).toBe(0)
+  })
+})
+
+describe('線路標籤', () => {
+  it('只認伺服器給的 official / value，其他一律不標', () => {
+    expect(laneTagOf({ laneTag: 'official' })).toBe('official')
+    expect(laneTagOf({ laneTag: 'value' })).toBe('value')
+    expect(laneTagOf({ laneTag: 'premium' })).toBe('')
+    expect(laneTagOf({})).toBe('')
+    expect(laneTagOf(null)).toBe('')
   })
 })
 

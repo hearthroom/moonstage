@@ -15,12 +15,13 @@ import { flattenVariants } from './canvas-model-catalog'
 import type { FlatVariant, ModelGroupLike, ModelVariantLike } from './canvas-model-catalog'
 
 /**
- * 收合線在第六條。
+ * 一顆模型收合時最多露出四條線路（owner 2026-10-01）。
  *
- * 六條而不是四條：清單本身由便宜排到貴，六條才看得出一段有意義的價格階梯；
- * 四條會在還沒拉開差距前就截斷。
+ * 我們自己接的線路永遠露出、排最前面；OpenRouter 名冊長出來的那一批只負責補位，
+ * 補到四條為止。不收合的話 DeepSeek V4 Flash 一打開就是二十幾條供應商，玩家要先
+ * 捲過整面名冊才看得到下一顆模型。
  */
-export const LANE_COLLAPSE_LIMIT = 6
+export const LANE_VISIBLE_LIMIT = 4
 
 export interface ModelFamilyView {
   /** 家族名，也是畫面上那顆模型的名字 */
@@ -93,46 +94,82 @@ export function primaryVariant(
   return selected || family.variants[0]
 }
 
+function isAutoListed(v: any): boolean {
+  return Boolean(v && v.laneAutoListed)
+}
+
+/** 這條線路的標籤：`official`（官方）、`value`（實惠）或空字串。由伺服器下發。 */
+export function laneTagOf(variant: any): 'official' | 'value' | '' {
+  const tag = variant && variant.laneTag
+  return tag === 'official' || tag === 'value' ? tag : ''
+}
+
+/** 自己接的在前、名冊那一批在後；兩段內部都照伺服器給的次序（名冊那段由便宜到貴）。 */
+function ordered<T>(all: T[]): { manual: T[]; listed: T[] } {
+  return {
+    manual: all.filter((v) => !isAutoListed(v)),
+    listed: all.filter((v) => isAutoListed(v)),
+  }
+}
+
 /**
- * 真正要畫出來的那幾條。
+ * 收合時名冊那一批要補進來的幾條（不含「玩家正在用的」那條例外）。
  *
- * 我們自己配的線路全留——它們是刻意挑過的，數量也不會自己長。會爆的是照上游名冊
- * 自動長出來的那一批（`laneAutoListed`），只留最便宜的幾條。
- *
- * **玩家現在用的那條永遠在裡面**，就算它排在收合線之後：他打開面板第一件事是確認
- * 自己在用哪一條，看不到它等於這一頁沒有回答他最想問的問題。
+ * 1. 空位＝四減掉自己接的條數。
+ * 2. 自己接的裡面沒有官方、名冊裡有官方，先補最便宜的那一家官方。
+ * 3. 剩下的空位由便宜到貴補。
  */
-export function visibleLanes(
-  variants: FlatVariant[] | null | undefined,
+function listedPicks<T>(manual: T[], listed: T[]): Set<T> {
+  const budget = Math.max(0, LANE_VISIBLE_LIMIT - manual.length)
+  const picks = new Set<T>()
+  if (budget === 0) return picks
+  if (!manual.some((v) => laneTagOf(v) === 'official')) {
+    const official = listed.find((v) => laneTagOf(v) === 'official')
+    if (official) picks.add(official)
+  }
+  for (const v of listed) {
+    if (picks.size >= budget) break
+    picks.add(v)
+  }
+  return picks
+}
+
+/**
+ * 真正要畫出來的那幾條：自己接的全部，加上名冊補位的幾條。
+ *
+ * **玩家現在用的那條永遠在裡面**，就算它不在補位名單裡：他打開面板第一件事是確認
+ * 自己在用哪一條，看不到它等於這一頁沒有回答他最想問的問題。
+ *
+ * 選單面板（ModelSelectPanel）跟這裡共用同一個函式，兩邊不各存一份規則。
+ */
+export function visibleLanes<T>(
+  variants: T[] | null | undefined,
   selectedValue = '',
   expanded = false,
-): FlatVariant[] {
+): T[] {
   const all = Array.isArray(variants) ? variants : []
-  if (expanded) return all.slice()
-  const ours = all.filter((v) => !(v as any).laneAutoListed)
-  const listed = all.filter((v) => (v as any).laneAutoListed)
-  if (listed.length <= LANE_COLLAPSE_LIMIT) return all.slice()
-  const head = listed.slice(0, LANE_COLLAPSE_LIMIT)
-  const selected = listed.find((v) => v.value === selectedValue)
-  if (selected && !head.some((v) => v.value === selected.value)) head.push(selected)
-  return ours.concat(head)
+  const { manual, listed } = ordered(all)
+  if (expanded) return manual.concat(listed)
+  const keep = listedPicks(manual, listed)
+  const selected = listed.find((v: any) => v.value === selectedValue)
+  if (selected) keep.add(selected)
+  return manual.concat(listed.filter((v) => keep.has(v)))
 }
 
 /**
  * 收合時還沒露出來幾條；展開時回「按收合會藏起來幾條」，讓按鈕留在原地。
  * 按鈕消失會讓剛展開的人找不到回去的路。
  */
-export function hiddenLaneCount(
-  variants: FlatVariant[] | null | undefined,
+export function hiddenLaneCount<T>(
+  variants: T[] | null | undefined,
   selectedValue = '',
   expanded = false,
 ): number {
   const all = Array.isArray(variants) ? variants : []
-  const listed = all.filter((v) => (v as any).laneAutoListed)
-  if (listed.length <= LANE_COLLAPSE_LIMIT) return 0
-  if (expanded) return listed.length - LANE_COLLAPSE_LIMIT
-  const shown = visibleLanes(all, selectedValue, false).filter((v) => (v as any).laneAutoListed)
-  return listed.length - shown.length
+  const { manual, listed } = ordered(all)
+  if (expanded) return listed.length - listedPicks(manual, listed).size
+  const shown = visibleLanes(all, selectedValue, false).length - manual.length
+  return listed.length - shown
 }
 
 /**

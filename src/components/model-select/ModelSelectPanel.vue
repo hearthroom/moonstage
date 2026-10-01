@@ -280,6 +280,14 @@
 								<div class="ms-opt-line1">
 									<div class="ms-radio" :class="{ 'is-on': formData.selectModel === variant.value }"></div>
 									<span class="ms-opt-name">{{ optionLabelFor(detailFamily, variant) }}</span>
+									<!-- 官方／實惠是伺服器下發的標籤（自己接的線路手動配，OpenRouter 依開發商
+										 自家供貨判定）。實惠用強調色：在意價格的玩家要一眼找得到它。 -->
+									<div
+										v-if="laneTagOf(variant)"
+										class="ms-badge"
+										:class="{ 'is-accent': laneTagOf(variant) === 'value' }">
+										<span class="ms-badge-text">{{ t(laneTagOf(variant) === 'official' ? 'modelSelect.laneOfficial' : 'modelSelect.laneValue') }}</span>
+									</div>
 									<!-- 上游供應商此刻掛著的折扣。扣費是跟著它走的（server 端用供應商現價
 										 算成本），所以這個數字不是裝飾。它沒有截止時間，隨時會結束。 -->
 									<div v-if="variant.providerDiscountPercent > 0" class="ms-badge is-accent">
@@ -306,8 +314,8 @@
 								</div>
 							</div>
 
-							<!-- 收在後面的是**比較貴**的那幾條（清單本身由便宜到貴）。標籤寫出
-								 被收起來的是什麼、有幾條——只放一個箭頭的話，使用者不知道展開會拿到什麼。 -->
+							<!-- 收起來的是名冊補位之外的供應商。標籤寫出還有幾條——只放一個箭頭的話，
+								 使用者不知道展開會拿到什麼。 -->
 							<div
 								v-if="hiddenVariantCount(detailFamily) > 0"
 								class="ms-more"
@@ -382,6 +390,7 @@
 	const stageHost = useStageHost()
 	import { CanvasInput } from '@/pages/canvas/components/canvas-field'
 	import { variantPrice } from '@/pages/canvas/canvas-model-catalog'
+	import { visibleLanes, hiddenLaneCount, laneTagOf } from '@/pages/canvas/canvas-model-lanes'
 	import icon_deepseek from '@/static/icon/models/deepseek.png';
 	import icon_gpt from '@/static/icon/models/gpt.png';
 	import icon_claude from '@/static/icon/models/claude.png';
@@ -657,17 +666,8 @@
 		return family.variants;
 	};
 
-	/**
-	 * 上游名冊自動長出來的線路，預設只露出最便宜的幾條。
-	 *
-	 * **只收這一批**：我們自己配的中繼渠道（經濟線路、官方供應商）永遠留在上面，
-	 * 它們是刻意挑過的、數量也不會自己長。會爆的是自動長出來的那一批——單一模型
-	 * 今天就有三十條，全部平鋪的話使用者要捲很久才看得到確認鍵。
-	 *
-	 * 六條而不是四條：這批清單本身由便宜到貴，六條才看得出一段有意義的價格階梯；
-	 * 四條會在還沒拉開差距前就截斷。
-	 */
-	const LANE_COLLAPSE_LIMIT = 6;
+	// 收合規則（最多四條、自己配的在前、名冊補最便宜的）在 canvas-model-lanes，
+	// 這裡只記哪幾顆模型被玩家展開。
 	const expandedLaneFamilies = ref({});
 
 	const isShowingAllLanes = (family) => !!expandedLaneFamilies.value[family && family.family];
@@ -681,38 +681,11 @@
 		};
 	};
 
-	/**
-	 * 真正要渲染的那幾條。
-	 *
-	 * **選中的那條永遠在裡面**，即使它排在收合線之後：使用者打開面板第一件事是確認
-	 * 自己現在用的是哪一條，看不到它就等於這一頁沒有回答他最想問的問題。
-	 */
-	/**
-	 * 真正要渲染的那幾條。
-	 *
-	 * 自己配的渠道全留；自動長出來的那一批只留最便宜的幾條。**選中的那條永遠在裡面**，
-	 * 即使它排在收合線之後：使用者打開面板第一件事是確認自己現在用的是哪一條，
-	 * 看不到它就等於這一頁沒有回答他最想問的問題。
-	 */
-	const getVisibleVariants = (family) => {
-		const variants = getFilteredVariants(family);
-		if (isShowingAllLanes(family)) return variants;
-		const ours = variants.filter(v => !v.laneAutoListed);
-		const listed = variants.filter(v => v.laneAutoListed);
-		if (listed.length <= LANE_COLLAPSE_LIMIT) return variants;
-		const head = listed.slice(0, LANE_COLLAPSE_LIMIT);
-		const selected = listed.find(v => v.value === formData.selectModel);
-		if (selected && !head.some(v => v.value === selected.value)) head.push(selected);
-		return ours.concat(head);
-	};
+	const getVisibleVariants = (family) =>
+		visibleLanes(getFilteredVariants(family), formData.selectModel, isShowingAllLanes(family));
 
-	/** 收合狀態下還沒露出來的條數；展開狀態下回「按收合會藏起來幾條」，讓按鈕留著。 */
-	const hiddenVariantCount = (family) => {
-		const listed = getFilteredVariants(family).filter(v => v.laneAutoListed);
-		if (listed.length <= LANE_COLLAPSE_LIMIT) return 0;
-		if (isShowingAllLanes(family)) return listed.length - LANE_COLLAPSE_LIMIT;
-		return listed.length - getVisibleVariants(family).filter(v => v.laneAutoListed).length;
-	};
+	const hiddenVariantCount = (family) =>
+		hiddenLaneCount(getFilteredVariants(family), formData.selectModel, isShowingAllLanes(family));
 
 	const laneToggleLabel = (family) => {
 		if (isShowingAllLanes(family)) return t('modelSelect.laneCollapse');
