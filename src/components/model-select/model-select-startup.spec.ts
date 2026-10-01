@@ -80,16 +80,16 @@ it('hides a model whose every lane is dead, unless the player is using it', asyn
   } finally { using.unmount() }
 })
 
-it('shows each tier estimate and prices the lane at the chosen tier', async () => {
+it('explains the price of the chosen tier and reports the unsaved choice', async () => {
   const live = JSON.parse(JSON.stringify((await import('../../pages/canvas/__tests__/fixtures/model-catalog-live.json')).default))
   const deepseek = live[0].families.find((f: any) => f.family === 'DeepSeek V4 Flash')
   const lane = deepseek.variants[2]
   const quotes = [
-    { value: 1, tokens: 64000, text: '64K', quoteMin: 12, quoteMax: 186 },
-    { value: 2, tokens: 96000, text: '96K', quoteMin: 30, quoteMax: 310 },
-    { value: 3, tokens: 128000, text: '128K', quoteMin: 40, quoteMax: 693 },
+    { value: 1, tokens: 64000, text: '64K', quoteMin: 12, quoteMax: 18, quoteFull: 60 },
+    { value: 2, tokens: 96000, text: '96K', quoteMin: 12, quoteMax: 18, quoteFull: 90 },
+    { value: 3, tokens: 128000, text: '128K', quoteMin: 12, quoteMax: 18, quoteFull: 120 },
   ]
-  deepseek.variants.forEach((v: any) => { v.isCacheStable = true; v.contextBudgetOptions = quotes })
+  deepseek.variants.forEach((v: any) => { v.isCacheStable = true; v.contextBudgetOptions = quotes; v.estSource = 'conversation' })
   const get = vi.fn(async (url: string) => url === '/models'
     ? { statusCode: 200, data: live }
     : { statusCode: 200, data: [] })
@@ -101,20 +101,24 @@ it('shows each tier estimate and prices the lane at the chosen tier', async () =
     await flushPromises()
     const pills = wrapper.findAll('.ms-pill.token')
     expect(pills).toHaveLength(3)
-    expect(pills.every(p => p.find('.ms-pill-sub').exists())).toBe(true)
     expect(pills[0].text()).toContain('modelSelect.contextTierRecommended')
-    expect(pills[1].text()).not.toContain('modelSelect.contextTierRecommended')
+    // 數字不單獨擺在按鈕上，而是寫成兩句完整的話
+    const lines = () => wrapper.findAll('.ms-tier-quote-line').map(l => l.text())
+    expect(lines()).toEqual(['modelSelect.tierNextTurn', 'modelSelect.tierFull'])
     const vm = wrapper.vm as any
-    expect(vm.getVariantPrice(lane)).toMatchObject({ min: 12, max: 186 })
+    expect(vm.variantPriceText(lane)).toBe('modelSelect.priceNext')
+
     await pills[2].trigger('click')
-    expect(vm.getVariantPrice(lane)).toMatchObject({ min: 40, max: 693 })
+    await flushPromises()
+    const drafts = wrapper.emitted('draft') as any[]
+    expect(drafts[drafts.length - 1][0]).toMatchObject({ value: lane.value, context: 3, price: 'modelSelect.priceNext' })
 
     vm.deepPrepEnabled = true
     vm.deepPrepRuntimeEnabled = true
     vm.deepPrepModelSupported = true
     await flushPromises()
     expect(vm.deepPrepOn).toBe(true)
-    expect(wrapper.find('.ms-pill-sub').exists()).toBe(false)
-    expect(wrapper.text()).toContain('modelSelect.contextTierAgentNote')
+    expect(lines()).toEqual(['modelSelect.contextTierAgentNote'])
+    expect(vm.variantPriceText(lane)).toBe('modelSelect.priceAgent')
   } finally { wrapper.unmount() }
 })

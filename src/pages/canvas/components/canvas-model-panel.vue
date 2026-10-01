@@ -20,12 +20,30 @@
            @keydown.enter.prevent="$emit('close')">×</div>
     </div>
 
-    <div class="mp-info-bar">
-      <div class="mp-model-name">{{ modelName }}</div>
-      <div class="mp-energy-pill" :class="{ 'is-dynamic': scoreDynamic }">
-        <span class="mp-ev"><span>{{ scoreText || '—' }}</span></span>
-        <span class="mp-el"><span>{{ labels.perTurn }}</span></span>
-      </div>
+    <!-- 玩家在下面換了模型或檔位、還沒按確定時，這一列寫出「從哪個換到哪個、價格
+         變成多少」：原本的劃掉，箭頭指向新的。沒換就維持原本的一列。 -->
+    <div class="mp-info-bar" :class="{ 'is-switching': switching }">
+      <template v-if="!switching">
+        <div class="mp-model-name">{{ modelName }}</div>
+        <div class="mp-energy-pill" :class="{ 'is-dynamic': scoreDynamic }">
+          <template v-if="scoreLabel"><span class="mp-ev"><span>{{ scoreLabel }}</span></span></template>
+          <template v-else>
+            <span class="mp-ev"><span>{{ scoreText || '—' }}</span></span>
+            <span class="mp-el"><span>{{ labels.perTurn }}</span></span>
+          </template>
+        </div>
+      </template>
+      <template v-else>
+        <div class="mp-info-row is-was">
+          <div class="mp-model-name">{{ modelName }}</div>
+          <div class="mp-energy-pill"><span class="mp-ev"><span>{{ scoreLabel || scoreText || '—' }}</span></span></div>
+        </div>
+        <div class="mp-info-arrow" aria-hidden="true">↓ {{ labels.switchTo }}</div>
+        <div class="mp-info-row is-next">
+          <div class="mp-model-name">{{ draft && draft.name }}</div>
+          <div class="mp-energy-pill is-dynamic"><span class="mp-ev"><span>{{ draft && draft.price }}</span></span></div>
+        </div>
+      </template>
     </div>
 
     <div class="mp-setting-body">
@@ -39,6 +57,7 @@
         :thinking-depth="thinkingDepth"
         :show-thinking-process="showThinkingProcess"
         @select="$emit('apply', $event)"
+        @draft="draft = $event"
         @close="$emit('close')"
       />
     </div>
@@ -52,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch, nextTick } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, nextTick } from 'vue'
 import ModelSelectPanel from '@/components/model-select/ModelSelectPanel.vue'
 import { attachDelegatedDragScroll } from '../canvas-drag-scroll'
 
@@ -65,6 +84,8 @@ const props = withDefaults(defineProps<{
   modelName?: string
   scoreText?: string
   scoreDynamic?: boolean
+  /** 價格連同它的意思（「下一輪約 …」）；固定計價時空字串，退回 scoreText＋perTurn */
+  scoreLabel?: string
   contextValue?: number
   thinkingDepth?: string
   showThinkingProcess?: boolean
@@ -72,6 +93,7 @@ const props = withDefaults(defineProps<{
     close: string
     done: string
     perTurn: string
+    switchTo?: string
   }
 }>(), {
   open: true,
@@ -81,6 +103,7 @@ const props = withDefaults(defineProps<{
   modelName: '',
   scoreText: '',
   scoreDynamic: false,
+  scoreLabel: '',
   contextValue: 1,
   thinkingDepth: '',
   showThinkingProcess: true,
@@ -94,6 +117,15 @@ const emit = defineEmits<{
 }>()
 
 const picker = ref<any>(null)
+
+/** 選單裡還沒確認的選擇（模型、檔位、價格），由 ModelSelectPanel 回報。 */
+const draft = ref<{ value: string; name: string; price: string; context?: number } | null>(null)
+const switching = computed(() => {
+  const d = draft.value
+  if (!d || !d.value) return false
+  return d.value !== props.selectedValue || (d.context != null && d.context !== props.contextValue)
+})
+watch(() => props.open, (open) => { if (!open) draft.value = null })
 const shellEl = ref<HTMLElement | null>(null)
 
 // 分類與排序那兩條橫向 rail 在桌機要拉得動（滑鼠沒有橫向滾輪）。掛在殼上用事件委派：
