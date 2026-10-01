@@ -432,7 +432,7 @@
 	"modelSelect.tryAnotherFilter": "다른 분류나 검색어로 찾아보세요",
 	"modelSelect.priceCredits": "{n} 크레딧",
 	"modelSelect.priceCreditsFrom": "{n} 크레딧부터",
-	"modelSelect.tierFull": "대화가 {tier}를 다 채우면 턴마다 약 {n} 크레딧입니다.",
+	"modelSelect.tierFull": "대화가 {tier}를 가득 채운 상태에서는 턴마다 약 {n} 크레딧입니다.",
 	"modelSelect.tierFirstTurn": "이 카드는 아직 대화가 없어 사이트 전체의 최근 사용량으로 보면 첫 턴은 약 {n} 크레딧입니다.",
 	"modelSelect.tierNextTurn": "지금 대화 길이라면 다음 턴은 약 {n} 크레딧입니다.",
 	"modelSelect.priceAgent": "실제 사용량 기준",

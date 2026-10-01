@@ -281,7 +281,7 @@
 	"modelSelect.tryAnotherFilter": "试试其他分类或搜索关键字",
 	"modelSelect.priceCredits": "{n} 积分",
 	"modelSelect.priceCreditsFrom": "{n} 积分起",
-	"modelSelect.tierFull": "对话长到占满 {tier} 以后，每轮约 {n} 积分。",
+	"modelSelect.tierFull": "对话占满 {tier} 时，每轮约 {n} 积分。",
 	"modelSelect.tierFirstTurn": "这张卡还没聊过，按全站近期的用量估，第一轮约 {n} 积分。",
 	"modelSelect.tierNextTurn": "按目前的对话长度，下一轮约 {n} 积分。",
 	"modelSelect.priceAgent": "按实际用量",

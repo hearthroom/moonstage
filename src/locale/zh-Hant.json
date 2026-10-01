@@ -432,7 +432,7 @@
 	"modelSelect.tryAnotherFilter": "試試其他分類或搜尋關鍵字",
 	"modelSelect.priceCredits": "{n} 積分",
 	"modelSelect.priceCreditsFrom": "{n} 積分起",
-	"modelSelect.tierFull": "對話長到吃滿 {tier} 以後，每輪約 {n} 積分。",
+	"modelSelect.tierFull": "對話吃滿 {tier} 時，每輪約 {n} 積分。",
 	"modelSelect.tierFirstTurn": "這張卡還沒聊過，依全站近期的用量估，第一輪約 {n} 積分。",
 	"modelSelect.tierNextTurn": "照目前的對話長度，下一輪約 {n} 積分。",
 	"modelSelect.priceAgent": "依實際用量",

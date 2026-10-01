@@ -38,8 +38,11 @@ describe('模型設定頂欄：換模型時寫出從哪個換到哪個', () => {
 
   it('只換了檔位也算換：價格會變', async () => {
     const w = mount()
-    w.findComponent(ModelSelectPanel).vm.$emit('draft', { value: 'opus', name: 'Claude Opus 5.5 · 凌波', price: '下一輪約 400–460', context: 3 })
+    w.findComponent(ModelSelectPanel).vm.$emit('draft', { value: 'opus', name: 'Claude Opus 5.5 · 凌波', price: '下一輪約 400–460', context: 3, tier: '128K', fromTier: '64K' })
     await w.vm.$nextTick()
     expect(w.find('.mp-info-row.is-next').text()).toContain('下一輪約 400–460')
+    // 模型名一樣，要靠檔位分出前後
+    expect(w.find('.mp-info-row.is-was').text()).toContain('64K')
+    expect(w.find('.mp-info-row.is-next').text()).toContain('128K')
   })
 })
