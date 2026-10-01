@@ -79,11 +79,35 @@ export function createLongPress(options: LongPressOptions): LongPressHandle {
   let timer: any = null
   let origin: { x: number; y: number } | null = null
   let fired = false
+  let unwatch: (() => void) | null = null
+
+  /*
+    按著的期間在整份文件上（捕獲階段）盯三件事，任一發生就取消：
+    - 放開（touchend／touchcancel）：氣泡裡卡片自己的元素可能擋掉冒泡，氣泡就收不到放開，
+      計時器在手指早就離開後照樣到期。
+    - 任何捲動：手指按下去停住慣性捲動、或串流中內容自己往上捲過手指底下——手指沒動、
+      8px 的判定擋不到，但玩家是在捲動或在看，不是在長按。
+  */
+  function watch(event: any) {
+    const target = event && event.target
+    const doc: Document | null = (target && target.ownerDocument) || (typeof document === 'undefined' ? null : document)
+    if (!doc || typeof doc.addEventListener !== 'function') return
+    const stop = () => cancel()
+    doc.addEventListener('touchend', stop, true)
+    doc.addEventListener('touchcancel', stop, true)
+    doc.addEventListener('scroll', stop, { capture: true, passive: true } as any)
+    unwatch = () => {
+      doc.removeEventListener('touchend', stop, true)
+      doc.removeEventListener('touchcancel', stop, true)
+      doc.removeEventListener('scroll', stop, { capture: true } as any)
+    }
+  }
 
   function cancel() {
     if (timer != null) clearTimer(timer)
     timer = null
     origin = null
+    if (unwatch) { unwatch(); unwatch = null }
   }
 
   return {
@@ -98,7 +122,9 @@ export function createLongPress(options: LongPressOptions): LongPressHandle {
           fire()
         })
       }, delayMs)
+      watch(event)
       function fire() {
+        if (unwatch) { unwatch(); unwatch = null }
         fired = true
         // 震動在部分瀏覽器（非使用者手勢期間、或使用者關掉了）會拋例外。
         // 那不該把選單一起帶走——觸覺回饋是加分，選單是功能本身。
