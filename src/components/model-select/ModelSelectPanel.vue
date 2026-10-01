@@ -70,19 +70,20 @@
 						v-for="item in contextBudgetLevelOptions"
 						:key="item.value"
 						class="ms-pill token"
-						:class="{ 'is-on': item.value === formData.context, 'selected': item.value === formData.context, 'has-quote': item.quoteMin && !deepPrepOn }"
+						:class="{ 'is-on': item.value === formData.context, 'selected': item.value === formData.context }"
 						@click="contextBudgetLevelChange(item.value)">
 						<span class="ms-pill-text">
 							{{ item.text }}<span v-if="item.isFloor" class="ms-pill-tag">{{ t('modelSelect.contextTierRecommended') }}</span>
 						</span>
-						<!-- 這段對話下一輪在這一檔大約扣多少（伺服器依模型實際的回報口徑估），
-							 實際照模型回報的用量扣。Agent 模式一輪會呼叫多次模型，那時不顯示。 -->
-						<span v-if="item.quoteMin && !deepPrepOn" class="ms-pill-sub">
-							{{ t('modelSelect.contextTierQuote', { n: item.quoteMin }) }}
-						</span>
 					</div>
 				</div>
-				<span class="ms-hint">{{ deepPrepOn ? t('modelSelect.contextTierAgentNote') : t('modelSelect.contextTierExplain') }}</span>
+				<!-- 選中的檔位要花多少，寫成兩句完整的話：數字單獨擺在按鈕上沒人看得懂。
+					 一句是這段對話的下一輪，一句是對話長到吃滿這一檔以後。都是估算。
+					 Agent 模式一輪會呼叫多次模型，估不出來，改說明這件事。 -->
+				<div class="ms-tier-quote">
+					<span v-for="line in tierQuoteLines" :key="line" class="ms-tier-quote-line">{{ line }}</span>
+				</div>
+				<span class="ms-hint">{{ t('modelSelect.contextTierExplain') }}</span>
 			</div>
 
 			<div v-if="hasThinkingDepthOptions" class="ms-card">
@@ -397,8 +398,8 @@
 	import { useStageHost } from '@/host/stage-host'
 	const stageHost = useStageHost()
 	import { CanvasInput } from '@/pages/canvas/components/canvas-field'
-	import { variantPrice } from '@/pages/canvas/canvas-model-catalog'
-	import { visibleLanes, hiddenLaneCount, laneTagOf, isDeadLane } from '@/pages/canvas/canvas-model-lanes'
+	import { variantPrice, priceMeaning } from '@/pages/canvas/canvas-model-catalog'
+	import { visibleLanes, hiddenLaneCount, laneTagOf, isDeadLane, composeModelDisplayName } from '@/pages/canvas/canvas-model-lanes'
 	import icon_deepseek from '@/static/icon/models/deepseek.png';
 	import icon_gpt from '@/static/icon/models/gpt.png';
 	import icon_claude from '@/static/icon/models/claude.png';
@@ -507,6 +508,7 @@
 	const emit = defineEmits<{
 		(e: 'select', payload: Record<string, unknown>): void
 		(e: 'close'): void
+		(e: 'draft', payload: { value: string; name: string; price: string; context: number }): void
 	}>();
 
 	const formData = reactive({
@@ -1189,12 +1191,30 @@ const truncationText = (completionRate: number) => {
 	});
 
 
+	/**
+	 * 價格要說清楚它是什麼：這段對話的下一輪、還沒聊過的卡的第一輪，還是固定價。
+	 * en 的「起」是前綴（from 25 credits），語序跟中文相反 → 每一種都是完整的 key。
+	 * Agent 模式一輪會呼叫多次模型，估不出來，只說依實際用量。
+	 */
+	const PRICE_KEYS = {
+		next: ['modelSelect.priceNext', 'modelSelect.priceNextFrom'],
+		fresh: ['modelSelect.priceFresh', 'modelSelect.priceFreshFrom'],
+		estimate: ['modelSelect.priceCredits', 'modelSelect.priceCreditsFrom'],
+		fixed: ['modelSelect.priceCredits', 'modelSelect.priceCreditsFrom'],
+	};
+	const priceLabel = (meaning, amount, from = false) => {
+		if (deepPrepOn.value) return t('modelSelect.priceAgent');
+		const keys = PRICE_KEYS[meaning] || PRICE_KEYS.estimate;
+		return t(from ? keys[1] : keys[0], { n: amount });
+	};
+
 	const priceTextFor = (family) => {
 		const d = familyPriceDisplay(family);
 		if (!d) return '';
-		// en 的「起」是前綴（from 25 credits），語序跟中文相反 → 必須是完整的 key，
-		// 不能由這裡拼字串。
-		return t(d.from ? 'modelSelect.priceCreditsFrom' : 'modelSelect.priceCredits', { n: d.amountText });
+		const variants = getFilteredVariants(family) || [];
+		const meaning = priceMeaning(variants.find(v => v && v.billingType === 'dynamic') || variants[0]);
+		const amount = meaning === 'estimate' ? d.amountText : d.amountText.replace('~', '');
+		return priceLabel(meaning, amount, d.from);
 	};
 
 	const originalPriceFor = (family) => {
@@ -1230,8 +1250,34 @@ const truncationText = (completionRate: number) => {
 		return (variant && variant.channelLabel) || (variant && variant.name) || '';
 	};
 
-	const variantPriceText = (variant) =>
-		t('modelSelect.priceCredits', { n: formatPrice(getVariantPrice(variant)) });
+	const variantPriceText = (variant) => {
+		const meaning = priceMeaning(variant);
+		const price = getVariantPrice(variant);
+		const amount = meaning === 'next' || meaning === 'fresh' ? priceRange(price) : formatPrice(price);
+		return priceLabel(meaning, amount);
+	};
+
+	/** 區間用 en dash，兩端一樣時只寫一個數字。 */
+	const priceRange = (price) => {
+		if (!price || !price.isDynamic) return String((price && price.fixed) || 0);
+		return price.min === price.max ? String(price.min) : `${price.min}–${price.max}`;
+	};
+
+	/** 選中檔位下面那兩句。 */
+	const tierQuoteLines = computed(() => {
+		if (deepPrepOn.value) return [t('modelSelect.contextTierAgentNote')];
+		const variant = selectItem.value;
+		if (!variant || variant.billingType !== 'dynamic') return [];
+		const option = contextBudgetLevelOptions.value.find(o => o.value === formData.context);
+		if (!option || !option.quoteMin) return [];
+		const range = option.quoteMax && option.quoteMax !== option.quoteMin ? `${option.quoteMin}–${option.quoteMax}` : String(option.quoteMin);
+		const lines = [t(priceMeaning(variant) === 'next' ? 'modelSelect.tierNextTurn' : 'modelSelect.tierFirstTurn', { n: range })];
+		if (option.quoteFull && option.quoteFull > option.quoteMin) {
+			lines.push(t('modelSelect.tierFull', { tier: option.text, n: option.quoteFull }));
+		}
+		return lines;
+	});
+
 
 	/** 浮動的那條要講出處，否則「~」沒有來源。 */
 	/**
@@ -2030,4 +2076,11 @@ function composeModelDisplayName(variant, familyName) {
 		（含高消費確認）。
 	*/
 	defineExpose({ sure });
+
+	// 把玩家還沒確認的選擇告訴外殼：頂欄要寫出「從哪個模型換到哪個、價格變成多少」。
+	watch(() => [selectItem.value && selectItem.value.value, formData.context, deepPrepOn.value, selectItem.value && selectItem.value.estMinScore], () => {
+		const variant = selectItem.value;
+		if (!variant) return;
+		emit('draft', { value: variant.value, name: composeModelDisplayName(variant, variant.family), price: variantPriceText(variant), context: formData.context });
+	}, { immediate: true });
 </script>

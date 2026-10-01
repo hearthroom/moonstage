@@ -10,6 +10,8 @@ export interface ContextBudgetOption {
   quoteMax?: number
   /** 這段對話下一輪在這一檔大約扣的點數（畫面上的「約」）。 */
   quoteMin?: number
+  /** 對話長到吃滿這一檔以後，每輪大約扣的點數。 */
+  quoteFull?: number
 }
 
 export interface ContextBudgetLevelOption extends ContextBudgetOption {
@@ -119,12 +121,14 @@ const normalizeOption = (
   // 每一檔的估價（伺服器依這段對話與模型實際的回報口徑算的）：quoteMin＝約、quoteMax＝常見最高。
   const quoteMin = Number(item?.quoteMin)
   const quoteMax = Number(item?.quoteMax)
+  const quoteFull = Number(item?.quoteFull)
   return {
     text,
     value,
     ...(normalizedTokens ? { tokens: normalizedTokens } : {}),
     ...(Number.isFinite(quoteMax) && quoteMax > 0 ? { quoteMax } : {}),
     ...(Number.isFinite(quoteMin) && quoteMin > 0 ? { quoteMin } : {}),
+    ...(Number.isFinite(quoteFull) && quoteFull > 0 ? { quoteFull } : {}),
   }
 }
 

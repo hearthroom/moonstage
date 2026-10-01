@@ -149,6 +149,7 @@
         :model-name="formData.selectModelName"
         :score-text="modelScoreText"
         :score-dynamic="modelScoreDynamic"
+        :score-label="modelScoreLabel"
         :context-value="formData.context"
         :thinking-depth="formData.thinkingDepth"
         :show-thinking-process="formData.showThinkingProcess !== false"
@@ -508,7 +509,7 @@ import {
   createPanelState, toggleMore, closeMore, openSheet, closeSheet, onEscape,
   type CanvasPanelState, type CanvasSheet,
 } from './canvas-panel-state'
-import { findVariant, resolveVariant, scoreParts } from './canvas-model-catalog'
+import { findVariant, resolveVariant, scoreParts, priceMeaning } from './canvas-model-catalog'
 import { resolveStoredModel, composeModelDisplayName, createModelLookup } from './canvas-model-lanes'
 import { contextUsageDisplayForRow, contextBudgetTokens } from './canvas-context-usage'
 import {
@@ -9656,10 +9657,21 @@ watch(selectedVariant, (variant) => {
 const modelScoreOpts = computed(() => ({ context: Number(formData.context) || 1, thinkingDepth: String(formData.thinkingDepth || '') }))
 const modelScoreText = computed(() => scoreParts(selectedVariant.value, modelScoreOpts.value).text)
 const modelScoreDynamic = computed(() => scoreParts(selectedVariant.value, modelScoreOpts.value).dynamic)
+// 動態計價的價格要說清楚是什麼：這段對話的下一輪，還是還沒聊過的卡依全站估的第一輪。
+// 跟模型選單用同一組字（priceMeaning），頂欄與選單才不會各說各話。
+const modelScoreLabel = computed(() => {
+  const text = modelScoreText.value
+  if (!text) return ''
+  const meaning = priceMeaning(selectedVariant.value)
+  if (meaning === 'next') return t('modelSelect.priceNext', { n: text })
+  if (meaning === 'fresh') return t('modelSelect.priceFresh', { n: text })
+  return ''
+})
 const modelPanelLabels = computed(() => ({
   close: t('main.cancel'),
   done: t('main.sure'),
   perTurn: t('canvas.panel.perTurn'),
+  switchTo: t('canvas.panel.switchTo'),
   contextTitle: t('modelSelect.contextBudgetShort'),
   contextHint: t('canvas.panel.contextHint'),
   thinkingTitle: t('modelSelect.thinkingDepth'),

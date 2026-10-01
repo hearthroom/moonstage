@@ -228,6 +228,24 @@ export function scoreParts(variant?: ModelVariantLike | null, opts: ScoreContext
   return { text: '', dynamic: false }
 }
 
+/**
+ * 這個價格是什麼意思。畫面上的數字一定要跟著這個說明一起出現，否則「約 331」沒人看得懂。
+ *
+ *   next      依這段對話目前的長度估的下一輪（伺服器 estSource=conversation）
+ *   fresh     這張卡還沒聊過：依全站近期的用量估的第一輪（estSource=model）
+ *   estimate  其他估算來源（舊目錄）：只能說是估算
+ *   fixed     固定計價，數字就是每輪扣的點數
+ */
+export type PriceMeaning = 'next' | 'fresh' | 'estimate' | 'fixed'
+
+export function priceMeaning(variant?: ModelVariantLike | null): PriceMeaning {
+  if (!variant || variant.billingType !== 'dynamic') return 'fixed'
+  const source = (variant as any).estSource
+  if (source === 'conversation') return 'next'
+  if (source === 'model') return 'fresh'
+  return 'estimate'
+}
+
 export function formatScore(variant?: ModelVariantLike | null, opts: ScoreContext = {}): string {
   return scoreParts(variant, opts).text
 }
