@@ -9606,6 +9606,19 @@ function onConfirmOk() {
 // 不另外抄一份到別的狀態裡（兩份遲早會各說各話）。
 const modelGroups = ref<any[]>([])
 
+/*
+  每一輪結束後重抓一次目錄：輸入區與模型設定上的「下一輪約 …」是依這段對話目前的
+  長度與最近幾輪的實際用量估的，對話長了一輪，估價就該跟著變。不重抓的話要玩家
+  自己重新整理頁面才會更新（owner 2026-10-02）。等一秒再抓，讓伺服器先把這一輪記下來。
+*/
+let catalogAfterTurn: ReturnType<typeof setTimeout> | null = null
+watch(() => isGenerating.value, (now, before) => {
+  if (!before || now) return
+  if (catalogAfterTurn) clearTimeout(catalogAfterTurn)
+  catalogAfterTurn = setTimeout(() => { catalogAfterTurn = null; loadModelCatalog() }, 1000)
+})
+onUnmounted(() => { if (catalogAfterTurn) clearTimeout(catalogAfterTurn) })
+
 async function loadModelCatalog(retryLeft = 1) {
   try {
     const res = await _this.http.get(_this.requestUrl.getModelListV2, {

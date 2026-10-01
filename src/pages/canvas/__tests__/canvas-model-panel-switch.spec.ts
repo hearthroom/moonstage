@@ -46,3 +46,17 @@ describe('模型設定頂欄：換模型時寫出從哪個換到哪個', () => {
     expect(w.find('.mp-info-row.is-next').text()).toContain('128K')
   })
 })
+
+import fs from 'node:fs'
+import path from 'node:path'
+
+// 「下一輪約 …」依這段對話目前的長度估，每一輪結束後畫布要重抓一次目錄，
+// 不能等玩家重新整理頁面（owner 2026-10-02）。
+describe('每輪結束後重抓估價', () => {
+  it('回覆結束（生成中 → 不在生成）時重抓模型目錄', () => {
+    const src = fs.readFileSync(path.join(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
+    const block = src.slice(src.indexOf('watch(() => isGenerating.value, (now, before) => {'))
+    expect(block.length).toBeGreaterThan(0)
+    expect(block.slice(0, 300)).toMatch(/if \(!before \|\| now\) return[\s\S]*loadModelCatalog\(\)/)
+  })
+})
