@@ -281,11 +281,11 @@
 									<div class="ms-radio" :class="{ 'is-on': formData.selectModel === variant.value }"></div>
 									<span class="ms-opt-name">{{ optionLabelFor(detailFamily, variant) }}</span>
 									<!-- 官方／實惠是伺服器下發的標籤（自己接的線路手動配，OpenRouter 依開發商
-										 自家供貨判定）。實惠用強調色：在意價格的玩家要一眼找得到它。 -->
+										 自家供貨判定）。實惠用金色、官方用藍色，一眼分得開。 -->
 									<div
 										v-if="laneTagOf(variant)"
 										class="ms-badge"
-										:class="{ 'is-accent': laneTagOf(variant) === 'value' }">
+										:class="{ 'is-accent': laneTagOf(variant) === 'value', 'is-official': laneTagOf(variant) === 'official' }">
 										<span class="ms-badge-text">{{ t(laneTagOf(variant) === 'official' ? 'modelSelect.laneOfficial' : 'modelSelect.laneValue') }}</span>
 									</div>
 									<!-- 上游供應商此刻掛著的折扣。扣費是跟著它走的（server 端用供應商現價
@@ -390,7 +390,7 @@
 	const stageHost = useStageHost()
 	import { CanvasInput } from '@/pages/canvas/components/canvas-field'
 	import { variantPrice } from '@/pages/canvas/canvas-model-catalog'
-	import { visibleLanes, hiddenLaneCount, laneTagOf } from '@/pages/canvas/canvas-model-lanes'
+	import { visibleLanes, hiddenLaneCount, laneTagOf, isDeadLane } from '@/pages/canvas/canvas-model-lanes'
 	import icon_deepseek from '@/static/icon/models/deepseek.png';
 	import icon_gpt from '@/static/icon/models/gpt.png';
 	import icon_claude from '@/static/icon/models/claude.png';
@@ -696,7 +696,7 @@
 		const variants = getFilteredVariants(family);
 		if (!variants || variants.length === 0) return null;
 		const selected = variants.find(v => v.value === formData.selectModel);
-		return selected || variants[0];
+		return selected || variants.find(v => !isDeadLane(v)) || variants[0];
 	};
 
 	const getVariantMetrics = (variant) => {
@@ -1109,6 +1109,14 @@ const truncationText = (completionRate: number) => {
 		// 才發作（見 dedupeFamilies 的註解）。
 		let families = dedupeFamilies(
 			mergeFreeModelFamilies(filteredFamilies.value, t('modelSelect.freeModelName')));
+
+		// 每一條線路都壞掉的模型整列不出現：點進去沒有一條用得了。玩家正在用的例外，
+		// 他得看得到自己現在選的是什麼。
+		families = families.filter(f => {
+			const variants = f.variants || [];
+			if (variants.some(v => v.value === formData.selectModel)) return true;
+			return variants.length === 0 || variants.some(v => !isDeadLane(v));
+		});
 
 		const q = String(searchQuery.value || '').trim().toLowerCase();
 		if (q) {

@@ -11,6 +11,7 @@ import {
   LANE_VISIBLE_LIMIT,
   buildFamilyList,
   laneTagOf,
+  isDeadLane,
   isFamilySelected,
   primaryVariant,
   visibleLanes,
@@ -144,6 +145,35 @@ describe('線路收合：自己接的在前，名冊補位到四條', () => {
   it('沒有線路也不炸', () => {
     expect(visibleLanes(null, '', false)).toEqual([])
     expect(hiddenLaneCount(undefined, '', false)).toBe(0)
+  })
+})
+
+describe('壞掉的線路不列出來', () => {
+  const dead = (value: string, extra: any = {}) =>
+    ({ value, laneAutoListed: true, status: { uptime: { percent24h: 0, samples24h: 90 } }, ...extra }) as any
+  const ok = (value: string, extra: any = {}) =>
+    ({ value, laneAutoListed: true, status: { uptime: { percent24h: 99, samples24h: 90 } }, ...extra }) as any
+
+  it('近 24 小時幾乎沒有成功、樣本又夠的才算壞；樣本不足不下結論', () => {
+    expect(isDeadLane(dead('a'))).toBe(true)
+    expect(isDeadLane({ status: { uptime: { percent24h: 0, samples24h: 3 } } })).toBe(false)
+    expect(isDeadLane({ status: { uptime: { percent24h: 40, samples24h: 90 } } })).toBe(false)
+    expect(isDeadLane({})).toBe(false)
+  })
+
+  it('壞掉的官方不拿來補位，改補下一家活著的官方', () => {
+    const lanes = [
+      { value: 'relay', laneTag: 'value' } as any,
+      ok('cheap'), dead('dead-official', { laneTag: 'official' }), ok('ok2'), ok('alive-official', { laneTag: 'official' }),
+    ]
+    expect(visibleLanes(lanes, '', false).map((v: any) => v.value)).toEqual(['relay', 'cheap', 'ok2', 'alive-official'])
+    expect(visibleLanes(lanes, '', true).map((v: any) => v.value)).not.toContain('dead-official')
+    expect(hiddenLaneCount(lanes, '', false)).toBe(0)
+  })
+
+  it('玩家正在用的那條就算壞了也看得到', () => {
+    const lanes = [ok('a'), dead('b')]
+    expect(visibleLanes(lanes, 'b', false).map((v: any) => v.value)).toEqual(['a', 'b'])
   })
 })
 

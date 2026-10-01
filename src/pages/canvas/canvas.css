@@ -2665,6 +2665,12 @@
     color: var(--lt-canvas-accent);
   }
 
+  .ms-badge.is-official {
+    border-color: var(--lt-canvas-official);
+    background: var(--lt-canvas-official-bg);
+    color: var(--lt-canvas-official);
+  }
+
   /* 狀態燈：只有例外態才亮 */
   .ms-dot {
     flex: 0 0 auto;
