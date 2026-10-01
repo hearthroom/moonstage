@@ -441,6 +441,7 @@ import { bindBubbleFit } from './canvas-bubble-fit'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
 import { clearPendingReplyPhase, insertBeforePendingReply, markPendingReplyPhase, pendingReplyLabel } from './canvas-pending-reply'
+import { createOutcomeUnconfirmedHold } from './outcome-unconfirmed-hold'
 
 // ── Open Canvas ─────────────────────────────────────────────────
 import '@/common/canvas-theme-vars.css'
@@ -753,8 +754,9 @@ let thinkingPhraseTimer: ReturnType<typeof setInterval> | null = null
 let slowWaitGiveUpTimer: ReturnType<typeof setTimeout> | null = null
 // 安撫可以久，但不能無限。產品邊界：五分鐘內必須有結果（I-1）。
 const SLOW_WAIT_GIVE_UP_MS = 5 * 60 * 1000
-// 第一次壓住「結果還在確認中」的時間點。超過五分鐘才真的讓它宣告。
-let outcomeUnconfirmedSuppressedAt = 0
+// 一輪進行中壓住「結果還在確認中」，超過五分鐘才真的讓它宣告。起點綁在那一輪上，
+// 換一輪就重新計時（見 outcome-unconfirmed-hold.ts）。
+const outcomeUnconfirmedHold = createOutcomeUnconfirmedHold<PendingChatTurn>(SLOW_WAIT_GIVE_UP_MS)
 
 // 從兩個詞池各挑一個拼成一句。每語言各自帶模板——{A}{B} 的中文語序
 // 直接套到英文會產生不通順的句子。
@@ -806,7 +808,7 @@ function enterSlowWait(capturedPending: PendingChatTurn, storedDraft: string) {
 }
 
 function exitSlowWait() {
-  outcomeUnconfirmedSuppressedAt = 0;
+  outcomeUnconfirmedHold.reset();
   if (slowWaitGiveUpTimer) { clearTimeout(slowWaitGiveUpTimer); slowWaitGiveUpTimer = null }
   if (thinkingPhraseTimer) { clearInterval(thinkingPhraseTimer); thinkingPhraseTimer = null }
   thinkingPhrase.value = ''
@@ -5504,12 +5506,8 @@ function announceOutcomeUnconfirmed() {
   // 改成：只要這一輪還在進行中就自己記時並放行等待，直到超過產品邊界的五分鐘
   // （I-1）才真的宣告。這樣三條路徑（輪詢耗盡、身分對帳、確認逾時）都被擋住，
   // 而「不能永遠停在等待」的性質仍然成立。
-  if (pendingChatTurn) {
-    const now = Date.now();
-    if (!outcomeUnconfirmedSuppressedAt) outcomeUnconfirmedSuppressedAt = now;
-    if (now - outcomeUnconfirmedSuppressedAt < SLOW_WAIT_GIVE_UP_MS) return;
-  }
-  outcomeUnconfirmedSuppressedAt = 0;
+  if (outcomeUnconfirmedHold.shouldHold(pendingChatTurn, Date.now())) return;
+  outcomeUnconfirmedHold.reset();
   if (markPendingOutcomeUnconfirmed()) return;
   // 轉換失敗有兩種完全不同的成因，不能都退回 toast：
   //   (a) 根本沒有佔位氣泡可轉（例如劇情回溯不產生 AI 氣泡）→ 才該說「還在確認」
@@ -5911,6 +5909,12 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
         store.commit('setCompactStatus', 'compacting');
         console.log('[AutoCompact] 伺服端觸發壓縮，原因:', event.data.reason);
         startCompactWatchdog();
+        // 和 prepStep 同理：整理劇情跑一兩分鐘，那段期間伺服器還沒寫任何東西。
+        // 不把它算成伺服器活著，15 秒等不到「已寫入」就會開始追問結果，最後在
+        // 「整理劇情中…」上面再跳一張「結果還在確認中」（owner 2026-10-01）。
+        if (pendingChatTurn) {
+          chatTransport.noteServerStreamProgress(pendingChatTurn, 'durable_operation');
+        }
         // 等回覆的那顆氣泡留著，只把標籤換成「整理劇情中…」。這裡先前是拿掉它、「交給 pill」，
         // 但那顆 pill 從 mobile 分出來時就沒有搬過來：整理劇情加上讀長上下文的那一兩分鐘，
         // 回覆那一側什麼都沒有，玩家以為卡住（owner 2026-09-23）。伺服器每 15 秒重送一次，
