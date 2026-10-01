@@ -2470,6 +2470,26 @@
       border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  /* 上下文檔位帶報價時兩行：檔位在上、「最多 N」在下。 */
+  .ms-pill.has-quote {
+    flex-direction: column;
+    gap: 0;
+    padding: 4px 12px;
+  }
+
+  .ms-pill-sub {
+    font-size: 10px;
+    line-height: 14px;
+    color: var(--lt-canvas-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ms-pill-tag {
+    padding-left: 4px;
+    font-size: 10px;
+    color: var(--lt-canvas-accent);
+  }
+
   .ms-chip.is-on,
   .ms-pill.is-on {
     border-color: var(--lt-canvas-accent);

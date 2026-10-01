@@ -163,6 +163,12 @@
   .ms-pill {
     padding: 0 12px
 }
+.ms-pill.has-quote {
+    padding: 4px 12px
+}
+.ms-pill-tag {
+    padding-left: 4px
+}
 .ms-card {
     padding: 12px
 }

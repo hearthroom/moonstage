@@ -79,3 +79,42 @@ it('hides a model whose every lane is dead, unless the player is using it', asyn
     expect(names(using)).toContain('Claude Sonnet 4.5')
   } finally { using.unmount() }
 })
+
+it('shows each tier ceiling and prices the lane at the chosen tier', async () => {
+  const live = JSON.parse(JSON.stringify((await import('../../pages/canvas/__tests__/fixtures/model-catalog-live.json')).default))
+  const deepseek = live[0].families.find((f: any) => f.family === 'DeepSeek V4 Flash')
+  const lane = deepseek.variants[2]
+  const quotes = [
+    { value: 1, tokens: 64000, text: '64K', quoteMin: 12, quoteMax: 186 },
+    { value: 2, tokens: 96000, text: '96K', quoteMin: 30, quoteMax: 310 },
+    { value: 3, tokens: 128000, text: '128K', quoteMin: 40, quoteMax: 693 },
+  ]
+  deepseek.variants.forEach((v: any) => { v.isCacheStable = true; v.contextBudgetOptions = quotes })
+  const get = vi.fn(async (url: string) => url === '/models'
+    ? { statusCode: 200, data: live }
+    : { statusCode: 200, data: [] })
+  const wrapper = shallowMount(ModelSelectPanel, {
+    props: { open: true, roleId: 'fixture-role', selectModel: lane.value },
+    global: { config: { globalProperties: { http: { get }, requestUrl: { playerAgentMode: '/agent-mode', getModelListV2: '/models' } } } },
+  })
+  try {
+    await flushPromises()
+    const pills = wrapper.findAll('.ms-pill.token')
+    expect(pills).toHaveLength(3)
+    expect(pills.every(p => p.find('.ms-pill-sub').exists())).toBe(true)
+    expect(pills[0].text()).toContain('modelSelect.contextTierRecommended')
+    expect(pills[1].text()).not.toContain('modelSelect.contextTierRecommended')
+    const vm = wrapper.vm as any
+    expect(vm.getVariantPrice(lane)).toMatchObject({ min: 12, max: 186 })
+    await pills[2].trigger('click')
+    expect(vm.getVariantPrice(lane)).toMatchObject({ min: 40, max: 693 })
+
+    vm.deepPrepEnabled = true
+    vm.deepPrepRuntimeEnabled = true
+    vm.deepPrepModelSupported = true
+    await flushPromises()
+    expect(vm.deepPrepOn).toBe(true)
+    expect(wrapper.find('.ms-pill-sub').exists()).toBe(false)
+    expect(wrapper.text()).toContain('modelSelect.contextTierAgentNote')
+  } finally { wrapper.unmount() }
+})

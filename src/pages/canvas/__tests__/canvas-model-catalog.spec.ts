@@ -14,6 +14,7 @@ import {
   resolveVariant,
   formatScore,
   scoreParts,
+  variantPrice,
 } from '../canvas-model-catalog'
 
 const STATIC_VALUE = 'deepseek-v4-flash-ripple'
@@ -134,5 +135,25 @@ describe('每輪點數跟著上下文檔位', () => {
   it('動態計價的區間不乘檔位（估算已經是該檔位的）', () => {
     const v = { value: 'grok', billingType: 'dynamic', estMinScore: 269, estMaxScore: 823 } as any
     expect(scoreParts(v, { context: 5 })).toEqual({ text: '269–823', dynamic: true })
+  })
+})
+
+describe('每一檔的報價', () => {
+  const quoted = {
+    value: 'x', billingType: 'dynamic', estMinScore: 10, estMaxScore: 50, estSource: 'conversation',
+    contextBudgetOptions: [
+      { value: 1, text: '64K', quoteMin: 12, quoteMax: 186 },
+      { value: 3, text: '128K', quoteMin: 40, quoteMax: 693 },
+    ],
+  } as any
+
+  it('選了哪一檔就用那一檔的報價，不必等重新抓目錄', () => {
+    expect(variantPrice(quoted, { context: 1 })).toMatchObject({ min: 12, max: 186 })
+    expect(variantPrice(quoted, { context: 3 })).toMatchObject({ min: 40, max: 693 })
+  })
+
+  it('那一檔沒有報價時退回目錄給的區間', () => {
+    expect(variantPrice(quoted, { context: 2 })).toMatchObject({ min: 10, max: 50 })
+    expect(variantPrice({ ...quoted, contextBudgetOptions: undefined }, { context: 3 })).toMatchObject({ min: 10, max: 50 })
   })
 })
