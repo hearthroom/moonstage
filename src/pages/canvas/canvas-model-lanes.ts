@@ -196,3 +196,26 @@ export function resolveStoredModel(
   }
   return empty
 }
+
+/**
+ * 「已存的代號 → 畫面上的線路」查表，對同一份目錄只攤平一次。
+ *
+ * 每則 AI 回覆底下的上下文 chip 都要查它用的模型；串流中每個 chunk 都讓整串重畫。
+ * 每次都從頭查是「則數 × chunk 數」次把整份目錄（幾百條線路）攤平：2026-10-01 手機模擬
+ * （6 倍降速）一輪生成主執行緒 159 秒裡有 72 秒花在這裡。目錄換了就換一張新表。
+ */
+export function createModelLookup(groups: ModelGroupLike[] | null | undefined): (stored: string) => FlatVariant | null {
+  const memo = new Map<string, FlatVariant | null>()
+  let exact: Map<string, FlatVariant> | null = null
+  return (stored: string) => {
+    const key = String(stored || '')
+    if (memo.has(key)) return memo.get(key)!
+    if (!exact) {
+      exact = new Map()
+      for (const v of flattenVariants(groups)) if (!exact.has(v.value)) exact.set(v.value, v)
+    }
+    const hit = exact.get(key) || resolveStoredModel(groups, key).variant
+    memo.set(key, hit)
+    return hit
+  }
+}

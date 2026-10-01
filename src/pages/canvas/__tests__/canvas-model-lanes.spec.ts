@@ -16,7 +16,9 @@ import {
   hiddenLaneCount,
   composeModelDisplayName,
   resolveStoredModel,
+  createModelLookup,
 } from '../canvas-model-lanes'
+import { resolveVariant } from '../canvas-model-catalog'
 
 const CLAUDE_BASE = 'relay-claude-sonnet-4-5'
 const CLAUDE_RIPPLE = 'relay-claude-sonnet-4-5-ripple'
@@ -159,5 +161,38 @@ describe('已存的模型代號換算', () => {
     expect(resolveStoredModel(live as any, '不存在的模型')).toEqual({ variant: null, family: null, exact: false })
     expect(resolveStoredModel(live as any, '')).toEqual({ variant: null, family: null, exact: false })
     expect(resolveStoredModel(null, CLAUDE_BASE)).toEqual({ variant: null, family: null, exact: false })
+  })
+})
+
+/*
+  2026-10-01：串流中每個 chunk 整串重畫，每則 AI 回覆都查一次它的模型。每次都把整份目錄攤平，
+  手機上一輪生成有一半的主執行緒時間花在這裡。查表要對同一份目錄只走一遍。
+*/
+describe('按目錄記住的模型查表', () => {
+  function counting(groups: any[]) {
+    let reads = 0
+    const wrap = (v: any): any => (v && typeof v === 'object'
+      ? new Proxy(v, { get(t, k, r) { reads++; return wrap(Reflect.get(t, k, r)) } })
+      : v)
+    return { groups: wrap(groups), reads: () => reads }
+  }
+
+  it('跟逐次查（精確代號優先、再換算基礎代號）結果相同', () => {
+    const lookup = createModelLookup(live as any)
+    for (const code of [CLAUDE_RIPPLE, CLAUDE_BASE, CLAUDE_STABLE1, 'relay-claude-sonnet-4', '不存在的模型', '']) {
+      const expected = resolveVariant(live as any, code) || resolveStoredModel(live as any, code).variant
+      expect(lookup(code)?.value ?? null, code).toBe(expected?.value ?? null)
+    }
+    expect(createModelLookup(null)(CLAUDE_BASE)).toBe(null)
+  })
+
+  it('同一份目錄查幾百次，目錄只走一遍', () => {
+    const c = counting(live as any)
+    const lookup = createModelLookup(c.groups)
+    lookup(CLAUDE_RIPPLE)
+    lookup(CLAUDE_BASE)
+    const afterFirst = c.reads()
+    for (let i = 0; i < 300; i++) { lookup(CLAUDE_RIPPLE); lookup(CLAUDE_BASE) }
+    expect(c.reads()).toBe(afterFirst)
   })
 })

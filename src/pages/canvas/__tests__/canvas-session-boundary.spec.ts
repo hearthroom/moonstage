@@ -51,7 +51,9 @@ describe('長按', () => {
       setTimer: (f, ms) => { fn = f; scheduled = ms; return 1 },
       clearTimer: () => { fn = null },
     })
-    return { handle, fire: () => fn && fn(), scheduledMs: () => scheduled, triggered }
+    // 到期後還會讓出一個 tick（排隊中的放開／滑開先算）才觸發：fire 把那一個 tick 一起跑完。
+    const fire = () => { for (let i = 0; i < 2 && fn; i++) { const f = fn; fn = null; f() } }
+    return { handle, fire, scheduledMs: () => scheduled, triggered }
   }
 
   const touch = (x: number, y: number) => ({ touches: [{ clientX: x, clientY: y }] } as any)
