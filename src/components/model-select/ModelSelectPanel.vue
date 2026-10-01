@@ -75,8 +75,8 @@
 						<span class="ms-pill-text">
 							{{ item.text }}<span v-if="item.isFloor" class="ms-pill-tag">{{ t('modelSelect.contextTierRecommended') }}</span>
 						</span>
-						<!-- 這一檔一輪最多扣多少。一般對話以它封頂，所以它是承諾，不是估計。
-							 Agent 模式一輪會呼叫多次模型，不受這個上限限制，那時不顯示。 -->
+						<!-- 這一檔一輪大約最多扣多少。用我們自己的分詞估算，實際照模型回報的用量扣，
+							 不封頂。Agent 模式一輪會呼叫多次模型，估算對它沒意義，那時不顯示。 -->
 						<span v-if="item.quoteMax && !deepPrepOn" class="ms-pill-sub">
 							{{ t('modelSelect.contextTierQuoteMax', { n: item.quoteMax }) }}
 						</span>

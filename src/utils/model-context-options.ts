@@ -6,7 +6,7 @@ export interface ContextBudgetOption {
   name?: string
   value: number
   tokens?: number
-  /** 這一檔一輪最多扣的點數（一般對話以它封頂）。 */
+  /** 這一檔一輪大約最多扣的點數。估算，實際照模型回報的用量扣。 */
   quoteMax?: number
   /** 這段對話下一輪在這一檔大約扣的點數。 */
   quoteMin?: number
@@ -116,7 +116,7 @@ const normalizeOption = (
     ? '168K'
     : String(explicitText || formatBudgetText(value, normalizedTokens))
 
-  // 每一檔的報價（伺服器依這段對話算的）：quoteMax 是這一檔一輪最多扣的點數。
+  // 每一檔的報價（伺服器依這段對話算的）：quoteMax 是這一檔一輪大約最多扣的點數（估算，不封頂）。
   const quoteMin = Number(item?.quoteMin)
   const quoteMax = Number(item?.quoteMax)
   return {
