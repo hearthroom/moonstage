@@ -434,8 +434,6 @@ export function uptimeBucketTone(bucket: any): 'none' | 'green' | 'amber' | 'red
 
 /** 樣本不足時整列不出現，不寫一個「100%（3 筆）」去誤導。 */
 export const UPTIME_MIN_SAMPLES_24H = 20
-/** 只在「剛從故障恢復」時追加 72h：24h 明顯比 72h 好。反向落差由燈號負責，不重複講。 */
-export const UPTIME_72H_DELTA_POINTS = 1.0
 
 export interface LaneMetrics {
   /** 沒有真實對話撐起來的數字。首字與完整回覆率同源，要空一起空。 */
@@ -499,17 +497,14 @@ export function laneMetrics(status: any): LaneMetrics {
 
 export interface DetailMetrics {
   usage: { rank: number; total: number; share: number } | null
-  uptime: { percent24h: number; percent72h: number | null } | null
 }
 
 /**
- * 展開層 KV 區的值。**列組是固定的**——沒有資料的列回 null 讓呼叫端畫「—」，
- * 而不是整列消失：列會忽有忽無的話，同一個位置在不同卡片上是不同的東西，
- * 跨卡片比較就沒了，而那正是選兩欄 KV 的理由。
+ * 展開層 KV 區的值。沒有資料回 null，讓呼叫端畫「—」而不是整列消失。
  *
- * 唯一會整列消失的是可用率，因為樣本不足時那個數字是誤導而不是缺漏。
+ * 可用率不在這裡：每條線路列上已經各自寫了，展開層再寫一次是重複（owner 2026-10-02）。
  */
-export function detailMetrics(family: Family | null | undefined, primary: Variant | null): DetailMetrics {
+export function detailMetrics(family: Family | null | undefined): DetailMetrics {
   const f = family || {}
   const rank = finite(f.usageRank)
   const usage = rank !== null && rank > 0
@@ -522,18 +517,5 @@ export function detailMetrics(family: Family | null | undefined, primary: Varian
     }
     : null
 
-  const up = (primary && primary.status && primary.status.uptime) || null
-  let uptime: DetailMetrics['uptime'] = null
-  if (up) {
-    const p24 = finite(up.percent24h)
-    const s24 = finite(up.samples24h) || 0
-    if (p24 !== null && s24 >= UPTIME_MIN_SAMPLES_24H) {
-      const p72 = finite(up.percent72h)
-      // 只有「24h 明顯比 72h 好」才追加——那句話的意思是「這條線路最近才剛恢復」。
-      const worthShowing72h = p72 !== null && p72 <= p24 - UPTIME_72H_DELTA_POINTS
-      uptime = { percent24h: p24, percent72h: worthShowing72h ? p72 : null }
-    }
-  }
-
-  return { usage, uptime }
+  return { usage }
 }

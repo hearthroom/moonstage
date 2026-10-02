@@ -29,10 +29,8 @@ describe('chat modelSelect AA intelligence chip (desktop, mirrors mobile feat/aa
     expect(source).toMatch(/const rowMetaFor[\s\S]*?getIntelligenceIndex\(family, primary\)/)
     expect(source).toContain("t('modelSelect.metricIntelligence')")
 
-    // 出處從三行「各自標註」合併成一行墊底（2026-08-27 版面改版）：原本 121 字的
-    // 灰字區裡有 45 字在講出處，而「來源」兩個字重複了三次。出處是可信度需求，
-    // 不是掃視需求——要有，但不該跟數據搶同一個字級。
-    expect(source).toContain("t('modelSelect.metricsSource')")
+    // 出處整行拿掉（owner 2026-10-02：這頁不是論文，用量一列自己就說清楚了）。
+    expect(source).not.toContain("t('modelSelect.metricsSource')")
     expect(source).not.toContain("t('modelSelect.aaIntelligenceSource')")
     expect(source).not.toMatch(/family\.expanded\s*&&\s*getIntelligenceIndex/)
   })
@@ -82,8 +80,6 @@ describe('chat modelSelect AA intelligence chip (desktop, mirrors mobile feat/aa
     expect(source).toMatch(/v-for="row in detailRowsFor\(detailFamily\)"/)
     // 沒有資料畫「—」，不是整列消失
     expect(source).toMatch(/row\.value \|\| '—'/)
-    // 出處只剩一行
-    expect(source).toContain("t('modelSelect.metricsSource')")
     expect(source).not.toMatch(/v-if="getAgenticIndex\(detailFamily[\s\S]{0,80}class="ms-kv"/)
 
     // 綜合智力不再重複：收合列的指標帶已經有了，展開只給新東西
@@ -120,12 +116,8 @@ describe('chat modelSelect AA intelligence chip (desktop, mirrors mobile feat/aa
       'modelSelect.metricPopularity',
       'modelSelect.usageRankValue',
       'modelSelect.usageRankDetail',
-      'modelSelect.metricsSource',
       'modelSelect.metricTruncation',
       'modelSelect.laneNoUsageData',
-      'modelSelect.metricUptime',
-      'modelSelect.uptimeValue',
-      'modelSelect.uptimeValueWith72h',
     ]
     for (const locale of locales) {
       const dict = locale.default as Record<string, string>

@@ -365,13 +365,12 @@
 								 列會忽有忽無的話，同一個位置在不同卡片上是不同的東西，
 								 跨卡片比較就沒了——而那正是選 KV 的理由。
 								 綜合智力不在這裡：收合列的指標帶已經有了，展開只給新東西。 -->
-							<!-- 用量與可用率各一列，左標右值。不另開「評測與用量」標題：兩列自己就說清楚了。
-								 （並排成兩格試過：用量那個值太長，半格放不下會折行。） -->
+							<!-- 用量一列，左標右值。不另開標題、不寫出處：這一列自己就說清楚了。
+								 可用率不在這裡——每條線路列上已經各寫了一次。 -->
 							<div v-for="row in detailRowsFor(detailFamily)" :key="row.key" class="ms-kv">
 								<span class="ms-kv-k">{{ t(row.labelKey) }}</span>
 								<span class="ms-kv-v" :class="{ 'is-none': !row.value }">{{ row.value || '—' }}</span>
 							</div>
-							<span class="ms-src">{{ t('modelSelect.metricsSource') }}</span>
 						</div>
 					</template>
 				</div>
@@ -818,11 +817,11 @@ const truncationText = (completionRate: number) => {
 
 	/**
 	 * 展開層 KV 的列組。用量一列固定在，沒有資料的畫「—」。
-	 * 不放 Agent 表現與上下文：前者對角色扮演沒有參考價值，後者上面的檔位鍵已經寫了
-	 * （owner 2026-10-02）。
+	 * 不放 Agent 表現、上下文與可用率：第一個對角色扮演沒有參考價值，後兩個上面的
+	 * 檔位鍵與線路列已經寫了（owner 2026-10-02）。
 	 */
 	const detailRowsFor = (family) => {
-		const m = detailMetrics(family, getFamilyPrimaryVariant(family));
+		const m = detailMetrics(family);
 		const rows = [
 			{
 				key: 'usage', labelKey: 'modelSelect.metricPopularity',
@@ -831,17 +830,6 @@ const truncationText = (completionRate: number) => {
 				}) : '',
 			},
 		];
-		// 可用率是唯一會整列消失的：樣本不足時那個數字是誤導，不是缺漏。
-		if (m.uptime) {
-			rows.push({
-				key: 'uptime', labelKey: 'modelSelect.metricUptime',
-				value: m.uptime.percent72h === null
-					? t('modelSelect.uptimeValue', { p: pctText(m.uptime.percent24h) })
-					: t('modelSelect.uptimeValueWith72h', {
-						p24: pctText(m.uptime.percent24h), p72: pctText(m.uptime.percent72h),
-					}),
-			});
-		}
 		return rows;
 	};
 
@@ -1345,7 +1333,9 @@ const truncationText = (completionRate: number) => {
 				n: dyn.length,
 			});
 		}
-		return hint ? base + ' ' + hint : base;
+		if (!hint) return base;
+		// 中日文句號後面直接接下一句，不留空格；英韓文照常空一格。
+		return /[。！？]$/.test(base) ? base + hint : base + ' ' + hint;
 	};
 
 	/** 列的指標帶。桌面列更寬，所以比手機多一段吐字速度。 */

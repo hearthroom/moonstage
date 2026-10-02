@@ -2399,13 +2399,18 @@
     flex: 1 1 auto;
     padding: 0 16px;
     overscroll-behavior: contain;
+    /* 捲動區的下緣淡出，不在確定鍵上方切出一條硬邊。用遮罩淡掉內容本身，
+       不疊一層色塊：彈層底色是作者的卡決定的，疊色塊會跟它對不上。 */
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
   }
 
   .ms-sheet {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding-bottom: 8px;
+    /* 捲到底時最後一列要完整露出來，不能落在淡出的那 32px 裡 */
+    padding-bottom: 32px;
     font-family: var(--lt-canvas-font);
     color: var(--lt-canvas-sheet-fg);
   }

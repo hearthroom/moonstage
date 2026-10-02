@@ -670,35 +670,8 @@ describe('detailMetrics — 展開層的兩欄 KV', () => {
 
   it('全球用量保留名次不只給佔比', () => {
     // 收合列在 en 下第三段會被截斷，只給佔比的話英文使用者兩處都看不到名次。
-    const m = detailMetrics(fam({ usageRank: 17, usageTotal: 48, usageShare: 0.6 }), null)
+    const m = detailMetrics(fam({ usageRank: 17, usageTotal: 48, usageShare: 0.6 }))
     expect(m.usage).toEqual({ rank: 17, total: 48, share: 0.6 })
-  })
-
-  it('可用率樣本不足時整列不出現，不寫「100%（3 筆）」', () => {
-    const few = detailMetrics(fam(), { status: { uptime: { percent24h: 100, samples24h: 3 } } })
-    expect(few.uptime).toBeNull()
-
-    const enough = detailMetrics(fam(), { status: { uptime: { percent24h: 99.2, samples24h: 96 } } })
-    expect(enough.uptime).toMatchObject({ percent24h: 99.2 })
-  })
-
-  it('72h 只在「剛從故障恢復」時追加：24h 明顯比 72h 好才顯示', () => {
-    const recovered = detailMetrics(fam(), {
-      status: { uptime: { percent24h: 99.5, samples24h: 96, percent72h: 91.0, samples72h: 288 } },
-    })
-    expect(recovered.uptime?.percent72h).toBe(91.0)
-
-    // 落差不到 1 個百分點 → 沒有資訊量，不佔位
-    const steady = detailMetrics(fam(), {
-      status: { uptime: { percent24h: 99.5, samples24h: 96, percent72h: 99.1, samples72h: 288 } },
-    })
-    expect(steady.uptime?.percent72h).toBeNull()
-
-    // 反向落差（24h 比 72h 差）不特別標——燈號已經在講了
-    const degrading = detailMetrics(fam(), {
-      status: { uptime: { percent24h: 90.0, samples24h: 96, percent72h: 99.0, samples72h: 288 } },
-    })
-    expect(degrading.uptime?.percent72h).toBeNull()
   })
 })
 
@@ -707,12 +680,12 @@ describe('detailMetrics 的佔比要四捨五入到小數一位', () => {
   // 小數一位了，detailMetrics 卻直接吐原始浮點數——兩個函式對**同一個顯示值**各算
   // 一次，於是漂開。凡是會進畫面的數字，格式化只能有一個地方決定。
   it('原始浮點數不得直接進畫面', () => {
-    const m = detailMetrics({ family: 'X', variants: [], usageRank: 30, usageTotal: 48, usageShare: 0.32893907412701234 }, null)
+    const m = detailMetrics({ family: 'X', variants: [], usageRank: 30, usageTotal: 48, usageShare: 0.32893907412701234 })
     expect(m.usage?.share).toBe(0.3)
   })
 
   it('小數一位是刻意的：取整數會把 0.4% 變成 0%', () => {
-    const m = detailMetrics({ family: 'X', variants: [], usageRank: 40, usageTotal: 48, usageShare: 0.44 }, null)
+    const m = detailMetrics({ family: 'X', variants: [], usageRank: 40, usageTotal: 48, usageShare: 0.44 })
     expect(m.usage?.share).toBe(0.4)
   })
 })
