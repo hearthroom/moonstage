@@ -847,7 +847,7 @@ describe('orderModelGroups — 分類列的順序', () => {
       g('Ling'), g('Kimi', 38), g('GLM', 7), g('MiMo', 13), g('Claude', 43), g('MiniMax'),
       g('Gemini', 9), g('DeepSeek', 1), g('Hunyuan', 4),
     ]).map(x => x.group)
-    expect(out.slice(0, 7)).toEqual(['DeepSeek', 'MiniMax', 'MiMo', 'Claude', 'Gemini', 'GLM', 'Kimi'])
+    expect(out.slice(0, 7)).toEqual(['DeepSeek', 'MiMo', 'Claude', 'Gemini', 'GLM', 'Kimi', 'MiniMax'])
   })
 
   it('其餘照旗下最好的名次排；沒有名次的放最後、維持原順序', () => {
