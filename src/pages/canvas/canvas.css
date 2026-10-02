@@ -2234,6 +2234,7 @@
   }
 
   .mp-dock-row .mp-info-bar .mp-model-name {
+    flex: 0 1 auto;
     max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
@@ -3517,6 +3518,74 @@
 
     .ms-detail-desc {
       font-size: 13px;
+    }
+
+    /* 展開的模型：線路排成多欄方格，不是一長條——橫螢幕一屏就看得完整個模型
+       （owner 2026-10-02 平板截圖：一欄時整頁空著，線路要一直往下捲）。 */
+    .ms-opts {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 8px;
+      border: 0;
+      border-radius: 0;
+    }
+
+    .ms-opt {
+      border: 1px solid var(--lt-canvas-sheet-line);
+      border-radius: 12px;
+    }
+
+    .ms-opt + .ms-opt {
+      border-top-color: var(--lt-canvas-sheet-line);
+    }
+
+    .ms-opt.is-on {
+      border-color: var(--lt-canvas-accent);
+      box-shadow: none;
+    }
+
+    /* 欄頭在方格上方：靠左寫「線路 · 下一輪約」，不是對齊一個已經不存在的價格欄 */
+    .ms-lane-headrow {
+      justify-content: flex-start;
+      padding: 4px 0 0;
+    }
+
+    .ms-lane-headrow > .ms-eyebrow + .ms-eyebrow::before {
+      content: '· ';
+    }
+
+    /*
+       底部一塊在橫螢幕排成一行：設定鍵、現用模型、確定鍵並排。攤開的面板仍在它們上面，
+       佔滿整寬。直排兩行在寬螢幕上一半是空的。
+    */
+    .u-popup__content .model-setting-scope .bottom {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 16px;
+    }
+
+    .model-setting-scope .bottom .ms-dock-panel {
+      flex: 1 0 100%;
+    }
+
+    .mp-dock-chips-slot {
+      flex: 0 1 auto;
+    }
+
+    .mp-dock-row {
+      flex: 1 1 320px;
+    }
+
+    .mp-dock-row .mp-info-bar {
+      flex-direction: row;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mp-dock-row .mp-info-bar.is-switching {
+      flex-direction: column;
+      align-items: stretch;
     }
   }
 
