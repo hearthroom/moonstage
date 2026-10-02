@@ -700,25 +700,6 @@ describe('detailMetrics — 展開層的兩欄 KV', () => {
     })
     expect(degrading.uptime?.percent72h).toBeNull()
   })
-
-  it('Agent 表現沒有值時仍然回一列（值為 null），讓 KV 的列組固定', () => {
-    // 固定列組才能跨卡片比較——那正是選 KV 而不是 chips 的理由。
-    expect(detailMetrics(fam(), null).agentic).toBeNull()
-    expect(detailMetrics(fam({ aaAgenticIndex: 50 }), null).agentic).toBe(50)
-  })
-
-  it('上下文檔位給範圍', () => {
-    const m = detailMetrics(fam({ contextBudgetOptions: [
-      { text: '48K', value: 1, tokens: 48000 },
-      { text: '128K', value: 4, tokens: 128000 },
-    ] }), null)
-    expect(m.contextRange).toEqual({ min: '48K', max: '128K' })
-  })
-
-  it('只有一個檔位時 min === max，呼叫端自己決定顯示成一個還是一段', () => {
-    const m = detailMetrics(fam({ contextBudgetOptions: [{ text: '48K', value: 1, tokens: 48000 }] }), null)
-    expect(m.contextRange).toEqual({ min: '48K', max: '48K' })
-  })
 })
 
 describe('detailMetrics 的佔比要四捨五入到小數一位', () => {

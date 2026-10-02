@@ -118,7 +118,6 @@ describe('chat modelSelect AA intelligence chip (desktop, mirrors mobile feat/aa
     ])
     const keys = [
       'modelSelect.metricsTitle',
-      'modelSelect.metricAgentic',
       'modelSelect.metricPopularity',
       'modelSelect.usageRankValue',
       'modelSelect.usageRankDetail',
@@ -128,8 +127,6 @@ describe('chat modelSelect AA intelligence chip (desktop, mirrors mobile feat/aa
       'modelSelect.metricUptime',
       'modelSelect.uptimeValue',
       'modelSelect.uptimeValueWith72h',
-      'modelSelect.metricContext',
-      'modelSelect.contextRangeValue',
     ]
     for (const locale of locales) {
       const dict = locale.default as Record<string, string>

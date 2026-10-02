@@ -498,10 +498,8 @@ export function laneMetrics(status: any): LaneMetrics {
 }
 
 export interface DetailMetrics {
-  agentic: number | null
   usage: { rank: number; total: number; share: number } | null
   uptime: { percent24h: number; percent72h: number | null } | null
-  contextRange: { min: string; max: string } | null
 }
 
 /**
@@ -513,11 +511,6 @@ export interface DetailMetrics {
  */
 export function detailMetrics(family: Family | null | undefined, primary: Variant | null): DetailMetrics {
   const f = family || {}
-  const agentic = (() => {
-    const v = finite(f.aaAgenticIndex)
-    return v === null || v <= 0 ? null : v
-  })()
-
   const rank = finite(f.usageRank)
   const usage = rank !== null && rank > 0
     // 小數一位跟 getUsageRank 同一條規則：取整數會把 0.4% 變成 0%，
@@ -542,10 +535,5 @@ export function detailMetrics(family: Family | null | undefined, primary: Varian
     }
   }
 
-  const opts: any[] = Array.isArray(f.contextBudgetOptions) ? f.contextBudgetOptions : []
-  const contextRange = opts.length
-    ? { min: String(opts[0].text || ''), max: String(opts[opts.length - 1].text || '') }
-    : null
-
-  return { agentic, usage, uptime, contextRange }
+  return { usage, uptime }
 }

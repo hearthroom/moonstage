@@ -804,11 +804,14 @@ const truncationText = (completionRate: number) => {
 		return parts.join(' · ');
 	};
 
-	/** 展開層 KV 的列組。**固定四列**，沒有資料的畫「—」。 */
+	/**
+	 * 展開層 KV 的列組。用量一列固定在，沒有資料的畫「—」。
+	 * 不放 Agent 表現與上下文：前者對角色扮演沒有參考價值，後者上面的檔位鍵已經寫了
+	 * （owner 2026-10-02）。
+	 */
 	const detailRowsFor = (family) => {
 		const m = detailMetrics(family, getFamilyPrimaryVariant(family));
 		const rows = [
-			{ key: 'agentic', labelKey: 'modelSelect.metricAgentic', value: m.agentic === null ? '' : String(m.agentic) },
 			{
 				key: 'usage', labelKey: 'modelSelect.metricPopularity',
 				value: m.usage ? t('modelSelect.usageRankDetail', {
@@ -827,14 +830,6 @@ const truncationText = (completionRate: number) => {
 					}),
 			});
 		}
-		rows.push({
-			key: 'context', labelKey: 'modelSelect.metricContext',
-			value: m.contextRange
-				? (m.contextRange.min === m.contextRange.max
-					? m.contextRange.min
-					: t('modelSelect.contextRangeValue', m.contextRange))
-				: '',
-		});
 		return rows;
 	};
 
