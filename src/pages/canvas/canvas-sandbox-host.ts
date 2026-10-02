@@ -8,7 +8,7 @@
  * 差分：橋自己記「殼已經知道哪些訊息」，每次 sync() 讀一次宿主狀態，只送變化——
  * 新氣泡 message.new、內容長了 message.stream、定稿 message.done、消失 message.remove。
  * 訊息 id 給殼看的是 `h<宿主id>`（冷啟動的歷史）與 `l<n>`（之後長出來的），serverId 是宿主 id
- * （只有 AI 定稿後才給；玩家訊息永遠 null）——作者的契約說 id 不穩、持久化用 serverId。
+ * （只有 AI 定稿後才給；玩家訊息與開場白永遠 null）——作者的契約說 id 不穩、持久化用 serverId。
  *
  * 安全：只認 `event.source === iframe.contentWindow` 且 origin 相符的訊息；送出去也只送給
  * 那個 origin（不透明 origin 'null' 只能用 '*'，此時靠 source 核）。
@@ -116,6 +116,8 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   const visible = (snapshot: HudHostState = hud.read()): HudHostMessage[] => snapshot.messages.filter((m) => m.role !== 'system')
   const roleOf = (m: HudHostMessage): 'user' | 'ai' => (m.role === 'user' ? 'user' : 'ai')
   const finishedOf = (m: HudHostMessage) => m.role === 'user' || !!m.finished
+  // 開場白不給 serverId（同 MMD）：作者腳本拿「AI 訊息有 serverId」判斷已經聊過，開場白帶了就把開場動畫當成舊存檔跳過。
+  const serverIdOf = (m: HudHostMessage): string | null => (roleOf(m) === 'ai' && finishedOf(m) && !m.opening ? m.id : null)
   const hostIdOf = (shellId: string): string | null => {
     for (const [hostId, t] of tracked.entries()) if (t.shellId === shellId) return hostId
     return null
@@ -129,7 +131,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       id: shellId,
       role: roleOf(m),
       content: m.text,
-      serverId: roleOf(m) === 'ai' && finished ? m.id : null,
+      serverId: serverIdOf(m),
       state: finished ? 'done' : (m.text ? 'streaming' : 'pending'),
       view: viewOf(m),
     }
@@ -219,7 +221,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
         tracked.set(m.id, { shellId, role: roleOf(m), content: m.text, finished, viewKey: viewKeyOf(m) })
         const before = nextKnown[index]
         post(before ? { type: 'message.new', message: toShell(m, shellId), before } : { type: 'message.new', message: toShell(m, shellId) })
-        if (finished && roleOf(m) === 'ai' && m.text) post({ type: 'message.done', id: shellId, content: m.text, serverId: m.id })
+        if (finished && roleOf(m) === 'ai' && m.text) post({ type: 'message.done', id: shellId, content: m.text, serverId: serverIdOf(m) })
         return
       }
       if (t.finished) {
@@ -230,7 +232,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
           tracked.set(m.id, { shellId, role: roleOf(m), content: m.text, finished, viewKey: viewKeyOf(m) })
           const before = nextKnown[index]
           post(before ? { type: 'message.new', message: toShell(m, shellId), before } : { type: 'message.new', message: toShell(m, shellId) })
-          if (roleOf(m) === 'ai') post({ type: 'message.done', id: shellId, content: m.text, serverId: m.id, view: viewOf(m) })
+          if (roleOf(m) === 'ai') post({ type: 'message.done', id: shellId, content: m.text, serverId: serverIdOf(m), view: viewOf(m) })
           return
         }
         // 正文沒變、呈現資料變了（可重生成的鍵亮起、上下文用量、思考過程…）：只換呈現。
@@ -242,7 +244,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
         t.finished = true
         t.content = m.text
         t.viewKey = viewKeyOf(m)
-        post({ type: 'message.done', id: t.shellId, content: m.text, serverId: roleOf(m) === 'ai' ? m.id : null, view: viewOf(m) })
+        post({ type: 'message.done', id: t.shellId, content: m.text, serverId: serverIdOf(m), view: viewOf(m) })
         return
       }
       if (t.content !== m.text) {

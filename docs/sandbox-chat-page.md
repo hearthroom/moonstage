@@ -86,7 +86,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 | `back-handled` | `{ handled }` 回應宿主的 `back` |
 | `debug` | `{ level, args }` 轉給宿主 console |
 
-訊息 `id` 由宿主決定，形如 `l1`、`l2`…遞增；`serverId` 只在 AI 訊息定稿後有值，玩家訊息永遠 `null`。
+訊息 `id` 由宿主決定，形如 `l1`、`l2`…遞增；`serverId` 只在 AI 訊息定稿後有值，玩家訊息與開場白永遠 `null`（作者腳本常拿它分辨「已經聊過」）。
 
 ## 3. `sdk` 契約（殼內作者看到的）
 
