@@ -2197,10 +2197,34 @@
     color: var(--lt-canvas-muted);
   }
 
-  .ms-tier-quote {
+  /* 檔位下面的估價：兩格並排，小標在上、數字在下 */
+  .ms-tier-stats {
+    display: flex;
+    gap: 8px;
+  }
+
+  .ms-tier-stat {
     display: flex;
     flex-direction: column;
+    flex: 1 1 0;
     gap: 2px;
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: var(--lt-canvas-sheet-item-bg);
+  }
+
+  .ms-tier-stat-k {
+    font-size: 11px;
+    color: var(--lt-canvas-muted);
+  }
+
+  .ms-tier-stat-v {
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ms-tier-note {
     font-size: 12px;
     line-height: 1.5;
   }
@@ -2605,6 +2629,12 @@
 
   .ms-set .ms-pill {
     padding: 0 10px;
+  }
+
+  /* 檔位鍵撐滿整行：只有三檔時不留右半邊的空白，五檔時一樣排成一行 */
+  .ms-pills.is-fill > .ms-pill {
+    flex: 1 1 0;
+    min-width: max-content;
   }
 
   .ms-card-title {
