@@ -2868,20 +2868,39 @@
     font-size: 14px;
   }
 
+  /* 線路表：欄頭一列，下面是一張框，列與列之間一條細線 */
+  .ms-lane-headrow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 12px 0;
+  }
+
+  .ms-opts {
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+    border: 1px solid var(--lt-canvas-sheet-line);
+    overflow: hidden;
+  }
+
   /* 線路列：一顆單選圓點 */
   .ms-opt {
     display: flex;
     flex-direction: column;
     gap: 2px;
     padding: 8px 12px;
-    border-radius: 12px;
-    border: 1px solid var(--lt-canvas-sheet-line);
     cursor: pointer;
   }
 
+  .ms-opt + .ms-opt {
+    border-top: 1px solid var(--lt-canvas-sheet-line);
+  }
+
   .ms-opt.is-on {
-    border-color: var(--lt-canvas-accent);
     background: var(--lt-canvas-accent-bg);
+    box-shadow: inset 2px 0 0 var(--lt-canvas-accent);
   }
 
   .ms-opt-line1 {

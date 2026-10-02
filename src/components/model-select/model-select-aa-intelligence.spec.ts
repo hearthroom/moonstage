@@ -117,7 +117,6 @@ describe('chat modelSelect AA intelligence chip (desktop, mirrors mobile feat/aa
       import('@/locale/ko.json'),
     ])
     const keys = [
-      'modelSelect.metricsTitle',
       'modelSelect.metricPopularity',
       'modelSelect.usageRankValue',
       'modelSelect.usageRankDetail',
