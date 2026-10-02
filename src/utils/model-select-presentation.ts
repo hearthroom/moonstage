@@ -530,7 +530,7 @@ export function detailMetrics(family: Family | null | undefined): DetailMetrics 
  * 其餘分類照「旗下最好的那個模型在全球角色扮演用量的名次」排，越前面越靠前；
  * 沒有名次的排最後，彼此之間維持伺服器給的原順序。
  */
-export const PINNED_MODEL_GROUPS = ['deepseek', 'minimax', 'mimo', 'claude', 'gemini', 'glm', 'kimi']
+export const PINNED_MODEL_GROUPS = ['deepseek', 'mimo', 'claude', 'gemini', 'glm', 'kimi', 'minimax']
 
 export function orderModelGroups<T extends { group?: string; families?: Array<{ usageRank?: unknown }> }>(groups: T[]): T[] {
   const bestRank = (g: T) => {
