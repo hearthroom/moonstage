@@ -16,7 +16,7 @@ export type SandboxMessageState = 'pending' | 'streaming' | 'done'
 export type SandboxTheme = 'dark' | 'light'
 export type StageState = 'closed' | 'content' | 'full'
 
-/** 一則訊息。`id` 由宿主決定（l1、l2…遞增）；`serverId` 只在 AI 訊息定稿後有值，玩家訊息永遠 null。 */
+/** 一則訊息。`id` 由宿主決定（l1、l2…遞增）；`serverId` 只在 AI 訊息定稿後有值，玩家訊息與開場白永遠 null。 */
 export interface SandboxMessage {
   id: string
   role: SandboxRole

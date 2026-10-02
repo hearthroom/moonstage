@@ -125,7 +125,7 @@ describe('沙箱宿主橋', () => {
     await flush()
     expect(h.posted[0]).toMatchObject({ ms: SANDBOX_PROTOCOL_VERSION, type: 'hello', config: { capabilities: { saves: false, edit: true, send: true }, role: { name: '露娜' } } })
     expect(h.posted[1]).toEqual({ ms: 1, type: 'messages', messages: [
-      { id: 'greeting', role: 'ai', content: '你好', serverId: '10', state: 'done' },
+      { id: 'greeting', role: 'ai', content: '你好', serverId: null, state: 'done' },
       { id: 'h11', role: 'user', content: '嗨', serverId: null, state: 'done' },
       { id: 'h12', role: 'ai', content: '哈囉', serverId: '12', state: 'done' },
     ] })
@@ -191,6 +191,25 @@ describe('沙箱宿主橋', () => {
     expect(h.posted[0]).toMatchObject({ message: { id: 'l1', role: 'user', content: '嗨', serverId: null } })
     expect(h.posted[1]).toMatchObject({ message: { id: 'l2', role: 'ai', content: '', serverId: null, state: 'pending' } })
     expect(h.posted[5]).toEqual({ ms: 1, type: 'message.done', id: 'l2', content: '你好', serverId: '21' })
+    host.destroy()
+  })
+
+  it('開場白換一則（切換開場白／新對話）：重發的 new 與 done 都不帶 serverId，作者腳本才不會當成已聊過', async () => {
+    const state = { current: makeState({ messages: [msg({ id: '10', text: '你好', opening: true })] }) }
+    const { hud } = fakeHud(state)
+    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '1', hello })
+    host.start()
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    h.posted.length = 0
+    state.current = makeState({ messages: [msg({ id: '10', text: '晚安', opening: true })] })
+    host.sync()
+    state.current = makeState({ messages: [msg({ id: '30', text: '早安', opening: true })] })
+    host.sync()
+    const withServerId = h.posted.filter((p) => p.type === 'message.done' || p.type === 'message.new')
+      .map((p) => (p.type === 'message.new' ? (p as { message: { serverId: unknown } }).message.serverId : (p as { serverId: unknown }).serverId))
+    expect(withServerId.length).toBeGreaterThan(0)
+    expect(withServerId.every((id) => id === null)).toBe(true)
     host.destroy()
   })
 
