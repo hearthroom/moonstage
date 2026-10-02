@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  orderModelGroups,
   familyPriceDisplay,
   familyKey,
   dedupeFamilies,
@@ -835,5 +836,29 @@ describe('uptimeBucketTone — 優先用 server 算好的 state', () => {
     expect(uptimeBucketTone({ total: 10, percent: 80 })).toBe('amber')
     expect(uptimeBucketTone({ total: 10, percent: 10 })).toBe('red')
     expect(uptimeBucketTone({ total: 0, percent: 0 })).toBe('none')
+  })
+})
+
+describe('orderModelGroups — 分類列的順序', () => {
+  const g = (group: string, ...ranks: Array<number | undefined>) => ({ group, families: ranks.map(usageRank => ({ usageRank })) })
+
+  it('固定的幾家照指定順序排在最前面，不管它們在用量榜上的名次', () => {
+    const out = orderModelGroups([
+      g('Ling'), g('Kimi', 38), g('GLM', 7), g('MiMo', 13), g('Claude', 43), g('MiniMax'),
+      g('Gemini', 9), g('DeepSeek', 1), g('Hunyuan', 4),
+    ]).map(x => x.group)
+    expect(out.slice(0, 7)).toEqual(['DeepSeek', 'MiniMax', 'MiMo', 'Claude', 'Gemini', 'GLM', 'Kimi'])
+  })
+
+  it('其餘照旗下最好的名次排；沒有名次的放最後、維持原順序', () => {
+    const out = orderModelGroups([
+      g('Ling'), g('Nemotron', undefined), g('Qwen', 26, undefined), g('Seed'),
+      g('Hunyuan', undefined, 4), g('Grok'), g('Gemma', 18, 11), g('GPT', 16, 22),
+    ]).map(x => x.group)
+    expect(out).toEqual(['Hunyuan', 'Gemma', 'GPT', 'Qwen', 'Ling', 'Nemotron', 'Seed', 'Grok'])
+  })
+
+  it('分類名大小寫與前後空白不影響', () => {
+    expect(orderModelGroups([g('Ling'), g(' deepseek ')]).map(x => x.group)).toEqual([' deepseek ', 'Ling'])
   })
 })

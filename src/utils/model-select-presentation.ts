@@ -519,3 +519,42 @@ export function detailMetrics(family: Family | null | undefined): DetailMetrics 
 
   return { usage }
 }
+
+/**
+ * 分類列的順序。
+ *
+ * 前面幾個是固定的：酒館玩家最常用、最常來找的那幾家（owner 2026-10-02 指定）。
+ * Claude 在用量榜上排得後面是因為它在別處貴，不是因為它不好用——這裡價格低，
+ * 所以照玩家實際會想找的順序放在前面，而不是照榜單。
+ *
+ * 其餘分類照「旗下最好的那個模型在全球角色扮演用量的名次」排，越前面越靠前；
+ * 沒有名次的排最後，彼此之間維持伺服器給的原順序。
+ */
+export const PINNED_MODEL_GROUPS = ['deepseek', 'minimax', 'mimo', 'claude', 'gemini', 'glm', 'kimi']
+
+export function orderModelGroups<T extends { group?: string; families?: Array<{ usageRank?: unknown }> }>(groups: T[]): T[] {
+  const bestRank = (g: T) => {
+    let best = Infinity
+    for (const f of g.families || []) {
+      const r = finite(f && f.usageRank)
+      if (r !== null && r > 0 && r < best) best = r
+    }
+    return best
+  }
+  return groups
+    .map((g, index) => ({
+      g, index,
+      pin: PINNED_MODEL_GROUPS.indexOf(String(g.group || '').trim().toLowerCase()),
+      rank: bestRank(g),
+    }))
+    .sort((a, b) => {
+      if (a.pin !== -1 || b.pin !== -1) {
+        if (a.pin === -1) return 1
+        if (b.pin === -1) return -1
+        return a.pin - b.pin
+      }
+      if (a.rank !== b.rank) return a.rank - b.rank
+      return a.index - b.index
+    })
+    .map(x => x.g)
+}
