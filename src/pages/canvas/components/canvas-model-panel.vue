@@ -12,8 +12,26 @@
     模型、上下文檔位、Agent 模式本來就都在模型選單裡，而自動摘要不該讓玩家撥
     ——關掉它會讓長對話的記憶行為整個改變，那不是一個開關該承擔的後果。
   -->
+    <!-- 搜尋框跟標題同一列：單獨佔一行時，手機第一屏連一個模型都看不到
+         （owner 2026-10-02 iPhone 截圖）。它在捲動區外面，往下捲也一直在。
+         真的 input（模板裡的 <input> 會被編譯器包一層殼，殼自帶尺寸與一個空的
+         佔位點，看起來像 bug）；左邊放放大鏡，讓人一眼知道這是搜尋。 -->
     <div class="mp-top">
       <div class="mp-title">{{ title }}</div>
+      <div class="ms-search">
+        <span class="ms-search-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        </span>
+        <CanvasInput
+          el-class="ms-search-input"
+          :value="searchQuery"
+          :placeholder="labels.search || ''"
+          @input="searchQuery = $event" />
+        <span v-if="searchQuery" class="ms-search-clear" role="button" tabindex="0"
+              :aria-label="labels.close"
+              @click="searchQuery = ''"
+              @keydown.enter.prevent="searchQuery = ''">×</span>
+      </div>
       <div class="mp-close" role="button" tabindex="0"
            :aria-label="labels.close"
            @click="$emit('close')"
@@ -56,6 +74,7 @@
         :context="contextValue"
         :thinking-depth="thinkingDepth"
         :show-thinking-process="showThinkingProcess"
+        v-model:search-query="searchQuery"
         @select="$emit('apply', $event)"
         @draft="draft = $event"
         @close="$emit('close')"
@@ -73,6 +92,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch, nextTick } from 'vue'
 import ModelSelectPanel from '@/components/model-select/ModelSelectPanel.vue'
+import { CanvasInput } from './canvas-field'
 import { attachDelegatedDragScroll } from '../canvas-drag-scroll'
 
 const props = withDefaults(defineProps<{
@@ -94,6 +114,7 @@ const props = withDefaults(defineProps<{
     done: string
     perTurn: string
     switchTo?: string
+    search?: string
   }
 }>(), {
   open: true,
@@ -126,6 +147,7 @@ const switching = computed(() => {
   if (!d || !d.value) return false
   return d.value !== props.selectedValue || (d.context != null && d.context !== props.contextValue)
 })
+const searchQuery = ref('')
 watch(() => props.open, (open) => { if (!open) draft.value = null })
 const shellEl = ref<HTMLElement | null>(null)
 
