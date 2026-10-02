@@ -277,50 +277,57 @@
 
 						<!-- 第一層：說明 → 線路 → 狀況徽章 → 評測與用量。全部在文流裡，一起捲。 -->
 						<div v-else class="ms-detail">
-							<span class="ms-detail-desc">{{ isFreeFamily(detailFamily) ? t('modelSelect.freeModelDesc') : getDisplayDescription(detailFamily) }}</span>
+							<span v-if="isFreeFamily(detailFamily) || getDisplayDescription(detailFamily)" class="ms-detail-desc">{{ isFreeFamily(detailFamily) ? t('modelSelect.freeModelDesc') : getDisplayDescription(detailFamily) }}</span>
 
-							<span class="ms-eyebrow ms-detail-eyebrow">{{ optionSectionLabel(detailFamily) }}</span>
-							<div
-								v-for="variant in getVisibleVariants(detailFamily)"
-								:key="variant.value"
-								class="ms-opt"
-								:class="{ 'is-on': formData.selectModel === variant.value }"
-								@click="selectVariant(detailFamily, variant)">
-								<div class="ms-opt-line1">
-									<div class="ms-radio" :class="{ 'is-on': formData.selectModel === variant.value }"></div>
-									<span class="ms-opt-name">{{ optionLabelFor(detailFamily, variant) }}</span>
-									<!-- 官方／實惠是伺服器下發的標籤（自己接的線路手動配，OpenRouter 依開發商
-										 自家供貨判定）。實惠用金色、官方用藍色，一眼分得開。 -->
-									<div
-										v-if="laneTagOf(variant)"
-										class="ms-badge"
-										:class="{ 'is-accent': laneTagOf(variant) === 'value', 'is-official': laneTagOf(variant) === 'official' }">
-										<span class="ms-badge-text">{{ t(laneTagOf(variant) === 'official' ? 'modelSelect.laneOfficial' : 'modelSelect.laneValue') }}</span>
+							<!-- 線路是一張表：價格的意思（下一輪約／新對話約）寫在欄頭一次，
+								 每列只放數字——每列都寫一次「下一輪約」，名字就沒地方放了。 -->
+							<div class="ms-lane-headrow">
+								<span class="ms-eyebrow">{{ optionSectionLabel(detailFamily) }}</span>
+								<span v-if="laneHeadFor(detailFamily)" class="ms-eyebrow">{{ laneHeadFor(detailFamily) }}</span>
+							</div>
+							<div class="ms-opts">
+								<div
+									v-for="variant in getVisibleVariants(detailFamily)"
+									:key="variant.value"
+									class="ms-opt"
+									:class="{ 'is-on': formData.selectModel === variant.value }"
+									@click="selectVariant(detailFamily, variant)">
+									<div class="ms-opt-line1">
+										<div class="ms-radio" :class="{ 'is-on': formData.selectModel === variant.value }"></div>
+										<span class="ms-opt-name">{{ optionLabelFor(detailFamily, variant) }}</span>
+										<!-- 官方／實惠是伺服器下發的標籤（自己接的線路手動配，OpenRouter 依開發商
+											 自家供貨判定）。實惠用金色、官方用藍色，一眼分得開。 -->
+										<div
+											v-if="laneTagOf(variant)"
+											class="ms-badge"
+											:class="{ 'is-accent': laneTagOf(variant) === 'value', 'is-official': laneTagOf(variant) === 'official' }">
+											<span class="ms-badge-text">{{ t(laneTagOf(variant) === 'official' ? 'modelSelect.laneOfficial' : 'modelSelect.laneValue') }}</span>
+										</div>
+										<!-- 上游供應商此刻掛著的折扣。扣費是跟著它走的（server 端用供應商現價
+											 算成本），所以這個數字不是裝飾。它沒有截止時間，隨時會結束。 -->
+										<div v-if="variant.providerDiscountPercent > 0" class="ms-badge is-accent">
+											<span class="ms-badge-text">-{{ variant.providerDiscountPercent }}%</span>
+										</div>
+										<div
+											v-if="variantDotTone(variant)"
+											class="ms-dot"
+											:class="'ms-dot-' + variantDotTone(variant)"></div>
+										<span class="ms-opt-price">{{ laneAmountText(detailFamily, variant) }}</span>
 									</div>
-									<!-- 上游供應商此刻掛著的折扣。扣費是跟著它走的（server 端用供應商現價
-										 算成本），所以這個數字不是裝飾。它沒有截止時間，隨時會結束。 -->
-									<div v-if="variant.providerDiscountPercent > 0" class="ms-badge is-accent">
-										<span class="ms-badge-text">-{{ variant.providerDiscountPercent }}%</span>
-									</div>
-									<div
-										v-if="variantDotTone(variant)"
-										class="ms-dot"
-										:class="'ms-dot-' + variantDotTone(variant)"></div>
-									<span class="ms-opt-price">{{ variantPriceText(variant) }}</span>
-								</div>
-								<!-- 指標直接掛在這條線路底下，讀的人不必自己配名字。
-									 整列只有一個結果：選這條線路。次動作只在**已經選中**的那一列出現，
-									 而且帶文字——裸箭頭在列尾的語意是「整列會導航」，跟這裡「整列是選取」
-									 正好相反。它跟指標擠同一行，不另開一列。 -->
-								<div class="ms-opt-line2">
-									<span class="ms-opt-meta">{{ laneMetaFor(variant) }}</span>
-									<div
-										v-if="formData.selectModel === variant.value"
-										class="ms-opt-entry"
-										@click.stop="openLaneDetail(detailFamily, variant)">
-										<span class="ms-opt-entry-text">{{ t('modelSelect.laneDetailEntry') }}</span>
-										<svg class="ms-opt-entry-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-											stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+									<!-- 指標直接掛在這條線路底下，讀的人不必自己配名字。
+										 整列只有一個結果：選這條線路。次動作只在**已經選中**的那一列出現，
+										 而且帶文字——裸箭頭在列尾的語意是「整列會導航」，跟這裡「整列是選取」
+										 正好相反。它跟指標擠同一行，不另開一列。 -->
+									<div class="ms-opt-line2">
+										<span class="ms-opt-meta">{{ laneMetaFor(variant) }}</span>
+										<div
+											v-if="formData.selectModel === variant.value"
+											class="ms-opt-entry"
+											@click.stop="openLaneDetail(detailFamily, variant)">
+											<span class="ms-opt-entry-text">{{ t('modelSelect.laneDetailEntry') }}</span>
+											<svg class="ms-opt-entry-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+												stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+										</div>
 									</div>
 								</div>
 							</div>
@@ -358,7 +365,8 @@
 								 列會忽有忽無的話，同一個位置在不同卡片上是不同的東西，
 								 跨卡片比較就沒了——而那正是選 KV 的理由。
 								 綜合智力不在這裡：收合列的指標帶已經有了，展開只給新東西。 -->
-							<span class="ms-eyebrow ms-detail-eyebrow">{{ t('modelSelect.metricsTitle') }}</span>
+							<!-- 用量與可用率各一列，左標右值。不另開「評測與用量」標題：兩列自己就說清楚了。
+								 （並排成兩格試過：用量那個值太長，半格放不下會折行。） -->
 							<div v-for="row in detailRowsFor(detailFamily)" :key="row.key" class="ms-kv">
 								<span class="ms-kv-k">{{ t(row.labelKey) }}</span>
 								<span class="ms-kv-v" :class="{ 'is-none': !row.value }">{{ row.value || '—' }}</span>
@@ -1265,6 +1273,22 @@ const truncationText = (completionRate: number) => {
 		const amount = meaning === 'next' || meaning === 'fresh' ? priceRange(price) : formatPrice(price);
 		return priceLabel(meaning, amount);
 	};
+
+	/**
+	 * 線路表的價格欄頭。看得到的線路都是同一種估法（都是「下一輪」或都是「新對話」）時
+	 * 才有欄頭，列上只放數字；混著固定計價或 Agent 模式時沒有欄頭，每列照舊寫完整。
+	 */
+	const LANE_HEAD_KEYS = { next: 'modelSelect.priceNextHead', fresh: 'modelSelect.priceFreshHead' };
+	const laneHeadFor = (family) => {
+		if (deepPrepOn.value || !family) return '';
+		const meanings = new Set((getVisibleVariants(family) || []).map(v => priceMeaning(v)));
+		if (meanings.size !== 1) return '';
+		const key = LANE_HEAD_KEYS[[...meanings][0]];
+		return key ? t(key) : '';
+	};
+	const laneAmountText = (family, variant) => laneHeadFor(family)
+		? priceRange(getVariantPrice(variant))
+		: variantPriceText(variant);
 
 	/** 區間用 en dash，兩端一樣時只寫一個數字。 */
 	const priceRange = (price) => {
