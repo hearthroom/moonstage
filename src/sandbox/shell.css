@@ -83,7 +83,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
 [data-slot="right"] { right: 0; }
 
 [data-chat="author-stage"] { display: none; background: var(--chat-bg); overflow: auto; }
-[data-chat="author-stage"][data-stage="content"] { display: block; position: absolute; left: 0; right: 0; top: var(--shell-header-h, 45px); bottom: 0; z-index: 2000; }
+[data-chat="author-stage"][data-stage="content"] { display: block; position: absolute; left: 0; right: 0; top: var(--shell-header-h, 45px); bottom: var(--shell-composer-h, 0px); z-index: 2000; }
 [data-chat="author-stage"][data-stage="full"] { display: block; position: absolute; inset: 0; z-index: 3000; }
 
 [data-chat="root"][data-chrome="shell"] [data-chat="composer"] { flex-shrink: 0; background: var(--chat-composer-bg); color: var(--chat-composer-text); border-top: 1px solid var(--chat-border); padding: calc(12 * var(--rpx)) calc(20 * var(--rpx)) calc(12 * var(--rpx) + env(safe-area-inset-bottom)); }
@@ -115,7 +115,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
 [data-chat="root"][data-chrome="host"] [data-chat="header"] { display: none; }
 [data-chat="root"][data-chrome="host"] [data-chat="composer"] { display: none; }
 [data-chat="root"][data-chrome="host"] [data-slot="left"], [data-chat="root"][data-chrome="host"] [data-slot="right"] { top: 0; }
-[data-chat="root"][data-chrome="host"] [data-chat="author-stage"][data-stage="content"] { top: 0; }
+[data-chat="root"][data-chrome="host"] [data-chat="author-stage"][data-stage="content"] { top: 0; bottom: 0; }
 
 }
 @layer lt-base {

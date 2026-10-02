@@ -217,7 +217,7 @@ export function createShell(options: CreateShellOptions): Shell {
       visible: () => composerVisible,
     },
     stage: {
-      open: (mode) => { stageState = mode; setStage(refs, mode); transport.send({ type: 'stage', state: mode }) },
+      open: (mode) => { stageState = mode; syncChromeInsets(); setStage(refs, mode); transport.send({ type: 'stage', state: mode }) },
       close: () => { stageState = 'closed'; setStage(refs, 'closed'); transport.send({ type: 'stage', state: 'closed' }) },
       el: () => refs.stage,
       visible: () => stageState !== 'closed',
@@ -422,9 +422,14 @@ export function createShell(options: CreateShellOptions): Shell {
   // ── 標準頁首與輸入區：跟一般卡同一套元件，資料由宿主送來（chrome 訊息），按鍵轉回宿主做。 ──
   let chromeApps: Array<{ unmount(): void }> = []
   let disposeComposerOverhang: (() => void) | null = null
-  const headerResize = typeof ResizeObserver === 'function'
-    ? new ResizeObserver(() => refs.root.style.setProperty('--shell-header-h', `${refs.header.offsetHeight}px`))
-    : null
+  // 舞台 content 只蓋訊息區：上緣讓出頁首、下緣讓出輸入區（含作者把輸入區往上推的量），輸入區藏起來就貼底。
+  function syncChromeInsets() {
+    refs.root.style.setProperty('--shell-header-h', `${refs.header.offsetHeight}px`)
+    const c = refs.composer.hidden ? null : refs.composer.getBoundingClientRect()
+    const inset = c && c.height > 0 ? Math.max(0, Math.round(refs.root.getBoundingClientRect().bottom - c.top)) : 0
+    refs.root.style.setProperty('--shell-composer-h', `${inset}px`)
+  }
+  const headerResize = typeof ResizeObserver === 'function' ? new ResizeObserver(syncChromeInsets) : null
   if (standardChrome) {
     refs.header.innerHTML = ''
     refs.composer.innerHTML = ''
@@ -458,7 +463,7 @@ export function createShell(options: CreateShellOptions): Shell {
     composerApp.config.warnHandler = () => {}
     composerApp.mount(refs.composer)
     chromeApps = [headerApp, composerApp]
-    if (headerResize) headerResize.observe(refs.header)
+    if (headerResize) { headerResize.observe(refs.header); headerResize.observe(refs.composer); headerResize.observe(refs.root) }
     // 作者腳本把輸入區往上推（給自己的底部工具列讓位）時，訊息區底部被蓋住的量要補成
     // 對話欄的底部內距——跟一般畫布同一套量法；殼在 iframe 裡，畫布那邊的觀察器看不到這裡。
     // 綁在殼的輸入區容器（[data-chat="composer"]）而不是裡面的 .composer-scope：作者腳本從
