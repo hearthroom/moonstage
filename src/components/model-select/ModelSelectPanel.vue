@@ -17,7 +17,34 @@
 			 收在同一張卡裡、用細線分段——三張卡各自的內距與間隔加起來就是半個螢幕。 -->
 		<div v-if="!isLoading" class="ms-card">
 			<div class="ms-set">
-				<span class="ms-card-title">{{ t('modelSelect.contextBudgetShort') }}</span>
+				<!-- 標題列：左邊上下文容量，右邊 Agent 模式的小開關。兩段說明都收在 ⓘ 後面，
+					 點了才在標題底下攤開——常駐的話，還沒看到模型就先讀完兩段字（owner 2026-10-02）。
+					 Agent 模式不支援時開關停用但仍然顯示，原因在它的 ⓘ 裡：整個消失的話，
+					 開著的對話換到不支援的模型之後，使用者看不到也關不掉。 -->
+				<div class="ms-set-head">
+					<span class="ms-card-title">{{ t('modelSelect.contextBudgetShort') }}</span>
+					<span class="ms-info" :class="{ 'is-on': openHint === 'context' }" role="button" tabindex="0"
+						:aria-label="t('modelSelect.contextBudgetShort')"
+						:aria-expanded="openHint === 'context' ? 'true' : 'false'"
+						@click="toggleHint('context')"
+						@keydown.enter.prevent="toggleHint('context')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></span>
+					<template v-if="deepPrepVisible">
+						<span class="ms-set-head-gap"></span>
+						<span class="ms-agent-label" :class="{ 'is-disabled': !deepPrepModelSupported }">✦ {{ t('modelSelect.deepPrepLabel') }}</span>
+						<span class="ms-info" :class="{ 'is-on': openHint === 'agent' }" role="button" tabindex="0"
+							:aria-label="t('modelSelect.deepPrepLabel')"
+							:aria-expanded="openHint === 'agent' ? 'true' : 'false'"
+							@click="toggleHint('agent')"
+							@keydown.enter.prevent="toggleHint('agent')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></span>
+						<ASwitch
+							:checked="deepPrepOn"
+							:disabled="!deepPrepModelSupported || deepPrepSaving"
+							size="small"
+							@change="onDeepPrepChange" />
+					</template>
+				</div>
+				<span v-if="openHint === 'context'" class="ms-hint">{{ t('modelSelect.contextTierExplain') }}</span>
+				<span v-if="openHint === 'agent' && deepPrepVisible" class="ms-hint">{{ deepPrepModelSupported ? t('modelSelect.deepPrepHintBilling') : t('modelSelect.deepPrepUnsupported') }}</span>
 				<div class="ms-pills is-fill">
 					<div
 						v-for="item in contextBudgetLevelOptions"
@@ -40,7 +67,6 @@
 						<span class="ms-tier-stat-v">{{ cell.value }}</span>
 					</div>
 				</div>
-				<span class="ms-hint">{{ t('modelSelect.contextTierExplain') }}</span>
 			</div>
 
 			<div v-if="hasThinkingDepthOptions" class="ms-set">
@@ -69,20 +95,6 @@
 				</div>
 			</div>
 
-			<!-- 模型不支援時停用但仍然顯示，並講出原因。整個消失的話，開著的
-				 對話換到不支援的模型之後，使用者看不到也關不掉。計費那句一直留著：
-				 開關會改變扣點方式，不能等開了才知道。 -->
-			<div v-if="deepPrepVisible" class="ms-set ms-switch-line">
-				<div class="ms-switch-col">
-					<span class="ms-card-title">✦ {{ t('modelSelect.deepPrepLabel') }}</span>
-					<span class="ms-hint">{{ deepPrepModelSupported ? t('modelSelect.deepPrepHintBilling') : t('modelSelect.deepPrepUnsupported') }}</span>
-				</div>
-				<ASwitch
-					:checked="deepPrepOn"
-					:disabled="!deepPrepModelSupported || deepPrepSaving"
-					size="small"
-					@change="onDeepPrepChange" />
-			</div>
 		</div>
 
 		<!-- 排序鍵排在分類列第一顆，寫著現在怎麼排；點了才在列底下攤開選項。
@@ -1081,6 +1093,9 @@ const truncationText = (completionRate: number) => {
 	const searchQuery = computed(() => props.searchQuery || '');
 	// 排序選項平常收著，只露出一顆寫著目前排法的鍵；選完就收回去。
 	const sortOpen = ref(false);
+	// 設定卡上兩個 ⓘ 的說明，一次只攤開一段；再點一次收起來。
+	const openHint = ref('');
+	const toggleHint = (key) => { openHint.value = openHint.value === key ? '' : key; };
 	// 預設「熱門」：站內用量欄位還沒上線時每個家族同分，tie-break 讓它自然退回
 	// 原次序，也就是設計文件 §3.55 的降級行為。
 	const sortMode = ref('popular');

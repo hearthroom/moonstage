@@ -2612,6 +2612,54 @@
     flex-direction: row;
   }
 
+  /* 設定卡標題列：左邊標題＋ⓘ，右邊 Agent 模式＋ⓘ＋開關 */
+  .ms-set-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .ms-agent-label {
+    flex: 0 1 auto;
+    min-width: 0;
+    padding-left: 8px;
+    font-size: 12px;
+    color: var(--lt-canvas-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 把 Agent 那一組推到右邊 */
+  .ms-set-head-gap {
+    flex: 1 1 auto;
+  }
+
+  .ms-agent-label.is-disabled {
+    color: var(--lt-canvas-sheet-faint);
+  }
+
+  .ms-info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    color: var(--lt-canvas-sheet-faint);
+    cursor: pointer;
+  }
+
+  .ms-info svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .ms-info.is-on {
+    color: var(--lt-canvas-accent);
+  }
+
   /* 卡片內寬放不下五顆預設尺寸的檔位鍵，最後一顆會自己折到第二行 */
   .ms-set .ms-pills {
     gap: 6px;
