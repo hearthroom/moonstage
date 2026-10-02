@@ -2931,8 +2931,10 @@
     opacity: 1;
   }
 
+  /* 名字不撐開：官方／實惠的標籤緊跟在名字後面——它說的是這條線路，不是價格。
+     撐開剩下空間的是價格欄，數字靠右對齊。 */
   .ms-opt-name {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
     font-size: 13px;
     overflow: hidden;
@@ -2941,7 +2943,8 @@
   }
 
   .ms-opt-price {
-    flex: 0 0 auto;
+    flex: 1 0 auto;
+    text-align: right;
     font-size: 12px;
     font-variant-numeric: tabular-nums;
   }
