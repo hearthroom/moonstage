@@ -1123,6 +1123,25 @@ export function recordExactOperationProbeMiss(
   }
 }
 
+// Refusals the server sends only before a turn exists: the balance does not cover
+// the next turn's estimate, so nothing was stored. That makes the error itself the
+// proof, and the player gets the text back at once instead of after repeated empty
+// probes. Errors that can also come from transport stay on the probe path.
+const DEFINITIVE_PRE_ADMISSION_ERRORS = new Set(['insufficient_credits'])
+
+export function isDefinitivePreAdmissionRejection(
+  pending: any,
+  errorType: unknown,
+): boolean {
+  if (!pending || typeof pending !== 'object') return false
+  if (pending.operationOutcomeCapability === 'legacy') return false
+  // Continue, Retry and Rewrite reuse a bubble already on screen and the server keeps
+  // their turn; only a new send has nothing stored to give back.
+  if ((pending.operationKind || 'send') !== 'send') return false
+  if (pending.accepted === true || String(pending.operationId || '').trim()) return false
+  return DEFINITIVE_PRE_ADMISSION_ERRORS.has(String(errorType || '').trim())
+}
+
 export function mergeOperationStatusIntoStreamEntry(
   entry: any,
   input: any,

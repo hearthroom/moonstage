@@ -567,6 +567,7 @@ import {
   isChatSendInFlight,
   resolveTimelineMutationGate,
   markExplicitPreAdmissionError,
+  isDefinitivePreAdmissionRejection,
   markStreamEntryAccepted,
   mergeChatHistoryOperationProjections,
   mergeOperationStatusIntoStreamEntry,
@@ -6078,6 +6079,15 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
           Date.now(),
         )) {
           persistPendingPreAdmissionState(pendingChatTurn as PendingChatTurn);
+          // 點數不夠付這一輪的估價：伺服器在回合成立前就拒絕，什麼都沒存。
+          // 不用再等幾輪空探測確認，直接把原文放回輸入框並講清楚原因。
+          if (isDefinitivePreAdmissionRejection(pendingChatTurn, errorType)) {
+            settleConfirmedPreAdmissionFailure(
+              pendingChatTurn as PendingChatTurn,
+              pendingChatTurn?.draft || readLsEntry()?.pendingPayload?.message || '',
+            );
+            break;
+          }
         }
         if (
           pendingChatTurn?.operationOutcomeCapability === 'legacy'

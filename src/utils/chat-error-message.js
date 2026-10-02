@@ -5,6 +5,9 @@ const CHAT_ERROR_I18N_KEYS = Object.freeze({
   model_refused: 'error.modelRefused',
   empty_response: 'error.emptyResponse',
   server_error: 'error.serverError',
+  // The provider's typed code for a turn it could not serve (not a credit or
+  // capacity refusal); present it as the server error it is, not as a lost connection.
+  temporarily_unavailable: 'error.serverError',
   timeout: 'error.timeout',
   connection_error: 'error.connectionError',
   insufficient_credits: 'chat.point_no_tips',
@@ -73,6 +76,7 @@ const CHAT_ERROR_FINISH_REASONS = Object.freeze({
   model_refused: 'refusal',
   empty_response: 'empty_response',
   server_error: 'server_error',
+  temporarily_unavailable: 'server_error',
   connection_error: 'network_error',
   content_filter: 'content_filter_input',
   compact_retryable: 'compact_retryable',
