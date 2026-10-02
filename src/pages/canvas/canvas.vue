@@ -9685,6 +9685,7 @@ const modelPanelLabels = computed(() => ({
   done: t('main.sure'),
   perTurn: t('canvas.panel.perTurn'),
   switchTo: t('canvas.panel.switchTo'),
+  search: t('modelSelect.searchPlaceholder'),
   contextTitle: t('modelSelect.contextBudgetShort'),
   contextHint: t('canvas.panel.contextHint'),
   thinkingTitle: t('modelSelect.thinkingDepth'),

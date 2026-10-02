@@ -44,16 +44,22 @@ describe('模型選單在畫布彈層裡的版面', () => {
     expect(rule('.model-setting-scope .mp-setting-body')).toContain('flex: 1 1 auto')
   })
 
-  it('排序是一條 chip rail 加一句說明，不是浮在清單上的選單', () => {
+  // owner 2026-10-02：排序單獨佔一排 chip 太浪費畫面，改成清單標頭上的一顆鍵，點了才攤開。
+  // 原本守的那件事不變：攤開的選項在文流裡，不是浮在清單上的選單。
+  it('排序收成清單標頭上的一顆鍵，點了才在文流裡攤開選項與說明', () => {
     expect(template).not.toContain('ms-sort-menu')
     expect(template).not.toContain('sortSheetOpen')
+    expect(template).toMatch(/class="ms-listhead"[\s\S]{0,300}class="ms-sort-toggle"/)
+    expect(template).toContain('{{ sortLabel }}')
+    expect(template).toMatch(/<div v-if="sortOpen" class="ms-sort">/)
     // 2026-09-05 起 chip 也帶舊頁面的節點名（model-filter-tab），作者對它寫的外觀才對得上。
     expect(template).toMatch(/v-for="opt in SORT_OPTIONS"[\s\S]{0,200}class="ms-chip model-filter-tab"/)
     expect(template).toContain("{{ t(sortDescKey) }}")
     expect(panel).toMatch(/const sortDescKey = computed/)
+    expect(rule('.ms-sort')).not.toMatch(/position:\s*(absolute|fixed)/)
   })
 
-  it('分類與排序的 rail 是 edge-to-edge：容器不留內距，內層給兩端 16px', () => {
+  it('分類 rail 是 edge-to-edge：容器不留內距，內層給兩端 16px', () => {
     const rail = rule('.ms-rail')
     expect(rail).toContain('left: -16px')
     expect(rail).toContain('width: calc(100% + 32px)')
@@ -103,7 +109,6 @@ describe('模型選單在畫布彈層裡的版面', () => {
     expect(template).toContain('v-for="(b, i) in laneBuckets"')
     expect(template).toContain('toggleAllLanes(detailFamily)')
     expect(template).toContain('v-for="row in detailRowsFor(detailFamily)"')
-    expect(template).toContain("t('modelSelect.searchPlaceholder')")
     expect(template).toContain("t('modelSelect.noModelsFound')")
   })
 
@@ -145,11 +150,17 @@ describe('模型選單吃卡片美化', () => {
     expect(template).toMatch(/class="ms-row model-item" :class="\{ 'model-item-active': isFamilySelected\(family\) \}"/)
     expect(template).not.toMatch(/class="ms-family model-item"/)
   })
-  it('搜尋框是真的 input，有放大鏡，有字時有清除鍵', () => {
-    expect(template).toMatch(/<span class="ms-search-icon"[\s\S]*?<svg/)
-    expect(template).toMatch(/<CanvasInput\s+el-class="ms-search-input"/)
-    expect(template).toMatch(/v-if="searchQuery" class="ms-search-clear"/)
-    expect(template).not.toMatch(/<input[\s\S]{0,80}class="ms-search-input"/)
+  // owner 2026-10-02：搜尋框搬到殼的標題列上，跟「模型設定」同一行。
+  it('搜尋框在標題列上，是真的 input，有放大鏡，有字時有清除鍵', () => {
+    const shell = fs.readFileSync(path.resolve(__dirname, '../components/canvas-model-panel.vue'), 'utf8')
+    const shellTemplate = shell.slice(0, shell.indexOf('\n</template>'))
+    expect(shellTemplate).toMatch(/class="mp-top"[\s\S]{0,200}class="mp-title"[\s\S]{0,120}class="ms-search"/)
+    expect(shellTemplate).toMatch(/<span class="ms-search-icon"[\s\S]*?<svg/)
+    expect(shellTemplate).toMatch(/<CanvasInput\s+el-class="ms-search-input"/)
+    expect(shellTemplate).toMatch(/v-if="searchQuery" class="ms-search-clear"/)
+    expect(shellTemplate).not.toMatch(/<input[\s\S]{0,80}class="ms-search-input"/)
+    expect(shellTemplate).toContain('v-model:search-query="searchQuery"')
+    expect(template).not.toContain('class="ms-search"')
   })
   it('每次打開都把上一次的確認狀態歸零', () => {
     expect(template).toMatch(/watch\(\(\) => props\.open, \(open\) => \{\s*\n\s*if \(!open\) return;[\s\S]{0,400}isSure\.value = false;/)

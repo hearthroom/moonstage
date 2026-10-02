@@ -10,60 +10,13 @@
 	-->
 	<div class="ms-sheet">
 
-		<!-- 搜尋框：真的 input（模板裡的 <input> 會被編譯器包一層殼，殼自帶尺寸與一個空的
-			 佔位點，看起來像 bug）；左邊放放大鏡，讓人一眼知道這是搜尋。 -->
-		<div class="ms-search">
-			<span class="ms-search-icon" aria-hidden="true">
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-			</span>
-			<CanvasInput
-				el-class="ms-search-input"
-				:value="searchQuery"
-				:placeholder="t('modelSelect.searchPlaceholder')"
-				@input="searchQuery = $event" />
-			<span v-if="searchQuery" class="ms-search-clear" role="button" tabindex="0"
-				:aria-label="t('main.cancel')"
-				@click="searchQuery = ''"
-				@keydown.enter.prevent="searchQuery = ''">×</span>
-		</div>
+		<!-- 搜尋框在殼的標題列上（canvas-model-panel.vue），字由 searchQuery 傳進來：
+			 單獨佔一行的話，手機第一屏連一個模型都看不到（owner 2026-10-02 iPhone 截圖）。 -->
 
-		<!-- 分類。捲動容器本身不留左右內距，第一顆與最後一顆的邊距由內層給，
-			 內容才會滑到彈層邊緣才消失（DESIGN §3.3）。 -->
-		<div class="ms-rail">
-			<div class="ms-rail-inner">
-				<div
-					v-for="(tab, index) in displayTabs"
-					:key="index"
-					class="ms-chip model-filter-tab"
-					:class="{ 'is-on': tabCurrent === tab.tabIndex, 'active': tabCurrent === tab.tabIndex }"
-					@click="tabChange(tab.tabIndex)">
-					<span class="ms-chip-text">{{ tab.name }}</span>
-				</div>
-			</div>
-		</div>
-
-		<!-- 排序。不再是彈出的選單——選單蓋在清單上，在手機上就是一片黑。
-			 每一個選項都有一句「它實際在比什麼」，選中的那句寫在 rail 底下。 -->
-		<div class="ms-sort">
-			<span class="ms-eyebrow">{{ t('modelSelect.sortTitle') }}</span>
-			<div class="ms-rail">
-				<div class="ms-rail-inner">
-					<div
-						v-for="opt in SORT_OPTIONS"
-						:key="opt.value"
-						class="ms-chip model-filter-tab"
-						:class="{ 'is-on': sortMode === opt.value, 'active': sortMode === opt.value }"
-						@click="sortMode = opt.value">
-						<span class="ms-chip-text">{{ t(opt.labelKey) }}</span>
-					</div>
-				</div>
-			</div>
-			<span class="ms-hint">{{ t(sortDescKey) }}</span>
-		</div>
-
-		<!-- 設定常駐：上下文檔位、思考深度、Agent 模式。它們跟著選中的模型走。 -->
-		<template v-if="!isLoading">
-			<div class="ms-card">
+		<!-- 設定常駐：上下文檔位、思考深度、Agent 模式。它們跟著選中的模型走，
+			 收在同一張卡裡、用細線分段——三張卡各自的內距與間隔加起來就是半個螢幕。 -->
+		<div v-if="!isLoading" class="ms-card">
+			<div class="ms-set">
 				<span class="ms-card-title">{{ t('modelSelect.contextBudgetShort') }}</span>
 				<div class="ms-pills">
 					<div
@@ -86,7 +39,7 @@
 				<span class="ms-hint">{{ t('modelSelect.contextTierExplain') }}</span>
 			</div>
 
-			<div v-if="hasThinkingDepthOptions" class="ms-card">
+			<div v-if="hasThinkingDepthOptions" class="ms-set">
 				<span class="ms-card-title">{{ t('modelSelect.thinkingDepth') }}</span>
 				<div class="ms-pills">
 					<div
@@ -113,24 +66,63 @@
 			</div>
 
 			<!-- 模型不支援時停用但仍然顯示，並講出原因。整個消失的話，開著的
-				 對話換到不支援的模型之後，使用者看不到也關不掉。 -->
-			<div v-if="deepPrepVisible" class="ms-card">
-				<div class="ms-switch-line">
-					<div class="ms-switch-col">
-						<span class="ms-card-title">✦ {{ t('modelSelect.deepPrepLabel') }}</span>
-						<span class="ms-hint">{{ deepPrepModelSupported ? t('modelSelect.deepPrepHintBilling') : t('modelSelect.deepPrepUnsupported') }}</span>
-					</div>
-					<ASwitch
-						:checked="deepPrepOn"
-						:disabled="!deepPrepModelSupported || deepPrepSaving"
-						size="small"
-						@change="onDeepPrepChange" />
+				 對話換到不支援的模型之後，使用者看不到也關不掉。計費那句一直留著：
+				 開關會改變扣點方式，不能等開了才知道。 -->
+			<div v-if="deepPrepVisible" class="ms-set ms-switch-line">
+				<div class="ms-switch-col">
+					<span class="ms-card-title">✦ {{ t('modelSelect.deepPrepLabel') }}</span>
+					<span class="ms-hint">{{ deepPrepModelSupported ? t('modelSelect.deepPrepHintBilling') : t('modelSelect.deepPrepUnsupported') }}</span>
+				</div>
+				<ASwitch
+					:checked="deepPrepOn"
+					:disabled="!deepPrepModelSupported || deepPrepSaving"
+					size="small"
+					@change="onDeepPrepChange" />
+			</div>
+		</div>
+
+		<!-- 分類。捲動容器本身不留左右內距，第一顆與最後一顆的邊距由內層給，
+			 內容才會滑到彈層邊緣才消失（DESIGN §3.3）。 -->
+		<div class="ms-rail">
+			<div class="ms-rail-inner">
+				<div
+					v-for="(tab, index) in displayTabs"
+					:key="index"
+					class="ms-chip model-filter-tab"
+					:class="{ 'is-on': tabCurrent === tab.tabIndex, 'active': tabCurrent === tab.tabIndex }"
+					@click="tabChange(tab.tabIndex)">
+					<span class="ms-chip-text">{{ tab.name }}</span>
 				</div>
 			</div>
-		</template>
+		</div>
 
+		<!-- 清單標頭右邊是排序鍵，寫著現在怎麼排；點了才在它底下攤開選項。
+			 攤開的那一段在文流裡，不浮在清單上——浮起來的選單在手機上就是一片黑。 -->
 		<div class="ms-listhead">
 			<span class="ms-eyebrow">{{ t('modelSelect.allModels') }} · {{ displayFamilies.length }}</span>
+			<div class="ms-sort-toggle" :class="{ 'is-open': sortOpen }" role="button" tabindex="0"
+				:aria-expanded="sortOpen ? 'true' : 'false'"
+				@click="sortOpen = !sortOpen"
+				@keydown.enter.prevent="sortOpen = !sortOpen">
+				<svg class="ms-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
+				<span class="ms-sort-toggle-text">{{ sortLabel }}</span>
+				<svg class="ms-caret" :class="{ 'is-open': sortOpen }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 10l6 5 6-5" /></svg>
+			</div>
+		</div>
+
+		<!-- 每一個選項都有一句「它實際在比什麼」，選中的那句寫在選項底下。 -->
+		<div v-if="sortOpen" class="ms-sort">
+			<div class="ms-pills">
+				<div
+					v-for="opt in SORT_OPTIONS"
+					:key="opt.value"
+					class="ms-chip model-filter-tab"
+					:class="{ 'is-on': sortMode === opt.value, 'active': sortMode === opt.value }"
+					@click="chooseSort(opt.value)">
+					<span class="ms-chip-text">{{ t(opt.labelKey) }}</span>
+				</div>
+			</div>
+			<span class="ms-hint">{{ t(sortDescKey) }}</span>
 		</div>
 
 		<div class="ms-list">
@@ -175,6 +167,10 @@
 								<!-- 狀態燈只有例外態才亮。一頁全綠等於沒有燈。 -->
 								<div v-if="rowDotTone(family)" class="ms-dot" :class="'ms-dot-' + rowDotTone(family)"></div>
 								<span class="ms-name">{{ family.family }}</span>
+							</div>
+							<!-- 徽章跟線路名排在第二行：跟名字擠同一行時，手機上它們自己折成一行，
+								 一列就變三行高。 -->
+							<div class="ms-sub-line">
 								<div v-if="isFamilySelected(family)" class="ms-badge is-accent">
 									<span class="ms-badge-text">{{ t('modelSelect.currentInUse') }}</span>
 								</div>
@@ -190,8 +186,8 @@
 								<div v-else-if="hasFamilyBadge(family, 'new')" class="ms-badge">
 									<span class="ms-badge-text">{{ t('modelSelect.newBadge') }}</span>
 								</div>
+								<span v-if="rowMetaFor(family)" class="ms-meta">{{ rowMetaFor(family) }}</span>
 							</div>
-							<span v-if="rowMetaFor(family)" class="ms-meta">{{ rowMetaFor(family) }}</span>
 						</div>
 
 						<div class="ms-price-col">
@@ -308,18 +304,20 @@
 										:class="'ms-dot-' + variantDotTone(variant)"></div>
 									<span class="ms-opt-price">{{ variantPriceText(variant) }}</span>
 								</div>
-								<!-- 指標直接掛在這條線路底下，讀的人不必自己配名字。 -->
-								<span class="ms-opt-meta">{{ laneMetaFor(variant) }}</span>
-								<!-- 整列只有一個結果：選這條線路。次動作只在**已經選中**的那一列出現，
+								<!-- 指標直接掛在這條線路底下，讀的人不必自己配名字。
+									 整列只有一個結果：選這條線路。次動作只在**已經選中**的那一列出現，
 									 而且帶文字——裸箭頭在列尾的語意是「整列會導航」，跟這裡「整列是選取」
-									 正好相反。 -->
-								<div
-									v-if="formData.selectModel === variant.value"
-									class="ms-opt-entry"
-									@click.stop="openLaneDetail(detailFamily, variant)">
-									<span class="ms-opt-entry-text">{{ t('modelSelect.laneDetailEntry') }}</span>
-									<svg class="ms-opt-entry-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-										stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+									 正好相反。它跟指標擠同一行，不另開一列。 -->
+								<div class="ms-opt-line2">
+									<span class="ms-opt-meta">{{ laneMetaFor(variant) }}</span>
+									<div
+										v-if="formData.selectModel === variant.value"
+										class="ms-opt-entry"
+										@click.stop="openLaneDetail(detailFamily, variant)">
+										<span class="ms-opt-entry-text">{{ t('modelSelect.laneDetailEntry') }}</span>
+										<svg class="ms-opt-entry-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+											stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+									</div>
 								</div>
 							</div>
 
@@ -371,7 +369,7 @@
 			<div v-else class="ms-empty">
 				<span class="ms-empty-title">{{ t('modelSelect.noModelsFound') }}</span>
 				<span class="ms-hint">{{ t('modelSelect.tryAnotherFilter') }}</span>
-				<div class="ms-pill is-on ms-empty-btn" @click="searchQuery = ''; tabChange(-1)">
+				<div class="ms-pill is-on ms-empty-btn" @click="$emit('update:searchQuery', ''); tabChange(-1)">
 					<span class="ms-pill-text">{{ t('modelSelect.allModels') }}</span>
 				</div>
 			</div>
@@ -397,7 +395,6 @@
 	// @ts-nocheck
 	import { useStageHost } from '@/host/stage-host'
 	const stageHost = useStageHost()
-	import { CanvasInput } from '@/pages/canvas/components/canvas-field'
 	import { variantPrice, priceMeaning } from '@/pages/canvas/canvas-model-catalog'
 	import { visibleLanes, hiddenLaneCount, laneTagOf, isDeadLane, composeModelDisplayName } from '@/pages/canvas/canvas-model-lanes'
 	import icon_deepseek from '@/static/icon/models/deepseek.png';
@@ -499,15 +496,18 @@
 		showThinkingProcess?: boolean
 		autoCompactEnabled?: boolean
 		compactExtraInstruction?: string
+		/** 搜尋框住在殼的標題列上，字從那裡傳進來 */
+		searchQuery?: string
 	}>(), {
 		roleId: '', open: true, selectModel: '', selectModelName: '', context: 1,
 		thinkingDepth: '', showThinkingProcess: true, autoCompactEnabled: false,
-		compactExtraInstruction: '',
+		compactExtraInstruction: '', searchQuery: '',
 	});
 
 	const emit = defineEmits<{
 		(e: 'select', payload: Record<string, unknown>): void
 		(e: 'close'): void
+		(e: 'update:searchQuery', value: string): void
 		(e: 'draft', payload: { value: string; name: string; price: string; context: number; tier: string; fromTier: string }): void
 	}>();
 
@@ -1080,12 +1080,16 @@ const truncationText = (completionRate: number) => {
 	// 純計算在 utils/model-select-presentation.ts，mobile 有一份同語意的 .js。
 	// 計價一旦兩端漂移，就是使用者看到一個數字、被扣另一個。
 
-	const searchQuery = ref('');
-	// 桌面版設定常駐（不像手機收成 chip），所以只有排序需要彈層。
-	const sortSheetOpen = ref(false);
+	const searchQuery = computed(() => props.searchQuery || '');
+	// 排序選項平常收著，只露出一顆寫著目前排法的鍵；選完就收回去。
+	const sortOpen = ref(false);
 	// 預設「熱門」：站內用量欄位還沒上線時每個家族同分，tie-break 讓它自然退回
 	// 原次序，也就是設計文件 §3.55 的降級行為。
 	const sortMode = ref('popular');
+	const chooseSort = (value) => {
+		sortMode.value = value;
+		sortOpen.value = false;
+	};
 	// 桌面版右側是常駐詳情面板，不是手風琴——有空間就不必展開／收合。
 	const detailFamilyName = ref('');
 

@@ -2104,8 +2104,16 @@
   }
 
   .mp-title {
+    flex: 0 0 auto;
     font-size: 15px;
     font-weight: 600;
+  }
+
+  /* 標題列上的搜尋框吃掉標題右邊剩下的寬度 */
+  .mp-top .ms-search {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 32px;
   }
 
   .mp-close {
@@ -2372,7 +2380,7 @@
   .ms-sheet {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     padding-bottom: 8px;
     font-family: var(--lt-canvas-font);
     color: var(--lt-canvas-sheet-fg);
@@ -2535,14 +2543,59 @@
     gap: 8px;
   }
 
-  /* 設定卡 */
+  /* 清單標頭：左邊數量，右邊排序鍵 */
+  .ms-listhead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 32px;
+  }
+
+  .ms-sort-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 32px;
+    padding: 0 0 0 8px;
+    font-size: 12px;
+    color: var(--lt-canvas-muted);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .ms-sort-toggle.is-open {
+    color: var(--lt-canvas-accent);
+  }
+
+  .ms-sort-icon {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+  }
+
+  /* 設定卡：三組設定收在同一張卡裡，段與段之間一條細線 */
   .ms-card {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 12px;
+    padding: 0 12px;
     border-radius: var(--lt-canvas-sheet-radius);
     background: var(--lt-canvas-sheet-item-bg);
+  }
+
+  .ms-set {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 0;
+  }
+
+  .ms-set + .ms-set {
+    border-top: 1px solid var(--lt-canvas-sheet-line);
+  }
+
+  .ms-set.ms-switch-line {
+    flex-direction: row;
   }
 
   .ms-card-title {
@@ -2574,10 +2627,6 @@
     color: var(--lt-canvas-muted);
   }
 
-  .ms-listhead {
-    padding-top: 4px;
-  }
-
   /* 清單：一列一張卡，詳情長在同一張卡裡 */
   .ms-list {
     display: flex;
@@ -2604,8 +2653,8 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 56px;
-    padding: 10px 12px;
+    min-height: 48px;
+    padding: 8px 12px;
     cursor: pointer;
   }
 
@@ -2641,10 +2690,10 @@
     min-width: 0;
   }
 
-  .ms-name-line {
+  .ms-name-line,
+  .ms-sub-line {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
     gap: 6px;
     min-width: 0;
   }
@@ -2656,6 +2705,8 @@
   }
 
   .ms-meta {
+    flex: 1 1 auto;
+    min-width: 0;
     font-size: 11px;
     color: var(--lt-canvas-muted);
     overflow: hidden;
@@ -2758,8 +2809,8 @@
   .ms-detail {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 12px;
+    gap: 6px;
+    padding: 10px 12px;
     border-top: 1px solid var(--lt-canvas-sheet-line);
   }
 
@@ -2782,8 +2833,8 @@
   .ms-opt {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding: 10px 12px;
+    gap: 2px;
+    padding: 8px 12px;
     border-radius: 12px;
     border: 1px solid var(--lt-canvas-sheet-line);
     cursor: pointer;
@@ -2832,8 +2883,18 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .ms-opt-meta {
+  /* 線路第二行：左邊指標，選中的那一條右邊多一個「查看可用率紀錄」 */
+  .ms-opt-line2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
     padding-left: 24px;
+  }
+
+  .ms-opt-meta {
+    flex: 1 1 auto;
+    min-width: 0;
     font-size: 11px;
     line-height: 1.5;
     color: var(--lt-canvas-muted);
@@ -2842,10 +2903,8 @@
   .ms-opt-entry {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 8px 0 0 24px;
-    border-top: 1px solid var(--lt-canvas-sheet-line);
+    flex: 0 0 auto;
+    gap: 2px;
     font-size: 12px;
     color: var(--lt-canvas-accent);
   }
