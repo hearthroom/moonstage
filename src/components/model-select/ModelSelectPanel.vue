@@ -465,6 +465,7 @@
 	import { getAaAgenticIndex, getAaIntelligenceIndex, getModelHealthMetrics, getUsageRank } from '@/utils/model-health-metrics'
 	import {
 		laneMetrics,
+		orderModelGroups,
 		detailMetrics,
 		variantStatusTone,
 	uptimeBucketTone,
@@ -1061,10 +1062,13 @@ const truncationText = (completionRate: number) => {
 
 	// Display tabs
 	const displayTabs = computed(() => {
-		const tabs = modelTabs.value.map((tab, index) => ({
+		// tabIndex 是在伺服器原順序裡的位置（篩選靠它），排序只改顯示的先後。
+		const tabs = orderModelGroups(modelTabs.value.map((tab, index) => ({
+			group: tab.group,
+			families: tab.families,
 			name: tab.group,
 			tabIndex: index
-		}));
+		})));
 		// 「全部」放最前面：它是預設值，擺在十幾個分類的尾巴等於每次都要滑到底才回得來。
 		tabs.unshift({ name: t('modelSelect.allModels'), tabIndex: -1 });
 		return tabs;
