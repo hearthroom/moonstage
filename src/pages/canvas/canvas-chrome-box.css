@@ -175,6 +175,9 @@
 .ms-set {
     padding: 10px 0
 }
+.ms-agent-label {
+    padding-left: 8px
+}
 .ms-set .ms-pill {
     padding: 0 10px
 }
