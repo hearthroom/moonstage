@@ -75,7 +75,7 @@ describe('模型選單在畫布彈層裡的版面', () => {
   })
 
   it('詳情長在被點開的那一列底下，跟列在同一張卡裡（同一次 v-for）', () => {
-    const family = template.slice(template.indexOf('v-for="family in displayFamilies"'))
+    const family = template.slice(template.indexOf('v-for="family in column"'))
     expect(family).toMatch(/class="ms-family"[\s\S]*?class="ms-row model-item"[\s\S]*?<template v-if="detailFamily && detailFamily\.family === family\.family">/)
     // 列上的點擊是開／收，不是只開
     expect(template).toContain('@click="toggleDetail(family)"')

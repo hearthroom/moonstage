@@ -184,228 +184,232 @@
 					列與它的詳情要在**同一次迭代**裡（key 掛在卡上），否則清單重排時詳情會被
 					重新掛載，正在看的可用率圖表整個掉回去。
 				-->
-				<div
-					v-for="family in displayFamilies"
-					:key="familyKey(family)"
-					class="ms-family"
-					:class="{
-						'is-current': isFamilySelected(family),
-						'is-active': detailFamily && detailFamily.family === family.family
-					}">
-					<!-- 舊頁面的 .model-item 是「一條列」：卡片對選中列寫的是整塊填主色＋白字。
-						 名字掛在列上、不掛在整張家族卡上，展開的線路清單才不會整片被填掉
-						 （owner 2026-09-05 iPhone 截圖）。 -->
-					<div class="ms-row model-item" :class="{ 'model-item-active': isFamilySelected(family) }" @click="toggleDetail(family)">
-						<div class="ms-tile" :style="modelIconFor(family) ? { background: modelIconBgFor(family) } : monogramStyle(family)">
-							<img v-if="modelIconFor(family)" class="ms-tile-img" :src="modelIconFor(family)"  />
-							<span v-else class="ms-tile-mono">{{ family.family.charAt(0).toUpperCase() }}</span>
+				<!-- 寬螢幕排成左右兩欄，兩欄各自往下長：展開一個模型只把它那一欄往下推，
+					 另一欄不動，展開的詳情也維持窄的一條（owner 2026-10-02）。手機就是一欄。 -->
+				<div v-for="(column, ci) in listColumns" :key="'col-' + ci" class="ms-list-col">
+					<div
+						v-for="family in column"
+						:key="familyKey(family)"
+						class="ms-family"
+						:class="{
+							'is-current': isFamilySelected(family),
+							'is-active': detailFamily && detailFamily.family === family.family
+						}">
+						<!-- 舊頁面的 .model-item 是「一條列」：卡片對選中列寫的是整塊填主色＋白字。
+							 名字掛在列上、不掛在整張家族卡上，展開的線路清單才不會整片被填掉
+							 （owner 2026-09-05 iPhone 截圖）。 -->
+						<div class="ms-row model-item" :class="{ 'model-item-active': isFamilySelected(family) }" @click="toggleDetail(family)">
+							<div class="ms-tile" :style="modelIconFor(family) ? { background: modelIconBgFor(family) } : monogramStyle(family)">
+								<img v-if="modelIconFor(family)" class="ms-tile-img" :src="modelIconFor(family)"  />
+								<span v-else class="ms-tile-mono">{{ family.family.charAt(0).toUpperCase() }}</span>
+							</div>
+
+							<!-- 兩行，每行都撐滿：第一行名字＋價格，第二行徽章＋指標，右端寫有幾條線路。
+								 價格不再自己佔一欄——佔一欄時名字被擠到折行，一列變三行高。 -->
+							<div class="ms-name-col">
+								<div class="ms-name-line">
+									<!-- 狀態燈只有例外態才亮。一頁全綠等於沒有燈。 -->
+									<div v-if="rowDotTone(family)" class="ms-dot" :class="'ms-dot-' + rowDotTone(family)"></div>
+									<span class="ms-name">{{ family.family }}</span>
+									<span v-if="originalPriceFor(family)" class="ms-price-was">{{ originalPriceFor(family) }}</span>
+									<span class="ms-price" :class="{ 'is-accent': family.discountUntilTs > 0 }">{{ priceTextFor(family) }}</span>
+								</div>
+								<div class="ms-sub-line">
+									<div v-if="isFamilySelected(family)" class="ms-badge is-accent">
+										<span class="ms-badge-text">{{ t('modelSelect.currentInUse') }}</span>
+									</div>
+									<div v-if="family.discountUntilTs > 0" class="ms-badge is-accent">
+										<span class="ms-badge-text">-{{ getDiscountPercent(family) }}%</span>
+									</div>
+									<div v-else-if="isFreeFamily(family)" class="ms-badge">
+										<span class="ms-badge-text">{{ t('modelSelect.free') }}</span>
+									</div>
+									<div v-else-if="family.isMember" class="ms-badge">
+										<span class="ms-badge-text">VIP</span>
+									</div>
+									<div v-else-if="hasFamilyBadge(family, 'new')" class="ms-badge">
+										<span class="ms-badge-text">{{ t('modelSelect.newBadge') }}</span>
+									</div>
+									<span class="ms-meta">{{ rowMetaFor(family) }}</span>
+									<span class="ms-expand-hint">{{ expandHintFor(family) }}</span>
+									<svg class="ms-caret" :class="{ 'is-open': detailFamily && detailFamily.family === family.family }"
+										viewBox="0 0 24 24" fill="none" stroke="currentColor"
+										stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+										<path d="M6 10l6 5 6-5" />
+									</svg>
+								</div>
+							</div>
 						</div>
 
-						<!-- 兩行，每行都撐滿：第一行名字＋價格，第二行徽章＋指標，右端寫有幾條線路。
-							 價格不再自己佔一欄——佔一欄時名字被擠到折行，一列變三行高。 -->
-						<div class="ms-name-col">
-							<div class="ms-name-line">
-								<!-- 狀態燈只有例外態才亮。一頁全綠等於沒有燈。 -->
-								<div v-if="rowDotTone(family)" class="ms-dot" :class="'ms-dot-' + rowDotTone(family)"></div>
-								<span class="ms-name">{{ family.family }}</span>
-								<span v-if="originalPriceFor(family)" class="ms-price-was">{{ originalPriceFor(family) }}</span>
-								<span class="ms-price" :class="{ 'is-accent': family.discountUntilTs > 0 }">{{ priceTextFor(family) }}</span>
-							</div>
-							<div class="ms-sub-line">
-								<div v-if="isFamilySelected(family)" class="ms-badge is-accent">
-									<span class="ms-badge-text">{{ t('modelSelect.currentInUse') }}</span>
+						<template v-if="detailFamily && detailFamily.family === family.family">
+							<!-- 第二層：一條線路的 72 小時可用率。同一張卡裡換內容，左上角回上一層。 -->
+							<div v-if="laneDetailVariant" class="ms-detail">
+								<div class="ms-lane-back" @click="closeLaneDetail">
+									<svg class="ms-lane-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+										stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
+									<span class="ms-lane-back-text">{{ laneDetailFamily ? laneDetailFamily.family : '' }}</span>
 								</div>
-								<div v-if="family.discountUntilTs > 0" class="ms-badge is-accent">
-									<span class="ms-badge-text">-{{ getDiscountPercent(family) }}%</span>
-								</div>
-								<div v-else-if="isFreeFamily(family)" class="ms-badge">
-									<span class="ms-badge-text">{{ t('modelSelect.free') }}</span>
-								</div>
-								<div v-else-if="family.isMember" class="ms-badge">
-									<span class="ms-badge-text">VIP</span>
-								</div>
-								<div v-else-if="hasFamilyBadge(family, 'new')" class="ms-badge">
-									<span class="ms-badge-text">{{ t('modelSelect.newBadge') }}</span>
-								</div>
-								<span class="ms-meta">{{ rowMetaFor(family) }}</span>
-								<span class="ms-expand-hint">{{ expandHintFor(family) }}</span>
-								<svg class="ms-caret" :class="{ 'is-open': detailFamily && detailFamily.family === family.family }"
-									viewBox="0 0 24 24" fill="none" stroke="currentColor"
-									stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-									<path d="M6 10l6 5 6-5" />
-								</svg>
-							</div>
-						</div>
-					</div>
+								<span class="ms-detail-name">{{ laneDetailName }}</span>
 
-					<template v-if="detailFamily && detailFamily.family === family.family">
-						<!-- 第二層：一條線路的 72 小時可用率。同一張卡裡換內容，左上角回上一層。 -->
-						<div v-if="laneDetailVariant" class="ms-detail">
-							<div class="ms-lane-back" @click="closeLaneDetail">
-								<svg class="ms-lane-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-									stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
-								<span class="ms-lane-back-text">{{ laneDetailFamily ? laneDetailFamily.family : '' }}</span>
-							</div>
-							<span class="ms-detail-name">{{ laneDetailName }}</span>
-
-							<div class="ms-lane-head">
-								<div class="ms-chip-status" :class="'ms-chip-' + laneDetailTone">
-									<div class="ms-dot" :class="'ms-dot-fill-' + laneDetailTone"></div>
-									<span class="ms-chip-status-text">{{ laneDetailStatusText }}</span>
+								<div class="ms-lane-head">
+									<div class="ms-chip-status" :class="'ms-chip-' + laneDetailTone">
+										<div class="ms-dot" :class="'ms-dot-fill-' + laneDetailTone"></div>
+										<span class="ms-chip-status-text">{{ laneDetailStatusText }}</span>
+									</div>
+									<span v-if="laneHistory && laneHistory.percentText" class="ms-lane-pct">{{ laneHistory.percentText }}</span>
+									<span class="ms-lane-pct-cap">{{ t('modelSelect.laneDetailUptime') }}</span>
 								</div>
-								<span v-if="laneHistory && laneHistory.percentText" class="ms-lane-pct">{{ laneHistory.percentText }}</span>
-								<span class="ms-lane-pct-cap">{{ t('modelSelect.laneDetailUptime') }}</span>
+
+								<div v-if="laneHistoryLoading" class="ms-lane-empty">
+									<span class="ms-hint">{{ t('modelSelect.speedObserving') }}</span>
+								</div>
+								<div v-else-if="!laneBuckets.length" class="ms-lane-empty">
+									<span class="ms-hint">{{ t('modelSelect.laneDetailEmpty') }}</span>
+								</div>
+								<template v-else>
+									<div class="ms-buckets">
+										<div
+											v-for="(b, i) in laneBuckets"
+											:key="b.hourStartMs"
+											class="ms-bucket"
+											:class="['ms-bucket-' + b.tone, { 'ms-bucket-sel': laneSelectedIndex === i }]"
+											:style="{ width: laneBucketWidthPct + '%' }"
+											@mouseenter="laneSelectedIndex = i"
+											@mouseleave="laneSelectedIndex = -1"
+											@click.stop="laneSelectedIndex = laneSelectedIndex === i ? -1 : i"></div>
+									</div>
+									<!-- tooltip 放方塊條**下方**：放上方會蓋掉可用率那個數字。 -->
+									<div class="ms-bucket-tipwrap">
+										<div v-if="laneSelected" class="ms-bucket-dot" :style="laneDotStyle"></div>
+										<div v-if="laneSelected" class="ms-bucket-tip" :style="laneTipStyle">
+											<span class="ms-bucket-tip-t">{{ laneSelected.rangeText }}</span>
+											<div class="ms-bucket-tip-row">
+												<div v-if="laneSelected.tone !== 'none'" class="ms-dot" :class="'ms-dot-fill-' + laneSelected.tone"></div>
+												<span class="ms-bucket-tip-v">{{ laneSelected.valueText }}</span>
+											</div>
+										</div>
+									</div>
+									<div class="ms-bucket-axis">
+										<span class="ms-bucket-axis-t">{{ t('modelSelect.bucketAxisDay3') }}</span>
+										<span class="ms-bucket-axis-t">{{ t('modelSelect.bucketAxisDay2') }}</span>
+										<span class="ms-bucket-axis-t">{{ t('modelSelect.bucketAxisDay1') }}</span>
+										<span class="ms-bucket-axis-t">{{ t('modelSelect.bucketAxisNow') }}</span>
+									</div>
+									<div class="ms-bucket-legend">
+										<div v-for="k in bucketLegend" :key="k.tone" class="ms-bucket-key">
+											<div class="ms-bucket-sw" :class="'ms-bucket-' + k.tone"></div>
+											<span class="ms-bucket-key-t">{{ k.text }}</span>
+										</div>
+									</div>
+								</template>
+
+								<span class="ms-eyebrow ms-detail-eyebrow">{{ t('modelSelect.laneMetricsHeading') }}</span>
+								<div v-for="row in laneDetailMetrics" :key="row.key" class="ms-kv">
+									<span class="ms-kv-k">{{ row.label }}</span>
+									<span class="ms-kv-v">{{ row.value }}</span>
+								</div>
+								<span class="ms-src">{{ t('modelSelect.laneHistorySource') }}</span>
 							</div>
 
-							<div v-if="laneHistoryLoading" class="ms-lane-empty">
-								<span class="ms-hint">{{ t('modelSelect.speedObserving') }}</span>
-							</div>
-							<div v-else-if="!laneBuckets.length" class="ms-lane-empty">
-								<span class="ms-hint">{{ t('modelSelect.laneDetailEmpty') }}</span>
-							</div>
-							<template v-else>
-								<div class="ms-buckets">
+							<!-- 第一層：說明 → 線路 → 狀況徽章 → 評測與用量。全部在文流裡，一起捲。 -->
+							<div v-else class="ms-detail">
+								<span v-if="isFreeFamily(detailFamily) || getDisplayDescription(detailFamily)" class="ms-detail-desc">{{ isFreeFamily(detailFamily) ? t('modelSelect.freeModelDesc') : getDisplayDescription(detailFamily) }}</span>
+
+								<!-- 線路是一張表：價格的意思（下一輪約／新對話約）寫在欄頭一次，
+									 每列只放數字——每列都寫一次「下一輪約」，名字就沒地方放了。 -->
+								<div class="ms-lane-headrow">
+									<span class="ms-eyebrow">{{ optionSectionLabel(detailFamily) }}</span>
+									<span v-if="laneHeadFor(detailFamily)" class="ms-eyebrow">{{ laneHeadFor(detailFamily) }}</span>
+								</div>
+								<div class="ms-opts">
 									<div
-										v-for="(b, i) in laneBuckets"
-										:key="b.hourStartMs"
-										class="ms-bucket"
-										:class="['ms-bucket-' + b.tone, { 'ms-bucket-sel': laneSelectedIndex === i }]"
-										:style="{ width: laneBucketWidthPct + '%' }"
-										@mouseenter="laneSelectedIndex = i"
-										@mouseleave="laneSelectedIndex = -1"
-										@click.stop="laneSelectedIndex = laneSelectedIndex === i ? -1 : i"></div>
-								</div>
-								<!-- tooltip 放方塊條**下方**：放上方會蓋掉可用率那個數字。 -->
-								<div class="ms-bucket-tipwrap">
-									<div v-if="laneSelected" class="ms-bucket-dot" :style="laneDotStyle"></div>
-									<div v-if="laneSelected" class="ms-bucket-tip" :style="laneTipStyle">
-										<span class="ms-bucket-tip-t">{{ laneSelected.rangeText }}</span>
-										<div class="ms-bucket-tip-row">
-											<div v-if="laneSelected.tone !== 'none'" class="ms-dot" :class="'ms-dot-fill-' + laneSelected.tone"></div>
-											<span class="ms-bucket-tip-v">{{ laneSelected.valueText }}</span>
+										v-for="variant in getVisibleVariants(detailFamily)"
+										:key="variant.value"
+										class="ms-opt"
+										:class="{ 'is-on': formData.selectModel === variant.value }"
+										@click="selectVariant(detailFamily, variant)">
+										<div class="ms-opt-line1">
+											<div class="ms-radio" :class="{ 'is-on': formData.selectModel === variant.value }"></div>
+											<span class="ms-opt-name">{{ optionLabelFor(detailFamily, variant) }}</span>
+											<!-- 官方／實惠是伺服器下發的標籤（自己接的線路手動配，OpenRouter 依開發商
+												 自家供貨判定）。實惠用金色、官方用藍色，一眼分得開。 -->
+											<div
+												v-if="laneTagOf(variant)"
+												class="ms-badge"
+												:class="{ 'is-accent': laneTagOf(variant) === 'value', 'is-official': laneTagOf(variant) === 'official' }">
+												<span class="ms-badge-text">{{ t(laneTagOf(variant) === 'official' ? 'modelSelect.laneOfficial' : 'modelSelect.laneValue') }}</span>
+											</div>
+											<!-- 上游供應商此刻掛著的折扣。扣費是跟著它走的（server 端用供應商現價
+												 算成本），所以這個數字不是裝飾。它沒有截止時間，隨時會結束。 -->
+											<div v-if="variant.providerDiscountPercent > 0" class="ms-badge is-accent">
+												<span class="ms-badge-text">-{{ variant.providerDiscountPercent }}%</span>
+											</div>
+											<div
+												v-if="variantDotTone(variant)"
+												class="ms-dot"
+												:class="'ms-dot-' + variantDotTone(variant)"></div>
+											<span class="ms-opt-price">{{ laneAmountText(detailFamily, variant) }}</span>
+										</div>
+										<!-- 指標直接掛在這條線路底下，讀的人不必自己配名字。
+											 整列只有一個結果：選這條線路。次動作只在**已經選中**的那一列出現，
+											 而且帶文字——裸箭頭在列尾的語意是「整列會導航」，跟這裡「整列是選取」
+											 正好相反。它跟指標擠同一行，不另開一列。 -->
+										<div class="ms-opt-line2">
+											<span class="ms-opt-meta">{{ laneMetaFor(variant) }}</span>
+											<div
+												v-if="formData.selectModel === variant.value"
+												class="ms-opt-entry"
+												@click.stop="openLaneDetail(detailFamily, variant)">
+												<span class="ms-opt-entry-text">{{ t('modelSelect.laneDetailEntry') }}</span>
+												<svg class="ms-opt-entry-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+													stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+											</div>
 										</div>
 									</div>
 								</div>
-								<div class="ms-bucket-axis">
-									<span class="ms-bucket-axis-t">{{ t('modelSelect.bucketAxisDay3') }}</span>
-									<span class="ms-bucket-axis-t">{{ t('modelSelect.bucketAxisDay2') }}</span>
-									<span class="ms-bucket-axis-t">{{ t('modelSelect.bucketAxisDay1') }}</span>
-									<span class="ms-bucket-axis-t">{{ t('modelSelect.bucketAxisNow') }}</span>
-								</div>
-								<div class="ms-bucket-legend">
-									<div v-for="k in bucketLegend" :key="k.tone" class="ms-bucket-key">
-										<div class="ms-bucket-sw" :class="'ms-bucket-' + k.tone"></div>
-										<span class="ms-bucket-key-t">{{ k.text }}</span>
-									</div>
-								</div>
-							</template>
 
-							<span class="ms-eyebrow ms-detail-eyebrow">{{ t('modelSelect.laneMetricsHeading') }}</span>
-							<div v-for="row in laneDetailMetrics" :key="row.key" class="ms-kv">
-								<span class="ms-kv-k">{{ row.label }}</span>
-								<span class="ms-kv-v">{{ row.value }}</span>
-							</div>
-							<span class="ms-src">{{ t('modelSelect.laneHistorySource') }}</span>
-						</div>
-
-						<!-- 第一層：說明 → 線路 → 狀況徽章 → 評測與用量。全部在文流裡，一起捲。 -->
-						<div v-else class="ms-detail">
-							<span v-if="isFreeFamily(detailFamily) || getDisplayDescription(detailFamily)" class="ms-detail-desc">{{ isFreeFamily(detailFamily) ? t('modelSelect.freeModelDesc') : getDisplayDescription(detailFamily) }}</span>
-
-							<!-- 線路是一張表：價格的意思（下一輪約／新對話約）寫在欄頭一次，
-								 每列只放數字——每列都寫一次「下一輪約」，名字就沒地方放了。 -->
-							<div class="ms-lane-headrow">
-								<span class="ms-eyebrow">{{ optionSectionLabel(detailFamily) }}</span>
-								<span v-if="laneHeadFor(detailFamily)" class="ms-eyebrow">{{ laneHeadFor(detailFamily) }}</span>
-							</div>
-							<div class="ms-opts">
+								<!-- 收起來的是名冊補位之外的供應商。標籤寫出還有幾條——只放一個箭頭的話，
+									 使用者不知道展開會拿到什麼。 -->
 								<div
-									v-for="variant in getVisibleVariants(detailFamily)"
-									:key="variant.value"
-									class="ms-opt"
-									:class="{ 'is-on': formData.selectModel === variant.value }"
-									@click="selectVariant(detailFamily, variant)">
-									<div class="ms-opt-line1">
-										<div class="ms-radio" :class="{ 'is-on': formData.selectModel === variant.value }"></div>
-										<span class="ms-opt-name">{{ optionLabelFor(detailFamily, variant) }}</span>
-										<!-- 官方／實惠是伺服器下發的標籤（自己接的線路手動配，OpenRouter 依開發商
-											 自家供貨判定）。實惠用金色、官方用藍色，一眼分得開。 -->
-										<div
-											v-if="laneTagOf(variant)"
-											class="ms-badge"
-											:class="{ 'is-accent': laneTagOf(variant) === 'value', 'is-official': laneTagOf(variant) === 'official' }">
-											<span class="ms-badge-text">{{ t(laneTagOf(variant) === 'official' ? 'modelSelect.laneOfficial' : 'modelSelect.laneValue') }}</span>
-										</div>
-										<!-- 上游供應商此刻掛著的折扣。扣費是跟著它走的（server 端用供應商現價
-											 算成本），所以這個數字不是裝飾。它沒有截止時間，隨時會結束。 -->
-										<div v-if="variant.providerDiscountPercent > 0" class="ms-badge is-accent">
-											<span class="ms-badge-text">-{{ variant.providerDiscountPercent }}%</span>
-										</div>
-										<div
-											v-if="variantDotTone(variant)"
-											class="ms-dot"
-											:class="'ms-dot-' + variantDotTone(variant)"></div>
-										<span class="ms-opt-price">{{ laneAmountText(detailFamily, variant) }}</span>
+									v-if="hiddenVariantCount(detailFamily) > 0"
+									class="ms-more"
+									@click="toggleAllLanes(detailFamily)">
+									<span class="ms-more-text">{{ laneToggleLabel(detailFamily) }}</span>
+									<svg
+										class="ms-caret"
+										:class="{ 'is-open': isShowingAllLanes(detailFamily) }"
+										viewBox="0 0 24 24" fill="none" stroke="currentColor"
+										stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+										<path d="M6 10l6 5 6-5" />
+									</svg>
+								</div>
+
+								<span v-if="dynamicNoteFor(detailFamily)" class="ms-note">{{ dynamicNoteFor(detailFamily) }}</span>
+
+								<!-- 警示徽章排在指標之前：它們是「現在有狀況」，該先看到。
+									 「樣本不足」不在這裡——它折進可用率那一列的值，緊貼它修飾的數字。 -->
+								<div v-if="hasSignalBadges(detailFamily)" class="ms-signals">
+									<div v-for="badge in alertBadgesFor(detailFamily)" :key="badge.key" class="ms-badge">
+										<span class="ms-badge-text">{{ t(badge.key) }}</span>
 									</div>
-									<!-- 指標直接掛在這條線路底下，讀的人不必自己配名字。
-										 整列只有一個結果：選這條線路。次動作只在**已經選中**的那一列出現，
-										 而且帶文字——裸箭頭在列尾的語意是「整列會導航」，跟這裡「整列是選取」
-										 正好相反。它跟指標擠同一行，不另開一列。 -->
-									<div class="ms-opt-line2">
-										<span class="ms-opt-meta">{{ laneMetaFor(variant) }}</span>
-										<div
-											v-if="formData.selectModel === variant.value"
-											class="ms-opt-entry"
-											@click.stop="openLaneDetail(detailFamily, variant)">
-											<span class="ms-opt-entry-text">{{ t('modelSelect.laneDetailEntry') }}</span>
-											<svg class="ms-opt-entry-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-												stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
-										</div>
+									<div v-if="getNoLimitBadgeState(detailFamily)" class="ms-badge">
+										<span class="ms-badge-text">{{ getNoLimitBadgeText(detailFamily) }}</span>
 									</div>
 								</div>
-							</div>
 
-							<!-- 收起來的是名冊補位之外的供應商。標籤寫出還有幾條——只放一個箭頭的話，
-								 使用者不知道展開會拿到什麼。 -->
-							<div
-								v-if="hiddenVariantCount(detailFamily) > 0"
-								class="ms-more"
-								@click="toggleAllLanes(detailFamily)">
-								<span class="ms-more-text">{{ laneToggleLabel(detailFamily) }}</span>
-								<svg
-									class="ms-caret"
-									:class="{ 'is-open': isShowingAllLanes(detailFamily) }"
-									viewBox="0 0 24 24" fill="none" stroke="currentColor"
-									stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-									<path d="M6 10l6 5 6-5" />
-								</svg>
-							</div>
-
-							<span v-if="dynamicNoteFor(detailFamily)" class="ms-note">{{ dynamicNoteFor(detailFamily) }}</span>
-
-							<!-- 警示徽章排在指標之前：它們是「現在有狀況」，該先看到。
-								 「樣本不足」不在這裡——它折進可用率那一列的值，緊貼它修飾的數字。 -->
-							<div v-if="hasSignalBadges(detailFamily)" class="ms-signals">
-								<div v-for="badge in alertBadgesFor(detailFamily)" :key="badge.key" class="ms-badge">
-									<span class="ms-badge-text">{{ t(badge.key) }}</span>
-								</div>
-								<div v-if="getNoLimitBadgeState(detailFamily)" class="ms-badge">
-									<span class="ms-badge-text">{{ getNoLimitBadgeText(detailFamily) }}</span>
+								<!-- 兩欄 KV：列組固定，沒有資料的列畫「—」而不是整列消失。
+									 列會忽有忽無的話，同一個位置在不同卡片上是不同的東西，
+									 跨卡片比較就沒了——而那正是選 KV 的理由。
+									 綜合智力不在這裡：收合列的指標帶已經有了，展開只給新東西。 -->
+								<!-- 用量一列，左標右值。不另開標題、不寫出處：這一列自己就說清楚了。
+									 可用率不在這裡——每條線路列上已經各寫了一次。 -->
+								<div v-for="row in detailRowsFor(detailFamily)" :key="row.key" class="ms-kv">
+									<span class="ms-kv-k">{{ t(row.labelKey) }}</span>
+									<span class="ms-kv-v" :class="{ 'is-none': !row.value }">{{ row.value || '—' }}</span>
 								</div>
 							</div>
-
-							<!-- 兩欄 KV：列組固定，沒有資料的列畫「—」而不是整列消失。
-								 列會忽有忽無的話，同一個位置在不同卡片上是不同的東西，
-								 跨卡片比較就沒了——而那正是選 KV 的理由。
-								 綜合智力不在這裡：收合列的指標帶已經有了，展開只給新東西。 -->
-							<!-- 用量一列，左標右值。不另開標題、不寫出處：這一列自己就說清楚了。
-								 可用率不在這裡——每條線路列上已經各寫了一次。 -->
-							<div v-for="row in detailRowsFor(detailFamily)" :key="row.key" class="ms-kv">
-								<span class="ms-kv-k">{{ t(row.labelKey) }}</span>
-								<span class="ms-kv-v" :class="{ 'is-none': !row.value }">{{ row.value || '—' }}</span>
-							</div>
-						</div>
-					</template>
+						</template>
+					</div>
 				</div>
 			</template>
 
@@ -473,7 +477,7 @@
 		要動它的邏輯時，連同型別一起處理，再把這一行拿掉。
 	*/
 	import { computed, ref, reactive, getCurrentInstance, nextTick, watch } from 'vue';
-	import { onMounted } from 'vue';
+	import { onMounted, onBeforeUnmount } from 'vue';
 	import { useI18n } from 'vue-i18n';
 	const { t } = useI18n();
 
@@ -1209,6 +1213,22 @@ const truncationText = (completionRate: number) => {
 		// 取當下選中的話，使用者點一條線路就改變了當下選中 → 清單重排 → 他正在
 		// 看的那一列被搬走（手機端症狀是「點完就消失」）。
 		return pinFamilyToTop(families, pinnedModelValue.value);
+	});
+
+	// 寬螢幕（跟 canvas.css 的桌機斷點同一條）把清單拆成左右兩欄，照順序左右交錯：
+	// 左欄是第 1、3、5…個，右欄是第 2、4、6…個，讀起來仍然是由左而右、由上而下。
+	const WIDE_QUERY = '(min-width: 769px)';
+	const wideMedia = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(WIDE_QUERY) : null;
+	const isWide = ref(!!(wideMedia && wideMedia.matches));
+	const onWideChange = (e) => { isWide.value = !!e.matches; };
+	if (wideMedia && wideMedia.addEventListener) wideMedia.addEventListener('change', onWideChange);
+	onBeforeUnmount(() => {
+		if (wideMedia && wideMedia.removeEventListener) wideMedia.removeEventListener('change', onWideChange);
+	});
+	const listColumns = computed(() => {
+		const list = displayFamilies.value;
+		if (!isWide.value) return [list];
+		return [list.filter((_, i) => i % 2 === 0), list.filter((_, i) => i % 2 === 1)];
 	});
 
 	/**

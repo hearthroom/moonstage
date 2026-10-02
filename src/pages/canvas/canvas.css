@@ -2770,6 +2770,13 @@
     flex-direction: column;
   }
 
+  .ms-list-col {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    min-width: 0;
+  }
+
   /* 平常是直角，分隔線才是一條直線；只有正在用的與被展開的那一列有圓角框 */
   .ms-family {
     border: 1px solid transparent;
@@ -3445,15 +3452,11 @@
       grid-column: 1 / -1;
     }
 
+    /* 左右兩欄，各自往下長（欄是模板拆的，見 listColumns） */
     .ms-list {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    /* 展開的那一張跨兩欄：詳情要用整個寬度，而且不會把旁邊那一欄擠成一長條。 */
-    .ms-family.is-active {
-      grid-column: 1 / -1;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 16px;
     }
 
     .ms-row {
@@ -3485,73 +3488,8 @@
       font-size: 14px;
     }
 
-    /* 詳情：指標排成一列數字方塊，一眼掃過；線路、說明、來源仍佔整寬。 */
-    .ms-detail {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px 12px;
-      padding: 14px 16px 16px;
-    }
-
-    .ms-detail > * {
-      grid-column: 1 / -1;
-    }
-
-    .ms-detail > .ms-kv {
-      grid-column: span 1;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 4px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      background: var(--lt-canvas-sheet-item-bg);
-    }
-
-    .ms-detail > .ms-kv .ms-kv-k {
-      font-size: 11px;
-    }
-
-    .ms-detail > .ms-kv .ms-kv-v {
-      font-size: 15px;
-      text-align: left;
-    }
-
     .ms-detail-desc {
       font-size: 13px;
-    }
-
-    /* 展開的模型：線路排成多欄方格，不是一長條——橫螢幕一屏就看得完整個模型
-       （owner 2026-10-02 平板截圖：一欄時整頁空著，線路要一直往下捲）。 */
-    .ms-opts {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 8px;
-      border: 0;
-      border-radius: 0;
-    }
-
-    .ms-opt {
-      border: 1px solid var(--lt-canvas-sheet-line);
-      border-radius: 12px;
-    }
-
-    .ms-opt + .ms-opt {
-      border-top-color: var(--lt-canvas-sheet-line);
-    }
-
-    .ms-opt.is-on {
-      border-color: var(--lt-canvas-accent);
-      box-shadow: none;
-    }
-
-    /* 欄頭在方格上方：靠左寫「線路 · 下一輪約」，不是對齊一個已經不存在的價格欄 */
-    .ms-lane-headrow {
-      justify-content: flex-start;
-      padding: 4px 0 0;
-    }
-
-    .ms-lane-headrow > .ms-eyebrow + .ms-eyebrow::before {
-      content: '· ';
     }
 
     /*

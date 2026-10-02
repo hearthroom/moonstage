@@ -256,21 +256,6 @@
       padding: 12px 14px
     }
 }
-@media (min-width: 769px) {
-    .ms-detail {
-      padding: 14px 16px 16px
-    }
-}
-@media (min-width: 769px) {
-    .ms-detail > .ms-kv {
-      padding: 10px 12px
-    }
-}
-@media (min-width: 769px) {
-    .ms-lane-headrow {
-      padding: 4px 0 0
-    }
-}
 .u-popup__content .bottom {
     padding-top: 4px
 }
