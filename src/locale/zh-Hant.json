@@ -538,7 +538,7 @@
 	"modelSelect.signalLatencyExtreme": "明顯高於平時",
 	"modelSelect.signalStreamIssue": "輸出斷續",
 	"modelSelect.signalErrorRateHigh": "錯誤偏多",
-	"modelSelect.allModels": "全部",
+	"modelSelect.globalTop": "全球熱門",
 	"modelSelect.noModelsFound": "暫無模型",
 	"modelSelect.quotaLeft": "{n} 次可用",
 	"modelSelect.discount": "限時優惠",

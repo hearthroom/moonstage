@@ -85,10 +85,20 @@
 			</div>
 		</div>
 
-		<!-- 分類。捲動容器本身不留左右內距，第一顆與最後一顆的邊距由內層給，
+		<!-- 排序鍵排在分類列第一顆，寫著現在怎麼排；點了才在列底下攤開選項。
+			 攤開的那一段在文流裡，不浮在清單上——浮起來的選單在手機上就是一片黑。
+			 捲動容器本身不留左右內距，第一顆與最後一顆的邊距由內層給，
 			 內容才會滑到彈層邊緣才消失（DESIGN §3.3）。 -->
 		<div class="ms-rail">
 			<div class="ms-rail-inner">
+				<div class="ms-chip ms-sort-toggle" :class="{ 'is-open': sortOpen }" role="button" tabindex="0"
+					:aria-expanded="sortOpen ? 'true' : 'false'"
+					@click="sortOpen = !sortOpen"
+					@keydown.enter.prevent="sortOpen = !sortOpen">
+					<svg class="ms-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
+					<span class="ms-chip-text">{{ sortLabel }}</span>
+					<svg class="ms-caret" :class="{ 'is-open': sortOpen }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 10l6 5 6-5" /></svg>
+				</div>
 				<div
 					v-for="(tab, index) in displayTabs"
 					:key="index"
@@ -97,20 +107,6 @@
 					@click="tabChange(tab.tabIndex)">
 					<span class="ms-chip-text">{{ tab.name }}</span>
 				</div>
-			</div>
-		</div>
-
-		<!-- 清單標頭右邊是排序鍵，寫著現在怎麼排；點了才在它底下攤開選項。
-			 攤開的那一段在文流裡，不浮在清單上——浮起來的選單在手機上就是一片黑。 -->
-		<div class="ms-listhead">
-			<span class="ms-eyebrow">{{ currentTabName }} · {{ displayFamilies.length }}</span>
-			<div class="ms-sort-toggle" :class="{ 'is-open': sortOpen }" role="button" tabindex="0"
-				:aria-expanded="sortOpen ? 'true' : 'false'"
-				@click="sortOpen = !sortOpen"
-				@keydown.enter.prevent="sortOpen = !sortOpen">
-				<svg class="ms-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
-				<span class="ms-sort-toggle-text">{{ sortLabel }}</span>
-				<svg class="ms-caret" :class="{ 'is-open': sortOpen }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 10l6 5 6-5" /></svg>
 			</div>
 		</div>
 
@@ -166,14 +162,16 @@
 							<span v-else class="ms-tile-mono">{{ family.family.charAt(0).toUpperCase() }}</span>
 						</div>
 
+						<!-- 兩行，每行都撐滿：第一行名字＋價格，第二行徽章＋指標，右端寫有幾條線路。
+							 價格不再自己佔一欄——佔一欄時名字被擠到折行，一列變三行高。 -->
 						<div class="ms-name-col">
 							<div class="ms-name-line">
 								<!-- 狀態燈只有例外態才亮。一頁全綠等於沒有燈。 -->
 								<div v-if="rowDotTone(family)" class="ms-dot" :class="'ms-dot-' + rowDotTone(family)"></div>
 								<span class="ms-name">{{ family.family }}</span>
+								<span v-if="originalPriceFor(family)" class="ms-price-was">{{ originalPriceFor(family) }}</span>
+								<span class="ms-price" :class="{ 'is-accent': family.discountUntilTs > 0 }">{{ priceTextFor(family) }}</span>
 							</div>
-							<!-- 徽章跟線路名排在第二行：跟名字擠同一行時，手機上它們自己折成一行，
-								 一列就變三行高。 -->
 							<div class="ms-sub-line">
 								<div v-if="isFamilySelected(family)" class="ms-badge is-accent">
 									<span class="ms-badge-text">{{ t('modelSelect.currentInUse') }}</span>
@@ -190,19 +188,15 @@
 								<div v-else-if="hasFamilyBadge(family, 'new')" class="ms-badge">
 									<span class="ms-badge-text">{{ t('modelSelect.newBadge') }}</span>
 								</div>
-								<span v-if="rowMetaFor(family)" class="ms-meta">{{ rowMetaFor(family) }}</span>
+								<span class="ms-meta">{{ rowMetaFor(family) }}</span>
+								<span class="ms-expand-hint">{{ expandHintFor(family) }}</span>
+								<svg class="ms-caret" :class="{ 'is-open': detailFamily && detailFamily.family === family.family }"
+									viewBox="0 0 24 24" fill="none" stroke="currentColor"
+									stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<path d="M6 10l6 5 6-5" />
+								</svg>
 							</div>
 						</div>
-
-						<div class="ms-price-col">
-							<span v-if="originalPriceFor(family)" class="ms-price-was">{{ originalPriceFor(family) }}</span>
-							<span class="ms-price" :class="{ 'is-accent': family.discountUntilTs > 0 }">{{ priceTextFor(family) }}</span>
-						</div>
-						<svg class="ms-caret" :class="{ 'is-open': detailFamily && detailFamily.family === family.family }"
-							viewBox="0 0 24 24" fill="none" stroke="currentColor"
-							stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-							<path d="M6 10l6 5 6-5" />
-						</svg>
 					</div>
 
 					<template v-if="detailFamily && detailFamily.family === family.family">
@@ -381,7 +375,7 @@
 				<span class="ms-empty-title">{{ t('modelSelect.noModelsFound') }}</span>
 				<span class="ms-hint">{{ t('modelSelect.tryAnotherFilter') }}</span>
 				<div class="ms-pill is-on ms-empty-btn" @click="$emit('update:searchQuery', ''); tabChange(-1)">
-					<span class="ms-pill-text">{{ t('modelSelect.allModels') }}</span>
+					<span class="ms-pill-text">{{ t('modelSelect.globalTop') }}</span>
 				</div>
 			</div>
 		</div>
@@ -466,6 +460,7 @@
 	import {
 		laneMetrics,
 		orderModelGroups,
+		globalTopFamilies,
 		detailMetrics,
 		variantStatusTone,
 	uptimeBucketTone,
@@ -668,17 +663,18 @@
 	}, { immediate: true });
 
 	// Filter families based on MAX mode
-	const filteredFamilies = computed(() => {
+	const maxModeFamilies = (families) => {
 		if (formData.context === 100) {
-			return currentFamilies.value
+			return families
 				.filter(f => f.isSupportMax)
 				.map(f => ({
 					...f,
 					variants: f.variants.filter(v => v.isSupportMax)
 				}));
 		}
-		return currentFamilies.value;
-	});
+		return families;
+	};
+	const filteredFamilies = computed(() => maxModeFamilies(currentFamilies.value));
 
 	// Get filtered variants for a family (respecting MAX mode)
 	const getFilteredVariants = (family) => {
@@ -1070,15 +1066,12 @@ const truncationText = (completionRate: number) => {
 			tabIndex: index
 		})));
 		// 「全部」放最前面：它是預設值，擺在十幾個分類的尾巴等於每次都要滑到底才回得來。
-		tabs.unshift({ name: t('modelSelect.allModels'), tabIndex: -1 });
+		// 「全球熱門」放最前面：它是預設值，也是不知道要選什麼的人唯一會看的地方。
+		// 它取代了原本的「全部」——後面的分類加起來就是全部，「全部」本身不回答任何問題。
+		if (globalTopList.value.length) tabs.unshift({ name: t('modelSelect.globalTop'), tabIndex: -1 });
 		return tabs;
 	});
 
-	/** 清單標頭寫的是現在看的分類，不是永遠寫「全部」。 */
-	const currentTabName = computed(() => {
-		const tab = displayTabs.value.find(x => x.tabIndex === tabCurrent.value);
-		return tab ? tab.name : t('modelSelect.allModels');
-	});
 
 	// ── v3 呈現層 ───────────────────────────────────────────────────────
 	//
@@ -1126,8 +1119,12 @@ const truncationText = (completionRate: number) => {
 		// 去重要在排序**之前**做。「全部」把每個分類攤平，同一個模型同時掛在「精選」
 		// 與品牌分類底下——不去重的話清單裡有重複的 :key，而重複的 key 只有在重排時
 		// 才發作（見 dedupeFamilies 的註解）。
+		// 有搜尋字時找所有分類，不只找目前這一格——在「全球熱門」裡搜不到前十名以外的
+		// 模型，使用者只會以為它不存在。
+		const q = String(searchQuery.value || '').trim().toLowerCase();
+		const pool = q ? maxModeFamilies(allTabFamilies()) : filteredFamilies.value;
 		let families = dedupeFamilies(
-			mergeFreeModelFamilies(filteredFamilies.value, t('modelSelect.freeModelName')));
+			mergeFreeModelFamilies(pool, t('modelSelect.freeModelName')));
 
 		// 每一條線路都壞掉的模型整列不出現：點進去沒有一條用得了。玩家正在用的例外，
 		// 他得看得到自己現在選的是什麼。
@@ -1137,7 +1134,6 @@ const truncationText = (completionRate: number) => {
 			return variants.length === 0 || variants.some(v => !isDeadLane(v));
 		});
 
-		const q = String(searchQuery.value || '').trim().toLowerCase();
 		if (q) {
 			families = families.filter(f => {
 				if (String(f.family || '').toLowerCase().includes(q)) return true;
@@ -1706,7 +1702,7 @@ const truncationText = (completionRate: number) => {
 		// 畫面只顯示「暫無模型」，看起來像資料沒回來，其實是參數形狀不對。
 		const index = normalizeTabIndex(e);
 		if (index < 0) {
-			showAllFamilies();
+			showGlobalTop();
 			return;
 		}
 		tabCurrent.value = index;
@@ -1716,16 +1712,31 @@ const truncationText = (completionRate: number) => {
 		rememberBrowsedCategory(modelTabs.value[index]?.group || '');
 	};
 
-	const showAllFamilies = () => {
-		rememberBrowsedCategory(ALL_CATEGORY);
-		tabCurrent.value = -1;
+	/** 所有分類攤平。搜尋與「全球熱門」都從這一份挑。 */
+	const allTabFamilies = () => {
 		const all = [];
 		modelTabs.value.forEach(tab => {
-			if (tab.families) {
-				all.push(...tab.families);
-			}
+			if (tab.families) all.push(...tab.families);
 		});
-		currentFamilies.value = all;
+		return all;
+	};
+
+	const globalTopList = computed(() => globalTopFamilies(dedupeFamilies(allTabFamilies())));
+
+	/**
+	 * 切到「全球熱門」。`remember` 只在使用者自己點的時候為真：進場時落在這一格不是
+	 * 瀏覽意圖，記下來的話下一次打開就不再跳到正在用的模型。
+	 * 名次資料還沒有（上游掛了、第一次抓取還沒回來）時這一格是空的，改落在第一個分類。
+	 */
+	const showGlobalTop = (remember = true) => {
+		if (!globalTopList.value.length) {
+			tabCurrent.value = 0;
+			currentFamilies.value = modelTabs.value[0]?.families || [];
+			return;
+		}
+		if (remember) rememberBrowsedCategory(ALL_CATEGORY);
+		tabCurrent.value = -1;
+		currentFamilies.value = globalTopList.value;
 	};
 
 	// Check if a family contains the currently selected model
@@ -1969,10 +1980,7 @@ const truncationText = (completionRate: number) => {
 				// 接得回來就不要再跳到目前使用中的模型——那個跳轉是給「沒有瀏覽意圖」
 				// 的進場用的，重放在回頁上等於把使用者剛看到的位置洗掉。
 				const resumedBrowsedCategory = resumeBrowsedCategory();
-				if (!resumedBrowsedCategory) {
-					tabCurrent.value = 0;
-					currentFamilies.value = modelTabs.value[0]?.families || [];
-				}
+				if (!resumedBrowsedCategory) showGlobalTop(false);
 
 
 				nextTick(() => {
@@ -2002,7 +2010,7 @@ const truncationText = (completionRate: number) => {
 		// 讓一次失敗的請求抹掉使用者的瀏覽位置。
 		if (!modelTabs.value.length) return false;
 		if (remembered === ALL_CATEGORY) {
-			showAllFamilies();
+			showGlobalTop();
 			return true;
 		}
 		const index = modelTabs.value.findIndex(tab => tab.group === remembered);
@@ -2024,23 +2032,13 @@ const truncationText = (completionRate: number) => {
 		);
 		if (currentTabHasModel) return;
 
-		// 跳過第一個分頁去找這個模型：第一個分頁是編輯／演算法選出來的推薦集合
-		// （2026-08-29 起是「全球熱門」，先前是「精選」），模型在那裡是客串，
-		// 在品牌分頁才是它的家。找不到才退回任何一個分頁。
-		let tabIndex = modelTabs.value.findIndex((tab, idx) =>
-			idx > 0 && tab.families && tab.families.some(f =>
+		// 「全球熱門」是前端從各分類挑出來的，伺服器下發的每一格都是品牌分類，
+		// 所以直接找模型所在的那一格。
+		const tabIndex = modelTabs.value.findIndex(tab =>
+			tab.families && tab.families.some(f =>
 				f.variants.some(v => v.value === formData.selectModel)
 			)
 		);
-		// 別的分頁都沒有就退回第一個分頁
-		if (tabIndex < 0) {
-			tabIndex = modelTabs.value.findIndex(tab =>
-				tab.families && tab.families.some(f =>
-					f.variants.some(v => v.value === formData.selectModel)
-				)
-			);
-		}
-
 		if (tabIndex >= 0 && tabIndex !== tabCurrent.value) {
 			tabCurrent.value = tabIndex;
 			currentFamilies.value = modelTabs.value[tabIndex].families;

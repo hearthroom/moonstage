@@ -387,7 +387,7 @@
 	"modelSelect.signalLatencyExtreme": "Well above usual",
 	"modelSelect.signalStreamIssue": "Output drops",
 	"modelSelect.signalErrorRateHigh": "High error rate",
-	"modelSelect.allModels": "All",
+	"modelSelect.globalTop": "Global Top",
 	"modelSelect.noModelsFound": "No models found",
 	"modelSelect.quotaLeft": "{n} left",
 	"modelSelect.discount": "Limited offer",

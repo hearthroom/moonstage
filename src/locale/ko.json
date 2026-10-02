@@ -538,7 +538,7 @@
 	"modelSelect.signalLatencyExtreme": "평소보다 크게 높음",
 	"modelSelect.signalStreamIssue": "출력 끊김",
 	"modelSelect.signalErrorRateHigh": "오류 많음",
-	"modelSelect.allModels": "전체",
+	"modelSelect.globalTop": "글로벌 인기",
 	"modelSelect.noModelsFound": "모델을 찾을 수 없습니다",
 	"modelSelect.quotaLeft": "{n}회 사용 가능",
 	"modelSelect.discount": "한정 할인",
