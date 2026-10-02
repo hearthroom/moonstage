@@ -294,6 +294,19 @@ describe('殼：功能欄、樣式、主題、輸入區、舞台與返回', () =
     expect(closed).toEqual([1])
   })
 
+  it('舞台 content 只蓋訊息區：下緣讓出輸入區；輸入區藏起來就貼底', () => {
+    const s = boot(config())
+    const rect = (top: number, bottom: number) => ({ top, bottom, height: bottom - top, left: 0, right: 0, width: 0, x: 0, y: top, toJSON() {} }) as DOMRect
+    s.refs.root.getBoundingClientRect = () => rect(0, 800)
+    s.refs.composer.getBoundingClientRect = () => rect(720, 800)
+    s.sdk.stage.open('content')
+    expect(s.refs.root.style.getPropertyValue('--shell-composer-h')).toBe('80px')
+    s.sdk.stage.close()
+    s.refs.composer.hidden = true
+    s.sdk.stage.open('content')
+    expect(s.refs.root.style.getPropertyValue('--shell-composer-h')).toBe('0px')
+  })
+
   it('切會話：清氣泡（unmount）、關舞台、清補發記錄、發 conversation:switch；訂閱不清', () => {
     const s = boot(config())
     s.handle({ type: 'messages', messages: [{ id: 'h1', role: 'ai', content: 'a', serverId: '1' }] })
