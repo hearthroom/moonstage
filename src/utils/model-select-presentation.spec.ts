@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   orderModelGroups,
+  globalTopFamilies,
   familyPriceDisplay,
   familyKey,
   dedupeFamilies,
@@ -860,5 +861,22 @@ describe('orderModelGroups — 分類列的順序', () => {
 
   it('分類名大小寫與前後空白不影響', () => {
     expect(orderModelGroups([g('Ling'), g(' deepseek ')]).map(x => x.group)).toEqual([' deepseek ', 'Ling'])
+  })
+})
+
+describe('globalTopFamilies — 「全球熱門」', () => {
+  const f = (family: string, usageRank?: number, bestStatus = 'green') => ({ family, usageRank, bestStatus })
+
+  it('照名次取前十，沒有名次的與紅燈的不收', () => {
+    const all = [f('Z', 3), f('NoRank'), f('Red', 1, 'red'), ...Array.from({ length: 12 }, (_, i) => f('M' + (i + 10), i + 10)), f('A', 2)]
+    const out = globalTopFamilies(all).map(x => x.family)
+    expect(out).toHaveLength(10)
+    expect(out.slice(0, 3)).toEqual(['A', 'Z', 'M10'])
+    expect(out).not.toContain('NoRank')
+    expect(out).not.toContain('Red')
+  })
+
+  it('同名次用名字排，兩次打開順序一樣', () => {
+    expect(globalTopFamilies([f('b', 5), f('a', 5)]).map(x => x.family)).toEqual(['a', 'b'])
   })
 })

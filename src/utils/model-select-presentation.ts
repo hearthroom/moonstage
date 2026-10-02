@@ -558,3 +558,21 @@ export function orderModelGroups<T extends { group?: string; families?: Array<{ 
     })
     .map(x => x.g)
 }
+
+/**
+ * 「全球熱門」：全球角色扮演用量名次的前十名，跟 LunaTalk 的第一個分頁同一個口徑。
+ *
+ * 只收有名次的；所有線路都紅燈的不收——這一格是給還不知道要選什麼的人看的，
+ * 把一個現在打不通的模型排在最前面，比少一格糟得多。同名次用名字排，讓順序在兩次
+ * 打開之間穩定。取前十：再往後的長尾對新使用者沒有意義，名次也容易在兩次抓取間互換。
+ */
+export const GLOBAL_TOP_LIMIT = 10
+
+export function globalTopFamilies<T extends { family?: string; usageRank?: unknown; bestStatus?: unknown }>(families: T[], limit = GLOBAL_TOP_LIMIT): T[] {
+  return families
+    .map(f => ({ f, rank: finite(f && f.usageRank) }))
+    .filter(x => x.rank !== null && x.rank > 0 && x.f.bestStatus !== 'red')
+    .sort((a, b) => (a.rank as number) - (b.rank as number) || String(a.f.family || '').localeCompare(String(b.f.family || '')))
+    .slice(0, limit)
+    .map(x => x.f)
+}

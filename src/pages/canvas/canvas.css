@@ -2572,28 +2572,13 @@
     gap: 8px;
   }
 
-  /* 清單標頭：左邊數量，右邊排序鍵 */
-  .ms-listhead {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    min-height: 32px;
-  }
-
+  /* 分類列第一顆是排序鍵：帶圖示與下拉箭頭，跟分類分得開 */
   .ms-sort-toggle {
-    display: inline-flex;
-    align-items: center;
     gap: 4px;
-    min-height: 32px;
-    padding: 0 0 0 8px;
-    font-size: 12px;
-    color: var(--lt-canvas-muted);
-    cursor: pointer;
-    user-select: none;
   }
 
   .ms-sort-toggle.is-open {
+    border-color: var(--lt-canvas-accent);
     color: var(--lt-canvas-accent);
   }
 
@@ -2671,26 +2656,43 @@
     color: var(--lt-canvas-muted);
   }
 
-  /* 清單：一列一張卡，詳情長在同一張卡裡 */
+  /* 清單：一列一條，列與列之間一條細線；被展開的那一列才有底色，詳情長在它裡面 */
   .ms-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
   }
 
+  /* 平常是直角，分隔線才是一條直線；只有正在用的與被展開的那一列有圓角框 */
   .ms-family {
-    border-radius: var(--lt-canvas-sheet-radius);
     border: 1px solid transparent;
-    background: var(--lt-canvas-sheet-item-bg);
     transition: border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .ms-family + .ms-family {
+    border-top-color: var(--lt-canvas-sheet-line);
+  }
+
+  .ms-family.is-current,
+  .ms-family.is-active {
+    border-radius: var(--lt-canvas-sheet-radius);
+  }
+
+  .ms-family.is-active {
+    border-color: transparent;
   }
 
   .ms-family.is-current {
     border-color: var(--lt-canvas-accent);
   }
 
+  /* 圓角框的上下兩列不畫分隔線，免得線頂到框 */
+  .ms-family.is-current + .ms-family,
+  .ms-family.is-active + .ms-family {
+    border-top-color: transparent;
+  }
+
   .ms-family.is-active {
-    background: var(--lt-canvas-sheet-item-bg-hover);
+    background: var(--lt-canvas-sheet-item-bg);
   }
 
   .ms-row {
@@ -2743,9 +2745,30 @@
   }
 
   .ms-name {
+    flex: 1 1 auto;
+    min-width: 0;
     font-size: 14px;
     line-height: 1.3;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ms-name-line .ms-price,
+  .ms-name-line .ms-price-was {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ms-expand-hint {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--lt-canvas-sheet-faint);
+  }
+
+  .ms-sub-line .ms-caret {
+    width: 14px;
+    height: 14px;
   }
 
   .ms-meta {
@@ -2756,15 +2779,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .ms-price-col {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    flex: 0 0 auto;
-    gap: 1px;
-    font-variant-numeric: tabular-nums;
   }
 
   .ms-price {

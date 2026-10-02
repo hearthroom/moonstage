@@ -44,12 +44,12 @@ describe('模型選單在畫布彈層裡的版面', () => {
     expect(rule('.model-setting-scope .mp-setting-body')).toContain('flex: 1 1 auto')
   })
 
-  // owner 2026-10-02：排序單獨佔一排 chip 太浪費畫面，改成清單標頭上的一顆鍵，點了才攤開。
-  // 原本守的那件事不變：攤開的選項在文流裡，不是浮在清單上的選單。
-  it('排序收成清單標頭上的一顆鍵，點了才在文流裡攤開選項與說明', () => {
+  // owner 2026-10-02：排序單獨佔一排 chip 太浪費畫面，改成分類列的第一顆鍵（跟 LunaTalk 一樣），
+  // 點了才攤開。原本守的那件事不變：攤開的選項在文流裡，不是浮在清單上的選單。
+  it('排序是分類列的第一顆鍵，點了才在文流裡攤開選項與說明', () => {
     expect(template).not.toContain('ms-sort-menu')
     expect(template).not.toContain('sortSheetOpen')
-    expect(template).toMatch(/class="ms-listhead"[\s\S]{0,300}class="ms-sort-toggle"/)
+    expect(template).toMatch(/class="ms-rail-inner">\s*<div class="ms-chip ms-sort-toggle"/)
     expect(template).toContain('{{ sortLabel }}')
     expect(template).toMatch(/<div v-if="sortOpen" class="ms-sort">/)
     // 2026-09-05 起 chip 也帶舊頁面的節點名（model-filter-tab），作者對它寫的外觀才對得上。

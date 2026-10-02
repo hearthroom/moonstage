@@ -538,7 +538,7 @@
 	"modelSelect.signalLatencyExtreme": "通常より大幅に高い",
 	"modelSelect.signalStreamIssue": "出力途切れ",
 	"modelSelect.signalErrorRateHigh": "エラー多発",
-	"modelSelect.allModels": "すべて",
+	"modelSelect.globalTop": "世界の人気",
 	"modelSelect.noModelsFound": "モデルが見つかりません",
 	"modelSelect.quotaLeft": "{n}回使用可能",
 	"modelSelect.discount": "期間限定セール",
