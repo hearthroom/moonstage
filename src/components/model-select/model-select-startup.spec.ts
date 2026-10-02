@@ -102,9 +102,10 @@ it('explains the price of the chosen tier and reports the unsaved choice', async
     const pills = wrapper.findAll('.ms-pill.token')
     expect(pills).toHaveLength(3)
     expect(pills[0].text()).toContain('modelSelect.contextTierRecommended')
-    // 數字不單獨擺在按鈕上，而是寫成兩句完整的話
-    const lines = () => wrapper.findAll('.ms-tier-quote-line').map(l => l.text())
-    expect(lines()).toEqual(['modelSelect.tierNextTurn', 'modelSelect.tierFull'])
+    // 數字不單獨擺在按鈕上，而是兩格：每格一個小標說明它是哪一種估價
+    const labels = () => wrapper.findAll('.ms-tier-stat-k').map(l => l.text())
+    expect(labels()).toEqual(['modelSelect.tierStatNext', 'modelSelect.tierStatFull'])
+    expect(wrapper.findAll('.ms-tier-stat-v').map(v => v.text())).toEqual(['modelSelect.tierStatValue', 'modelSelect.tierStatValue'])
     const vm = wrapper.vm as any
     expect(vm.variantPriceText(lane)).toBe('modelSelect.priceNext')
 
@@ -118,7 +119,8 @@ it('explains the price of the chosen tier and reports the unsaved choice', async
     vm.deepPrepModelSupported = true
     await flushPromises()
     expect(vm.deepPrepOn).toBe(true)
-    expect(lines()).toEqual(['modelSelect.contextTierAgentNote'])
+    expect(labels()).toEqual([])
+    expect(wrapper.find('.ms-tier-note').text()).toBe('modelSelect.contextTierAgentNote')
     expect(vm.variantPriceText(lane)).toBe('modelSelect.priceAgent')
   } finally { wrapper.unmount() }
 })

@@ -18,7 +18,7 @@
 		<div v-if="!isLoading" class="ms-card">
 			<div class="ms-set">
 				<span class="ms-card-title">{{ t('modelSelect.contextBudgetShort') }}</span>
-				<div class="ms-pills">
+				<div class="ms-pills is-fill">
 					<div
 						v-for="item in contextBudgetLevelOptions"
 						:key="item.value"
@@ -30,18 +30,22 @@
 						</span>
 					</div>
 				</div>
-				<!-- 選中的檔位要花多少，寫成兩句完整的話：數字單獨擺在按鈕上沒人看得懂。
-					 一句是這段對話的下一輪，一句是對話長到吃滿這一檔以後。都是估算。
-					 Agent 模式一輪會呼叫多次模型，估不出來，改說明這件事。 -->
-				<div class="ms-tier-quote">
-					<span v-for="line in tierQuoteLines" :key="line" class="ms-tier-quote-line">{{ line }}</span>
+				<!-- 選中的檔位要花多少：左邊是這段對話的下一輪，右邊是對話長到吃滿這一檔以後。
+					 都是估算。數字不擺在檔位鍵上（那裡沒人看得懂它在算什麼），而是並排成兩格，
+					 每格一個小標說明它是哪一種。Agent 模式一輪會呼叫多次模型，估不出來，改說明這件事。 -->
+				<span v-if="deepPrepOn" class="ms-tier-note">{{ t('modelSelect.contextTierAgentNote') }}</span>
+				<div v-else-if="tierStats.length" class="ms-tier-stats">
+					<div v-for="cell in tierStats" :key="cell.key" class="ms-tier-stat">
+						<span class="ms-tier-stat-k">{{ cell.label }}</span>
+						<span class="ms-tier-stat-v">{{ cell.value }}</span>
+					</div>
 				</div>
 				<span class="ms-hint">{{ t('modelSelect.contextTierExplain') }}</span>
 			</div>
 
 			<div v-if="hasThinkingDepthOptions" class="ms-set">
 				<span class="ms-card-title">{{ t('modelSelect.thinkingDepth') }}</span>
-				<div class="ms-pills">
+				<div class="ms-pills is-fill">
 					<div
 						v-for="option in thinkingDepthOptions"
 						:key="option.value"
@@ -1268,19 +1272,26 @@ const truncationText = (completionRate: number) => {
 		return price.min === price.max ? String(price.min) : `${price.min}–${price.max}`;
 	};
 
-	/** 選中檔位下面那兩句。 */
-	const tierQuoteLines = computed(() => {
-		if (deepPrepOn.value) return [t('modelSelect.contextTierAgentNote')];
+	/** 選中檔位下面那兩格：下一輪、吃滿這一檔以後每輪。 */
+	const tierStats = computed(() => {
 		const variant = selectItem.value;
 		if (!variant || variant.billingType !== 'dynamic') return [];
 		const option = contextBudgetLevelOptions.value.find(o => o.value === formData.context);
 		if (!option || !option.quoteMin) return [];
 		const range = option.quoteMax && option.quoteMax !== option.quoteMin ? `${option.quoteMin}–${option.quoteMax}` : String(option.quoteMin);
-		const lines = [t(priceMeaning(variant) === 'next' ? 'modelSelect.tierNextTurn' : 'modelSelect.tierFirstTurn', { n: range })];
+		const cells = [{
+			key: 'now',
+			label: t(priceMeaning(variant) === 'next' ? 'modelSelect.tierStatNext' : 'modelSelect.tierStatFirst'),
+			value: t('modelSelect.tierStatValue', { n: range }),
+		}];
 		if (option.quoteFull && option.quoteFull > option.quoteMin) {
-			lines.push(t('modelSelect.tierFull', { tier: option.text, n: option.quoteFull }));
+			cells.push({
+				key: 'full',
+				label: t('modelSelect.tierStatFull', { tier: option.text }),
+				value: t('modelSelect.tierStatValue', { n: option.quoteFull }),
+			});
 		}
-		return lines;
+		return cells;
 	});
 
 
