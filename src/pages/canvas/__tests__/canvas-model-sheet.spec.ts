@@ -91,7 +91,7 @@ describe('模型選單在畫布彈層裡的版面', () => {
   // owner 2026-10-02：設定搬到底部跟確定鍵同一塊，上面整片留給模型清單。
   it('設定住在殼底部：設定鍵、攤開面板、現用模型都在 .bottom 裡，跟確定鍵同一塊', () => {
     const shell = fs.readFileSync(path.join(root, 'src/pages/canvas/components/canvas-model-panel.vue'), 'utf8')
-    const bottom = shell.slice(shell.indexOf('<div class="bottom">'), shell.indexOf('</template>'))
+    const bottom = shell.slice(shell.indexOf('<div class="bottom">'), shell.lastIndexOf('</template>'))
     for (const piece of ['ref="dockPanel"', 'ref="dockChips"', 'class="mp-info-bar"', 'class="btn"']) {
       expect(bottom, piece).toContain(piece)
     }
