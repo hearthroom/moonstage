@@ -175,6 +175,9 @@
 .ms-set {
     padding: 10px 0
 }
+.ms-set .ms-pill {
+    padding: 0 10px
+}
 .ms-row {
     padding: 8px 12px
 }

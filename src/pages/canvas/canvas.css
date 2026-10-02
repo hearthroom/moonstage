@@ -2598,6 +2598,15 @@
     flex-direction: row;
   }
 
+  /* 卡片內寬放不下五顆預設尺寸的檔位鍵，最後一顆會自己折到第二行 */
+  .ms-set .ms-pills {
+    gap: 6px;
+  }
+
+  .ms-set .ms-pill {
+    padding: 0 10px;
+  }
+
   .ms-card-title {
     font-size: 13px;
   }

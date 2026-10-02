@@ -99,7 +99,7 @@
 		<!-- 清單標頭右邊是排序鍵，寫著現在怎麼排；點了才在它底下攤開選項。
 			 攤開的那一段在文流裡，不浮在清單上——浮起來的選單在手機上就是一片黑。 -->
 		<div class="ms-listhead">
-			<span class="ms-eyebrow">{{ t('modelSelect.allModels') }} · {{ displayFamilies.length }}</span>
+			<span class="ms-eyebrow">{{ currentTabName }} · {{ displayFamilies.length }}</span>
 			<div class="ms-sort-toggle" :class="{ 'is-open': sortOpen }" role="button" tabindex="0"
 				:aria-expanded="sortOpen ? 'true' : 'false'"
 				@click="sortOpen = !sortOpen"
@@ -1073,6 +1073,12 @@ const truncationText = (completionRate: number) => {
 		// 「全部」放最前面：它是預設值，擺在十幾個分類的尾巴等於每次都要滑到底才回得來。
 		tabs.unshift({ name: t('modelSelect.allModels'), tabIndex: -1 });
 		return tabs;
+	});
+
+	/** 清單標頭寫的是現在看的分類，不是永遠寫「全部」。 */
+	const currentTabName = computed(() => {
+		const tab = displayTabs.value.find(x => x.tabIndex === tabCurrent.value);
+		return tab ? tab.name : t('modelSelect.allModels');
 	});
 
 	// ── v3 呈現層 ───────────────────────────────────────────────────────
