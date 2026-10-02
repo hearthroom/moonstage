@@ -95,7 +95,11 @@ it('explains the price of the chosen tier and reports the unsaved choice', async
     : { statusCode: 200, data: [] })
   const wrapper = shallowMount(ModelSelectPanel, {
     props: { open: true, roleId: 'fixture-role', selectModel: lane.value },
-    global: { config: { globalProperties: { http: { get }, requestUrl: { playerAgentMode: '/agent-mode', getModelListV2: '/models' } } } },
+    global: {
+      // 設定住在殼底部、靠 Teleport 送過去；沒有殼時它就地渲染。shallow 預設會把 Teleport
+      // 換成空殼，這裡要真的 Teleport 才看得到檔位鍵。
+      stubs: { teleport: false },
+      config: { globalProperties: { http: { get }, requestUrl: { playerAgentMode: '/agent-mode', getModelListV2: '/models' } } } },
   })
   try {
     await flushPromises()

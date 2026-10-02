@@ -38,32 +38,6 @@
            @keydown.enter.prevent="$emit('close')">×</div>
     </div>
 
-    <!-- 玩家在下面換了模型或檔位、還沒按確定時，這一列寫出「從哪個換到哪個、價格
-         變成多少」：原本的劃掉，箭頭指向新的。沒換就維持原本的一列。 -->
-    <div class="mp-info-bar" :class="{ 'is-switching': switching }">
-      <template v-if="!switching">
-        <div class="mp-model-name">{{ modelName }}</div>
-        <div class="mp-energy-pill" :class="{ 'is-dynamic': scoreDynamic }">
-          <template v-if="scoreLabel"><span class="mp-ev"><span>{{ scoreLabel }}</span></span></template>
-          <template v-else>
-            <span class="mp-ev"><span>{{ scoreText || '—' }}</span></span>
-            <span class="mp-el"><span>{{ labels.perTurn }}</span></span>
-          </template>
-        </div>
-      </template>
-      <template v-else>
-        <div class="mp-info-row is-was">
-          <div class="mp-model-name">{{ modelName }}<template v-if="tierChanged && draft && draft.fromTier"> · {{ draft.fromTier }}</template></div>
-          <div class="mp-energy-pill"><span class="mp-ev"><span>{{ scoreLabel || scoreText || '—' }}</span></span></div>
-        </div>
-        <div class="mp-info-arrow" aria-hidden="true">↓ {{ labels.switchTo }}</div>
-        <div class="mp-info-row is-next">
-          <div class="mp-model-name">{{ draft && draft.name }}<template v-if="tierChanged && draft && draft.tier"> · {{ draft.tier }}</template></div>
-          <div class="mp-energy-pill is-dynamic"><span class="mp-ev"><span>{{ draft && draft.price }}</span></span></div>
-        </div>
-      </template>
-    </div>
-
     <div class="mp-setting-body">
       <ModelSelectPanel
         ref="picker"
@@ -77,14 +51,50 @@
         v-model:search-query="searchQuery"
         @select="$emit('apply', $event)"
         @draft="draft = $event"
+        :dock-chips="dockChips"
+        :dock-panel="dockPanel"
         @close="$emit('close')"
       />
     </div>
 
+    <!--
+      底部一塊：攤開的設定面板（點了才有）→ 設定鍵一排 → 現用模型＋確定鍵。
+      設定跟確定擺在一起：要確認的就是這幾樣，手指也在這裡。上面整片留給模型清單。
+      設定的內容由模型選單元件 Teleport 進 dockPanel / dockChips 這兩個位置。
+    -->
     <div class="bottom">
-      <div class="btn" role="button" tabindex="0"
-           @click="onDone"
-           @keydown.enter.prevent="onDone">{{ labels.done }}</div>
+      <div ref="dockPanel" class="mp-dock-panel-slot"></div>
+      <div ref="dockChips" class="mp-dock-chips-slot"></div>
+      <div class="mp-dock-row">
+        <!-- 玩家在下面換了模型或檔位、還沒按確定時，這一列寫出「從哪個換到哪個、價格
+             變成多少」：原本的劃掉，箭頭指向新的。沒換就維持原本的一列。 -->
+        <div class="mp-info-bar" :class="{ 'is-switching': switching }">
+          <template v-if="!switching">
+            <div class="mp-model-name">{{ modelName }}</div>
+            <div class="mp-energy-pill" :class="{ 'is-dynamic': scoreDynamic }">
+              <template v-if="scoreLabel"><span class="mp-ev"><span>{{ scoreLabel }}</span></span></template>
+              <template v-else>
+                <span class="mp-ev"><span>{{ scoreText || '—' }}</span></span>
+                <span class="mp-el"><span>{{ labels.perTurn }}</span></span>
+              </template>
+            </div>
+          </template>
+          <template v-else>
+            <div class="mp-info-row is-was">
+              <div class="mp-model-name">{{ modelName }}<template v-if="tierChanged && draft && draft.fromTier"> · {{ draft.fromTier }}</template></div>
+              <div class="mp-energy-pill"><span class="mp-ev"><span>{{ scoreLabel || scoreText || '—' }}</span></span></div>
+            </div>
+            <div class="mp-info-arrow" aria-hidden="true">↓ {{ labels.switchTo }}</div>
+            <div class="mp-info-row is-next">
+              <div class="mp-model-name">{{ draft && draft.name }}<template v-if="tierChanged && draft && draft.tier"> · {{ draft.tier }}</template></div>
+              <div class="mp-energy-pill is-dynamic"><span class="mp-ev"><span>{{ draft && draft.price }}</span></span></div>
+            </div>
+          </template>
+        </div>
+        <div class="btn" role="button" tabindex="0"
+             @click="onDone"
+             @keydown.enter.prevent="onDone">{{ labels.done }}</div>
+      </div>
     </div>
   </div>
 </template>
@@ -150,6 +160,9 @@ const switching = computed(() => {
 const searchQuery = ref('')
 watch(() => props.open, (open) => { if (!open) draft.value = null })
 const shellEl = ref<HTMLElement | null>(null)
+/** 底部給設定用的兩個位置，掛上之後才有值；交給模型選單 Teleport 進來。 */
+const dockChips = ref<HTMLElement | null>(null)
+const dockPanel = ref<HTMLElement | null>(null)
 
 // 分類與排序那兩條橫向 rail 在桌機要拉得動（滑鼠沒有橫向滾輪）。掛在殼上用事件委派：
 // rail 是資料到了才長出來、換分頁又重畫的節點，開面板那一刻逐個掛會掛到已經不在
