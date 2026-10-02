@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   orderModelGroups,
+  revealScrollDelta,
   globalTopFamilies,
   familyPriceDisplay,
   familyKey,
@@ -878,5 +879,25 @@ describe('globalTopFamilies — 「全球熱門」', () => {
 
   it('同名次用名字排，兩次打開順序一樣', () => {
     expect(globalTopFamilies([f('b', 5), f('a', 5)]).map(x => x.family)).toEqual(['a', 'b'])
+  })
+})
+
+describe('revealScrollDelta — 展開後捲到看得見', () => {
+  const box = { top: 100, bottom: 700 }
+
+  it('整張看得到就不動', () => {
+    expect(revealScrollDelta(box, { top: 200, bottom: 500 }, 32)).toBe(0)
+  })
+
+  it('下面露不出來時捲剛好那麼多，淡出那一段也算看不到', () => {
+    expect(revealScrollDelta(box, { top: 400, bottom: 800 }, 32)).toBe(132)
+  })
+
+  it('比畫面還長時捲到這張的頂端貼齊上緣為止，標題列不捲出去', () => {
+    expect(revealScrollDelta(box, { top: 600, bottom: 1600 }, 32)).toBe(500)
+  })
+
+  it('頂端已經在畫面上方時往回捲', () => {
+    expect(revealScrollDelta(box, { top: 40, bottom: 300 }, 32)).toBe(-60)
   })
 })

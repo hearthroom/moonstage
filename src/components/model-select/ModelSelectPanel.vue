@@ -8,7 +8,7 @@
 		「側欄＋雙欄詳情＋釘住的確認鍵」在 560px 寬的彈層裡沒有位置——
 		分類與排序收成兩條橫滑 rail，詳情長在被點開的那一列底下，確認鍵是殼上那顆。
 	-->
-	<div class="ms-sheet">
+	<div ref="sheetEl" class="ms-sheet">
 
 		<!-- 搜尋框在殼的標題列上（canvas-model-panel.vue），字由 searchQuery 傳進來：
 			 單獨佔一行的話，手機第一屏連一個模型都看不到（owner 2026-10-02 iPhone 截圖）。 -->
@@ -190,6 +190,7 @@
 					<div
 						v-for="family in column"
 						:key="familyKey(family)"
+						:data-family-key="familyKey(family)"
 						class="ms-family"
 						:class="{
 							'is-current': isFamilySelected(family),
@@ -504,6 +505,7 @@
 		laneMetrics,
 		orderModelGroups,
 		globalTopFamilies,
+		revealScrollDelta,
 		detailMetrics,
 		variantStatusTone,
 	uptimeBucketTone,
@@ -1474,6 +1476,27 @@ const truncationText = (completionRate: number) => {
 		const name = (family && family.family) || '';
 		const isOpen = !!(detailFamily.value && detailFamily.value.family === name);
 		detailFamilyName.value = isOpen ? DETAIL_COLLAPSED : name;
+		if (!isOpen) revealFamily(familyKey(family));
+	};
+
+	/**
+	 * 展開之後把它捲到看得見：從列表下緣點開時，展開的部分長在畫面外。
+	 * 只捲最少的量（見 revealScrollDelta），已經看得到就不動。
+	 */
+	const sheetEl = ref(null);
+	const REVEAL_FADE_PX = 32; // 捲動區下緣淡出的高度，跟 canvas.css 的遮罩同一個數
+	const revealFamily = (key) => {
+		nextTick(() => {
+			const root = sheetEl.value;
+			if (!root || typeof root.querySelectorAll !== 'function') return;
+			const card = Array.from(root.querySelectorAll('.ms-family')).find(el => el.dataset && el.dataset.familyKey === key);
+			const scroller = card && card.closest && card.closest('.mp-setting-body');
+			if (!card || !scroller) return;
+			const delta = revealScrollDelta(scroller.getBoundingClientRect(), card.getBoundingClientRect(), REVEAL_FADE_PX);
+			if (!delta) return;
+			if (typeof scroller.scrollBy === 'function') scroller.scrollBy({ top: delta, behavior: 'smooth' });
+			else scroller.scrollTop += delta;
+		});
 	};
 
 	/**

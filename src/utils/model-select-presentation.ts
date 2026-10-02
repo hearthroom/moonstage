@@ -576,3 +576,21 @@ export function globalTopFamilies<T extends { family?: string; usageRank?: unkno
     .slice(0, limit)
     .map(x => x.f)
 }
+
+/**
+ * 展開一個模型之後，捲動區要往下捲多少才看得到展開的部分。
+ *
+ * 從列表下緣點開時，展開的線路長在螢幕外，使用者只看到列上的箭頭轉了一下。
+ * 這裡算的是「最少要捲多少」：已經整張看得到就不動；放不下時捲到底，但不把這張的
+ * 標題列（它的頂端）捲出畫面。`fade` 是捲動區下緣淡出的那一段，落在那裡等於沒看到。
+ */
+export function revealScrollDelta(
+  scroller: { top: number; bottom: number },
+  target: { top: number; bottom: number },
+  fade = 0,
+): number {
+  const visibleBottom = scroller.bottom - fade
+  if (target.top < scroller.top) return target.top - scroller.top
+  if (target.bottom <= visibleBottom) return 0
+  return Math.max(0, Math.min(target.bottom - visibleBottom, target.top - scroller.top))
+}
