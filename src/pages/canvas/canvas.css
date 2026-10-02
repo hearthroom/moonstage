@@ -2197,6 +2197,116 @@
     color: var(--lt-canvas-muted);
   }
 
+  /*
+     底部一塊：攤開的設定面板 → 設定鍵一排 → 現用模型＋確定鍵。
+     特意多一層 .u-popup__content：彈層共用的 .bottom 是一排等寬鍵（桌機還靠右），
+     這裡要直排、確定鍵不撐滿，得蓋過那兩條。
+  */
+  .u-popup__content .model-setting-scope .bottom {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  /* 面板的位置本身不佔格：收著時裡面全是隱藏節點，不該留下一段 gap */
+  .mp-dock-panel-slot {
+    display: contents;
+  }
+
+  .mp-dock-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    /* 作者的卡把確定鍵寫成 width: 100% 時，讓它自己換到下一行，不把現用模型擠掉 */
+    flex-wrap: wrap;
+  }
+
+  /* 現用模型在確定鍵左邊：名字一行、價格一行，不另外畫底色 */
+  .mp-dock-row .mp-info-bar {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 0;
+    background: transparent;
+  }
+
+  .mp-dock-row .mp-info-bar .mp-model-name {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mp-dock-row .mp-info-bar.is-switching {
+    align-items: stretch;
+  }
+
+  /* 換模型時名字跟價格放不下一行就換行，不把名字截掉 */
+  .mp-dock-row .mp-info-row {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 2px 8px;
+  }
+
+  /* 設定鍵放不下時橫向滑 */
+  .mp-dock-chips-slot {
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .mp-dock-chips-slot::-webkit-scrollbar {
+    display: none;
+  }
+
+  .u-popup__content .model-setting-scope .bottom .btn {
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 0 24px;
+  }
+
+  .ms-dock-chips {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .ms-dchip {
+    gap: 2px;
+  }
+
+  .ms-dchip.is-open {
+    border-color: var(--lt-canvas-accent);
+    color: var(--lt-canvas-accent);
+  }
+
+  .ms-dchip .ms-caret {
+    width: 14px;
+    height: 14px;
+  }
+
+  .ms-dchip-agent {
+    gap: 6px;
+    padding-right: 6px;
+  }
+
+  .ms-dchip-agent.is-disabled .ms-chip-text {
+    color: var(--lt-canvas-sheet-faint);
+  }
+
+  .ms-dock-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border-radius: var(--lt-canvas-sheet-radius);
+    background: var(--lt-canvas-sheet-item-bg);
+  }
+
   /* 檔位下面的估價：兩格並排，小標在上、數字在下 */
   .ms-tier-stats {
     display: flex;
@@ -2588,56 +2698,12 @@
     height: 14px;
   }
 
-  /* 設定卡：三組設定收在同一張卡裡，段與段之間一條細線 */
-  .ms-card {
-    display: flex;
-    flex-direction: column;
-    padding: 0 12px;
-    border-radius: var(--lt-canvas-sheet-radius);
-    background: var(--lt-canvas-sheet-item-bg);
-  }
-
-  .ms-set {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 0;
-  }
-
-  .ms-set + .ms-set {
-    border-top: 1px solid var(--lt-canvas-sheet-line);
-  }
-
-  .ms-set.ms-switch-line {
-    flex-direction: row;
-  }
-
-  /* 設定卡標題列：左邊標題＋ⓘ，右邊 Agent 模式＋ⓘ＋開關 */
+  /* 攤開面板的標題列：標題＋ⓘ */
   .ms-set-head {
     display: flex;
     align-items: center;
     gap: 4px;
     min-width: 0;
-  }
-
-  .ms-agent-label {
-    flex: 0 1 auto;
-    min-width: 0;
-    padding-left: 8px;
-    font-size: 12px;
-    color: var(--lt-canvas-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* 把 Agent 那一組推到右邊 */
-  .ms-set-head-gap {
-    flex: 1 1 auto;
-  }
-
-  .ms-agent-label.is-disabled {
-    color: var(--lt-canvas-sheet-faint);
   }
 
   .ms-info {
@@ -2660,12 +2726,12 @@
     color: var(--lt-canvas-accent);
   }
 
-  /* 卡片內寬放不下五顆預設尺寸的檔位鍵，最後一顆會自己折到第二行 */
-  .ms-set .ms-pills {
+  /* 面板內寬放不下五顆預設尺寸的檔位鍵，最後一顆會自己折到第二行 */
+  .ms-dock-panel .ms-pills {
     gap: 6px;
   }
 
-  .ms-set .ms-pill {
+  .ms-dock-panel .ms-pill {
     padding: 0 10px;
   }
 
@@ -2690,13 +2756,6 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-  }
-
-  .ms-switch-col {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
   }
 
   .ms-switch-label {
@@ -3344,8 +3403,7 @@
       width: min(440px, calc(100vw - 48px));
     }
 
-    .role-setting .card,
-    .ms-card {
+    .role-setting .card {
       padding: 14px 16px;
     }
 
@@ -3384,22 +3442,6 @@
 
     .ms-sheet > * {
       grid-column: 1 / -1;
-    }
-
-    /* 搜尋與分類並排一列；設定卡三張一列。 */
-    .ms-sheet > .ms-search {
-      grid-column: span 3;
-      align-self: center;
-    }
-
-    .ms-sheet > .ms-search + .ms-rail {
-      grid-column: span 3;
-      align-self: center;
-    }
-
-    .ms-sheet > .ms-card {
-      grid-column: span 2;
-      align-self: stretch;
     }
 
     .ms-list {

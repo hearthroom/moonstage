@@ -13,14 +13,52 @@
 		<!-- 搜尋框在殼的標題列上（canvas-model-panel.vue），字由 searchQuery 傳進來：
 			 單獨佔一行的話，手機第一屏連一個模型都看不到（owner 2026-10-02 iPhone 截圖）。 -->
 
-		<!-- 設定常駐：上下文檔位、思考深度、Agent 模式。它們跟著選中的模型走，
-			 收在同一張卡裡、用細線分段——三張卡各自的內距與間隔加起來就是半個螢幕。 -->
-		<div v-if="!isLoading" class="ms-card">
-			<div class="ms-set">
-				<!-- 標題列：左邊上下文容量，右邊 Agent 模式的小開關。兩段說明都收在 ⓘ 後面，
-					 點了才在標題底下攤開——常駐的話，還沒看到模型就先讀完兩段字（owner 2026-10-02）。
-					 Agent 模式不支援時開關停用但仍然顯示，原因在它的 ⓘ 裡：整個消失的話，
+		<!--
+			設定（上下文檔位、思考深度、Agent 模式）住在殼的底部，跟確定鍵同一塊：
+			收合時只是確定鍵旁邊一排小鍵，寫著目前的值；點了才在它上面攤開選項。
+			擺在清單上方的話，還沒看到模型就先被設定吃掉半個畫面（owner 2026-10-02）。
+
+			狀態都在這個元件裡，所以用 Teleport 把這兩塊送進殼準備好的位置，不把
+			狀態搬出去。殼還沒給位置（剛掛上、或單獨掛這個元件的測試）時就地渲染。
+			攤開的那一塊用 v-show：收著時節點還在，作者的卡與測試都找得到。
+		-->
+		<Teleport v-if="!isLoading" :to="dockChips" :disabled="!dockChips">
+			<div class="ms-dock-chips">
+				<div class="ms-chip ms-dchip" :class="{ 'is-open': dockOpen === 'context' }" role="button" tabindex="0"
+					:aria-label="t('modelSelect.contextBudgetShort')"
+					:aria-expanded="dockOpen === 'context' ? 'true' : 'false'"
+					@click="toggleDock('context')"
+					@keydown.enter.prevent="toggleDock('context')">
+					<span class="ms-chip-text">{{ contextChipText }}</span>
+					<svg class="ms-caret" :class="{ 'is-open': dockOpen === 'context' }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 10l6 5 6-5" /></svg>
+				</div>
+				<div v-if="hasThinkingDepthOptions" class="ms-chip ms-dchip" :class="{ 'is-open': dockOpen === 'thinking' }" role="button" tabindex="0"
+					:aria-label="t('modelSelect.thinkingDepth')"
+					:aria-expanded="dockOpen === 'thinking' ? 'true' : 'false'"
+					@click="toggleDock('thinking')"
+					@keydown.enter.prevent="toggleDock('thinking')">
+					<span class="ms-chip-text">{{ thinkingChipText }}</span>
+					<svg class="ms-caret" :class="{ 'is-open': dockOpen === 'thinking' }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 10l6 5 6-5" /></svg>
+				</div>
+				<!-- Agent 模式是一顆真的開關，不必先攤開再按。名字可以點，點了攤開它的說明。
+					 模型不支援時開關停用但仍然顯示，原因在說明裡：整個消失的話，
 					 開著的對話換到不支援的模型之後，使用者看不到也關不掉。 -->
+				<div v-if="deepPrepVisible" class="ms-chip ms-dchip ms-dchip-agent" :class="{ 'is-open': dockOpen === 'agent', 'is-disabled': !deepPrepModelSupported }">
+					<span class="ms-chip-text" role="button" tabindex="0"
+						:aria-expanded="dockOpen === 'agent' ? 'true' : 'false'"
+						@click="toggleDock('agent')"
+						@keydown.enter.prevent="toggleDock('agent')">✦ {{ t('modelSelect.deepPrepLabel') }}</span>
+					<ASwitch
+						:checked="deepPrepOn"
+						:disabled="!deepPrepModelSupported || deepPrepSaving"
+						size="small"
+						@change="onDeepPrepChange" />
+				</div>
+			</div>
+		</Teleport>
+
+		<Teleport v-if="!isLoading" :to="dockPanel" :disabled="!dockPanel">
+			<div v-show="dockOpen === 'context'" class="ms-dock-panel">
 				<div class="ms-set-head">
 					<span class="ms-card-title">{{ t('modelSelect.contextBudgetShort') }}</span>
 					<span class="ms-info" :class="{ 'is-on': openHint === 'context' }" role="button" tabindex="0"
@@ -28,23 +66,8 @@
 						:aria-expanded="openHint === 'context' ? 'true' : 'false'"
 						@click="toggleHint('context')"
 						@keydown.enter.prevent="toggleHint('context')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></span>
-					<template v-if="deepPrepVisible">
-						<span class="ms-set-head-gap"></span>
-						<span class="ms-agent-label" :class="{ 'is-disabled': !deepPrepModelSupported }">✦ {{ t('modelSelect.deepPrepLabel') }}</span>
-						<span class="ms-info" :class="{ 'is-on': openHint === 'agent' }" role="button" tabindex="0"
-							:aria-label="t('modelSelect.deepPrepLabel')"
-							:aria-expanded="openHint === 'agent' ? 'true' : 'false'"
-							@click="toggleHint('agent')"
-							@keydown.enter.prevent="toggleHint('agent')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></span>
-						<ASwitch
-							:checked="deepPrepOn"
-							:disabled="!deepPrepModelSupported || deepPrepSaving"
-							size="small"
-							@change="onDeepPrepChange" />
-					</template>
 				</div>
 				<span v-if="openHint === 'context'" class="ms-hint">{{ t('modelSelect.contextTierExplain') }}</span>
-				<span v-if="openHint === 'agent' && deepPrepVisible" class="ms-hint">{{ deepPrepModelSupported ? t('modelSelect.deepPrepHintBilling') : t('modelSelect.deepPrepUnsupported') }}</span>
 				<div class="ms-pills is-fill">
 					<div
 						v-for="item in contextBudgetLevelOptions"
@@ -69,7 +92,7 @@
 				</div>
 			</div>
 
-			<div v-if="hasThinkingDepthOptions" class="ms-set">
+			<div v-if="hasThinkingDepthOptions" v-show="dockOpen === 'thinking'" class="ms-dock-panel">
 				<span class="ms-card-title">{{ t('modelSelect.thinkingDepth') }}</span>
 				<div class="ms-pills is-fill">
 					<div
@@ -95,7 +118,11 @@
 				</div>
 			</div>
 
-		</div>
+			<div v-if="deepPrepVisible" v-show="dockOpen === 'agent'" class="ms-dock-panel">
+				<span class="ms-card-title">✦ {{ t('modelSelect.deepPrepLabel') }}</span>
+				<span class="ms-hint">{{ deepPrepModelSupported ? t('modelSelect.deepPrepHintBilling') : t('modelSelect.deepPrepUnsupported') }}</span>
+			</div>
+		</Teleport>
 
 		<!-- 排序鍵排在分類列第一顆，寫著現在怎麼排；點了才在列底下攤開選項。
 			 攤開的那一段在文流裡，不浮在清單上——浮起來的選單在手機上就是一片黑。
@@ -517,10 +544,13 @@
 		compactExtraInstruction?: string
 		/** 搜尋框住在殼的標題列上，字從那裡傳進來 */
 		searchQuery?: string
+		/** 殼底部放設定鍵與攤開面板的位置；沒給（還沒掛上、或單獨掛這個元件）時就地渲染 */
+		dockChips?: HTMLElement | null
+		dockPanel?: HTMLElement | null
 	}>(), {
 		roleId: '', open: true, selectModel: '', selectModelName: '', context: 1,
 		thinkingDepth: '', showThinkingProcess: true, autoCompactEnabled: false,
-		compactExtraInstruction: '', searchQuery: '',
+		compactExtraInstruction: '', searchQuery: '', dockChips: null, dockPanel: null,
 	});
 
 	const emit = defineEmits<{
@@ -1096,6 +1126,17 @@ const truncationText = (completionRate: number) => {
 	// 設定卡上兩個 ⓘ 的說明，一次只攤開一段；再點一次收起來。
 	const openHint = ref('');
 	const toggleHint = (key) => { openHint.value = openHint.value === key ? '' : key; };
+	// 底部設定列：一次只攤開一塊（檔位／思考深度／Agent 說明），再點同一顆收起來。
+	const dockOpen = ref('');
+	const toggleDock = (key) => { dockOpen.value = dockOpen.value === key ? '' : key; };
+	const contextChipText = computed(() => {
+		const option = contextBudgetLevelOptions.value.find(o => o.value === formData.context);
+		return option ? option.text : t('modelSelect.contextBudgetShort');
+	});
+	const thinkingChipText = computed(() => {
+		const option = (thinkingDepthOptions.value || []).find(o => o.value === formData.thinkingDepth);
+		return option ? getThinkingOptionLabel(option) : t('modelSelect.thinkingDepth');
+	});
 	// 預設「熱門」：站內用量欄位還沒上線時每個家族同分，tie-break 讓它自然退回
 	// 原次序，也就是設計文件 §3.55 的降級行為。
 	const sortMode = ref('popular');
@@ -1572,6 +1613,7 @@ const truncationText = (completionRate: number) => {
 		// 這一份掛上去就一直在（彈層不是頁面）：上一次按過確認留下的 isSure 會讓第二次
 		// 確認直接被擋掉——重新整理後只有第一次有效（owner 2026-09-05）。每次打開歸零。
 		isSure.value = false;
+		dockOpen.value = '';
 		syncFromProps();
 		getModelList();
 		loadDeepPrepPreference();

@@ -111,6 +111,18 @@
 .mp-energy-pill {
     padding: 2px 10px
 }
+.mp-dock-row .mp-info-bar {
+    padding: 0
+}
+.u-popup__content .model-setting-scope .bottom .btn {
+    padding: 0 24px
+}
+.ms-dchip-agent {
+    padding-right: 6px
+}
+.ms-dock-panel {
+    padding: 12px
+}
 .ms-tier-stat {
     padding: 8px 10px
 }
@@ -169,16 +181,7 @@
 .ms-pill-tag {
     padding-left: 4px
 }
-.ms-card {
-    padding: 0 12px
-}
-.ms-set {
-    padding: 10px 0
-}
-.ms-agent-label {
-    padding-left: 8px
-}
-.ms-set .ms-pill {
+.ms-dock-panel .ms-pill {
     padding: 0 10px
 }
 .ms-row {
@@ -234,8 +237,7 @@
     }
 }
 @media (min-width: 769px) {
-    .role-setting .card,
-    .ms-card {
+    .role-setting .card {
       padding: 14px 16px
     }
 }
