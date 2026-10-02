@@ -35,6 +35,8 @@ export interface PendingChatTurn {
   failureCause?: string
   messageKey?: string
   preAdmissionErrorType?: string
+  // The server refused a regenerate before clearing the turn it replaces (turn_kept).
+  preAdmissionTurnKept?: boolean
   preAdmissionErrorAt?: number
   exactIdentityEmptyProbeCount?: number
   frozenStreamErrorConsumed?: boolean
@@ -1124,7 +1126,7 @@ export function recordExactOperationProbeMiss(
 }
 
 // Refusals the server sends only before a turn exists: the balance does not cover
-// the next turn's estimate, so nothing was stored. That makes the error itself the
+// the next turn's estimate, so nothing was stored or cleared. That makes the error itself the
 // proof, and the player gets the text back at once instead of after repeated empty
 // probes. Errors that can also come from transport stay on the probe path.
 const DEFINITIVE_PRE_ADMISSION_ERRORS = new Set(['insufficient_credits'])
@@ -1135,9 +1137,16 @@ export function isDefinitivePreAdmissionRejection(
 ): boolean {
   if (!pending || typeof pending !== 'object') return false
   if (pending.operationOutcomeCapability === 'legacy') return false
-  // Continue, Retry and Rewrite reuse a bubble already on screen and the server keeps
-  // their turn; only a new send has nothing stored to give back.
-  if ((pending.operationKind || 'send') !== 'send') return false
+  // A new send gives the text back. A regenerate (Rewrite or Retry) qualifies only when
+  // the server said it refused before clearing the turn (turn_kept) and the page holds
+  // the previous reply to put back; otherwise the turn may already be gone. An agent
+  // Continue adopts the interrupted bubble on screen; it never qualifies.
+  const kind = pending.operationKind || 'send'
+  if (kind !== 'send') {
+    const replacement = kind === 'rewrite' || kind === 'retry_generation'
+    const resume = String(pending.payload?.resumeFromOperationId || '').trim()
+    if (!replacement || !pending.rewriteSnapshot || resume || pending.preAdmissionTurnKept !== true) return false
+  }
   if (pending.accepted === true || String(pending.operationId || '').trim()) return false
   return DEFINITIVE_PRE_ADMISSION_ERRORS.has(String(errorType || '').trim())
 }

@@ -6079,6 +6079,11 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
           Date.now(),
         )) {
           persistPendingPreAdmissionState(pendingChatTurn as PendingChatTurn);
+          // 重新生成被拒時，伺服器只有在「還沒清掉那一輪」時才會帶 turn_kept；
+          // 只有這時才把原本的回覆放回去。
+          if (event.data?.turn_kept === true && pendingChatTurn) {
+            pendingChatTurn.preAdmissionTurnKept = true;
+          }
           // 點數不夠付這一輪的估價：伺服器在回合成立前就拒絕，什麼都沒存。
           // 不用再等幾輪空探測確認，直接把原文放回輸入框並講清楚原因。
           if (isDefinitivePreAdmissionRejection(pendingChatTurn, errorType)) {
@@ -7587,6 +7592,18 @@ function recoverPendingTurnAfterMissingDurableAck(
   return true;
 }
 
+// A Rewrite or Retry the server refused before clearing its turn (turn_kept): put the
+// previous reply back from the page's snapshot. Without that promise the turn may be
+// gone already, so the line goes back to the composer as before. An agent Continue
+// (resumeFromOperationId) adopted a bubble that is still the server's turn.
+function restoreRefusedReplacement(pending: PendingChatTurn | null): boolean {
+  if (!pending || pending.preAdmissionTurnKept !== true) return false;
+  if (!isReplacementOperationKind(pending.operationKind)) return false;
+  if (!pending.rewriteSnapshot) return false;
+  if (String((pending.payload as any)?.resumeFromOperationId || '').trim()) return false;
+  return discardPendingChatOperationCandidate(pending);
+}
+
 function settleConfirmedPreAdmissionFailure(
   capturedPending: PendingChatTurn,
   storedDraft = '',
@@ -7609,6 +7626,20 @@ function settleConfirmedPreAdmissionFailure(
   if (capturedPending.accepted === true) {
     discardPendingChatOperationCandidate(capturedPending);
     if (pendingChatTurn === capturedPending) pendingChatTurn = null;
+    pendingResendPayload.value = null;
+    clearStreamState();
+    removeOrphanPlaceholder();
+    appendChatErrorBubble(errorType, errorMessage, operationProjection);
+    closeWebSocket();
+    return true;
+  }
+
+  // 重新生成在開始前就被拒（例如點數不夠）：伺服器沒有動那一輪，把原本的回覆放回去，
+  // 不是把那句話當成沒送出的草稿。
+  const originalLine = String(capturedPending.rewriteSnapshot?.userBubble?.content ?? '');
+  if (restoreRefusedReplacement(capturedPending)) {
+    // 「編輯並重送」：氣泡換回原句，改過的字留在輸入框，不能丟。
+    if (storedDraft && storedDraft.trim() !== originalLine.trim() && !content.value) content.value = storedDraft;
     pendingResendPayload.value = null;
     clearStreamState();
     removeOrphanPlaceholder();
