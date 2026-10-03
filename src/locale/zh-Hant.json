@@ -3955,7 +3955,7 @@
 	"openChat.trial.creating": "建立中…",
 	"openChat.trial.slotsFull": "最多同時保留 {max} 張試玩卡。清除最久未使用的「{name}」，以建立這一張？",
 	"openChat.trial.evict": "清除並建立",
-	"openChat.trial.tooLarge": "此卡片超出試玩上限（世界書最多 1000 條、每條 3000 字、正規表示式單條 128 KB、檔案 4 MB）。",
+	"openChat.trial.tooLarge": "此卡片超出試玩上限（世界書最多 1000 條，每條字數上限依卡片語言而定；正規表示式單條 128 KB、檔案 4 MB）。",
 	"openChat.trial.unsupportedGeneric": "不支援：{message}",
 	"openChat.trial.unsupportedEntryContent": "世界書條目「{name}」已啟用但沒有內容。",
 	"openChat.trial.unsupportedRuleFind": "正規表示式規則「{name}」缺少尋找樣式。",

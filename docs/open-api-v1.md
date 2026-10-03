@@ -271,7 +271,7 @@ Play it like any card: `roleId` goes to `/role/detail` and `/conversation/start`
 |---|---|
 | trials per account | 5 |
 | time to live | 72 hours from the last import or the last message in any of its conversations |
-| worldbook entries | 1000 per trial, 3000 characters each |
+| worldbook entries | 1000 per trial; each entry's length follows the card's language: 4000 characters for Chinese (and when the language is unknown), 6000 for Japanese and Korean, 12000 for English |
 | display rules | 128 KB replacement text per rule, 1 MB for the whole rule set |
 | card text | the same per-language limits as authoring: opening 8000 characters (10000 for English cards), definition 10000 (50000), intro 500 (2500) |
 | request body | 4 MB |
