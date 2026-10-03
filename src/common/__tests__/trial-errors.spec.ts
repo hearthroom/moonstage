@@ -19,7 +19,7 @@ describe('describeTrialFailure', () => {
 
   it('開場白／世界書條目／條數／檔案：各自的行', () => {
     expect(describeTrialFailure(413, { detail: { reason: 'welcome', section: 'welcome', max: 8000, actual: 8123 } }, null).lines[0]).toEqual({ key: 'openChat.trial.limitWelcome', params: { actual: 8123, max: 8000 } })
-    expect(describeTrialFailure(413, { detail: { reason: 'entryContent', name: '沈栀语详细人设', index: 4, max: 3000, actual: 3120 } }, null).lines[0]).toEqual({ key: 'openChat.trial.limitEntry', params: { name: '沈栀语详细人设', actual: 3120, max: 3000 } })
+    expect(describeTrialFailure(413, { detail: { reason: 'entryContent', name: '沈栀语详细人设', index: 4, max: 4000, actual: 4120 } }, null).lines[0]).toEqual({ key: 'openChat.trial.limitEntry', params: { name: '沈栀语详细人设', actual: 4120, max: 4000 } })
     expect(describeTrialFailure(413, { detail: { reason: 'entries', max: 1000, actual: 1200 } }, null).lines[0]).toEqual({ key: 'openChat.trial.limitEntries', params: { actual: 1200, max: 1000 } })
     expect(describeTrialFailure(413, { detail: { reason: 'body', max: 4194304, actual: 5242880 } }, null).lines[0]).toEqual({ key: 'openChat.trial.limitBody', params: { actual: 5, max: 4 } })
   })

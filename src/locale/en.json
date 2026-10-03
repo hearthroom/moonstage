@@ -3955,7 +3955,7 @@
 	"openChat.trial.creating": "Creating…",
 	"openChat.trial.slotsFull": "Up to {max} trial cards can be kept at once. Remove the least recently used one, “{name}”, to create this one?",
 	"openChat.trial.evict": "Remove and create",
-	"openChat.trial.tooLarge": "This card exceeds the trial limits (worldbook up to 1000 entries, 3000 characters each, 128 KB per regex rule, 4 MB file).",
+	"openChat.trial.tooLarge": "This card exceeds the trial limits (worldbook up to 1000 entries, each within the length limit for the card's language, 128 KB per regex rule, 4 MB file).",
 	"openChat.trial.unsupportedGeneric": "Not supported: {message}",
 	"openChat.trial.unsupportedEntryContent": "Worldbook entry “{name}” is enabled but has no content.",
 	"openChat.trial.unsupportedRuleFind": "Regex rule “{name}” has no find pattern.",
