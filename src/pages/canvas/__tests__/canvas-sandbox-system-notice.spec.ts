@@ -24,7 +24,7 @@ import {
   terminalUIActionFromAllowedActions,
   terminalUIActionsFromAllowedActions,
 } from '../chat-operation-ui-state'
-import { operationFailureTitle } from '@/utils/operation-failure-copy'
+import { operationFailureSub, operationFailureTitle } from '@/utils/operation-failure-copy'
 import { findResumableAgentOperation } from '@/utils/agent-composer-action'
 import { allowsStageAction } from '@/host/capabilities'
 import zh from '@/locale/zh-Hant.json'
@@ -61,6 +61,7 @@ function resolver(timeline: any[], over: { capabilities?: unknown; operations?: 
     terminalUIActionsFromAllowedActions,
     findResumableAgentOperation,
     operationFailureTitle,
+    operationFailureSub,
   })
   return (index: number) => fns.systemNoticeFor(timeline[index], index)
 }
@@ -89,6 +90,14 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
   it('模型暫時不能用：標題講原因（failureCause），按鍵照伺服器給的', () => {
     const notice = resolver([user('u1'), failed({ failureCause: 'service_unavailable' })])(1)
     expect(notice?.label).toBe(t('error.serviceUnavailable'))
+    expect(notice?.sub).toBe(t('systemMsg.upstreamSub'))
+    expect(notice?.actions.map((a: any) => a.action)).toEqual(['retry', 'switch_model'])
+  })
+
+  it('我們這邊出錯：說是我們的問題、道歉、沒扣點，按鍵照伺服器給的', () => {
+    const notice = resolver([user('u1'), failed({ failureCause: 'internal_error' })])(1)
+    expect(notice?.label).toBe(t('systemMsg.ourError'))
+    expect(notice?.sub).toBe(t('systemMsg.ourErrorSub'))
     expect(notice?.actions.map((a: any) => a.action)).toEqual(['retry', 'switch_model'])
   })
 

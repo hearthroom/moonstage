@@ -119,6 +119,8 @@ export interface MessageView {
   prepTrail?: string[] | null
   agentInterrupted?: boolean
   interruptedNotice?: string
+  /** 中斷卡的說明，依原因而定（模型那邊、我們這邊、玩家能處理的）；沒有就用通用那句。 */
+  interruptedNoticeSub?: string
   /** 續跑的那次又停在跟上一次同一個原因上：中斷卡改建議換模型、多一顆切換模型。 */
   agentFailedAgain?: boolean
   latest?: boolean
