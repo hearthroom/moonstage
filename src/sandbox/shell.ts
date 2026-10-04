@@ -326,8 +326,9 @@ export function createShell(options: CreateShellOptions): Shell {
     onGrow: () => { scrollView.scrollTop = scrollView.scrollHeight; followBottom.pin() },
     // 三個點、動作列、開場白切換：殼只負責畫，做事的是宿主。
     onUi: (id, ui) => {
-      // 重新生成、繼續（會花點數）同樣只認真的手勢。
-      if (ui.kind === 'action' && (ui.key === 'rewrite' || ui.key === 'resume-agent') && !gesture) { debug.warn('ignored: not a user gesture', ui.key); return }
+      // 重新生成、繼續、系統訊息卡上的鍵（重試、繼續會花點數）同樣只認真的手勢。
+      const spends = ui.kind === 'action' && (ui.key === 'rewrite' || ui.key === 'resume-agent' || ui.key.startsWith('sys:'))
+      if (spends && !gesture) { debug.warn('ignored: not a user gesture', ui.key); return }
       transport.send({ type: 'message.ui', id, ...ui } as ShellToHost)
     },
     // 宿主的渲染管線保留正文裡的 <script>（跟一般卡同一套信任模型）：掛上後在那則的作用域裡跑一次。

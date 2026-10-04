@@ -71,6 +71,8 @@
         <!--
           誠實的失敗（I-1）。這一則為什麼停在這裡、現在能做什麼，就掛在它自己
           那一列底下——不另開一個玩家得去別處找的地方。
+          沙箱卡的殼畫同一張卡，資料由 systemNoticeFor() 用同一組運算式算好送過去：
+          這裡的閘或屬性改了，那裡要一起改。
         -->
         <chat-system-message
           v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason)"
@@ -3089,6 +3091,29 @@ const HUD_MORE_KINDS: Record<string, HudMoreKind> = {
 // 這幾個會先彈確認再動資料：HUD 不能替玩家按確認，所以標成破壞性、不給啟用。
 const HUD_DESTRUCTIVE_MORE = new Set(['new-chat', 'reset-chat', 'fork-archive']);
 
+/*
+  沙箱卡：一列底下那張系統訊息卡（誠實的失敗與下一步）的呈現資料，送進殼照畫。
+
+  沙箱卡的列表在跨源殼裡，模板裡那段 <chat-system-message> 畫不到那邊。這裡用跟模板
+  同一道閘、同一組運算式（一字不差，canvas-sandbox-system-notice.spec 比對兩邊）把卡算好，
+  殼收到的是玩家語系的字，不另有一份「結果 → 文案」的表。改模板的閘或屬性時這裡跟著改。
+  按鍵照元件的規則合成：伺服器列給了 ctas 就用那幾顆，否則用那一顆 cta／cta-action；
+  只有最新那一列有鍵（getSystemMsgCtas／getSystemMsgCta 本來就這樣判）。
+*/
+function systemNoticeFor(item: any, index: number) {
+  if (!item || !(item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason))) return null;
+  const ctas = getSystemMsgCtas(item, index);
+  const cta = getSystemMsgCta(item.finishReason, item, index);
+  const ctaAction = getSystemMsgCtaAction(item.finishReason, item, index);
+  const actions: Array<{ action: string; label: string }> = ctas.length ? ctas : (cta && ctaAction ? [{ action: ctaAction, label: cta }] : []);
+  return {
+    kind: getSystemMsgKind(item.finishReason),
+    label: operationFailureTitle(item.failureCause, t) || getSystemMsgLabel(item.finishReason),
+    sub: getSystemMsgSub(item.finishReason),
+    actions: actions.map((entry) => ({ action: String(entry.action), label: String(entry.label) })),
+  };
+}
+
 function buildHudHost(): HudHost {
   const indexOf = (messageId: string) => talkList.value.findIndex((it: any) => String(it.id) === messageId);
   const itemOf = (messageId: string) => { const i = indexOf(messageId); return i >= 0 ? { item: talkList.value[i] as any, index: i } : null; };
@@ -3138,8 +3163,8 @@ function buildHudHost(): HudHost {
             finished: !!item.chatFinish && !(sandboxCard.value && renderIsProvisional(item)),
             canonicalLatestAI: isAI && !opening && !!item.chatFinish && isLatestCanonicalAIIndex(index),
             canContinue: isAI && canContinueFromIndex(index),
-            // 沙箱殼用：標準訊息元件的整份呈現資料（html 走同一個快取，不重算）。
-            view: sandboxCard.value ? messageProps(item, index, item.chatLoading ? '' : hudMessageHtml(item)) : undefined,
+            // 沙箱殼用：標準訊息元件的整份呈現資料（html 走同一個快取，不重算），連同那一列底下的系統訊息卡。
+            view: sandboxCard.value ? { ...messageProps(item, index, item.chatLoading ? '' : hudMessageHtml(item)), systemNotice: systemNoticeFor(item, index) } : undefined,
           };
         }),
         generation: generating ? (streamingId ? 'streaming' as const : 'starting' as const) : 'idle' as const,
@@ -9175,6 +9200,17 @@ function onMenuPick(key: string) {
 }
 
 function onMessageAction(key: string, index: number) {
+  // 系統訊息卡上的鍵（沙箱殼把卡畫在那一列底下，按了回 sys:<動作>）：走一般卡那張卡同一個動作。
+  // 訊息是跨源來的，先對這一列現在給的鍵核一次（卡已經不是最新、或卡上沒有這顆鍵就不做）。
+  // 放在選單的能力閘之前：那道閘認的是選單的鍵名，不認得 sys:，卡上的鍵另有自己那道閘。
+  if (key.startsWith('sys:')) {
+    const row = talkList.value[index]
+    const action = key.slice(4)
+    const notice = systemNoticeFor(row, index)
+    if (!notice || !notice.actions.some((entry) => entry.action === action)) { notifyTimelineMutationBlocked(); return }
+    onSystemMsgCta(action, row, index)
+    return
+  }
   // 氣泡底下的「上下文 NN%」chip：不經選單，直接彈這段對話最近一次完成回覆的組成（mobile 同一份）。
   if (key === 'context-usage') {
  const row = talkList.value[index]

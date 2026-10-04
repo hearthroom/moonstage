@@ -13,6 +13,8 @@
  *     一則訊息只發一次 done，內容就是最終正文；一到就是定稿的（先 new 再 done、內容相同）不重畫。
  *   - 移除／切會話／**捲出視窗**：`message:unmount`；捲回來再 `message:mount`（補發記錄換成新的）。
  * 載荷恰好 `{ id, role, content, serverId }`，只傳一個實參。
+ * 系統列（role 'system'：失敗、點數不足、停止…那張卡）照畫，但不發以上任何事件——它是平台的介面，
+ * 不是對話內容；作者的腳本看 role 分支，多冒出一個空內容的角色會把收尾邏輯帶歪。
  *
  * 重畫的做法：定稿時把那則的 Vue 應用整個拆掉重掛（同步），mount 事件才能緊接著發；
  * 串流中的更新走響應式（非同步重繪），氣泡節點不換，作者綁在上面的東西不會掉。
@@ -25,7 +27,8 @@
  */
 import { createApp, h, nextTick, reactive, type App } from 'vue'
 import CanvasMessage from '@/pages/canvas/components/canvas-message.vue'
-import type { MessageLabels, MessageMenuAnchor, MessageView, SandboxMessage, SandboxRole } from '../protocol'
+import ChatSystemMessage from '@/components/chat-system-message/chat-system-message.vue'
+import type { MessageLabels, MessageMenuAnchor, MessageView, SandboxMessage, SandboxMessageRole, SandboxRole } from '../protocol'
 import type { EventBus } from '../sdk/events'
 
 export interface MessagePayload {
@@ -79,7 +82,7 @@ export interface MessageListDeps {
 
 interface EntryState {
   view: MessageView
-  chat: { from: SandboxRole; state: string; msgId: string | null; generating: boolean }
+  chat: { from: SandboxMessageRole; state: string; msgId: string | null; generating: boolean }
 }
 
 interface Entry {
@@ -121,7 +124,7 @@ export interface MessageList {
 }
 
 export function payloadOf(m: SandboxMessage): MessagePayload {
-  return { id: m.id, role: m.role, content: m.content, serverId: m.serverId == null ? null : String(m.serverId) }
+  return { id: m.id, role: m.role as SandboxRole, content: m.content, serverId: m.serverId == null ? null : String(m.serverId) }
 }
 
 const SCRIPT_RE = /<script[^>]*>([\s\S]*?)<\/script>/gi
@@ -133,8 +136,15 @@ const INITIAL_MIN = 4
 const DEFAULT_HEIGHT = 160
 
 export function createMessageList(deps: MessageListDeps): MessageList {
-  const { doc, list, bus, virtualize } = deps
+  const { doc, list, virtualize } = deps
   const entries = new Map<string, Entry>()
+  // 作者事件只發給對話內容：系統列（平台的那張卡）不發、也不留補發記錄。
+  const authorFacing = (m: SandboxMessage) => m.role !== 'system'
+  const bus = {
+    emit: (m: SandboxMessage, ...args: Parameters<MessageListDeps['bus']['emit']>) => { if (authorFacing(m)) deps.bus.emit(...args) },
+    forget: (key: string) => deps.bus.forget(key),
+    resetReplay: () => deps.bus.resetReplay(),
+  }
   let seq = 0
   // 估高：拆過的外框量到的平均值。
   let heightSum = 0
@@ -172,8 +182,8 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     const view: MessageView = m.view ? { ...m.view } : {
       mesid: seq,
       role: m.role,
-      name: m.role === 'ai' ? deps.roleName : deps.userName,
-      avatar: m.role === 'ai' ? deps.roleAvatar : deps.userAvatar,
+      name: m.role === 'user' ? deps.userName : deps.roleName,
+      avatar: m.role === 'user' ? deps.userAvatar : deps.roleAvatar,
       html: generating ? '' : renderCached(m),
       loading: generating,
       loadingLabel: deps.strings.generating,
@@ -221,7 +231,21 @@ export function createMessageList(deps: MessageListDeps): MessageList {
         onMenu: (anchor: MessageMenuAnchor | null) => { if (deps.onUi) deps.onUi(id, { kind: 'menu', anchor }) },
         onAction: (key: string) => { if (deps.onUi) deps.onUi(id, { kind: 'action', key }) },
         onSwipe: (delta: number) => { if (deps.onUi) deps.onUi(id, { kind: 'swipe', delta }) },
-      } as Record<string, unknown>),
+      } as Record<string, unknown>, {
+        // 系統訊息卡掛在訊息元件的預設插槽：一般卡在同一個位置掛同一個元件（canvas.vue 的 <chat-system-message>）。
+        // 字與按鍵都是宿主算好的；按鍵交回宿主，key 是 sys:<動作>。
+        default: () => {
+          const notice = state.view.systemNotice
+          if (!notice) return null
+          return h(ChatSystemMessage as unknown as Parameters<typeof h>[0], {
+            kind: notice.kind,
+            label: notice.label,
+            sub: notice.sub,
+            ctas: notice.actions,
+            onCta: (action: string) => { if (deps.onUi) deps.onUi(id, { kind: 'action', key: `sys:${action}` }) },
+          } as Record<string, unknown>)
+        },
+      }),
     })
     entry.app.config.warnHandler = () => {}
     entry.app.mount(entry.frame)
@@ -239,7 +263,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
   }
 
   const mount = (entry: Entry) => {
-    bus.emit('message:mount', payloadOf(entry.message), { bubble: entry.article, key: entry.message.id })
+    bus.emit(entry.message, 'message:mount', payloadOf(entry.message), { bubble: entry.article, key: entry.message.id })
   }
 
   /** 變成等高空殼：拆掉氣泡、發 unmount、mount 的補發記錄拿掉（done 的留著：定稿只發一次）。 */
@@ -247,7 +271,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     if (!entry.app) return
     const height = entry.frame.offsetHeight
     learn(height)
-    bus.emit('message:unmount', payloadOf(entry.message), { bubble: entry.article })
+    bus.emit(entry.message, 'message:unmount', payloadOf(entry.message), { bubble: entry.article })
     bus.forget(entry.message.id)
     unmountApp(entry)
     entry.state = null
@@ -333,7 +357,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     rendered.delete(String(id))
     if (entry.unobserve) { entry.unobserve(); entry.unobserve = null }
     dirty.delete(entry)
-    if (entry.app) bus.emit('message:unmount', payloadOf(entry.message), { bubble: entry.article })
+    if (entry.app) bus.emit(entry.message, 'message:unmount', payloadOf(entry.message), { bubble: entry.article })
     bus.forget(entry.message.id)
     bus.forget(`${entry.message.id}:done`)
     unmountApp(entry)
@@ -343,7 +367,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
   const makeEntry = (message: SandboxMessage): Entry => {
     const id = String(message.id)
     const m: SandboxMessage = { ...message, id }
-    if (!m.state) m.state = m.role === 'user' || m.content ? 'done' : 'pending'
+    if (!m.state) m.state = m.role !== 'ai' || m.content ? 'done' : 'pending'
     seq++
     const frame = doc.createElement('div')
     frame.setAttribute('data-chat', 'message-frame')
@@ -367,7 +391,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     } else {
       entries.set(id, entry)
     }
-    bus.emit('message:new', payloadOf(entry.message))
+    bus.emit(entry.message, 'message:new', payloadOf(entry.message))
     if (opts.before) list.insertBefore(entry.frame, opts.before.frame)
     else list.appendChild(entry.frame)
     if (opts.lazy && virtualize) {
@@ -382,7 +406,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     observe(entry)
     // 冷啟動（歷史訊息）：已定稿的每則補一個 done，作者的收尾邏輯才會對歷史也跑一次。
     if (opts.cold && entry.message.state === 'done') {
-      bus.emit('message:done', payloadOf(entry.message), { bubble: entry.app ? entry.article : null, key: `${id}:done` })
+      bus.emit(entry.message, 'message:done', payloadOf(entry.message), { bubble: entry.app ? entry.article : null, key: `${id}:done` })
     }
     return entry
   }
@@ -432,7 +456,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
       if (view) entry.message.view = view
       if (!entry.app) rebuild(entry)
       applyState(entry, stateOf(entry.message))
-      bus.emit('message:stream', { id: entry.message.id, role: entry.message.role, content }, { bubble: entry.article })
+      bus.emit(entry.message, 'message:stream', { id: entry.message.id, role: entry.message.role, content }, { bubble: entry.article })
     },
     done(id, content, serverId, view) {
       const entry = entries.get(String(id))
@@ -447,7 +471,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
       if (view) entry.message.view = view
       if (!entry.app) {
         // 空殼（捲出去的歷史被宿主補 done）：只記狀態，掛回來時照現況重建。
-        bus.emit('message:done', payloadOf(entry.message), { bubble: null, key: `${entry.message.id}:done` })
+        bus.emit(entry.message, 'message:done', payloadOf(entry.message), { bubble: null, key: `${entry.message.id}:done` })
         return
       }
       if (!unchanged) {
@@ -458,7 +482,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
       } else {
         applyState(entry, stateOf(entry.message))
       }
-      bus.emit('message:done', payloadOf(entry.message), { bubble: entry.article, key: `${entry.message.id}:done` })
+      bus.emit(entry.message, 'message:done', payloadOf(entry.message), { bubble: entry.article, key: `${entry.message.id}:done` })
       if (!unchanged) mount(entry)
       reconcile()
     },
