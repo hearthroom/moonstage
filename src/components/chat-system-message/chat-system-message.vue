@@ -170,6 +170,12 @@ export default {
   layer 裡會吃掉），間距用 padding。
 */
 @layer lt-base {
+/* 寬度是 100%／max-width 100% 再加內距：要 border-box 才不會超出那一列。uni 的基底本來就把 `*`
+   設成 border-box，沙箱卡的殼沒有那份基底，卡片右緣會被切掉一截，所以這裡自己講清楚。 */
+.sys-msg-wrap,
+.sys-msg-wrap * {
+  box-sizing: border-box;
+}
 .sys-msg-wrap {
   display: flex;
   flex-direction: column;

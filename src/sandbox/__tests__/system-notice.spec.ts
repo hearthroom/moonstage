@@ -8,6 +8,8 @@
  * 元件掛在那一列底下；按鍵交回宿主，跟重新生成一樣只認真的手勢。系統列是平台的介面，
  * 不是對話內容：作者腳本不會收到它的任何事件。
  */
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, it, expect, afterEach } from 'vitest'
 import { nextTick } from 'vue'
 import { createShell, type Shell } from '../shell'
@@ -103,6 +105,14 @@ describe('沙箱殼：系統訊息卡', () => {
     h.ml.setView('h3', { role: 'ai', html: '<p>說到一半</p>', finished: true, systemNotice: null } as MessageView)
     await nextTick()
     expect(frame.querySelector('.sys-msg-card')).toBeNull()
+  })
+})
+
+describe('沙箱殼：系統訊息卡的寬度', () => {
+  it('卡自己講明 border-box：殼沒有 uni 的基底重置，寬 100% 加內距會超出那一列、右緣被切掉', () => {
+    const src = fs.readFileSync(path.join(process.cwd(), 'src/components/chat-system-message/chat-system-message.vue'), 'utf8')
+    const style = src.slice(src.indexOf('@layer lt-base {'), src.indexOf('</style>'))
+    expect(style).toMatch(/\.sys-msg-wrap,\s*\.sys-msg-wrap \* \{\s*box-sizing: border-box;/)
   })
 })
 
