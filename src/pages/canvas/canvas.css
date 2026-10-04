@@ -913,19 +913,27 @@
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
-    /* 換到下一行時連同「繼續」一起靠右 */
-    margin-left: auto;
   }
 
-  /* 兩顆鍵都在時，窄螢幕上說明文字不被擠成一字一行：放不下就讓鍵換到下一行、靠右。 */
+  .agent-resume-card__actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* 兩顆鍵都在時，窄螢幕上說明文字不被擠成一字一行：放不下就讓兩顆鍵一起換到下一行、靠右。 */
   .agent-resume-card:has(.agent-resume-card__alt) {
     flex-wrap: wrap;
     row-gap: 8px;
-    column-gap: 8px;
   }
 
   .agent-resume-card:has(.agent-resume-card__alt) .agent-resume-card__body {
     flex: 1 1 160px;
+  }
+
+  .agent-resume-card:has(.agent-resume-card__alt) .agent-resume-card__actions {
+    margin-left: auto;
   }
 
   /* 軌跡在上、指示器在下：兩者之間留一口氣 */
