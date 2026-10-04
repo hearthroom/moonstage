@@ -88,7 +88,7 @@
         <div v-if="message.agentInterrupted" class="agent-resume-card" data-lt="agent-resume">
           <div class="agent-resume-card__body">
             <div class="agent-resume-card__text">{{ message.interruptedNotice || labels.interruptedNotice }}</div>
-            <div class="agent-resume-card__sub">{{ message.agentFailedAgain && labels.failedAgainSub ? labels.failedAgainSub : labels.interruptedNoticeSub }}</div>
+            <div class="agent-resume-card__sub">{{ message.agentFailedAgain && labels.failedAgainSub ? labels.failedAgainSub : (message.interruptedNoticeSub || labels.interruptedNoticeSub) }}</div>
           </div>
           <div class="agent-resume-card__actions">
             <div v-if="message.agentFailedAgain && labels.switchModel" class="agent-resume-card__alt" data-lt="agent-switch-model" role="button" tabindex="0"
@@ -261,6 +261,8 @@ const props = withDefaults(defineProps<{
     /** Agent 準備到一半被停下：軌跡已固定，底下給一張「進度留著／繼續」的卡 */
     agentInterrupted?: boolean
     interruptedNotice?: string
+    /** 依原因而定的說明（模型那邊、我們這邊、玩家能處理的）；沒有就用通用那句 */
+    interruptedNoticeSub?: string
     /** 續跑的那次又停在跟上一次同一個原因上：卡片建議換模型 */
     agentFailedAgain?: boolean
     /** 列表的最後一則（酒館的 last_mes），可能是使用者說的 */

@@ -78,7 +78,7 @@
           v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason)"
           :kind="getSystemMsgKind(item.finishReason)"
           :label="operationFailureTitle(item.failureCause, t) || getSystemMsgLabel(item.finishReason)"
-          :sub="getSystemMsgSub(item.finishReason)"
+          :sub="operationFailureSub(item.failureCause, t) || getSystemMsgSub(item.finishReason)"
           :cta="getSystemMsgCta(item.finishReason, item, index)"
           :cta-action="getSystemMsgCtaAction(item.finishReason, item, index)"
           :ctas="getSystemMsgCtas(item, index)"
@@ -366,7 +366,7 @@
 
 <script lang="ts" setup>
 import { cardPortrait } from './canvas-portrait'
-import { operationFailureTitle } from '@/utils/operation-failure-copy'
+import { operationFailureSub, operationFailureTitle } from '@/utils/operation-failure-copy'
 import { cfImageDesktop } from "@/utils/image-transform.js"
 
 import { createFullscreenController } from './canvas-fullscreen';
@@ -3108,7 +3108,7 @@ function systemNoticeFor(item: any, index: number) {
   return {
     kind: getSystemMsgKind(item.finishReason),
     label: operationFailureTitle(item.failureCause, t) || getSystemMsgLabel(item.finishReason),
-    sub: getSystemMsgSub(item.finishReason),
+    sub: operationFailureSub(item.failureCause, t) || getSystemMsgSub(item.finishReason),
     actions: actions.map((entry) => ({ action: String(entry.action), label: String(entry.label) })),
   };
 }
@@ -9030,6 +9030,7 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     prepTrail: Array.isArray(item.prepTrail) ? item.prepTrail : null,
     agentInterrupted: item.agentInterrupted === true,
     interruptedNotice: operationFailureTitle(item.failureCause, t),
+    interruptedNoticeSub: operationFailureSub(item.failureCause, t, { agent: true }),
     // 續跑的那次又停在跟上一次同一個原因上：卡片改建議換模型（看伺服器給的操作清單，重新載入也一樣）。
     agentFailedAgain: item.agentInterrupted === true && agentResumeFailedAgain(unref(knownOperations), item.operationId),
     reasoning: (!isUser && item.thinkingContent && formData.showThinkingProcess !== false)

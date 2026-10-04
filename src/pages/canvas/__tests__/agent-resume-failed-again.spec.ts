@@ -80,6 +80,12 @@ describe('中斷卡：同一個原因又停下時建議換模型', () => {
     expect(w.find('.agent-resume-card__sub').text()).toBe(LABELS.interruptedNoticeSub)
     expect(w.find('.agent-resume-card__alt').exists()).toBe(false)
   })
+
+  it('原因說得出是誰的問題時，說明照原因講；又停在同一個原因時仍以建議換模型為先', () => {
+    const upstream = '模型那邊的連線不穩，進度都還留著，可以按繼續接著跑，或換一個模型接手。'
+    expect(card({ interruptedNoticeSub: upstream }).find('.agent-resume-card__sub').text()).toBe(upstream)
+    expect(card({ interruptedNoticeSub: upstream, agentFailedAgain: true }).find('.agent-resume-card__sub').text()).toBe(LABELS.failedAgainSub)
+  })
 })
 
 describe('canvas.vue 的接線', () => {
