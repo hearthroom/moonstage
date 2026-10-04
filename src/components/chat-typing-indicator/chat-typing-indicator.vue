@@ -10,14 +10,18 @@
       <view v-for="index in 3" :key="index" class="typing-dot" />
     </view>
     <text class="typing-label" aria-hidden="true">{{ label }}</text>
+    <!-- 等了多久：每秒都在變，不放進 aria-label，否則讀屏每秒念一次。 -->
+    <text v-if="elapsed" class="typing-elapsed" aria-hidden="true">{{ elapsed }}</text>
   </view>
 </template>
 
 <script setup lang="ts">
 withDefaults(defineProps<{
   label?: string
+  elapsed?: string
 }>(), {
   label: 'Replying',
+  elapsed: '',
 })
 </script>
 
@@ -73,6 +77,16 @@ withDefaults(defineProps<{
   font-weight: 600;
   letter-spacing: 0.02em;
   white-space: nowrap;
+}
+
+/* 跟說法同一列、淡一階，數字等寬：每秒跳動時寬度不晃。 */
+.typing-elapsed {
+  font-size: var(--fs-micro, 12px);
+  line-height: 1;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0.64;
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes typing-dot-lift {

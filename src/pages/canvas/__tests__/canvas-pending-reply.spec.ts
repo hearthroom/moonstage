@@ -73,9 +73,10 @@ describe('等回覆的氣泡在整理劇情期間留著', () => {
     expect(list.map((r) => r.id)).toEqual(['u1', 'sum'])
   })
 
-  it('標籤：Agent 準備中寫思考中，有當下步驟用步驟文字，其餘正在回覆', () => {
-    expect(pendingReplyLabel({ hasLiveSteps: true, t })).toBe('思考中')
-    expect(pendingReplyLabel({ hasLiveSteps: false, prepStepText: '回想先前的劇情', t })).toBe('回想先前的劇情')
+  it('標籤：Agent 準備中寫思考中，有當下步驟用步驟文字，其餘用輪換的說法（沒有才寫正在回覆）', () => {
+    expect(pendingReplyLabel({ hasLiveSteps: true, phrase: '正細細斟酌用詞…', t })).toBe('思考中')
+    expect(pendingReplyLabel({ hasLiveSteps: false, prepStepText: '回想先前的劇情', phrase: '正細細斟酌用詞…', t })).toBe('回想先前的劇情')
+    expect(pendingReplyLabel({ hasLiveSteps: false, phrase: '正細細斟酌用詞…', t })).toBe('正細細斟酌用詞…')
     expect(pendingReplyLabel({ hasLiveSteps: false, t })).toBe('正在回覆')
   })
 })
@@ -112,7 +113,10 @@ describe('畫布接線（canvas.vue 的 inline WebSocket switch 無法獨立掛�
     // 任何一條清掉壓縮狀態的路徑（錯誤、看門狗、斷線、停止）都會讓標籤換回來
     expect(body).toContain('unref(isCompacting)')
     expect(body).toMatch(/\n\s+waitingHint,\n/)
-    expect(body).toMatch(/\n\s+slowHint,\n/)
+    // 等了多久跟輪換的說法：一般卡與沙箱卡同一份
+    expect(body).toMatch(/\n\s+waitElapsed,\n/)
+    expect(body).toContain('phrase: unref(waitPhrase)')
+    expect(body).not.toContain('slowHint')
   })
 })
 
@@ -126,26 +130,27 @@ describe('訊息元件：等回覆時的提示', () => {
     expect(hint?.classList.contains('is-delayed')).toBe(false)
   })
 
-  it('沒有伺服器提示時，放一句延遲浮現的提示（長上下文讀取要幾十秒）', () => {
-    const el = mount(CanvasMessage, { props: { message: { ...BASE, loadingLabel: '正在回覆', slowHint: '模型回應較慢，請耐心等待...' } } }).element as HTMLElement
-    const hint = el.querySelector('.lt-waiting-hint')
-    expect(hint?.classList.contains('is-delayed')).toBe(true)
-    expect(hint?.getAttribute('aria-hidden')).toBe('true')
+  it('等了多久寫在指示器旁邊：看得到，讀屏不每秒念一次', () => {
+    const el = mount(CanvasMessage, { props: { message: { ...BASE, loadingLabel: '正細細斟酌用詞…', waitElapsed: '23 秒' } } }).element as HTMLElement
+    const indicator = el.querySelector('.chat-typing-indicator') as HTMLElement
+    expect(indicator.textContent).toContain('正細細斟酌用詞…')
+    const elapsed = indicator.querySelector('.typing-elapsed') as HTMLElement
+    expect(elapsed.textContent).toBe('23 秒')
+    expect(elapsed.getAttribute('aria-hidden')).toBe('true')
+    expect(indicator.getAttribute('aria-label')).toBe('正細細斟酌用詞…')
+    expect(el.querySelector('.lt-waiting-hint')).toBeNull()
   })
 
   it('沒有任何提示時不畫提示節點；有內容之後也不畫', () => {
     const a = mount(CanvasMessage, { props: { message: { ...BASE, loadingLabel: '整理劇情中…' } } }).element as HTMLElement
     expect(a.querySelector('.lt-waiting-hint')).toBeNull()
     expect(a.querySelector('.chat-typing-indicator')?.textContent).toContain('整理劇情中…')
-    const b = mount(CanvasMessage, { props: { message: { ...BASE, loading: false, html: '<p>正文</p>', slowHint: 'x' } } }).element as HTMLElement
+    const b = mount(CanvasMessage, { props: { message: { ...BASE, loading: false, html: '<p>正文</p>', waitElapsed: '3 秒' } } }).element as HTMLElement
     expect(b.querySelector('.lt-waiting-hint')).toBeNull()
   })
 
-  it('延遲浮現靠 CSS（不必計時器）：規則存在且只用 token 內的時長', () => {
+  it('不再有 12 秒後浮現的「模型回應較慢」：等了多久已經寫在指示器旁邊', () => {
     const css = fs.readFileSync(path.join(process.cwd(), 'src/pages/canvas/canvas.css'), 'utf8')
-    const at = css.indexOf('.mes_text .lt-waiting-hint.is-delayed {')
-    expect(at).toBeGreaterThan(-1)
-    const rule = css.slice(at)
-    expect(rule.slice(0, 400)).toMatch(/animation:[^;]*250ms[^;]*12s/)
+    expect(css).not.toContain('.lt-waiting-hint.is-delayed')
   })
 })

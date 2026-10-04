@@ -976,23 +976,6 @@
     opacity: 0.72;
   }
 
-  /* 沒有伺服器提示時：一般回覆幾秒內就出字，12 秒還沒出字才浮現（長上下文要讀幾十秒）。
-     靠 CSS 延遲而不是計時器：節點隨指示器一起掛上、一起拿掉，第一個字到了自然消失。 */
-  .mes_text .lt-waiting-hint.is-delayed {
-    animation: lt-waiting-hint-in 250ms var(--ease-out, cubic-bezier(0.25, 0.46, 0.45, 0.94)) 12s both;
-  }
-
-  @keyframes lt-waiting-hint-in {
-    from { opacity: 0; }
-    to { opacity: 0.72; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .mes_text .lt-waiting-hint.is-delayed {
-      animation-timing-function: step-end;
-    }
-  }
-
   /*
      動作列：在 .mes_block 的文流裡、緊接氣泡之後，常駐 DOM、只調透明度。
      桌機平時淡、懸停浮起；觸控裝置沒有懸停，就用一個看得見的常駐透明度——

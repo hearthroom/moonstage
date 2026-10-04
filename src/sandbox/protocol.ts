@@ -114,7 +114,7 @@ export interface MessageView {
   loading?: boolean
   loadingLabel?: string
   waitingHint?: string
-  slowHint?: string
+  waitElapsed?: string
   prepSteps?: string[] | null
   prepTrail?: string[] | null
   agentInterrupted?: boolean

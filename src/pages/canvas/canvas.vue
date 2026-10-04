@@ -444,6 +444,7 @@ import { bindBubbleFit } from './canvas-bubble-fit'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
 import { clearPendingReplyPhase, insertBeforePendingReply, markPendingReplyPhase, pendingReplyLabel } from './canvas-pending-reply'
+import { createWaitClock, formatWaitElapsed } from './wait-clock'
 import { createOutcomeUnconfirmedHold } from './outcome-unconfirmed-hold'
 
 // ── Open Canvas ─────────────────────────────────────────────────
@@ -1864,6 +1865,37 @@ function tryResumeOnMount() {
   }
 }
 const talkList = ref([]);//对话列表
+// 等第一個字的時候：指示器的說法每 5 秒換一句，旁邊寫已經等了多久（owner 2026-10-05）。
+// 玩家要分得出「它在想」和「卡住了」，久了要不要停、換模型由他判斷；不寫「模型還沒回應」。
+// 只有還有回覆在等第一個字時才走秒，回覆一來就停。
+const waitNow = ref(Date.now());
+const waitPhrase = ref('');
+const waitClock = createWaitClock(() => waitNow.value);
+let waitTicker: ReturnType<typeof setInterval> | null = null;
+const waitingRowIds = computed(() => (talkList.value as any[]).filter((it) => it && it.chatLoading).map((it) => String(it.id)));
+watch(() => waitingRowIds.value.join('|'), () => {
+  const ids = waitingRowIds.value;
+  waitClock.keepOnly(new Set(ids));
+  if (!ids.length) {
+    if (waitTicker) { clearInterval(waitTicker); waitTicker = null; }
+    waitPhrase.value = '';
+    return;
+  }
+  if (waitTicker) return;
+  waitNow.value = Date.now();
+  waitPhrase.value = composeThinkingPhrase();
+  let ticks = 0;
+  waitTicker = setInterval(() => {
+    waitNow.value = Date.now();
+    if (++ticks % 5 === 0) {
+      // 避開和上一句一樣：換了字卻沒變化，比不換更像卡住。
+      let next = composeThinkingPhrase();
+      for (let i = 0; i < 5 && next === waitPhrase.value; i++) next = composeThinkingPhrase();
+      waitPhrase.value = next;
+    }
+  }, 1000);
+}, { immediate: true });
+onUnmounted(() => { if (waitTicker) { clearInterval(waitTicker); waitTicker = null; } });
 const isUserAtBottom = ref(true); //用户是否在底部（控制是否自动滚动）
 const autoScrollEnabled = ref(true); //是否启用自动滚动（用户手动往上滚时禁用）
 const isExpanded = ref(false);//简介展开
@@ -9009,11 +9041,11 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
   // 同時看全域的 isCompacting：清壓縮狀態的路徑有好幾條（錯誤、看門狗、斷線、停止），
   // 任何一條清掉，標籤就跟著換回來，不必每條都記得清氣泡上的標記。
   const pendingPhase = item.chatLoading && unref(isCompacting) ? item.pendingPhase : ''
-  const loadingLabel = pendingReplyLabel({ phase: pendingPhase, hasLiveSteps: !!liveSteps, prepStepText: unref(prepStepText), t })
-  // 長上下文要讀幾十秒才出第一個字。伺服器說慢了就立即寫出來；沒說的話放一句延遲浮現的
-  // （CSS 延遲，見 .lt-waiting-hint.is-delayed），整理劇情與 Agent 準備中不放——那兩種已經在說它在做什麼。
+  const loadingLabel = pendingReplyLabel({ phase: pendingPhase, hasLiveSteps: !!liveSteps, prepStepText: unref(prepStepText), phrase: unref(waitPhrase), t })
+  // 伺服器說了為什麼慢就寫在指示器下方；等了多久寫在指示器旁邊（取代先前 12 秒後浮現的
+  // 「模型回應較慢」：玩家看得到秒數在走，比一句固定的安撫更能判斷是在想還是卡住了）。
   const waitingHint = item.chatLoading && item.waitingHint ? String(item.waitingHint) : ''
-  const slowHint = item.chatLoading && !waitingHint && !liveSteps && pendingPhase !== 'compacting' ? t('error.modelSlow') : ''
+  const waitElapsed = item.chatLoading ? formatWaitElapsed(waitClock.elapsedSeconds(String(item.id)), t) : ''
   const html = htmlOverride != null ? htmlOverride : (item.chatLoading ? '' : renderMessage(item))
   return {
     mesid: index,
@@ -9024,7 +9056,7 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     html,
     loadingLabel,
     waitingHint,
-    slowHint,
+    waitElapsed,
     // 這一輪 Agent 做了什麼。用戶付了錢、等了一分多鐘，過程是他唯一能判斷
     // 「有沒有在幹活」的依據，不該隨氣泡出現而消失。
     prepTrail: Array.isArray(item.prepTrail) ? item.prepTrail : null,
