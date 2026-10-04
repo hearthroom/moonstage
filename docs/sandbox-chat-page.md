@@ -88,6 +88,13 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 
 訊息 `id` 由宿主決定，形如 `l1`、`l2`…遞增；`serverId` 只在 AI 訊息定稿後有值，玩家訊息與開場白永遠 `null`（作者腳本常拿它分辨「已經聊過」）。
 
+**系統列**：訊息的 `role` 除了 `user`／`ai` 還可能是 `system`——平台自己的那一列（內部錯誤、點數不足、模型暫時不能用、
+停止…的系統訊息卡）。殼照畫（`data-from="system"`），但**不發任何作者事件**、也不在補發記錄裡：它不是對話內容。
+卡的字與按鍵在 `view.systemNotice`（`{kind, label, sub, actions:[{action, label}]}`，宿主用一般卡同一組函式算好、
+只有最新一列有按鍵），AI 回覆底下的卡也走同一個欄位；殼把它掛在訊息元件的預設插槽（跟一般卡同一個位置、同一個
+`chat-system-message` 元件）。按鍵發 `message.ui { kind: 'action', key: 'sys:<action>' }`，跟重新生成、繼續一樣只認
+真的手勢；宿主收到後先對那一列當下的卡核一次再執行。
+
 ## 3. `sdk` 契約（殼內作者看到的）
 
 11 個鍵、30 個能力，全部**從第一版就存在**（作者腳本在頂層探測它們），每個能力有實作狀態：
@@ -121,7 +128,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 - 冷啟動：對每則已存在的訊息 `message:new → message:mount → message:done`，最後 `ready`。
 - `ready` 只發一次、**不補發**；`message:mount`／`message:done` 對晚訂閱者補發（所有已掛氣泡）。
 - 載荷單一實參 `{id, role, content, serverId}`；`message:stream` 只有 `{id, role, content}`；
-  `input:change` 是字串。
+  `input:change` 是字串。`role` 只會是 `user`／`ai`：系統列（`role: 'system'`）不發以上任何事件。
 - 回呼內 `document.querySelector` 只看得到**當前氣泡**的內容；回呼外就是一般的文件（不藏氣泡內容——舊頁寫法的
   `<img onerror>` 點火器靠整份文件撿引擎片段；MMD 新版契約只保證回呼內收窄）（`scope.ts`）。
 - 一則訊息只發一次 `message:done`，且帶定稿內容——原站會在串流前多發一次空內容的 `done`，
