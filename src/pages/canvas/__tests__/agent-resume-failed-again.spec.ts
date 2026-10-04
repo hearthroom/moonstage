@@ -6,6 +6,8 @@
  * 一直按繼續，而那個模型不會好。續跑的那次又停在跟上一次同一個原因上時，說明改成建議換
  * 模型，卡上多一顆「切換模型」。原因不同（上次逾時、這次工具失敗）不算，那是另一個問題；
  * 玩家自己按的停止也不算。
+ *
+ * 也一起釘住：卡上的「繼續」沒有東西可續時（回 false）要讓玩家知道，不能按了沒反應。
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -95,5 +97,10 @@ describe('canvas.vue 的接線', () => {
     expect(action.indexOf("key === 'switch-model'")).toBeGreaterThan(-1)
     expect(action.indexOf("key === 'switch-model'")).toBeLessThan(action.indexOf('onMenuPick(key)'))
     expect(action).toContain('openModelSelect()')
+  })
+
+  it('卡上的「繼續」沒有東西可續時講出來（繼續的目標不成立那一句），不是按了沒反應', () => {
+    const pick = slice('function onMenuPick(')
+    expect(pick).toMatch(/case 'resume-agent':[\s\S]*?if \(!resumeAgentOperation\(\)\) message\.error\(resolveChatErrorMessage\('continue_target_invalid', t\)\)/)
   })
 })

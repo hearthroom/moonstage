@@ -9167,7 +9167,9 @@ function onMenuPick(key: string) {
       break
     case 'resume-agent':
       // 中斷卡上的「繼續」：接著跑被停下的那一輪 Agent，不是重新開始。
-      resumeAgentOperation()
+      // 找不到可以續的那一輪（卡已經過時、操作清單還沒載到）時要講出來，不能按了沒反應：
+      // 用「繼續的目標不成立」那一條既有的錯誤說法。
+      if (!resumeAgentOperation()) message.error(resolveChatErrorMessage('continue_target_invalid', t))
       break
     case 'fork':
       closeMessageMenu()
