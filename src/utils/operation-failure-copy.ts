@@ -21,9 +21,10 @@ export function operationFailureTitle(cause: unknown, t: (key: string) => string
 }
 
 /**
- * 說明那一行要讓玩家看得出這次是誰的問題、他能做什麼（owner 2026-10-05）：
- * 模型那邊連線出狀況就說不是他的訊息、可以重試或換模型；我們這邊出錯就道歉，
- * 並說沒有扣點（伺服器只在這一輪實際沒扣時才給 internal_error）；他能處理的事就指路。
+ * 說明那一行要讓玩家看得出這次是誰的問題（owner 2026-10-05）：模型那邊連線出狀況
+ * 就說不是他的訊息；我們這邊出錯就道歉，並說沒有扣點（伺服器只在這一輪實際沒扣時
+ * 才給 internal_error）；他能處理的事就指路。要做什麼交給底下的按鍵，這一行不重複
+ * 「重試或換模型」——標題和按鍵已經說了，窄螢幕上三遍同一件事會擠成一長條。
  * 空回覆、拒答這類講不準原因的，回空字串沿用原本那一句，不替模型找理由。
  */
 export function operationFailureSub(cause: unknown, t: (key: string) => string, opts: { agent?: boolean } = {}): string {
