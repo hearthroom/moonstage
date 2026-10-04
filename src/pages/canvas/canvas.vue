@@ -497,6 +497,7 @@ import CanvasResponseSettings from './components/canvas-response-settings.vue'
 import ChatSystemMessage from '@/components/chat-system-message/chat-system-message.vue'
 import { sandboxRetryPrompt } from './canvas-sandbox-retry';
 import CanvasNotepad from './components/canvas-notepad.vue'
+import { notepadLength, notepadSourceRowsOf } from './canvas-notepad-sources'
 import CanvasContextBreakdown from './components/canvas-context-breakdown.vue'
 import CanvasMemory from './components/canvas-memory.vue'
 import { applyMemoryDeleteResponse, normalizeMemoryAtoms, type MemoryAtom } from './canvas-memory'
@@ -10484,9 +10485,9 @@ const notepad = ref({
   error: '',
 })
 
-// 可以抄過來的來源：這個帳號聊過的其他卡（開放契約的 conversation/list，扣掉現在這一張卡）。
-// 這份跟「存檔」不是同一份：存檔只列這張卡；抄筆記要的是別張卡上的那段對話。
-const notepadSourceRows = ref<any[]>([])
+// 可以抄過來的來源：這個帳號的其他對話（開放契約的 conversation/list，扣掉現在這一段）。
+// 手帳綁對話不綁卡，所以同一張卡的其他存檔也算來源；一段對話一列。
+const notepadSourceList = ref<any[]>([])
 
 async function loadNotepadSourceRows() {
   try {
@@ -10499,24 +10500,16 @@ async function loadNotepadSourceRows() {
     if (res.statusCode !== 200) return
     const list: any[] = (res.data && res.data.conversations) || []
     if (!Array.isArray(list)) return
-    const current = String(unref(roleId) || '')
-    notepadSourceRows.value = list.map((row: any) => {
-      const rowRoleId = String(row?.conversationRoleId || row?.roleId || '')
-      return {
-        key: rowRoleId,
-        conversationId: String(row?.conversationId || ''),
-        name: row?.roleName || row?.conversationName || rowRoleId,
-        current: rowRoleId === current,
-      }
-    }).filter((row: any) => row.key)
+    notepadSourceList.value = list
   } catch (e) {
     console.warn('筆記來源清單載入失敗', e)
   }
 }
 
+const notepadSourceRows = computed(() => notepadSourceRowsOf(notepadSourceList.value, String(unref(conversationId) || '')))
+
 const notepadCopyRows = computed(() => notepadSourceRows.value
-  .filter((row: any) => row && row.key && !row.current)
-  .map((row: any) => ({ key: row.key, name: row.name })))
+  .map((row) => ({ key: row.key, name: row.name })))
 
 const notepadLabels = computed(() => ({
   title: t('notepad.title'),
@@ -10528,8 +10521,8 @@ const notepadLabels = computed(() => ({
   retry: t('notepad.retry'),
   placeholder: t('notepad.placeholder'),
   waitingConversation: t('directive.waitingConversation'),
-  costNotice: t('notepad.costNotice', { threshold: notepad.value.discountThreshold }),
-  overBy: t('notepad.overBy', { count: Math.max(0, notepad.value.draft.length - notepad.value.maxLength) }),
+  costNotice: t('notepad.costNotice'),
+  overBy: t('notepad.overBy', { count: Math.max(0, notepadLength(notepad.value.draft) - notepad.value.maxLength) }),
   templateEntry: t('template.entry'),
   templateApply: t('template.apply'),
   templateEmpty: t('template.empty'),
@@ -10617,7 +10610,7 @@ async function onSaveNotepad() {
 function onToggleNotepadCopy() {
   const open = !notepad.value.copyOpen
   notepad.value = { ...notepad.value, copyOpen: open, templatesOpen: false }
-  if (open && !notepadSourceRows.value.length) loadNotepadSourceRows()
+  if (open && !notepadSourceList.value.length) loadNotepadSourceRows()
 }
 
 /*
@@ -10627,7 +10620,7 @@ function onToggleNotepadCopy() {
   覆蓋只動草稿不動伺服器：他還得自己按儲存，中間反悔隨時可以關掉。
 */
 async function onCopyNotepadFrom(sourceKey: string) {
-  const conversation = notepadSourceRows.value.find((row: any) => row.key === sourceKey)
+  const conversation = notepadSourceRows.value.find((row) => row.key === sourceKey)
   const sourceConversationId = String((conversation && conversation.conversationId) || '')
   if (!sourceConversationId) {
     notepad.value = { ...notepad.value, error: t('notepad.loadFailed') }

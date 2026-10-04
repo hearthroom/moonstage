@@ -4086,7 +4086,7 @@
 	"notepad.saveFailed": "저장하지 못했습니다. 다시 시도해 주세요",
 	"notepad.loadFailed": "불러오지 못했습니다. 다시 시도해 주세요",
 	"notepad.retry": "다시 시도",
-	"notepad.costNotice": "메모장 내용은 메시지마다 함께 전달됩니다. {threshold}자를 넘으면 이 대화는 긴 대화 포인트 할인이 적용되지 않습니다.",
+	"notepad.costNotice": "메모장 내용은 답장마다 AI에게 함께 전달되므로, 길어질수록 매번 쓰는 포인트가 늘어납니다.",
 	"notepad.overBy": "{count}자 초과했습니다. 줄인 뒤 저장해 주세요.",
 	"notepad.copyFrom": "다른 대화에서 복사",
 	"notepad.copyEmpty": "아직 메모장이 있는 다른 대화가 없습니다",

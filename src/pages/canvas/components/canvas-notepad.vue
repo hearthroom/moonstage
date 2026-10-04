@@ -36,7 +36,6 @@
         <CanvasTextField
           el-class="np-textarea"
           :value="draft"
-          :maxlength="maxLength"
           :placeholder="hasConversation ? labels.placeholder : labels.waitingConversation"
           :disabled="!hasConversation"
           @input="$emit('update:draft', $event)"
@@ -48,7 +47,7 @@
         「原本沒有的東西出現了」本身就是狀態變化的信號。
       -->
       <div v-if="noticeLevel !== 'none'" class="np-footnote" :class="{ 'is-over': noticeLevel === 'over' }">
-        <span class="np-count">{{ draft.length }} / {{ maxLength }}</span>
+        <span class="np-count">{{ draftLength }} / {{ maxLength }}</span>
         <span class="np-hint">{{ noticeText }}</span>
       </div>
 
@@ -195,6 +194,7 @@
 import { computed, ref, watch } from 'vue'
 import { CanvasInput, CanvasTextField } from './canvas-field'
 import { validateShareCodeInput } from '../../../utils/share-code'
+import { notepadLength } from '../canvas-notepad-sources'
 
 const props = withDefaults(defineProps<{
   draft?: string
@@ -345,9 +345,13 @@ function confirmDelete(templateId: string) {
 
 watch(() => props.copyOpen, (open) => { if (!open) pendingCopyKey.value = '' })
 
+// 不給輸入框原生 maxlength：貼上超長內容時瀏覽器會默默砍掉多的字，玩家以為存好了。
+// 超過上限就讓他看見超出幾字、自己刪。字數照伺服器的算法，一個字元算一個。
+const draftLength = computed(() => notepadLength(props.draft))
+
 const noticeLevel = computed<'none' | 'notice' | 'over'>(() => {
-  if (props.draft.length > props.maxLength) return 'over'
-  if (props.discountThreshold > 0 && props.draft.length > props.discountThreshold) return 'notice'
+  if (draftLength.value > props.maxLength) return 'over'
+  if (props.discountThreshold > 0 && draftLength.value > props.discountThreshold) return 'notice'
   return 'none'
 })
 
@@ -356,7 +360,7 @@ const noticeText = computed(() =>
 
 const saveDisabled = computed(() =>
   props.saving || props.loading || props.loadFailed || !props.hasConversation
-  || props.draft.length > props.maxLength)
+  || draftLength.value > props.maxLength)
 
 const hasUnsaved = computed(() => props.draft !== props.savedContent)
 
