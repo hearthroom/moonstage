@@ -340,6 +340,7 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '.np-discard', region: 'notepad', origin: 'lt', why: '關掉前問一次有沒存的字；收起來時節點仍在' },
   { selector: '.np-import', region: 'notepad', origin: 'lt', why: '貼分享碼匯入模板；模板區收著時跟著收' },
   { selector: '.agent-resume-card', region: 'message', origin: 'lt', why: 'Agent 被停下後的「進度留著／繼續」卡（節點名照 mobile）；只在中斷的那則出現' },
+  { selector: '[data-lt="agent-switch-model"]', region: 'message', origin: 'lt', why: '中斷卡上的「切換模型」：續跑的那次又停在同一個原因上時才出現，在「繼續」旁邊' },
   { selector: '.np-preview', region: 'notepad', origin: 'lt', why: '匯入前先看內容；收起來時節點仍在' },
   { selector: '.np-share', region: 'notepad', origin: 'lt', why: '產生的分享碼；收起來時節點仍在' },
 

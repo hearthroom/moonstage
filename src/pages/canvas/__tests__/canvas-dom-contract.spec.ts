@@ -94,7 +94,8 @@ function mountRegion(region: string) {
       return mount(CanvasIntro, { props: { text: '一段卡片描述', open: false } })
     case 'message':
       // 中斷卡只在被停下的那則出現；契約要查得到它，所以掛的是被停下的那一則。
-      return mount(CanvasMessage, { props: { message: { ...AI_MESSAGE, agentInterrupted: true, prepTrail: ['回想先前的劇情'] } } })
+      // 又停在同一個原因上（agentFailedAgain）時卡上才有「切換模型」，契約也要查得到。
+      return mount(CanvasMessage, { props: { message: { ...AI_MESSAGE, agentInterrupted: true, agentFailedAgain: true, prepTrail: ['回想先前的劇情'] } } })
     case 'message-user':
       return mount(CanvasMessage, {
         props: { message: { ...AI_MESSAGE, id: 'm2', mesid: 1, role: 'user', name: '小明', html: '<p>你好</p>', reasoning: '', swipes: null } },
