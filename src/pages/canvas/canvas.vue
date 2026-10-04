@@ -11356,6 +11356,8 @@ const composerLabels = computed(() => ({
   model: t('canvas.panel.model'),
   perTurn: t('canvas.composer.perTurn'),
   assist: t('canvas.assist.tip'),
+  // Agent 暫停時送出鍵變成「繼續」：讀屏要念「繼續」，不是「更多」。
+  continue: t('multiPass.continueAction'),
 }))
 
 const menuLabels = computed(() => ({

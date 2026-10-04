@@ -189,7 +189,7 @@ export interface ChromeState {
     modelScore: string
     assistBusy: boolean
     assistCost: string | number
-    labels: { stop: string; more: string; send: string; paste: string; clear: string; model: string; assist: string; perTurn: string }
+    labels: { stop: string; more: string; send: string; paste: string; clear: string; model: string; assist: string; perTurn: string; continue?: string }
   }
 }
 

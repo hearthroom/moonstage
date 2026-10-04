@@ -7,7 +7,8 @@
  * 模型，卡上多一顆「切換模型」。原因不同（上次逾時、這次工具失敗）不算，那是另一個問題；
  * 玩家自己按的停止也不算。
  *
- * 也一起釘住：卡上的「繼續」沒有東西可續時（回 false）要讓玩家知道，不能按了沒反應。
+ * 也一起釘住：卡上的「繼續」沒有東西可續時（回 false）要讓玩家知道，不能按了沒反應；
+ * 輸入區那顆「繼續」的無障礙名稱是「繼續」，不是「更多」。
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -15,6 +16,7 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { agentResumeFailedAgain } from '@/utils/agent-composer-action'
 import CanvasMessage from '../components/canvas-message.vue'
+import CanvasComposer from '../components/canvas-composer.vue'
 
 const CANVAS = fs.readFileSync(path.join(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
 const NIL = '00000000-0000-0000-0000-000000000000'
@@ -102,5 +104,26 @@ describe('canvas.vue 的接線', () => {
   it('卡上的「繼續」沒有東西可續時講出來（繼續的目標不成立那一句），不是按了沒反應', () => {
     const pick = slice('function onMenuPick(')
     expect(pick).toMatch(/case 'resume-agent':[\s\S]*?if \(!resumeAgentOperation\(\)\) message\.error\(resolveChatErrorMessage\('continue_target_invalid', t\)\)/)
+  })
+
+  it('輸入區的字帶「繼續」', () => {
+    const labels = CANVAS.slice(CANVAS.indexOf('const composerLabels = computed('), CANVAS.indexOf('}))', CANVAS.indexOf('const composerLabels = computed(')))
+    expect(labels).toContain("continue: t('multiPass.continueAction')")
+  })
+})
+
+describe('輸入區：「繼續」那顆鍵的無障礙名稱', () => {
+  const labels = { stop: '停止', more: '更多', send: '送出', paste: '貼上', clear: '清除', model: '模型', assist: '幫答', perTurn: '每輪', continue: '繼續' }
+  const composer = (sendState: string, over: Record<string, unknown> = {}) =>
+    mount(CanvasComposer, { props: { value: '', placeholder: '說點什麼', sendState, generating: false, labels: { ...labels, ...over } } })
+
+  it('繼續狀態念「繼續」，不是「更多」', () => {
+    const names = composer('continue').findAll('.lt-send').map((b) => b.attributes('aria-label'))
+    expect(names.length).toBeGreaterThan(0)
+    expect(new Set(names)).toEqual(new Set(['繼續']))
+  })
+
+  it('送出狀態念「送出」', () => {
+    expect(new Set(composer('send').findAll('.lt-send').map((b) => b.attributes('aria-label')))).toEqual(new Set(['送出']))
   })
 })

@@ -351,7 +351,8 @@ const props = withDefaults(defineProps<{
   assistBusy?: boolean
   /** 幫答每次的點數，顯示在 .beta-badge；空字串＝不顯示數字 */
   assistCost?: string | number
-  labels?: { stop: string; more: string; send: string; paste: string; clear: string; model: string; assist: string; perTurn: string }
+  /** continue：Agent 暫停時送出鍵變成「繼續」的那個名字（讀屏念的）；沒給就念送出。 */
+  labels?: { stop: string; more: string; send: string; paste: string; clear: string; model: string; assist: string; perTurn: string; continue?: string }
 }>(), {
   enterSends: true,
   shortcuts: () => [],
@@ -361,7 +362,7 @@ const props = withDefaults(defineProps<{
   assistEnabled: true,
   assistBusy: false,
   assistCost: '',
-  labels: () => ({ stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Let AI draft a reply', perTurn: 'Credits per turn' }),
+  labels: () => ({ stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Let AI draft a reply', perTurn: 'Credits per turn', continue: 'Continue' }),
 })
 
 const emit = defineEmits<{
@@ -387,7 +388,8 @@ onBeforeUnmount(() => leaveTopLayer(stopEl.value))
 const textareaEl = ref<any>(null)
 const composing = ref(false)
 
-const sendAriaLabel = computed(() => (props.sendState === 'continue' ? props.labels.more : props.labels.send))
+// 繼續狀態這顆鍵做的是把暫停的那一輪接著跑：念「繼續」（先前念成「更多」，那是＋面板的名字）。
+const sendAriaLabel = computed(() => (props.sendState === 'continue' ? (props.labels.continue || props.labels.send) : props.labels.send))
 
 // ── 兩態 ──────────────────────────────────────────────────────────────
 //
