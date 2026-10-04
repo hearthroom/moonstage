@@ -147,6 +147,11 @@ describe('canvas.vue：沙箱卡的 view 帶系統訊息卡，殼回來的動作
     expect(CANVAS).toMatch(/view: sandboxCard\.value \? \{ \.\.\.messageProps\(item, index, .*?\), systemNotice: systemNoticeFor\(item, index\) \} : undefined/)
   })
 
+  it('卡已經畫在殼裡：不再另外彈一個問要不要重試的確認框（同一件事只說一次）', () => {
+    expect(CANVAS).not.toContain('sandboxRetryPrompt')
+    expect(CANVAS).not.toContain('promptSandboxRetry')
+  })
+
   it('sys:<動作> 在訊息選單的能力閘之前處理，只放行這一列現在給的鍵，走卡片同一個 onSystemMsgCta', () => {
     const start = CANVAS.indexOf('\nfunction onMessageAction(')
     const body = CANVAS.slice(start, CANVAS.indexOf('\nfunction ', start + 1))
