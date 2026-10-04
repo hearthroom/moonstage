@@ -30,7 +30,9 @@
     padding: 6px 14px
 }
 .agent-resume-card__alt {
-    padding: 5px 13px;
+    padding: 5px 13px
+}
+.agent-resume-card:has(.agent-resume-card__alt) .agent-resume-card__actions {
     margin-left: auto
 }
 .canvas-sandbox-frame {

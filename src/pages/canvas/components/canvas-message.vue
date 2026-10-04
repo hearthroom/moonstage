@@ -90,12 +90,14 @@
             <div class="agent-resume-card__text">{{ message.interruptedNotice || labels.interruptedNotice }}</div>
             <div class="agent-resume-card__sub">{{ message.agentFailedAgain && labels.failedAgainSub ? labels.failedAgainSub : labels.interruptedNoticeSub }}</div>
           </div>
-          <div v-if="message.agentFailedAgain && labels.switchModel" class="agent-resume-card__alt" data-lt="agent-switch-model" role="button" tabindex="0"
-               @click.stop="$emit('action', 'switch-model')"
-               @keydown.enter.prevent.stop="$emit('action', 'switch-model')">{{ labels.switchModel }}</div>
-          <div class="agent-resume-card__btn" role="button" tabindex="0"
-               @click.stop="$emit('action', 'resume-agent')"
-               @keydown.enter.prevent.stop="$emit('action', 'resume-agent')">{{ labels.continueAction }}</div>
+          <div class="agent-resume-card__actions">
+            <div v-if="message.agentFailedAgain && labels.switchModel" class="agent-resume-card__alt" data-lt="agent-switch-model" role="button" tabindex="0"
+                 @click.stop="$emit('action', 'switch-model')"
+                 @keydown.enter.prevent.stop="$emit('action', 'switch-model')">{{ labels.switchModel }}</div>
+            <div class="agent-resume-card__btn" role="button" tabindex="0"
+                 @click.stop="$emit('action', 'resume-agent')"
+                 @keydown.enter.prevent.stop="$emit('action', 'resume-agent')">{{ labels.continueAction }}</div>
+          </div>
         </div>
         <template v-if="message.loading">
           <div v-if="message.prepSteps && message.prepSteps.length" class="lt-prep-live" data-lt="prep-live">

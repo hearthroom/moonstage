@@ -71,6 +71,8 @@ describe('中斷卡：同一個原因又停下時建議換模型', () => {
     await alt.trigger('click')
     await resume.find('.agent-resume-card__btn').trigger('click')
     expect(w.emitted('action')).toEqual([['switch-model'], ['resume-agent']])
+    // 兩顆鍵包在同一組裡：窄螢幕放不下時一起換到下一行，「繼續」不會自己被擠到另一行的左邊
+    expect(resume.findAll('.agent-resume-card__actions > div').map((b) => b.classes()[0])).toEqual(['agent-resume-card__alt', 'agent-resume-card__btn'])
   })
 
   it('第一次停下：照舊的說明，只有「繼續」', () => {
