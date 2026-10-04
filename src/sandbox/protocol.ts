@@ -119,6 +119,8 @@ export interface MessageView {
   prepTrail?: string[] | null
   agentInterrupted?: boolean
   interruptedNotice?: string
+  /** 續跑的那次又停在跟上一次同一個原因上：中斷卡改建議換模型、多一顆切換模型。 */
+  agentFailedAgain?: boolean
   latest?: boolean
   latestAI?: boolean
   contextUsage?: { label: string; tip: string; level: string } | null
@@ -152,6 +154,9 @@ export interface MessageLabels {
   interruptedNotice?: string
   interruptedNoticeSub?: string
   continueAction?: string
+  /** 續跑的那次又停在同一個原因上時，中斷卡的說明（建議換模型）與那顆鍵的字。 */
+  failedAgainSub?: string
+  switchModel?: string
 }
 
 /**

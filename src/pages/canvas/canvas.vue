@@ -661,7 +661,7 @@ import {
   normalizeMultiPassPreference,
   resolvePendingPrepTrailCollapsed,
 } from '@/utils/multi-pass';
-import { findResumableAgentOperation, resolveAgentResumeTarget } from '@/utils/agent-composer-action';
+import { agentResumeFailedAgain, findResumableAgentOperation, resolveAgentResumeTarget } from '@/utils/agent-composer-action';
 
 const store = useStore()
 
@@ -8981,6 +8981,8 @@ const messageLabels = computed(() => ({
   interruptedNotice: t('multiPass.interruptedNotice'),
   interruptedNoticeSub: t('multiPass.interruptedNoticeSub'),
   continueAction: t('multiPass.continueAction'),
+  failedAgainSub: t('multiPass.failedAgainSub'),
+  switchModel: t('chat.switchModel'),
 }))
 
 
@@ -9028,6 +9030,8 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     prepTrail: Array.isArray(item.prepTrail) ? item.prepTrail : null,
     agentInterrupted: item.agentInterrupted === true,
     interruptedNotice: operationFailureTitle(item.failureCause, t),
+    // 續跑的那次又停在跟上一次同一個原因上：卡片改建議換模型（看伺服器給的操作清單，重新載入也一樣）。
+    agentFailedAgain: item.agentInterrupted === true && agentResumeFailedAgain(unref(knownOperations), item.operationId),
     reasoning: (!isUser && item.thinkingContent && formData.showThinkingProcess !== false)
       ? item.thinkingContent : '',
     finished: !!item.chatFinish,
@@ -9208,6 +9212,12 @@ function onMessageAction(key: string, index: number) {
     const notice = systemNoticeFor(row, index)
     if (!notice || !notice.actions.some((entry) => entry.action === action)) { notifyTimelineMutationBlocked(); return }
     onSystemMsgCta(action, row, index)
+    return
+  }
+  // 中斷卡上的「切換模型」（同一個原因又停下時才有）：跟系統訊息卡的 switch_model 同一件事。
+  // 一樣放在選單的能力閘之前：打開模型選擇不改對話，輸入區的模型鍵也不受那道閘管。
+  if (key === 'switch-model') {
+    openModelSelect()
     return
   }
   // 氣泡底下的「上下文 NN%」chip：不經選單，直接彈這段對話最近一次完成回覆的組成（mobile 同一份）。

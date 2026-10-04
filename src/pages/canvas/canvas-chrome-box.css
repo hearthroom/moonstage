@@ -29,6 +29,10 @@
 .agent-resume-card__btn {
     padding: 6px 14px
 }
+.agent-resume-card__alt {
+    padding: 5px 13px;
+    margin-left: auto
+}
 .canvas-sandbox-frame {
     padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px))
 }

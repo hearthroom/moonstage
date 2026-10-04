@@ -3784,6 +3784,7 @@
 	"multiPass.failureInterrupted": "モデルの応答が中断されました",
 	"multiPass.failureUsage": "モデルから必要な使用量の情報が返されませんでした",
 	"multiPass.interruptedNoticeSub": "進行状況は保存されていますので、「続ける」で再開するか、モデルを切り替えてください。",
+	"multiPass.failedAgainSub": "同じ問題がまた起きたため、別のモデルに切り替えるとうまくいくかもしれません。",
 	"multiPass.continueAction": "続ける",
 	"mod.author.publishUpdate": "更新を公開",
 	"mod.author.publishUpdateConfirmTitle": "この更新を公開しますか？",

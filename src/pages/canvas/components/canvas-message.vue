@@ -83,12 +83,16 @@
           當下這步亮著。跟 mobile 同一份呈現；完成後這份清單搬進上面那個可展開的
           「準備過程」面板，不會消失。
         -->
-        <!-- 中斷之後的出路（照 mobile）：上面的軌跡說「發生了什麼」，這張說「現在能做什麼」。 -->
+        <!-- 中斷之後的出路（照 mobile）：上面的軌跡說「發生了什麼」，這張說「現在能做什麼」。
+             續跑的那次又停在同一個原因上：再按繼續多半一樣，說明改建議換模型，旁邊多一顆「切換模型」。 -->
         <div v-if="message.agentInterrupted" class="agent-resume-card" data-lt="agent-resume">
           <div class="agent-resume-card__body">
             <div class="agent-resume-card__text">{{ message.interruptedNotice || labels.interruptedNotice }}</div>
-            <div class="agent-resume-card__sub">{{ labels.interruptedNoticeSub }}</div>
+            <div class="agent-resume-card__sub">{{ message.agentFailedAgain && labels.failedAgainSub ? labels.failedAgainSub : labels.interruptedNoticeSub }}</div>
           </div>
+          <div v-if="message.agentFailedAgain && labels.switchModel" class="agent-resume-card__alt" data-lt="agent-switch-model" role="button" tabindex="0"
+               @click.stop="$emit('action', 'switch-model')"
+               @keydown.enter.prevent.stop="$emit('action', 'switch-model')">{{ labels.switchModel }}</div>
           <div class="agent-resume-card__btn" role="button" tabindex="0"
                @click.stop="$emit('action', 'resume-agent')"
                @keydown.enter.prevent.stop="$emit('action', 'resume-agent')">{{ labels.continueAction }}</div>
@@ -255,6 +259,8 @@ const props = withDefaults(defineProps<{
     /** Agent 準備到一半被停下：軌跡已固定，底下給一張「進度留著／繼續」的卡 */
     agentInterrupted?: boolean
     interruptedNotice?: string
+    /** 續跑的那次又停在跟上一次同一個原因上：卡片建議換模型 */
+    agentFailedAgain?: boolean
     /** 列表的最後一則（酒館的 last_mes），可能是使用者說的 */
     latest?: boolean
     /** 最新的那一則 AI 回覆——只有它能重新生成、改寫、繼續 */
@@ -263,7 +269,7 @@ const props = withDefaults(defineProps<{
     contextUsage?: { label: string; tip: string; level: string } | null
     swipes?: { index: number; total: number } | null
   }
-  labels?: { copy: string; edit: string; regenerate: string; reasoning: string; prepTrail: string; prev: string; next: string; interruptedNotice?: string; interruptedNoticeSub?: string; continueAction?: string }
+  labels?: { copy: string; edit: string; regenerate: string; reasoning: string; prepTrail: string; prev: string; next: string; interruptedNotice?: string; interruptedNoticeSub?: string; continueAction?: string; failedAgainSub?: string; switchModel?: string }
   menuLabel?: string
   /**
    * 沙箱殼用：MMD 新版契約的節點名與屬性掛在同一批節點上（data-chat=message／message-avatar／
@@ -272,7 +278,7 @@ const props = withDefaults(defineProps<{
    */
   chat?: { from: string; state: string; msgId: string | null; generating: boolean } | null
 }>(), {
-  labels: () => ({ copy: 'Copy', edit: 'Edit', regenerate: 'Regenerate', reasoning: 'Reasoning', prepTrail: 'Steps', prev: 'Previous', next: 'Next', interruptedNotice: '', interruptedNoticeSub: '', continueAction: 'Continue' }),
+  labels: () => ({ copy: 'Copy', edit: 'Edit', regenerate: 'Regenerate', reasoning: 'Reasoning', prepTrail: 'Steps', prev: 'Previous', next: 'Next', interruptedNotice: '', interruptedNoticeSub: '', continueAction: 'Continue', failedAgainSub: '', switchModel: 'Switch model' }),
   menuLabel: 'More',
   chat: null,
 })

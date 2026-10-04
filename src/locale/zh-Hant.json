@@ -3784,6 +3784,7 @@
 	"multiPass.failureInterrupted": "模型回應中斷",
 	"multiPass.failureUsage": "模型未回傳完整用量，這次無法完成",
 	"multiPass.interruptedNoticeSub": "進度已保留，可以按繼續接著跑，或換一個模型再試",
+	"multiPass.failedAgainSub": "同樣的問題又發生了，換一個模型可能比較順",
 	"multiPass.continueAction": "繼續",
 	"mod.author.publishUpdate": "發布更新",
 	"mod.author.publishUpdateConfirmTitle": "發布這次更新？",

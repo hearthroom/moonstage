@@ -59,6 +59,42 @@ export function findResumableAgentOperation<T extends AgentOperationLike>(
   return undefined
 }
 
+interface AgentAttemptLike {
+  operationId?: string
+  failureCause?: string
+  resumeFromOperationId?: string
+}
+
+/** Go 把「沒有」序列化成全零的 UUID，不是空字串。 */
+const NIL_OPERATION_ID = /^0{8}-0{4}-0{4}-0{4}-0{12}$/
+
+/**
+ * 續跑的那次又停在跟上一次同一個原因上。
+ *
+ * 「繼續」是把同一輪接著跑；伺服器在新的那次操作上記著它接的是哪一次
+ * （resumeFromOperationId）。新的這次又停下、原因跟上一次一樣，再按一次繼續
+ * 多半還是一樣——模型整條掛著的時候玩家只會一直按繼續，而那個模型不會好。
+ * 這時卡片改建議換模型。原因不同（上次逾時、這次工具失敗）是另一個問題，不算；
+ * 玩家自己按的停止也不算。
+ *
+ * operations 是伺服器給的清單（有上限，太舊的那次可能不在裡面：那就不算）。
+ */
+export function agentResumeFailedAgain(
+  operations: AgentAttemptLike[] | undefined,
+  operationId: unknown,
+): boolean {
+  if (!Array.isArray(operations)) return false
+  const id = String(operationId == null ? '' : operationId).trim()
+  if (!id) return false
+  const current = operations.find(op => op && op.operationId === id)
+  const parentId = String(current?.resumeFromOperationId || '').trim()
+  if (!parentId || NIL_OPERATION_ID.test(parentId)) return false
+  const parent = operations.find(op => op && op.operationId === parentId)
+  const cause = String(current?.failureCause || '').trim()
+  if (!parent || !cause || cause === 'stopped') return false
+  return String(parent.failureCause || '').trim() === cause
+}
+
 export function resolveAgentComposerAction(input: {
   streamActive?: boolean
   operations?: AgentOperationLike[]
