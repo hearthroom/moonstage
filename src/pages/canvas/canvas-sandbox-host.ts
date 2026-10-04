@@ -16,7 +16,7 @@
 import type { HudHost, HudHostMessage, HudHostState } from './canvas-hud-bridge'
 import {
   envelope, isSandboxEnvelope, targetOriginFor,
-  type HostToShell, type SandboxHelloConfig, type SandboxMessage, type ShellAction, type ShellToHost,
+  type HostToShell, type SandboxHelloConfig, type SandboxMessage, type SandboxMessageRole, type ShellAction, type ShellToHost,
 } from '@/sandbox/protocol'
 import type { SandboxSavesStore } from '@/host/sandbox-host'
 import { observeViewport, visibleViewport } from './canvas-viewport'
@@ -85,7 +85,7 @@ export interface SandboxHost {
 
 interface Tracked {
   shellId: string
-  role: 'user' | 'ai'
+  role: SandboxMessageRole
   content: string
   finished: boolean
   viewKey: string
@@ -113,8 +113,10 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     target.postMessage(envelope(message), targetOriginFor(deps.origin))
   }
 
-  const visible = (snapshot: HudHostState = hud.read()): HudHostMessage[] => snapshot.messages.filter((m) => m.role !== 'system')
-  const roleOf = (m: HudHostMessage): 'user' | 'ai' => (m.role === 'user' ? 'user' : 'ai')
+  // 系統列（失敗、點數不足、停止…那張卡）也送：一般卡畫在列表裡的東西，沙箱卡一樣要看得到。
+  // 殼照畫、不發作者事件；卡的字與按鍵在 view.systemNotice 裡（宿主算好的）。
+  const visible = (snapshot: HudHostState = hud.read()): HudHostMessage[] => snapshot.messages
+  const roleOf = (m: HudHostMessage): SandboxMessageRole => (m.role === 'user' ? 'user' : m.role === 'system' ? 'system' : 'ai')
   const finishedOf = (m: HudHostMessage) => m.role === 'user' || !!m.finished
   // 開場白不給 serverId（同 MMD）：作者腳本拿「AI 訊息有 serverId」判斷已經聊過，開場白帶了就把開場動畫當成舊存檔跳過。
   const serverIdOf = (m: HudHostMessage): string | null => (roleOf(m) === 'ai' && finishedOf(m) && !m.opening ? m.id : null)

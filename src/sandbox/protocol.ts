@@ -12,6 +12,11 @@
 export const SANDBOX_PROTOCOL_VERSION = 1
 
 export type SandboxRole = 'user' | 'ai'
+/**
+ * 列表裡一列的角色。'system' 是平台自己的系統列（失敗、點數不足、停止…的那張卡）：殼照畫，
+ * 但它不是對話內容，作者腳本收不到它的任何事件（作者看到的角色永遠只有 user／ai）。
+ */
+export type SandboxMessageRole = SandboxRole | 'system'
 export type SandboxMessageState = 'pending' | 'streaming' | 'done'
 export type SandboxTheme = 'dark' | 'light'
 export type StageState = 'closed' | 'content' | 'full'
@@ -19,7 +24,7 @@ export type StageState = 'closed' | 'content' | 'full'
 /** 一則訊息。`id` 由宿主決定（l1、l2…遞增）；`serverId` 只在 AI 訊息定稿後有值，玩家訊息與開場白永遠 null。 */
 export interface SandboxMessage {
   id: string
-  role: SandboxRole
+  role: SandboxMessageRole
   content: string
   serverId: string | null
   state?: SandboxMessageState
@@ -118,6 +123,21 @@ export interface MessageView {
   latestAI?: boolean
   contextUsage?: { label: string; tip: string; level: string } | null
   swipes?: { index: number; total: number } | null
+  /** 這一列底下的系統訊息卡（一般卡的 <chat-system-message>）；沒有就不畫。 */
+  systemNotice?: SystemNotice | null
+}
+
+/**
+ * 系統訊息卡的呈現資料：宿主用一般卡同一組函式算好、已經是玩家語系的字。殼不另有一份
+ * 「結果 → 文案」的表。按鍵按下去回 message.ui action，key 是 `sys:<action>`；
+ * 只有最新那一列有按鍵（宿主算的時候就收掉了）。
+ */
+export interface SystemNotice {
+  /** 語氣與圖示（chat-system-message 的 kind：server-error、quota、stopped…）。 */
+  kind: string
+  label: string
+  sub: string
+  actions: Array<{ action: string; label: string }>
 }
 
 /** 標準訊息元件的文案（宿主的語系）。 */
