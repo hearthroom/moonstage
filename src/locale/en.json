@@ -3784,6 +3784,7 @@
 	"multiPass.failureInterrupted": "The model’s response was interrupted",
 	"multiPass.failureUsage": "The model did not return complete usage information",
 	"multiPass.interruptedNoticeSub": "Your progress is saved; press Continue to resume, or switch models.",
+	"multiPass.failedAgainSub": "The same problem came up again, so a different model may work better.",
 	"multiPass.continueAction": "Continue",
 	"mod.author.publishUpdate": "Publish update",
 	"mod.author.publishUpdateConfirmTitle": "Publish this update?",

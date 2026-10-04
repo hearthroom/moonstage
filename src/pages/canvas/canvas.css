@@ -900,6 +900,34 @@
     cursor: pointer;
   }
 
+  /* 次要的「切換模型」：跟「繼續」同高同圓角，只描邊、跟著卡片的文字色（作者的配色吃得到）。
+     「繼續」仍是這張卡的主行動，所以它排在後面、保留品牌色。 */
+  .agent-resume-card__alt {
+    flex: 0 0 auto;
+    padding: 5px 13px;
+    border-radius: var(--lt-canvas-pill-radius, 9999px);
+    background: var(--lt-canvas-pill-bg, transparent);
+    border: var(--lt-canvas-pill-border, 1px solid color-mix(in srgb, currentColor 32%, transparent));
+    color: var(--lt-canvas-pill-fg, inherit);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    /* 換到下一行時連同「繼續」一起靠右 */
+    margin-left: auto;
+  }
+
+  /* 兩顆鍵都在時，窄螢幕上說明文字不被擠成一字一行：放不下就讓鍵換到下一行、靠右。 */
+  .agent-resume-card:has(.agent-resume-card__alt) {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    column-gap: 8px;
+  }
+
+  .agent-resume-card:has(.agent-resume-card__alt) .agent-resume-card__body {
+    flex: 1 1 160px;
+  }
+
   /* 軌跡在上、指示器在下：兩者之間留一口氣 */
   .lt-prep-live + .chat-typing-indicator {
     position: relative;
