@@ -4086,7 +4086,7 @@
 	"notepad.saveFailed": "保存できませんでした。もう一度お試しください",
 	"notepad.loadFailed": "読み込めませんでした。もう一度お試しください",
 	"notepad.retry": "再試行",
-	"notepad.costNotice": "手帳の内容は毎回のメッセージに含まれます。{threshold} 文字を超えると、この会話は長い会話向けのポイント割引の対象外になります。",
+	"notepad.costNotice": "手帳の内容は返信のたびに AI に送られるため、長くなるほど毎回消費するポイントが増えます。",
 	"notepad.overBy": "{count} 文字超えています。減らしてから保存してください。",
 	"notepad.copyFrom": "他の会話からコピー",
 	"notepad.copyEmpty": "他の会話にはまだ手帳がありません",

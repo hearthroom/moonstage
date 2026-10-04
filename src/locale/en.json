@@ -4086,7 +4086,7 @@
 	"notepad.saveFailed": "Couldn't save. Please try again.",
 	"notepad.loadFailed": "Couldn't load. Please try again.",
 	"notepad.retry": "Try again",
-	"notepad.costNotice": "Your notebook is included with every message. Past {threshold} characters, this chat no longer gets the long-conversation points discount.",
+	"notepad.costNotice": "Your notebook goes to the AI with every reply, so a longer notebook uses more points each time.",
 	"notepad.overBy": "{count} characters over the limit. Trim it to save.",
 	"notepad.copyFrom": "Copy from another chat",
 	"notepad.copyEmpty": "No other chat has a notebook yet",

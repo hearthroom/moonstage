@@ -4086,7 +4086,7 @@
 	"notepad.saveFailed": "儲存失敗，請再試一次",
 	"notepad.loadFailed": "載入失敗，請再試一次",
 	"notepad.retry": "重試",
-	"notepad.costNotice": "手帳的內容每則訊息都會帶上。超過 {threshold} 字後，這個對話不再套用長對話的積分優惠。",
+	"notepad.costNotice": "手帳的內容每次回覆都會一起送給 AI，寫得越長，每次回覆用掉的積分越多。",
 	"notepad.overBy": "超出 {count} 字，請刪減後再儲存。",
 	"notepad.copyFrom": "從其他對話複製",
 	"notepad.copyEmpty": "其他對話還沒有手帳",

@@ -4086,7 +4086,7 @@
 	"notepad.saveFailed": "保存失败，请再试一次",
 	"notepad.loadFailed": "加载失败，请再试一次",
 	"notepad.retry": "重试",
-	"notepad.costNotice": "手账的内容每条消息都会带上。超过 {threshold} 字后，这个对话不再享受长对话的积分优惠。",
+	"notepad.costNotice": "手账的内容每次回复都会一起发给 AI，写得越长，每次回复消耗的积分越多。",
 	"notepad.overBy": "超出 {count} 字，请删减后再保存。",
 	"notepad.copyFrom": "从其他对话复制",
 	"notepad.copyEmpty": "其他对话还没有手账",
