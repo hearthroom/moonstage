@@ -114,9 +114,11 @@ describe('畫布接線（canvas.vue 的 inline WebSocket switch 無法獨立掛�
     expect(body).toContain('unref(isCompacting)')
     expect(body).toMatch(/\n\s+waitingHint,\n/)
     // 等了多久跟輪換的說法：一般卡與沙箱卡同一份
-    expect(body).toMatch(/\n\s+waitElapsed,\n/)
+    expect(body).toMatch(/\n\s+waitStartedAt,\n/)
     expect(body).toContain('phrase: unref(waitPhrase)')
     expect(body).not.toContain('slowHint')
+    // 秒數在指示器裡走：畫布不每秒改資料（否則整頁每秒重畫、沙箱卡每秒收一次 view）
+    expect(source).not.toContain('waitNow')
   })
 })
 
@@ -131,7 +133,8 @@ describe('訊息元件：等回覆時的提示', () => {
   })
 
   it('等了多久寫在指示器旁邊：看得到，讀屏不每秒念一次', () => {
-    const el = mount(CanvasMessage, { props: { message: { ...BASE, loadingLabel: '正細細斟酌用詞…', waitElapsed: '23 秒' } } }).element as HTMLElement
+    const labels = { copy: '', edit: '', regenerate: '', reasoning: '', prepTrail: '', prev: '', next: '', waitSeconds: '{s} 秒', waitMinutes: '{m} 分 {s} 秒' }
+    const el = mount(CanvasMessage, { props: { labels, message: { ...BASE, loadingLabel: '正細細斟酌用詞…', waitStartedAt: Date.now() - 23_000 } } }).element as HTMLElement
     const indicator = el.querySelector('.chat-typing-indicator') as HTMLElement
     expect(indicator.textContent).toContain('正細細斟酌用詞…')
     const elapsed = indicator.querySelector('.typing-elapsed') as HTMLElement
@@ -145,7 +148,7 @@ describe('訊息元件：等回覆時的提示', () => {
     const a = mount(CanvasMessage, { props: { message: { ...BASE, loadingLabel: '整理劇情中…' } } }).element as HTMLElement
     expect(a.querySelector('.lt-waiting-hint')).toBeNull()
     expect(a.querySelector('.chat-typing-indicator')?.textContent).toContain('整理劇情中…')
-    const b = mount(CanvasMessage, { props: { message: { ...BASE, loading: false, html: '<p>正文</p>', waitElapsed: '3 秒' } } }).element as HTMLElement
+    const b = mount(CanvasMessage, { props: { message: { ...BASE, loading: false, html: '<p>正文</p>', waitStartedAt: Date.now() - 3_000 } } }).element as HTMLElement
     expect(b.querySelector('.lt-waiting-hint')).toBeNull()
   })
 

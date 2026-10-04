@@ -16,6 +16,7 @@ const config = (): SandboxHelloConfig => ({
   card: { rules: [], statusbar: '' },
   capabilities: { saves: false, edit: false, send: true },
   composer: true,
+  labels: { copy: '', edit: '', regenerate: '', reasoning: '', prepTrail: '', prev: '', next: '', waitSeconds: '{s} 秒', waitMinutes: '{m} 分 {s} 秒' },
 })
 
 let shell: Shell | null = null
@@ -33,7 +34,7 @@ describe('沙箱殼：等回覆的那一列', () => {
     expect(body().querySelector('.chat-typing-indicator')?.textContent).toContain('整理劇情中…')
     expect(body().querySelector('.lt-waiting-hint')).toBeNull()
 
-    s.handle({ type: 'message.view', id: 'l2', view: { role: 'ai', html: '', loading: true, loadingLabel: '正細細斟酌用詞…', waitingHint: '', waitElapsed: '12 秒' } })
+    s.handle({ type: 'message.view', id: 'l2', view: { role: 'ai', html: '', loading: true, loadingLabel: '正細細斟酌用詞…', waitingHint: '', waitStartedAt: Date.now() - 12_000 } })
     await nextTick()
     expect(body().querySelector('.chat-typing-indicator')?.textContent).toContain('正細細斟酌用詞…')
     expect(body().querySelector('.chat-typing-indicator .typing-elapsed')?.textContent).toBe('12 秒')

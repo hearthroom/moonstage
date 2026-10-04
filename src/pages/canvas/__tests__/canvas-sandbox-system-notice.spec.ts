@@ -201,6 +201,25 @@ describe('宿主橋：系統列送進殼', () => {
   })
   afterEach(() => { iframe.remove() })
 
+  it('歷史還沒載到、畫面上只有一張系統卡（例如載入失敗）：不算冷啟動，等真的歷史來了再送', async () => {
+    const current = { value: state([msg({ id: 'history-error', role: 'system', view: { role: 'system', html: '', systemNotice: NOTICE } })]) }
+    const hud = { labels: {}, read: () => current.value } as unknown as HudHost
+    const host = createSandboxHost({
+      hud, iframe, win: window, origin: ORIGIN, roleId: '1',
+      hello: () => ({ theme: 'dark', locale: 'zh-Hant', role: { name: '露娜', avatarUrl: '' }, user: { nickname: '小明', avatarUrl: '' }, card: { rules: [], statusbar: '' }, composer: true }),
+      onMessageAction: () => {},
+    })
+    host.start()
+    fromShell({ type: 'ready-shell' })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(posted.some((p) => p.type === 'messages')).toBe(false)
+    current.value = state([msg({ id: 'u1', role: 'user', text: '嗨' }), msg({ id: 'a1', text: '你好', html: '<p>你好</p>' })])
+    host.sync()
+    const cold = posted.find((p) => p.type === 'messages')!
+    expect(cold.messages.map((m: any) => m.id)).toEqual(['hu1', 'ha1'])
+    host.destroy?.()
+  })
+
   it('冷啟動與之後長出來的系統列都送：角色 system、沒有 serverId、已定稿、帶算好的卡；殼按的鍵交給畫布', async () => {
     const current = { value: state([
       msg({ id: 'u1', role: 'user', text: '嗨' }),

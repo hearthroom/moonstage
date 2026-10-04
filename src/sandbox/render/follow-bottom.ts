@@ -60,3 +60,16 @@ export function createFollowBottom(deps: FollowBottomDeps): FollowBottom {
     dispose() { scroller.removeEventListener('scroll', onScroll); unobserve() },
   }
 }
+
+/**
+ * 殼自己捲到底（onGrow）。新的一則掛上來就捲；只是畫面資料換了（soft，例如等回覆時
+ * 指示器的說法換一句）就只在玩家本來在底部時跟——他往上翻舊對話時不把他拉回來。
+ * 在底部時內容長高另有 ResizeObserver 跟上，這裡不會漏。
+ */
+export function growToBottom(scroller: HTMLElement, fb: FollowBottom): (soft?: boolean) => void {
+  return (soft) => {
+    if (soft && !fb.following()) return
+    scroller.scrollTop = scroller.scrollHeight
+    fb.pin()
+  }
+}

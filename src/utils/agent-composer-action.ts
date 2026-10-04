@@ -91,7 +91,8 @@ export function agentResumeFailedAgain(
   if (!parentId || NIL_OPERATION_ID.test(parentId)) return false
   const parent = operations.find(op => op && op.operationId === parentId)
   const cause = String(current?.failureCause || '').trim()
-  if (!parent || !cause || cause === 'stopped') return false
+  // 停止是玩家自己按的；點數不足換模型也沒用，該做的是儲值（卡上的說明照原因講）。
+  if (!parent || !cause || cause === 'stopped' || cause === 'insufficient_credits') return false
   return String(parent.failureCause || '').trim() === cause
 }
 

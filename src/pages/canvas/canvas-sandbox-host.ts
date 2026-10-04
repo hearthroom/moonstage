@@ -155,7 +155,8 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   }
   const tryColdStart = (snapshot: HudHostState): boolean => {
     const list = visible(snapshot)
-    if (!list.length) return false
+    // 只有系統卡（例如歷史載入失敗那張）不算歷史到了：冷啟動等真的對話，否則之後的歷史會被當成新訊息送給作者腳本。
+    if (!list.some((m) => m.role !== 'system')) return false
     const sameAsStale = list.length === staleIds.size && list.every((m) => staleIds.has(m.id))
     if (sameAsStale) return false
     coldStart(snapshot)

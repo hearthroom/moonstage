@@ -114,7 +114,8 @@ export interface MessageView {
   loading?: boolean
   loadingLabel?: string
   waitingHint?: string
-  waitElapsed?: string
+  /** 開始等第一個字的時間（毫秒）；秒數由指示器自己走，不每秒送 message.view */
+  waitStartedAt?: number
   prepSteps?: string[] | null
   prepTrail?: string[] | null
   agentInterrupted?: boolean
@@ -159,6 +160,9 @@ export interface MessageLabels {
   /** 續跑的那次又停在同一個原因上時，中斷卡的說明（建議換模型）與那顆鍵的字。 */
   failedAgainSub?: string
   switchModel?: string
+  /** 等了多久的格式：「{s} 秒」「{m} 分 {s} 秒」 */
+  waitSeconds?: string
+  waitMinutes?: string
 }
 
 /**

@@ -70,7 +70,8 @@ export interface MessageListDeps {
   labels?: MessageLabels
   menuLabel?: string
   /** 內容變了要捲到底。 */
-  onGrow?: () => void
+  /** 捲到底；soft＝只是畫面資料換了，玩家往上看時不動 */
+  onGrow?: (soft?: boolean) => void
   onUi?: (id: string, ui: MessageUi) => void
   /** 正文裡的 <script>（宿主渲染管線保留它們）在氣泡掛上後跑一次。 */
   runScripts?: (bubble: HTMLElement, codes: string[]) => void
@@ -417,7 +418,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     for (const k of Object.keys(entry.state.view)) if (!(k in next.view)) delete (entry.state.view as Record<string, unknown>)[k]
     Object.assign(entry.state.view, next.view)
     Object.assign(entry.state.chat, next.chat)
-    if (deps.onGrow) deps.onGrow()
+    if (deps.onGrow) deps.onGrow(true)
   }
 
   /** 冷啟動要同步掛幾則：從最末往前掛到撐滿 initialScreens 個視窗高，至少 INITIAL_MIN。 */
