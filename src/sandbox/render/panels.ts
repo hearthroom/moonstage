@@ -6,7 +6,7 @@
  * 面板裡可以打字的欄位（草稿、編輯中的字、分享碼）由殼自己持有一份：每個字都往返宿主一趟會讓游標亂跳。
  * 宿主送來的值跟上次送出去的一樣就當回音、留殼裡那份；不一樣（宿主清掉了、換了內容）就採宿主的。
  */
-import { createApp, h, reactive, type App, type Component } from 'vue'
+import { camelize, createApp, h, reactive, toHandlerKey, type App, type Component } from 'vue'
 import CanvasPopup from '@/pages/canvas/components/canvas-popup.vue'
 import CanvasMessageMenu from '@/pages/canvas/components/canvas-message-menu.vue'
 import CanvasConversationList from '@/pages/canvas/components/canvas-conversation-list.vue'
@@ -53,7 +53,10 @@ const EVENTS: Record<string, string[]> = {
 /** 殼自己持有的可打字欄位：事件名 → 屬性名。 */
 const LOCAL_FIELDS: Record<string, string> = { 'update:draft': 'draft', 'update:editing-text': 'editingText', 'update:code': 'code' }
 
-const emitKey = (event: string) => 'on' + event.split(/[:-]/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('')
+// 事件名要照 Vue 自己的拼法轉成屬性名：連字號併成駝峰、冒號保留——`update:draft` 是 `onUpdate:draft`，
+// `update:editing-text` 是 `onUpdate:editingText`。自己拆字串會把冒號也吃掉，Vue 就找不到處理函式，
+// 打字欄位的每一次輸入都靜默落空：手帳看起來有字，宿主存檔送出去的卻是空的。
+const emitKey = (event: string) => toHandlerKey(camelize(event))
 
 export interface PanelsDeps {
   mount: HTMLElement
