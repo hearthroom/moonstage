@@ -38,6 +38,8 @@ describe('agentResumeFailedAgain：續跑的那次又停在同一個原因', () 
     expect(agentResumeFailedAgain([op('op-1', 'upstream_timeout'), op('op-2', 'tool_rejections', 'op-1')], 'op-2')).toBe(false)
     expect(agentResumeFailedAgain([op('op-2', 'upstream_timeout', 'op-1')], 'op-2')).toBe(false)
     expect(agentResumeFailedAgain([op('op-1', ''), op('op-2', '', 'op-1')], 'op-2')).toBe(false)
+    // 點數不足換模型也沒用：說明照原因講（去儲值），不改口叫人換模型
+    expect(agentResumeFailedAgain([op('op-1', 'insufficient_credits'), op('op-2', 'insufficient_credits', 'op-1')], 'op-2')).toBe(false)
     expect(agentResumeFailedAgain([op('op-1', 'stopped'), op('op-2', 'stopped', 'op-1')], 'op-2')).toBe(false)
   })
 

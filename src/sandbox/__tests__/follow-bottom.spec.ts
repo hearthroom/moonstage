@@ -74,3 +74,24 @@ describe('殼的跟到底', () => {
     expect(detached()).toBe(true)
   })
 })
+
+describe('殼的捲到底：只換畫面資料時不把往上看的玩家拉回來', () => {
+  // 等第一個字時，指示器的說法每 5 秒換一句，宿主就送一次 message.view。先前每一次都捲到底，
+  // 玩家在等回覆時往上翻舊對話，會被一直拉回最底下。
+  it('新的一則：照舊捲到底；只是畫面資料換了：玩家在底部才跟，往上看時不動', async () => {
+    const { growToBottom } = await import('../render/follow-bottom')
+    const s = scroller(5000)
+    const { fb } = bind(s)
+    const grow = growToBottom(s as unknown as HTMLElement, fb)
+    s.userScroll(1200)
+    expect(fb.following()).toBe(false)
+    grow(true)
+    expect(s.scrollTop).toBe(1200)
+    grow()
+    expect(s.scrollTop).toBe(5000 - 733)
+    expect(fb.following()).toBe(true)
+    s.resize(5200)
+    grow(true)
+    expect(s.scrollTop).toBe(5200 - 733)
+  })
+})

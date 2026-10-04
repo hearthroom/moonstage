@@ -16,13 +16,32 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { formatWaitElapsed, type WaitElapsedFormat } from '@/utils/wait-clock'
+
+const props = withDefaults(defineProps<{
   label?: string
-  elapsed?: string
+  /** 開始等的時間（毫秒）；0 不顯示秒數。秒數在這裡走，宿主不必每秒改資料。 */
+  startedAt?: number
+  elapsedFormat?: WaitElapsedFormat
 }>(), {
   label: 'Replying',
-  elapsed: '',
+  startedAt: 0,
+  elapsedFormat: () => ({ seconds: '', minutes: '' }),
 })
+
+const now = ref(Date.now())
+let ticker: ReturnType<typeof setInterval> | null = null
+watch(() => props.startedAt, (at) => {
+  if (ticker) { clearInterval(ticker); ticker = null }
+  now.value = Date.now()
+  if (at > 0) ticker = setInterval(() => { now.value = Date.now() }, 1000)
+}, { immediate: true })
+onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
+
+const elapsed = computed(() => props.startedAt > 0
+  ? formatWaitElapsed(Math.floor((now.value - props.startedAt) / 1000), props.elapsedFormat)
+  : '')
 </script>
 
 <style scoped>

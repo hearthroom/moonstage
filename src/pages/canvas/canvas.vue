@@ -444,7 +444,7 @@ import { bindBubbleFit } from './canvas-bubble-fit'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
 import { clearPendingReplyPhase, insertBeforePendingReply, markPendingReplyPhase, pendingReplyLabel } from './canvas-pending-reply'
-import { createWaitClock, formatWaitElapsed } from './wait-clock'
+import { createWaitClock } from '@/utils/wait-clock'
 import { createOutcomeUnconfirmedHold } from './outcome-unconfirmed-hold'
 
 // ── Open Canvas ─────────────────────────────────────────────────
@@ -1867,10 +1867,9 @@ function tryResumeOnMount() {
 const talkList = ref([]);//对话列表
 // 等第一個字的時候：指示器的說法每 5 秒換一句，旁邊寫已經等了多久（owner 2026-10-05）。
 // 玩家要分得出「它在想」和「卡住了」，久了要不要停、換模型由他判斷；不寫「模型還沒回應」。
-// 只有還有回覆在等第一個字時才走秒，回覆一來就停。
-const waitNow = ref(Date.now());
+// 這裡只記每顆氣泡開始等的時間，秒數由指示器自己走（每秒改資料會整頁重畫，沙箱卡還會每秒收一次 view）。
 const waitPhrase = ref('');
-const waitClock = createWaitClock(() => waitNow.value);
+const waitClock = createWaitClock(() => Date.now());
 let waitTicker: ReturnType<typeof setInterval> | null = null;
 const waitingRowIds = computed(() => (talkList.value as any[]).filter((it) => it && it.chatLoading).map((it) => String(it.id)));
 watch(() => waitingRowIds.value.join('|'), () => {
@@ -1882,18 +1881,13 @@ watch(() => waitingRowIds.value.join('|'), () => {
     return;
   }
   if (waitTicker) return;
-  waitNow.value = Date.now();
   waitPhrase.value = composeThinkingPhrase();
-  let ticks = 0;
   waitTicker = setInterval(() => {
-    waitNow.value = Date.now();
-    if (++ticks % 5 === 0) {
-      // 避開和上一句一樣：換了字卻沒變化，比不換更像卡住。
-      let next = composeThinkingPhrase();
-      for (let i = 0; i < 5 && next === waitPhrase.value; i++) next = composeThinkingPhrase();
-      waitPhrase.value = next;
-    }
-  }, 1000);
+    // 避開和上一句一樣：換了字卻沒變化，比不換更像卡住。
+    let next = composeThinkingPhrase();
+    for (let i = 0; i < 5 && next === waitPhrase.value; i++) next = composeThinkingPhrase();
+    waitPhrase.value = next;
+  }, 5000);
 }, { immediate: true });
 onUnmounted(() => { if (waitTicker) { clearInterval(waitTicker); waitTicker = null; } });
 const isUserAtBottom = ref(true); //用户是否在底部（控制是否自动滚动）
@@ -9015,6 +9009,8 @@ const messageLabels = computed(() => ({
   continueAction: t('multiPass.continueAction'),
   failedAgainSub: t('multiPass.failedAgainSub'),
   switchModel: t('chat.switchModel'),
+  waitSeconds: t('chat.waitSeconds'),
+  waitMinutes: t('chat.waitMinutes'),
 }))
 
 
@@ -9045,7 +9041,7 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
   // 伺服器說了為什麼慢就寫在指示器下方；等了多久寫在指示器旁邊（取代先前 12 秒後浮現的
   // 「模型回應較慢」：玩家看得到秒數在走，比一句固定的安撫更能判斷是在想還是卡住了）。
   const waitingHint = item.chatLoading && item.waitingHint ? String(item.waitingHint) : ''
-  const waitElapsed = item.chatLoading ? formatWaitElapsed(waitClock.elapsedSeconds(String(item.id)), t) : ''
+  const waitStartedAt = item.chatLoading ? waitClock.startedAt(String(item.id)) : 0
   const html = htmlOverride != null ? htmlOverride : (item.chatLoading ? '' : renderMessage(item))
   return {
     mesid: index,
@@ -9056,7 +9052,7 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     html,
     loadingLabel,
     waitingHint,
-    waitElapsed,
+    waitStartedAt,
     // 這一輪 Agent 做了什麼。用戶付了錢、等了一分多鐘，過程是他唯一能判斷
     // 「有沒有在幹活」的依據，不該隨氣泡出現而消失。
     prepTrail: Array.isArray(item.prepTrail) ? item.prepTrail : null,
@@ -9241,6 +9237,7 @@ function onMessageAction(key: string, index: number) {
   // 系統訊息卡上的鍵（沙箱殼把卡畫在那一列底下，按了回 sys:<動作>）：走一般卡那張卡同一個動作。
   // 訊息是跨源來的，先對這一列現在給的鍵核一次（卡已經不是最新、或卡上沒有這顆鍵就不做）。
   // 放在選單的能力閘之前：那道閘認的是選單的鍵名，不認得 sys:，卡上的鍵另有自己那道閘。
+  if (typeof key !== 'string') return
   if (key.startsWith('sys:')) {
     const row = talkList.value[index]
     const action = key.slice(4)

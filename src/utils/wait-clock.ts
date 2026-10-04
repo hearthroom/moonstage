@@ -6,9 +6,13 @@
  *
  * 從這顆等回覆的氣泡第一次出現開始算，不是從按下送出：重新整理接回一輪還在跑的
  * 回覆時，畫面上沒有更早的時間可以對；從接回的那一刻算起，至少不會報錯的數字。
+ *
+ * 宿主只記開始的時間交給指示器，秒數在指示器裡走：每秒改一次訊息資料會讓整頁重畫，
+ * 沙箱卡還會每秒收到一次 message.view。
  */
 export interface WaitClock {
-  elapsedSeconds(id: string): number
+  /** 這顆氣泡開始等的時間（第一次問到時記下，之後不變）。 */
+  startedAt(id: string): number
   /** 只留還在等的那幾顆，其餘忘掉（回覆來了、氣泡換掉）。 */
   keepOnly(ids: Set<string>): void
 }
@@ -16,10 +20,9 @@ export interface WaitClock {
 export function createWaitClock(now: () => number): WaitClock {
   const started = new Map<string, number>()
   return {
-    elapsedSeconds(id) {
-      const at = now()
-      if (!started.has(id)) started.set(id, at)
-      return Math.max(0, Math.floor((at - (started.get(id) as number)) / 1000))
+    startedAt(id) {
+      if (!started.has(id)) started.set(id, now())
+      return started.get(id) as number
     },
     keepOnly(ids) {
       for (const id of [...started.keys()]) if (!ids.has(id)) started.delete(id)
@@ -27,10 +30,17 @@ export function createWaitClock(now: () => number): WaitClock {
   }
 }
 
-export function formatWaitElapsed(seconds: number, t: (key: string) => string): string {
-  if (!(seconds >= 1)) return ''
-  if (seconds < 60) return t('chat.waitSeconds').replace('{s}', String(seconds))
+export interface WaitElapsedFormat {
+  /** 「{s} 秒」 */
+  seconds: string
+  /** 「{m} 分 {s} 秒」 */
+  minutes: string
+}
+
+export function formatWaitElapsed(seconds: number, format: WaitElapsedFormat): string {
+  if (!(seconds >= 1) || !format.seconds) return ''
+  if (seconds < 60) return format.seconds.replace('{s}', String(seconds))
   const m = Math.floor(seconds / 60)
   const s = String(seconds % 60).padStart(2, '0')
-  return t('chat.waitMinutes').replace('{m}', String(m)).replace('{s}', s)
+  return (format.minutes || format.seconds).replace('{m}', String(m)).replace('{s}', s)
 }

@@ -26,7 +26,7 @@ import CanvasComposer from '@/pages/canvas/components/canvas-composer.vue'
 import { bindComposerOverhang } from '@/pages/canvas/canvas-composer-overhang'
 import { bindAuthorSideDock, collectFixedRoots } from '@/pages/canvas/canvas-author-side-dock'
 import { bindBubbleFit } from '@/pages/canvas/canvas-bubble-fit'
-import { createFollowBottom } from './render/follow-bottom'
+import { createFollowBottom, growToBottom } from './render/follow-bottom'
 import { mountGeometryDebug, rectText } from '@/common/geometry-debug'
 import { reactive, ref } from 'vue'
 // 標準播放器的樣式表整份帶進殼：訊息區的每一條規則跟一般卡同一份。頁首與輸入區的規則在殼裡沒有對應節點，不礙事。
@@ -323,7 +323,7 @@ export function createShell(options: CreateShellOptions): Shell {
     userAvatar: config.user.avatarUrl,
     labels: config.labels,
     menuLabel: config.menuLabel,
-    onGrow: () => { scrollView.scrollTop = scrollView.scrollHeight; followBottom.pin() },
+    onGrow: growToBottom(scrollView, followBottom),
     // 三個點、動作列、開場白切換：殼只負責畫，做事的是宿主。
     onUi: (id, ui) => {
       // 重新生成、繼續、系統訊息卡上的鍵（重試、繼續會花點數）同樣只認真的手勢。

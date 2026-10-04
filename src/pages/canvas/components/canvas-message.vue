@@ -111,7 +111,7 @@
               <span class="lt-prep-live-text">{{ line }}</span>
             </div>
           </div>
-          <ChatTypingIndicator :label="message.loadingLabel" :elapsed="message.waitElapsed" />
+          <ChatTypingIndicator :label="message.loadingLabel" :started-at="message.waitStartedAt || 0" :elapsed-format="{ seconds: labels.waitSeconds || '', minutes: labels.waitMinutes || '' }" />
           <!-- 伺服器說了為什麼慢就寫出來；等了多久在指示器旁邊。 -->
           <div v-if="message.waitingHint" class="lt-waiting-hint" data-lt="waiting-hint">{{ message.waitingHint }}</div>
         </template>
@@ -253,8 +253,8 @@ const props = withDefaults(defineProps<{
     /** 伺服器說模型回應慢時的那句話（立即顯示） */
     waitingHint?: string
     /** 沒有伺服器提示時延遲浮現的那句話 */
-    /** 等第一個字已經等了多久（「23 秒」）；指示器旁邊顯示，讀屏不念 */
-    waitElapsed?: string
+    /** 開始等第一個字的時間（毫秒）；指示器自己算已經等了多久，讀屏不念 */
+    waitStartedAt?: number
     prepSteps?: string[] | null
     prepTrail?: string[] | null
     /** Agent 準備到一半被停下：軌跡已固定，底下給一張「進度留著／繼續」的卡 */
@@ -272,7 +272,7 @@ const props = withDefaults(defineProps<{
     contextUsage?: { label: string; tip: string; level: string } | null
     swipes?: { index: number; total: number } | null
   }
-  labels?: { copy: string; edit: string; regenerate: string; reasoning: string; prepTrail: string; prev: string; next: string; interruptedNotice?: string; interruptedNoticeSub?: string; continueAction?: string; failedAgainSub?: string; switchModel?: string }
+  labels?: { copy: string; edit: string; regenerate: string; reasoning: string; prepTrail: string; prev: string; next: string; interruptedNotice?: string; interruptedNoticeSub?: string; continueAction?: string; failedAgainSub?: string; switchModel?: string; waitSeconds?: string; waitMinutes?: string }
   menuLabel?: string
   /**
    * 沙箱殼用：MMD 新版契約的節點名與屬性掛在同一批節點上（data-chat=message／message-avatar／
