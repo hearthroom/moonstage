@@ -783,7 +783,19 @@ export function settleZeroOutputTerminalFailure(
   if (kind === 'continue') {
     return removeOperationCandidate(messages, pending.aiBubbleId)
   }
+  // 伺服器已經收下的那句（accepted 帶回它的 chatId）在伺服器上就在：留著，只拿掉空的 AI 占位。
+  // 整組拿掉的話，緊接著要插在它後面的失敗卡找不到位置，畫面上那句與失敗卡要等歷史重新
+  // 載入才一起長回來（沙箱卡的殼還會把那則拆掉再重建）。還沒被收下的照舊整組拿掉。
+  if (hasServerChatId(messages, pending.userBubbleId)) {
+    return removeOwnedTurnBubbles(messages, { aiBubbleId: pending.aiBubbleId })
+  }
   return removeOwnedTurnBubbles(messages, pending)
+}
+
+function hasServerChatId(messages: any[], bubbleId: unknown): boolean {
+  if (!Array.isArray(messages) || bubbleId === undefined || bubbleId === null || bubbleId === '') return false
+  const row = messages.find(item => item && sameId(item.id, bubbleId))
+  return !!row && String(row.chatId ?? '').trim() !== ''
 }
 
 export function restoreRewriteCandidate(
