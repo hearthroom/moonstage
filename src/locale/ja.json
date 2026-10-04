@@ -3708,6 +3708,8 @@
 	"multiPass.temporarilyOff": "この機能は現在オフになっています",
 	"chat.thinkingPoolA": "じっくり|ゆっくり|静かに|丁寧に|注意深く|落ち着いて|念入りに|そっと|真剣に|辛抱強く|一つずつ",
 	"chat.thinkingPoolB": "言葉を選んでいます|細部を思い出しています|考えをまとめています|言い回しを探しています|話の流れを整えています|口調を確かめています|返事を組み立てています|どう伝えるか考えています|前の話を辿っています|表現を練っています|答えを探しています",
+	"chat.waitSeconds": "{s} 秒",
+	"chat.waitMinutes": "{m} 分 {s} 秒",
 	"chat.thinkingTemplate": "{A}{B}",
 	"multiPass.prepStillWorking": "まだ準備中です。少しお待ちください…",
 	"multiPass.prepResSetting": "この物語の設定",

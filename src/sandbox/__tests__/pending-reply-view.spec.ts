@@ -22,20 +22,21 @@ let shell: Shell | null = null
 afterEach(() => { shell?.dispose(); shell = null; delete (window as unknown as Record<string, unknown>).sdk })
 
 describe('沙箱殼：等回覆的那一列', () => {
-  it('整理劇情中的標籤照宿主的 view 畫；換成正在回覆後出現延遲浮現的提示', async () => {
+  it('整理劇情中的標籤照宿主的 view 畫；之後換成輪換的說法，旁邊寫等了多久', async () => {
     document.body.innerHTML = '<div id="app"></div>'
     shell = createShell({ doc: document, win: window as Window & typeof globalThis, mount: document.getElementById('app')!, config: config(), transport: { send: () => {} } })
     const s = shell
     s.handle({ type: 'messages', messages: [] })
     s.handle({ type: 'message.new', message: { id: 'l1', role: 'user', content: '1', serverId: null } })
-    s.handle({ type: 'message.new', message: { id: 'l2', role: 'ai', content: '', serverId: null, view: { role: 'ai', html: '', loading: true, loadingLabel: '整理劇情中…', waitingHint: '', slowHint: '' } } })
+    s.handle({ type: 'message.new', message: { id: 'l2', role: 'ai', content: '', serverId: null, view: { role: 'ai', html: '', loading: true, loadingLabel: '整理劇情中…', waitingHint: '' } } })
     const body = () => s.refs.list.querySelectorAll('[data-chat="message-body"]')[1] as HTMLElement
     expect(body().querySelector('.chat-typing-indicator')?.textContent).toContain('整理劇情中…')
     expect(body().querySelector('.lt-waiting-hint')).toBeNull()
 
-    s.handle({ type: 'message.view', id: 'l2', view: { role: 'ai', html: '', loading: true, loadingLabel: '正在回覆', waitingHint: '', slowHint: '模型回應較慢，請耐心等待...' } })
+    s.handle({ type: 'message.view', id: 'l2', view: { role: 'ai', html: '', loading: true, loadingLabel: '正細細斟酌用詞…', waitingHint: '', waitElapsed: '12 秒' } })
     await nextTick()
-    expect(body().querySelector('.chat-typing-indicator')?.textContent).toContain('正在回覆')
-    expect(body().querySelector('.lt-waiting-hint.is-delayed')?.textContent).toContain('模型回應較慢')
+    expect(body().querySelector('.chat-typing-indicator')?.textContent).toContain('正細細斟酌用詞…')
+    expect(body().querySelector('.chat-typing-indicator .typing-elapsed')?.textContent).toBe('12 秒')
+    expect(body().querySelector('.lt-waiting-hint')).toBeNull()
   })
 })

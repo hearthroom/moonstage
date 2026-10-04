@@ -111,11 +111,9 @@
               <span class="lt-prep-live-text">{{ line }}</span>
             </div>
           </div>
-          <ChatTypingIndicator :label="message.loadingLabel" />
-          <!-- 長上下文要讀幾十秒才出第一個字：伺服器說慢了就立即寫出來；沒說的話放一句
-               延遲浮現的（CSS 延遲，不用計時器；浮現前讀屏也不念）。 -->
+          <ChatTypingIndicator :label="message.loadingLabel" :elapsed="message.waitElapsed" />
+          <!-- 伺服器說了為什麼慢就寫出來；等了多久在指示器旁邊。 -->
           <div v-if="message.waitingHint" class="lt-waiting-hint" data-lt="waiting-hint">{{ message.waitingHint }}</div>
-          <div v-else-if="message.slowHint" class="lt-waiting-hint is-delayed" data-lt="waiting-hint" aria-hidden="true">{{ message.slowHint }}</div>
         </template>
         <div v-else class="lt-bubble-body" v-html="message.html"></div>
       </div>
@@ -255,7 +253,8 @@ const props = withDefaults(defineProps<{
     /** 伺服器說模型回應慢時的那句話（立即顯示） */
     waitingHint?: string
     /** 沒有伺服器提示時延遲浮現的那句話 */
-    slowHint?: string
+    /** 等第一個字已經等了多久（「23 秒」）；指示器旁邊顯示，讀屏不念 */
+    waitElapsed?: string
     prepSteps?: string[] | null
     prepTrail?: string[] | null
     /** Agent 準備到一半被停下：軌跡已固定，底下給一張「進度留著／繼續」的卡 */

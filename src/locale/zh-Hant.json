@@ -3708,6 +3708,8 @@
 	"multiPass.temporarilyOff": "這個功能暫時關閉中",
 	"chat.thinkingPoolA": "正在|還在|仍在|正細細|正慢慢|正反覆|正靜靜|正認真|正專心|正耐心|正仔細",
 	"chat.thinkingPoolB": "斟酌用詞|回想細節|理清思緒|挑選說法|組織語句|推敲語氣|梳理前因|拿捏分寸|琢磨回應|想著怎麼接|找合適的話",
+	"chat.waitSeconds": "{s} 秒",
+	"chat.waitMinutes": "{m} 分 {s} 秒",
 	"chat.thinkingTemplate": "{A}{B}…",
 	"multiPass.prepStillWorking": "還在準備，請再等一下…",
 	"multiPass.prepResSetting": "這個故事的設定",

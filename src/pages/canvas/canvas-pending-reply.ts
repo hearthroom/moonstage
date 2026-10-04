@@ -76,6 +76,8 @@ export interface PendingReplyLabelInput {
   hasLiveSteps: boolean
   /** Agent 模式的當下步驟文字 */
   prepStepText?: string
+  /** 輪換的說法（「正細細斟酌用詞…」那種），等第一個字時用；沒有才寫「正在回覆」 */
+  phrase?: string
   t: (key: string) => string
 }
 
@@ -83,5 +85,5 @@ export interface PendingReplyLabelInput {
 export function pendingReplyLabel(input: PendingReplyLabelInput): string {
   if (input.phase === 'compacting') return input.t('chat.compacting')
   if (input.hasLiveSteps) return input.t('chat.thinkingInProgress')
-  return input.prepStepText || input.t('chat.aiReplying')
+  return input.prepStepText || input.phrase || input.t('chat.aiReplying')
 }

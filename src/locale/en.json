@@ -3708,6 +3708,8 @@
 	"multiPass.temporarilyOff": "This feature is temporarily off",
 	"chat.thinkingPoolA": "Still|Carefully|Quietly|Slowly|Patiently|Thoughtfully|Gently|Steadily|Deliberately|Softly|Intently",
 	"chat.thinkingPoolB": "choosing the words|recalling the details|gathering thoughts|finding the right tone|piecing it together|weighing what to say|shaping a reply|working it out|thinking it over|picking the phrasing|settling on an answer",
+	"chat.waitSeconds": "{s}s",
+	"chat.waitMinutes": "{m}m {s}s",
 	"chat.thinkingTemplate": "{A} {B}…",
 	"multiPass.prepStillWorking": "Still preparing, one moment…",
 	"multiPass.prepResSetting": "this story's setting",

@@ -3703,6 +3703,8 @@
 	"multiPass.temporarilyOff": "이 기능은 현재 꺼져 있어요",
 	"chat.thinkingPoolA": "천천히|차분히|조용히|신중히|꼼꼼히|찬찬히|가만히|하나씩|정성껏|골똘히|곰곰이",
 	"chat.thinkingPoolB": "말을 고르는 중|기억을 더듬는 중|생각을 정리 중|표현을 찾는 중|이야기를 잇는 중|말투를 다듬는 중|답을 엮는 중|앞말을 떠올리는 중|문장을 다듬는 중|대답을 고르는 중|어떻게 말할지 고민",
+	"chat.waitSeconds": "{s}초",
+	"chat.waitMinutes": "{m}분 {s}초",
 	"chat.thinkingTemplate": "{A} {B}…",
 	"multiPass.prepStillWorking": "아직 준비 중입니다. 잠시만요…",
 	"multiPass.prepResSetting": "이 이야기의 설정",
