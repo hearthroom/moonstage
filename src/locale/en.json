@@ -4169,6 +4169,7 @@
 	"responseSettings.noteExamples.perspective.first_character": "e.g. Put inner thoughts in parentheses",
 	"responseSettings.noteExamples.perspective.second_user": "e.g. Only describe what I can see and hear",
 	"responseSettings.noteExamples.perspective.third_limited": "e.g. Stay with the heroine; never cut to the villain",
+	"responseSettings.noteExamples.perspective.third_omniscient": "e.g. Start each reply on my side, then cut to hers",
 	"responseSettings.noteExamples.length.auto": "e.g. Keep small talk short, let key moments run longer",
 	"responseSettings.noteExamples.length.recommended": "e.g. Small talk can run shorter, key moments get the full length",
 	"responseSettings.noteExamples.length.target": "e.g. Fights may run past the target, small talk stays on it",
@@ -4210,6 +4211,7 @@
 	"responseSettings.options.perspective.first_character": "Character’s first person",
 	"responseSettings.options.perspective.second_user": "Address me as you",
 	"responseSettings.options.perspective.third_limited": "Limited third person",
+	"responseSettings.options.perspective.third_omniscient": "Omniscient third person",
 	"responseSettings.options.length.auto": "Automatic",
 	"responseSettings.options.length.recommended": "Recommended",
 	"responseSettings.options.length.target": "Set a length",
@@ -4226,6 +4228,7 @@
 	"responseSettings.perspectiveHints.first_character": "“I” is the AI’s character, narrating in its own voice.",
 	"responseSettings.perspectiveHints.second_user": "Narrates your character as “you”, without acting for you.",
 	"responseSettings.perspectiveHints.third_limited": "Third person, limited to what the point-of-view character knows.",
+	"responseSettings.perspectiveHints.third_omniscient": "The camera can cut to places your character is not, showing what others do and think in private; your character only knows what they have seen themselves.",
 	"responseSettings.paceHints.natural": "How far the story moves depends on your replies and what follows from them.",
 	"responseSettings.paceHints.linger": "Stays in the moment with detailed reactions; no time skips or big new events.",
 	"responseSettings.paceHints.advance": "Moves other characters and events forward, adding new developments when they fit."
