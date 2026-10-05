@@ -35,6 +35,8 @@ it('explains only the selected option under each setting', async () => {
  }
  await pill(wrapper,'perspective','third_limited').trigger('click')
  expect(wrapper.get('[data-hint="perspective"]').text()).toBe('responseSettings.perspectiveHints.third_limited')
+ await pill(wrapper,'perspective','third_omniscient').trigger('click')
+ expect(wrapper.get('[data-hint="perspective"]').text()).toBe('responseSettings.perspectiveHints.third_omniscient')
  expect(wrapper.get('[data-hint="pace"]').text()).toBe('responseSettings.paceHints.natural')
  expect(wrapper.get('[data-hint="length"]').text()).toBe('responseSettings.lengthHints.auto')
  expect(wrapper.get('[data-hint="style"]').text()).toBe('responseSettings.styleHints.default')

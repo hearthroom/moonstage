@@ -4169,6 +4169,7 @@
 	"responseSettings.noteExamples.perspective.first_character": "例：心の声は括弧でくくって",
 	"responseSettings.noteExamples.perspective.second_user": "例：自分に見えるもの、聞こえるものだけ書いて",
 	"responseSettings.noteExamples.perspective.third_limited": "例：ヒロインの視点から離れず、悪役側には切り替えないで",
+	"responseSettings.noteExamples.perspective.third_omniscient": "例：毎回まず私の側を書いてから、彼女の側に切り替えて",
 	"responseSettings.noteExamples.length.auto": "例：雑談は短く、重要な場面は長めに",
 	"responseSettings.noteExamples.length.recommended": "例：雑談は短めでよく、重要な場面はしっかり書く",
 	"responseSettings.noteExamples.length.target": "例：戦闘は目標を超えてよい。雑談は目標どおりに",
@@ -4210,6 +4211,7 @@
 	"responseSettings.options.perspective.first_character": "キャラクターの一人称",
 	"responseSettings.options.perspective.second_user": "プレイヤーを二人称で呼ぶ",
 	"responseSettings.options.perspective.third_limited": "三人称・視点限定",
+	"responseSettings.options.perspective.third_omniscient": "三人称・全知",
 	"responseSettings.options.length.auto": "自動",
 	"responseSettings.options.length.recommended": "おすすめ",
 	"responseSettings.options.length.target": "文字数を指定",
@@ -4226,6 +4228,7 @@
 	"responseSettings.perspectiveHints.first_character": "「私」は AI が演じる役で、その役の口調で語ります。",
 	"responseSettings.perspectiveHints.second_user": "あなたの役を「あなた」と呼んで描きますが、代わりに行動はしません。",
 	"responseSettings.perspectiveHints.third_limited": "三人称で、視点人物が知っていることだけを書きます。",
+	"responseSettings.perspectiveHints.third_omniscient": "カメラはあなたの役がいない場所にも切り替わり、ほかの人物が人知れず行うことや考えも描きます。あなたの役が知っているのは、自分で見聞きしたことだけです。",
 	"responseSettings.paceHints.natural": "あなたの返信と展開の結果に合わせて、進み具合が決まります。",
 	"responseSettings.paceHints.linger": "今の場面にとどまって反応を細かく描き、時間を飛ばしたり大きな出来事を足したりしません。",
 	"responseSettings.paceHints.advance": "他の人物や出来事を進め、自然な流れで新しい展開を加えます。"

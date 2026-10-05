@@ -4169,6 +4169,7 @@
 	"responseSettings.noteExamples.perspective.first_character": "例：內心獨白用括號標出來",
 	"responseSettings.noteExamples.perspective.second_user": "例：只寫我看得到、聽得到的東西",
 	"responseSettings.noteExamples.perspective.third_limited": "例：只跟著女主角的視角，不要切到反派",
+	"responseSettings.noteExamples.perspective.third_omniscient": "例：每次回覆先寫我這邊，再切到她那邊",
 	"responseSettings.noteExamples.length.auto": "例：日常對話短一點，關鍵劇情可以寫長",
 	"responseSettings.noteExamples.length.recommended": "例：日常對話可以短一點，關鍵劇情寫足",
 	"responseSettings.noteExamples.length.target": "例：戰鬥場面可以超過目標，日常對話照目標就好",
@@ -4210,6 +4211,7 @@
 	"responseSettings.options.perspective.first_character": "角色第一人稱",
 	"responseSettings.options.perspective.second_user": "玩家第二人稱",
 	"responseSettings.options.perspective.third_limited": "第三人稱限知",
+	"responseSettings.options.perspective.third_omniscient": "第三人稱全知",
 	"responseSettings.options.length.auto": "自動",
 	"responseSettings.options.length.recommended": "推薦",
 	"responseSettings.options.length.target": "指定字數",
@@ -4226,6 +4228,7 @@
 	"responseSettings.perspectiveHints.first_character": "「我」指 AI 扮演的角色，用它的口吻敘述。",
 	"responseSettings.perspectiveHints.second_user": "用「你」來寫你扮演的角色，但不會因此替你行動。",
 	"responseSettings.perspectiveHints.third_limited": "用第三人稱，只寫視角人物知道的事。",
+	"responseSettings.perspectiveHints.third_omniscient": "鏡頭可以切到你不在場的地方，寫其他角色私下做的事和想法；你的角色只知道自己親身經歷的。",
 	"responseSettings.paceHints.natural": "依你的回應和劇情後果決定推進多少。",
 	"responseSettings.paceHints.linger": "停在當下細寫反應，不跳時間、不加大事件。",
 	"responseSettings.paceHints.advance": "主動推動其他角色和事件，適時加入新發展。"

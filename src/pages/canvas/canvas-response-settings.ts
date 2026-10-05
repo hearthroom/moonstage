@@ -1,7 +1,7 @@
 export const responseAxes = {
  agency: ['protect', 'assist', 'lines', 'coauthor'],
  style: ['default', 'guided', 'card', 'custom'],
- perspective: ['card', 'first_character', 'second_user', 'third_limited'],
+ perspective: ['card', 'first_character', 'second_user', 'third_limited', 'third_omniscient'],
  length: ['auto', 'recommended', 'target'],
  pace: ['natural', 'linger', 'advance'],
 } as const
