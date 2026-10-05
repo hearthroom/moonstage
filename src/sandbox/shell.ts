@@ -113,7 +113,7 @@ export function createShell(options: CreateShellOptions): Shell {
   }
   applyThemeVars(config.themeVars)
   // 訊息區的容器用標準的舞台元件（#scrollview／#chat／#msglistview 這些作者打得到的名字都在）。
-  const stageApp = createApp({ render: () => h(CanvasStage, { backgroundUrl: config.backgroundUrl || undefined }) })
+  const stageApp = createApp({ render: () => h(CanvasStage, { backgroundUrl: config.backgroundUrl || undefined, backgroundLandscapeUrl: config.backgroundLandscapeUrl || undefined }) })
   stageApp.config.warnHandler = () => {}
   stageApp.mount(refs.messages)
   const scrollView = (refs.messages.querySelector('#scrollview') as HTMLElement) || refs.messages

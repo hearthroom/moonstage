@@ -498,3 +498,18 @@ describe('殼：容量不夠時的選擇', () => {
     expect(sent.filter((m: any) => m.type === 'panel.ui' && m.panel === 'capacity' && m.event === 'pick')).toEqual([])
   })
 })
+
+describe('殼：舞台背景', () => {
+  it('直、橫兩張都交給舞台的兩個變數', () => {
+    boot(config({ backgroundUrl: 'https://cdn/p.jpg', backgroundLandscapeUrl: 'https://cdn/l.jpg' }))
+    const stage = document.querySelector('.chat-scope-box') as HTMLElement
+    expect(stage.style.getPropertyValue('--lt-bg-portrait')).toBe('url(https://cdn/p.jpg)')
+    expect(stage.style.getPropertyValue('--lt-bg-landscape')).toBe('url(https://cdn/l.jpg)')
+  })
+
+  it('沒有橫圖：不寫橫圖變數，橫屏退回直圖', () => {
+    boot(config({ backgroundUrl: 'https://cdn/p.jpg' }))
+    const stage = document.querySelector('.chat-scope-box') as HTMLElement
+    expect(stage.style.getPropertyValue('--lt-bg-landscape')).toBe('')
+  })
+})

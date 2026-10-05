@@ -54,7 +54,7 @@
       ></iframe>
     </div>
 
-    <CanvasStage v-if="!sandboxCard" :background-url="playerBackgroundUrl" @scroll="onStageScroll">
+    <CanvasStage v-if="!sandboxCard" :background-url="playerBackgroundUrl" :background-landscape-url="playerBackgroundLandscapeUrl" @scroll="onStageScroll">
       <CanvasIntro :text="introText" :open="introOpen" @toggle="introOpen = !introOpen" />
 
       <CanvasMessage
@@ -2898,6 +2898,7 @@ function mountSandbox(asset: any) {
           menuLabel: t('canvas.actions.more'),
           themeVars: collectCanvasVars(),
           backgroundUrl: String(playerBackgroundUrl.value || '') || undefined,
+          backgroundLandscapeUrl: String(playerBackgroundLandscapeUrl.value || '') || undefined,
           // 殼的網址是固定的，作者要開除錯面板得從宿主頁的網址帶進去：?sdkDebug=1
           debug: /[?&]sdkDebug=1\b/.test(String(window.location.search || '')),
         };

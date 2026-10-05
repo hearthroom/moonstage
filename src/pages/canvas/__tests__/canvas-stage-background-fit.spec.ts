@@ -69,3 +69,18 @@ describe('CanvasStage 只寫變數', () => {
     expect((w.find('.chat-scope-box').element as HTMLElement).getAttribute('style')).toBeFalsy()
   })
 })
+
+// 橫圖曾經算好了卻沒交給舞台（2026-09-15 起，作者上傳的橫式背景在橫屏上從沒出現過）。
+// canvas.vue 太大不好掛載，這裡看兩處交接點：一般卡的舞台、沙箱卡交給殼的設定。
+describe('canvas.vue 把橫圖交出去', () => {
+  const vue = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
+
+  it('一般卡：舞台拿到橫圖', () => {
+    const tag = vue.slice(vue.indexOf('<CanvasStage'), vue.indexOf('>', vue.indexOf('<CanvasStage')))
+    expect(tag).toMatch(/:background-landscape-url="playerBackgroundLandscapeUrl"/)
+  })
+
+  it('沙箱卡：交給殼的設定帶橫圖', () => {
+    expect(vue).toMatch(/backgroundLandscapeUrl:\s*String\(playerBackgroundLandscapeUrl\.value \|\| ''\) \|\| undefined/)
+  })
+})
