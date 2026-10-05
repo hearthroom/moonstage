@@ -89,6 +89,8 @@ export interface SandboxHelloConfig {
   debug?: boolean
   /** 整頁背景圖（可省略）。 */
   backgroundUrl?: string
+  /** 橫向螢幕用的背景圖（可省略，沒有就退回直圖）。 */
+  backgroundLandscapeUrl?: string
   /** 視窗高度（--chat-viewport-height），之後由 viewport 訊息更新。 */
   viewportHeight?: number
   /**
