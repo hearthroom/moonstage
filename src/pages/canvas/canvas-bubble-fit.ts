@@ -101,25 +101,59 @@ export type BindBubbleFitOptions = {
   subscribe?: (refresh: () => void) => void
 }
 
+/** 對話欄外面真正在捲的那一層：往上找第一個 overflow-y 會捲的祖先，都沒有就是文件本身。 */
+function scrollerOf(chat: HTMLElement, win: Window): HTMLElement | null {
+  for (let el = chat.parentElement; el; el = el.parentElement) {
+    let oy = ''
+    try { oy = win.getComputedStyle(el).overflowY } catch { continue }
+    if (oy === 'auto' || oy === 'scroll' || oy === 'overlay') return el
+  }
+  const doc = chat.ownerDocument
+  return (doc && (doc.scrollingElement as HTMLElement | null)) || null
+}
+
 /*
-  平常只量最後三則（新訊息、串流中的那則）；視窗尺寸一變全部重來。一般畫布與沙箱殼共用。
+  平常只量有變動的那幾則：變動落在某則氣泡裡就量那一則；落在氣泡外（新訊息掛上、整串換掉）
+  才量最後三則。視窗尺寸一變全部重來。一般畫布與沙箱殼共用。
+
+  為什麼不能每次變動都量最後三則：量之前要先拿掉釘上的寬度，那一瞬間氣泡被撐回原寬、文字換行
+  變少、整頁變矮，瀏覽器會把捲動位置往回夾；釘回去之後頁面恢復原高，位置卻回不來。作者的卡常有
+  計時器在動（花瓣、粒子），每一下都觸發一次，停在底部的人就被一直往上拉（2026-10-05 玩家回報
+  「沒法捲到最下邊，上下都不行」：一顆花瓣 400ms，每次拉回約 300px）。所以：
+    1. 別則訊息在動，不碰已經釘好的氣泡；
+    2. 非量不可的時候（那則自己在變、畫面轉向），量完把捲動位置放回原處。
 */
 export function bindBubbleFit(opts: BindBubbleFitOptions): () => void {
   const { win, chat, observe, subscribe } = opts
   if (!chat) return () => {}
   let raf = 0
   let full = true
+  let tail = false
+  const dirty = new Set<HTMLElement>()
   let disposed = false
   const run = () => {
     const c = chat.getBoundingClientRect()
     if (!(c.width > 0)) return
     const limit = { left: c.left + EDGE, right: c.right - EDGE }
     const bubbles = Array.from(chat.querySelectorAll('.mes_text')) as HTMLElement[]
-    const targets = full ? bubbles : bubbles.slice(-3)
-    if (full) resetBubbleFit(chat)
-    else for (const b of targets) { if (b.hasAttribute(FIT_ATTR)) resetBubbleFit(b.parentNode || b) }
+    let targets: HTMLElement[]
+    if (full) targets = bubbles
+    else {
+      const pick = new Set<HTMLElement>(tail ? bubbles.slice(-3) : [])
+      dirty.forEach((b) => { if (chat.contains(b)) pick.add(b) })
+      targets = bubbles.filter((b) => pick.has(b))
+    }
+    const wasFull = full
     full = false
+    tail = false
+    dirty.clear()
+    if (!targets.length) return
+    const scroller = scrollerOf(chat, win)
+    const top = scroller ? scroller.scrollTop : 0
+    if (wasFull) resetBubbleFit(chat)
+    else for (const b of targets) { if (b.hasAttribute(FIT_ATTR)) resetBubbleFit(b.parentNode || b) }
     for (const b of targets) { try { clampWideBubble(b, limit, win) } catch { /* 單一氣泡量不到不影響其他 */ } }
+    if (scroller && scroller.scrollTop !== top) scroller.scrollTop = top
   }
   const schedule = (all?: boolean) => {
     if (disposed) return
@@ -136,11 +170,19 @@ export function bindBubbleFit(opts: BindBubbleFitOptions): () => void {
   let observer: MutationObserver | null = null
   const MO = (win as Window & { MutationObserver?: typeof MutationObserver }).MutationObserver || (typeof MutationObserver === 'function' ? MutationObserver : null)
   if (MO && observe) {
-    observer = new MO(() => schedule())
+    observer = new MO((records: MutationRecord[]) => {
+      for (const r of records) {
+        const t = r.target as Element
+        const b = t && typeof t.closest === 'function' ? (t.closest('.mes_text') as HTMLElement | null) : null
+        if (b && chat.contains(b)) dirty.add(b)
+        else tail = true
+      }
+      schedule()
+    })
     observer.observe(observe, { childList: true, subtree: true })
   }
   win.addEventListener('resize', onResize)
-  if (subscribe) { try { subscribe(() => schedule()) } catch { /* 訂不到就只靠觀察器 */ } }
+  if (subscribe) { try { subscribe(() => { tail = true; schedule() }) } catch { /* 訂不到就只靠觀察器 */ } }
   schedule(true)
   return () => {
     disposed = true

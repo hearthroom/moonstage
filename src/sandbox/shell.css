@@ -128,4 +128,8 @@ pre.lt-frontend[data-lt-frontend] { display: none; }
    裝著前端區塊的那一組與氣泡改成撐滿可用寬度（仍受各自的 max-width 約束）。 */
 .mes_turn:has(pre.lt-frontend), .mes_text:has(pre.lt-frontend) { width: 100%; }
 iframe.lt-frontend__frame { display: block; width: 100%; min-height: 1px; border: 0; background: transparent; color-scheme: normal; }
+/* 程式碼框：長行在框裡左右滑，不把氣泡撐寬。grid 的 minmax(0,1fr) 讓短程式碼照原寬、長的封頂在氣泡上限；
+   只加 overflow-x 不夠——框的最小寬度仍是最長那一行，氣泡照樣被撐寬（見 canvas-bubble-fit.ts）。 */
+.mes_text pre:not(.lt-frontend) { display: grid; grid-template-columns: minmax(0, 1fr); }
+.mes_text pre:not(.lt-frontend) > code { overflow-x: auto; }
 }
