@@ -17,6 +17,8 @@ export interface PendingChatTurn {
   clientOperationId?: string
   operationId?: string
   operationState?: string
+  /** 上面那個 operationState 是什麼時候從伺服器讀到的（信任窗的起點）。 */
+  operationStateObservedAt?: number
   /** 這一輪的串流連線最後一次收到任何東西的時間，當作後端還活著的證據。 */
   streamActivityAt?: number
   operationVersion?: number
@@ -1527,6 +1529,97 @@ export function decideStreamResume(entry: any, now = Date.now(), options: any = 
     pendingPayload: prepared.payload,
     ...operationIdentity,
   }
+}
+
+/**
+ * 伺服器說這一輪還在跑，而這個頁面沒有在收它的串流：要不要接回去、從哪裡接。
+ *
+ * 一輪沒有總時長上限（owner 2026-10-06）。模型還在吐字，就只有玩家自己按停止能停；
+ * 畫面上的「正在生成」、即時文字與停止鍵要一直在——不管離開多久再回來、換了裝置、
+ * 或者本機紀錄早就過期。本機的碼表只能決定「要不要去問」，不能推翻伺服器那句「還在跑」：
+ * 以前過期的紀錄只會改成輪詢，文字凍住、停止鍵消失，直到那一輪結束才一次跳出全文。
+ *
+ * 伺服器的串流 id 就是 operationId，而輸出片段不會被刪，所以從 0 重播在任何時候都可行。
+ * 已經有連線、或者重連已經排好時不接：兩條路搶同一條連線只會互相取消。
+ */
+export function decideRunningOperationReattach(input: {
+  status: { operationId?: string; state?: string; kind?: string } | null | undefined
+  socketAttached: boolean
+  reconnectPending?: boolean
+  userStopRequested?: boolean
+  attachedStreamId?: string
+  lastEventId?: number
+  hasLiveBubble?: boolean
+}): { kind: 'none' } | { kind: 'reattach'; streamId: string; lastEventId: number; fullReplay: boolean } {
+  const none = { kind: 'none' as const }
+  const operationId = String(input?.status?.operationId || '').trim()
+  if (!operationId) return none
+  if (CHAT_OPERATION_LIVE_STATES.indexOf(String(input.status?.state || '').trim()) < 0) return none
+  // 倒回改的是時間線本身，沒有一則 AI 回覆可以接。
+  if (normalizedOperationKind(input.status?.kind) === 'backward') return none
+  if (input.socketAttached || input.reconnectPending || input.userStopRequested) return none
+  const lastEventId = Math.max(0, Math.floor(Number(input.lastEventId) || 0))
+  // 同一輪、畫面上的氣泡還在、也收過事件：從斷點接著收。其餘一律從頭重播進一顆新氣泡，
+  // 否則重播的內容會接在舊文字後面變成兩份。
+  if (input.hasLiveBubble === true && String(input.attachedStreamId || '') === operationId && lastEventId > 0) {
+    return { kind: 'reattach', streamId: operationId, lastEventId, fullReplay: false }
+  }
+  return { kind: 'reattach', streamId: operationId, lastEventId: 0, fullReplay: true }
+}
+
+/**
+ * 歷史回應裡還在跑的那一輪（同一段對話同時只會有一輪）。
+ *
+ * 換裝置或清過儲存的時候，本機沒有任何紀錄說「這裡有一輪在跑」——唯一的證據是伺服器。
+ * 歷史第一頁本來就帶著 operations，用它判斷，不必為了每次開頁都多開一條串流去問。
+ */
+export function liveOperationFromHistory(response: any): ChatOperationStatus | null {
+  if (!response || !Array.isArray(response.operations)) return null
+  for (const candidate of response.operations) {
+    const status = normalizeChatOperationStatus(candidate)
+    if (!status) continue
+    if (normalizedOperationKind(status.kind) === 'backward') continue
+    if (CHAT_OPERATION_LIVE_STATES.indexOf(status.state) >= 0) return status
+  }
+  return null
+}
+
+/**
+ * 歷史裡「還在寫」的那則 AI 列（turnStatus=streaming）交給串流氣泡。
+ *
+ * 伺服器邊生成邊把文字寫進那一列，所以串流進行中讀歷史會拿到寫到一半的版本；它跟即時
+ * 氣泡是同一則回覆。兩個都留就是畫面上同一段話出現兩次，而且上面那份不會再長。
+ */
+export function dropSupersededLiveAssistantRows<T = any>(rows: T[]): T[] {
+  if (!Array.isArray(rows)) return rows
+  return rows.filter((row: any) => !(row && row.type === 0 && row.liveTurn === true))
+}
+
+/**
+ * 斷線後的下一步。前幾次照退避；用完之後，伺服器還說這一輪在跑就以最長間隔一直重試，
+ * 不再退回輪詢——退回輪詢等於文字凍住到那一輪結束。伺服器不在跑了才放手。
+ */
+export function decideReconnectStep(input: {
+  attempt: number
+  delays: number[]
+  backendStillWorking: boolean
+}): { kind: 'retry'; delayMs: number; nextAttempt: number } | { kind: 'give_up' } {
+  const delays = Array.isArray(input?.delays) && input.delays.length ? input.delays : [1000]
+  const attempt = Math.max(0, Math.floor(Number(input?.attempt) || 0))
+  if (attempt < delays.length) return { kind: 'retry', delayMs: delays[attempt], nextAttempt: attempt + 1 }
+  if (input?.backendStillWorking) {
+    return { kind: 'retry', delayMs: delays[delays.length - 1], nextAttempt: delays.length }
+  }
+  return { kind: 'give_up' }
+}
+
+// 重連真的接上了（伺服器開始送這一輪的東西）。ready 不算：它在驗證續傳之前就會送出，
+// 續傳被拒時緊接著就是 error——拿它歸零會變成每秒重連一次的死循環。
+const RECONNECT_PROGRESS_EVENTS = new Set(['streamMeta', 'answer', 'thinking', 'prepStep'])
+
+/** 重連次數是「每一次斷線」的預算，不是整輪的：接上之後就歸零。 */
+export function shouldResetReconnectBudget(eventName: unknown): boolean {
+  return RECONNECT_PROGRESS_EVENTS.has(String(eventName || ''))
 }
 
 export function createChatTransportOwnership() {
