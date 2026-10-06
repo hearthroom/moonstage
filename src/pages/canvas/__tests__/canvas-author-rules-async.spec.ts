@@ -19,6 +19,8 @@ import {
 import { applyTavernRules } from '../canvas-rule-engine'
 import { scopeCardHtml } from '../canvas-style-scope'
 import { stripUnknownTags, wrapDialogue } from '../canvas-platform-defaults'
+// highlightText 也畫原生 [status]／[choices] 區塊（common/native-blocks）；跟頁面裡一樣是真實函式。
+import { drawNativeBlocks } from '../../../common/native-blocks'
 import { createRuleRunner, type RuleExecutor, type ExecutorJob } from '@/common/author-rules'
 import { executeRuleJob, type RuleResult } from '@/common/author-rules/rule-job'
 
@@ -71,7 +73,7 @@ function buildHighlightText(rules: any[], authorRules: unknown, crossLine = fals
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines,
     findStableBoundary, getStreamCacheEntry, setStreamCacheEntry, unwrapSingleHtmlFence,
-    applyTavernRules, scopeCardHtml, stripUnknownTags, wrapDialogue,
+    applyTavernRules, scopeCardHtml, stripUnknownTags, wrapDialogue, drawNativeBlocks,
     authorRules,
     authorRuleOptions: () => ({}),
     cardFormat: { value: 'tavern' },

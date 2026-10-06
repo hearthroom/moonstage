@@ -27,6 +27,8 @@ import {
 import { applyTavernRules } from '../canvas-rule-engine'
 import { scopeCardHtml } from '../canvas-style-scope'
 import { stripUnknownTags, wrapDialogue } from '../canvas-platform-defaults'
+// highlightText 也畫原生 [status]／[choices] 區塊（common/native-blocks）；跟頁面裡一樣是真實函式。
+import { drawNativeBlocks } from '../../../common/native-blocks'
 
 const CANVAS_VUE = path.join(process.cwd(), 'src/pages/canvas/canvas.vue')
 
@@ -50,7 +52,7 @@ function buildHighlightText(format: 'mmd' | 'tavern', rules: any[] = []) {
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines,
     findStableBoundary, getStreamCacheEntry, setStreamCacheEntry, unwrapSingleHtmlFence,
     applyTavernRules, scopeCardHtml,
-    stripUnknownTags, wrapDialogue,
+    stripUnknownTags, wrapDialogue, drawNativeBlocks,
     authorRuleOptions: () => ({}),
     cardFormat: { value: format },
     convertVisibleHtml: (html: string) => html,

@@ -539,3 +539,15 @@
       margin-right: auto
     }
 }
+.lt-status { margin: 10px 0 0; padding: 10px 12px
+}
+.lt-chip { padding: 1px 8px
+}
+.lt-stat { padding: 2px 8px
+}
+.lt-path__sep { margin: 0 4px
+}
+.lt-choices { margin: 10px 0 0
+}
+.lt-choice { padding: 8px 14px
+}

@@ -21,6 +21,8 @@ import {
 // highlightText 現在直接呼叫這兩支（非標準標籤剝除與對白上色）；這些測試驗的是別的管線行為，
 // 綁真實函式、來源給 tavern，等價於「沒有 MMD 預設」的路徑，跟改動前一樣。
 import { stripUnknownTags, wrapDialogue } from '../canvas-platform-defaults'
+// highlightText 也畫原生 [status]／[choices] 區塊（common/native-blocks）；跟頁面裡一樣是真實函式。
+import { drawNativeBlocks } from '../../../common/native-blocks'
 
 /*
   重 HTML（訊息以區塊 tag 開頭）也要過 Markdown。
@@ -55,7 +57,7 @@ function buildHighlightText(): (content: string, type?: number, cacheKey?: strin
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines,
     findStableBoundary, getStreamCacheEntry, setStreamCacheEntry, unwrapSingleHtmlFence,
-    stripUnknownTags, wrapDialogue,
+    stripUnknownTags, wrapDialogue, drawNativeBlocks,
     cardFormat: { value: 'tavern' },
     convertVisibleHtml: (html: string) => html,
     displayScript: (text: string) => text,

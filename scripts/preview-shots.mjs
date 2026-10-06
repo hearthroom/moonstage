@@ -77,6 +77,29 @@ try {
     writeFileSync(path.join(out, `${w}x${h}.png`), Buffer.from(shot.data, 'base64'))
     const sf = results[`${w}x${h}`].storyFirst || {}
     console.log(`${w}x${h}: bubbles ${results[`${w}x${h}`].bubbles}, status panels ${results[`${w}x${h}`].statusPanels}, raw ${results[`${w}x${h}`].rawPanels}; story text ${sf.storyTextShare}% of screen, ui ${sf.uiShare}%, interactive ${sf.interactiveAboveFold}, first choice above fold ${sf.firstChoiceAboveFold}, free input ${sf.freeInputVisible}${sf.rulesOff ? ' (rules off)' : ''}`)
+    // --count a,b,c：數幾個選擇器在殼裡的節點數，寫進 snapshot（釘選列、頁面模式、任何 kit 元素）。
+    if (opt('count', '')) {
+      results[`${w}x${h}`].counts = JSON.parse(await evaluate(`JSON.stringify(Object.fromEntries(${JSON.stringify(opt('count', '').split(','))}.map(s => [s, document.getElementById('frame').contentDocument.querySelectorAll(s).length])))`))
+      console.log(`  counts: ${JSON.stringify(results[`${w}x${h}`].counts)}`)
+    }
+    // --html sel：印出殼裡最後一個符合元素的 outerHTML（前 800 字），除錯用。
+    if (opt('html', '')) console.log('  html: ' + (await evaluate(`(() => { const d = document.getElementById('frame').contentDocument; const els = d.querySelectorAll(${JSON.stringify(opt('html', ''))}); const el = els[els.length - 1]; return el ? el.outerHTML.slice(0, 800) : 'not found' })()`)))
+    // --taps sel1,sel2：依序用真實輸入事件點這些元素，每點完回報 request 數、composer 內容與舞台狀態。
+    if (opt('taps', '')) {
+      const tapOne = async (selector, label) => {
+        const rect = await evaluate(`(() => { const d = document.getElementById('frame').contentDocument; const el = Array.from(d.querySelectorAll(${JSON.stringify(selector)})).filter(e => e.getBoundingClientRect().height > 0).pop(); if (!el) return null; el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); const f = document.getElementById('frame').getBoundingClientRect(); return { x: f.left + r.left + r.width / 2, y: f.top + r.top + r.height / 2 } })()`)
+        if (!rect) { console.log(`  tap ${label}: not found`); return }
+        await sleep(200)
+        for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: rect.x, y: rect.y, button: 'left', clickCount: 1 }, sessionId)
+        await sleep(1200)
+        const snap = JSON.parse(await evaluate('JSON.stringify(__preview.snapshot())'))
+        const s = await send('Page.captureScreenshot', { format: 'png' }, sessionId)
+        writeFileSync(path.join(out, `${w}x${h}-tap-${label}.png`), Buffer.from(s.data, 'base64'))
+        console.log(`  tap ${label}: requests ${snap.logTail.filter((l) => l.startsWith('request')).length}, composer "${(snap.composerValue || '').slice(0, 40)}", stage ${snap.stage}, bubbles ${snap.bubbles}`)
+      }
+      const taps = opt('taps', '').split(',')
+      for (let i = 0; i < taps.length; i++) await tapOne(taps[i], String(i + 1))
+    }
     // --interact：用真的輸入事件（isTrusted）點殼裡的元素，走跟玩家一樣的手勢路徑；合成的 click 不算手勢。
     if (args.includes('--interact')) {
       const tap = async (selector, label) => {
@@ -89,7 +112,7 @@ try {
         writeFileSync(path.join(out, `${w}x${h}-${label}.png`), Buffer.from(s.data, 'base64'))
         return true
       }
-      if (await tap('.hr-choice:not(.hr-choice--own)', 'choice')) {
+      if (await tap('.hr-choice:not(.hr-choice--own), .lt-choice:not(.lt-choice--own)', 'choice')) {
         // 帶確認的選項組第一次只是「待確認」，再點一次才送；已送出的鈕再點沒反應，所以一律點兩次。
         await tap('.hr-choice--armed', 'choice-confirm')
         await sleep(2500)

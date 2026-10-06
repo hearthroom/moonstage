@@ -513,3 +513,24 @@ describe('殼：舞台背景', () => {
     expect(stage.style.getPropertyValue('--lt-bg-landscape')).toBe('')
   })
 })
+
+describe('原生區塊：沒有規則的卡也有面板與選項', () => {
+  it('開場白裡的 [status] 與 [choices] 畫成 .lt-status／.lt-choices；點選項填進輸入框不送出；玩家訊息不畫', async () => {
+    const s = boot(config({ card: { rules: [], statusbar: '' } }))
+    s.handle({ type: 'messages', messages: [
+      { id: 'greeting', role: 'ai', content: 'Hi.\n[status]\nhp: 72/100\nmood: wary\n[/status]\n[choices]\n- Ask about the keeper\n- Say nothing\n[/choices]', serverId: null },
+      { id: 'l1', role: 'user', content: '[status]\nhp: 999\n[/status]', serverId: null },
+    ] })
+    await nextTick()
+    const bodies = s.refs.list.querySelectorAll('[data-chat="message-body"]')
+    expect(bodies[0].querySelector('.lt-status')).not.toBeNull()
+    expect(bodies[0].innerHTML).toContain('width:72.0%')
+    const btn = bodies[0].querySelector('.lt-choice') as HTMLButtonElement
+    expect(btn.textContent).toBe('Ask about the keeper')
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    expect(s.sdk.input.get()).toBe('Ask about the keeper')
+    expect(sent.some((m) => m.type === 'request')).toBe(false)
+    expect(bodies[1].querySelector('.lt-status')).toBeNull()
+    expect(bodies[1].textContent).toContain('[status]')
+  })
+})

@@ -212,10 +212,19 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
         requireSaves()
         const k = requireSaveKey(key)
         if (bytesOf(value) > SAVE_MAX_VALUE_BYTES) throw new SdkError('INVALID_ARGS', 'save value is too large')
-        if (!saves.has(k) && saves.size >= SAVE_MAX_KEYS) throw new SdkError('INVALID_ARGS', 'too many save keys')
+        // 上限要算上還在路上的寫入：十一個 set 同時發出時，等宿主回來再登記會全部放行（探針卡 2026-10-06 抓到）。
+        // 先佔位，宿主拒絕了再放掉；佔位期間 get 讀到的是新值（跟寫成功後一樣）。
+        const isNew = !saves.has(k)
+        if (isNew && saves.size >= SAVE_MAX_KEYS) throw new SdkError('INVALID_ARGS', 'too many save keys')
         takeSlot('save.set')
-        await host.request('save.set', [k, value])
+        const previous = saves.get(k)
         saves.set(k, value)
+        try {
+          await host.request('save.set', [k, value])
+        } catch (e) {
+          if (isNew) saves.delete(k); else saves.set(k, previous)
+          throw e
+        }
       },
       async remove(key) {
         requireSaves()

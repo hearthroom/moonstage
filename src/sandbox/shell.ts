@@ -172,6 +172,23 @@ export function createShell(options: CreateShellOptions): Shell {
   }
   doc.addEventListener('click', onLinkClick)
 
+  // ── 原生選項鈕（common/native-blocks）：點了把那一行填進輸入框並聚焦，不送出——選項是草稿不是鐵軌。
+  //    「✎」只聚焦。走冒泡階段，作者自己綁的 handler 先跑。 ──
+  const onChoiceClick = (event: Event) => {
+    if (event.defaultPrevented) return
+    const target = event.target as Element | null
+    const btn = target && typeof target.closest === 'function' ? (target.closest('.lt-choice') as HTMLElement | null) : null
+    if (!btn || !refs.root.contains(btn)) return
+    event.preventDefault()
+    if (!btn.classList.contains('lt-choice--own')) {
+      const text = (btn.getAttribute('title') || btn.textContent || '').trim()
+      sdkHost.input.set(text)
+      try { input.setCursor(text.length) } catch { /* 沒聚焦時部分瀏覽器會丟 */ }
+    }
+    sdkHost.input.focus()
+  }
+  doc.addEventListener('click', onChoiceClick)
+
   let busy = false
   let composing = false
   let stageState: StageState = 'closed'
@@ -247,13 +264,13 @@ export function createShell(options: CreateShellOptions): Shell {
   // 持久層在這個子網域上，宿主刪不到：先照握手給的範圍對一次（不同就清掉；沒給就刪掉、只用記憶體）再用。
   setAuthorRuleStorageScope(config.storageScope ?? null)
   const ruleRunner = options.ruleRunner || getAuthorRuleRunner()
-  const render = (content: string, opts: { streaming?: boolean; seed?: string } = {}): string | { html: string; provisional: true } => {
+  const render = (content: string, opts: { streaming?: boolean; seed?: string; role?: string } = {}): string | { html: string; provisional: true } => {
     // seed＝訊息 id：{{random}} 在同一則訊息裡固定，串流每一跳不重抽。
     const out = ruleRunner.display(
       { engine: 'display', text: content, rules: card.rules, options: { variants: config.variants || null, seed: opts.seed } },
       { streaming: !!opts.streaming },
     )
-    const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, macros, fencedDocument: stylePolicy.fencedDocument, convert }), stylePolicy)
+    const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, macros, fencedDocument: stylePolicy.fencedDocument, convert, nativeBlocks: opts.role === 'ai' }), stylePolicy)
     return out.provisional ? { html, provisional: true } : html
   }
   const htmlOf = (out: string | { html: string }) => (typeof out === 'string' ? out : out.html)
@@ -716,6 +733,7 @@ export function createShell(options: CreateShellOptions): Shell {
       doc.removeEventListener('click', onGesture, true)
       doc.removeEventListener('keydown', onGesture, true)
       doc.removeEventListener('click', onLinkClick)
+      doc.removeEventListener('click', onChoiceClick)
       scrollView.removeEventListener('scroll', onScroll)
       followBottom.dispose()
       refs.root.removeEventListener('scroll', resetRootScroll)
