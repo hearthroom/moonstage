@@ -24,13 +24,13 @@ export const ALLOWED_TAGS = new Set([
 ])
 
 /** 剝殼留子節點。 */
-const UNWRAP_TAGS = new Set(['iframe', 'link', 'meta', 'base', 'form', 'object', 'embed', 'noscript', 'template'])
+export const UNWRAP_TAGS = new Set(['iframe', 'link', 'meta', 'base', 'form', 'object', 'embed', 'noscript', 'template'])
 /** 連內容一起拿掉。 */
-const DROP_TAGS = new Set(['script', 'style'])
+export const DROP_TAGS = new Set(['script', 'style'])
 
 const TAG_RE = /<\/?([一-龥a-zA-Z0-9_-]+)(\s+[^>]*)?\s*\/?>/g
 const UNSAFE_ATTR_VALUE = /((--!?|])>)|<\/(style|script|title|xmp|textarea|noscript|iframe|noembed|noframes)/i
-const URL_ATTRS = ['href', 'src', 'xlink:href', 'action', 'formaction', 'poster']
+export const URL_ATTRS = ['href', 'src', 'xlink:href', 'action', 'formaction', 'poster']
 
 const allowedLower = new Set(Array.from(ALLOWED_TAGS, (t) => t.toLowerCase()))
 

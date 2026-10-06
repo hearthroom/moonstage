@@ -97,7 +97,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 
 ## 3. `sdk` 契約（殼內作者看到的）
 
-11 個鍵、30 個能力，全部**從第一版就存在**（作者腳本在頂層探測它們），每個能力有實作狀態：
+12 個鍵、32 個能力（`text` 是後來加的；完整清單由 `contract/sandbox-contract.json` 生成），全部**從第一版就存在**（作者腳本在頂層探測它們），每個能力有實作狀態：
 
 | 能力 | 狀態 | 備註 |
 |---|---|---|
@@ -264,6 +264,13 @@ z-index：平台節點一律 `auto`；舞台 content 2000、full 3000；平台�
   `request` → HudHost 動作、origin 不符的訊息被丟掉、更早的歷史整頁 `before` 插入不 remove、`history` 狀態變了才送。
 - `bench/sandbox-list/`（不是測試、不進 build）：假宿主餵 N 則合成訊息量冷啟動、DOM 節點、堆積、捲動幀時間；
   `npm run build:sandbox && python3 -m http.server 4173` → `/bench/sandbox-list/?n=300&format=mmd`，主控台 `await __bench.run()`。
+- `src/sandbox/__tests__/contract.spec.ts` → `contract/sandbox-contract.json`：作者契約的單一事實來源，由執行期物件
+  生成（sdk 鍵與能力、事件、錯誤碼、淨化名單、骨架節點、`--chat-*`、規則引擎常數），改了契約沒重生就紅
+  （`UPDATE_CONTRACT=1` 重生）。下游（hearthroom/skills 的驗證器與寫卡指南）只讀這份 JSON。
+- `bench/card-preview/`（不是測試、不進 build）：卡片離線預覽——假宿主＋真殼，讀一個卡資料夾（rules.json／welcome.md／
+  `preview/replies.md` 樣本）用 hello 餵進去，串流、切會話、重跑腳本、五種視口、深淺主題。
+  `node scripts/serve-card-preview.mjs <card-dir>` 起同源靜態伺服器；`node scripts/preview-shots.mjs --url … --out … [--interact]`
+  用系統 Chrome（CDP，零依賴）headless 截圖、寫 snapshot.json、以真實輸入事件點選項與 dock。
 - Hearthroom：匯入 `chatVersion` → `pageMode`、匯出還原、Worker 子網域路由與 CSP 標頭、saves API。
 
 ## 顯示字形（簡↔繁）
