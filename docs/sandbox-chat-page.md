@@ -124,7 +124,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 
 順序與補發規則（作者腳本依賴這些）：
 
-- 作者腳本在 DOM 建好**之前**執行；`this === window`、非嚴格模式、`document.currentScript` 為 null。
+- 作者腳本在 DOM 建好**之前**執行；`this === window`、非嚴格模式；內聯腳本當真正的 `<script>` 元素跑，所以 `document.currentScript` 是那個元素（只有語法錯誤退回包函式的 eval 時才是 null；探針卡 2026-10-06 實測）。
 - 冷啟動：對每則已存在的訊息 `message:new → message:mount → message:done`，最後 `ready`。
 - `ready` 只發一次、**不補發**；`message:mount`／`message:done` 對晚訂閱者補發（所有已掛氣泡）。
 - 載荷單一實參 `{id, role, content, serverId}`；`message:stream` 只有 `{id, role, content}`；

@@ -56,7 +56,8 @@ try {
   for (const [w, h] of sizes) {
     await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: w < 700 }, sessionId)
     // bare=1：預覽頁只剩殼，視口就是殼的視口（截圖才是玩家看到的那一塊）。
-    await send('Page.navigate', { url: url + (url.includes('?') ? '&' : '?') + 'bare=1' }, sessionId)
+    const extra = 'bare=1' + (args.includes('--text-only') ? '&rules=off' : '')
+    await send('Page.navigate', { url: url + (url.includes('?') ? '&' : '?') + extra }, sessionId)
     await waitFor(() => evaluate('typeof __preview === "object" && __preview.sent.some(m => m.type === "ready")'), 20000)
     await sleep(300)
     if (sample > 0) {
@@ -65,9 +66,17 @@ try {
     }
     const snap = await evaluate('JSON.stringify(__preview.snapshot())')
     results[`${w}x${h}`] = JSON.parse(snap)
+    // --probe：探針卡把每條契約主張的結果寫在殼的 window.__probe；一併抄進 snapshot。
+    if (args.includes('--probe')) {
+      await sleep(800)
+      results[`${w}x${h}`].probe = JSON.parse(await evaluate('JSON.stringify(document.getElementById("frame").contentWindow.__probe || null)'))
+      const r = (results[`${w}x${h}`].probe && results[`${w}x${h}`].probe.results) || {}
+      for (const [k, v] of Object.entries(r)) console.log(`  ${v.ok === true ? '✔' : v.ok === false ? '✖' : '·'} ${k}${v.note ? `  (${v.note.slice(0, 60)})` : ''}`)
+    }
     const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, sessionId)
     writeFileSync(path.join(out, `${w}x${h}.png`), Buffer.from(shot.data, 'base64'))
-    console.log(`${w}x${h}: bubbles ${results[`${w}x${h}`].bubbles}, status panels ${results[`${w}x${h}`].statusPanels}, raw ${results[`${w}x${h}`].rawPanels}`)
+    const sf = results[`${w}x${h}`].storyFirst || {}
+    console.log(`${w}x${h}: bubbles ${results[`${w}x${h}`].bubbles}, status panels ${results[`${w}x${h}`].statusPanels}, raw ${results[`${w}x${h}`].rawPanels}; story text ${sf.storyTextShare}% of screen, ui ${sf.uiShare}%, interactive ${sf.interactiveAboveFold}, first choice above fold ${sf.firstChoiceAboveFold}, free input ${sf.freeInputVisible}${sf.rulesOff ? ' (rules off)' : ''}`)
     // --interact：用真的輸入事件（isTrusted）點殼裡的元素，走跟玩家一樣的手勢路徑；合成的 click 不算手勢。
     if (args.includes('--interact')) {
       const tap = async (selector, label) => {
@@ -80,12 +89,13 @@ try {
         writeFileSync(path.join(out, `${w}x${h}-${label}.png`), Buffer.from(s.data, 'base64'))
         return true
       }
-      if (await tap('.hr-choice', 'choice')) {
+      if (await tap('.hr-choice:not(.hr-choice--own)', 'choice')) {
         // 帶確認的選項組第一次只是「待確認」，再點一次才送；已送出的鈕再點沒反應，所以一律點兩次。
         await tap('.hr-choice--armed', 'choice-confirm')
         await sleep(2500)
         results[`${w}x${h}`].afterChoice = JSON.parse(await evaluate('JSON.stringify(__preview.snapshot())'))
-        console.log(`  choice tapped: requests ${results[`${w}x${h}`].afterChoice.logTail.filter((l) => l.startsWith('request')).length}, bubbles ${results[`${w}x${h}`].afterChoice.bubbles}`)
+        const a = results[`${w}x${h}`].afterChoice
+        console.log(`  choice tapped: requests ${a.logTail.filter((l) => l.startsWith('request')).length}, bubbles ${a.bubbles}, composer "${(a.composerValue || '').slice(0, 40)}"`)
       }
       if (await tap('.hr-dock__tab', 'dock')) results[`${w}x${h}`].dockOpen = await evaluate(`!!document.getElementById('frame').contentDocument.querySelector('.hr-dock--open')`)
     }

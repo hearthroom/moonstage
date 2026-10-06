@@ -39,10 +39,13 @@
     state.samples.forEach((s, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = `sample ${i + 1}: ${s.slice(0, 28).replace(/\n/g, ' ')}`; select.appendChild(o) })
     // push 會把規則裡的字面 assets/ 路徑改寫成上傳後的網址；本機沒有那一步，把它們指到 /card/assets/。
     const assets = (s) => String(s ?? '').replace(/(["'(])assets\//g, `$1${cardBase}assets/`)
+    // ?rules=off：規則全停（text-only）——劇情為核的卡在這個狀態也要讀得順；綁定型的卡要看機制在文字裡是否可讀。
+    const rulesOff = params.get('rules') === 'off'
+    state.rulesOff = rulesOff
     state.card = {
       format: rules.cardFormat || 'mmd',
-      rules: (rules.rules || []).map((r, i) => ({ id: r.id ?? i, name: r.name || '', find: r.find, replace: assets(r.replace), enabled: r.enabled !== false })),
-      statusbar: assets(rules.mountTrigger || ''),
+      rules: rulesOff ? [] : (rules.rules || []).map((r, i) => ({ id: r.id ?? i, name: r.name || '', find: r.find, replace: assets(r.replace), enabled: r.enabled !== false })),
+      statusbar: rulesOff ? '' : assets(rules.mountTrigger || ''),
     }
     state.welcome = assets(welcome)
     state.name = cardJson.name || 'Card'
@@ -149,9 +152,39 @@
     post({ type: 'viewport', height: h })
   }
   if (bare) window.addEventListener('resize', resize)
+  // story-first 審計：首屏裡劇情文字佔多少、可互動元素幾個、第一個選擇是否在首屏、有沒有自由輸入。
+  const storyFirst = () => {
+    const doc = frame.contentDocument
+    const win = frame.contentWindow
+    const vh = win.innerHeight, vw = win.innerWidth
+    const area = (el) => { const r = el.getBoundingClientRect(); const w = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0)); const h = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0)); return w * h }
+    const visible = (el) => area(el) > 0
+    const bodies = Array.from(doc.querySelectorAll('[data-chat="message-body"]'))
+    const panels = Array.from(doc.querySelectorAll('.hr-status, .hr-choices, [data-slot="statusbar"] > *, .hr-dock, .hr-pinned'))
+    const textArea = bodies.reduce((a, el) => {
+      // 正文面積 = 氣泡面積 − 氣泡內面板面積
+      const inner = Array.from(el.querySelectorAll('.hr-status, .hr-choices')).reduce((b, p) => b + area(p), 0)
+      return a + Math.max(0, area(el) - inner)
+    }, 0)
+    const uiArea = panels.reduce((a, el) => a + area(el), 0)
+    const interactive = Array.from(doc.querySelectorAll('button, [onclick], a[href], input, select')).filter((el) => visible(el) && !el.closest('[data-chat="composer"], [data-chat="header"]')).length
+    const firstChoice = doc.querySelector('.hr-choice, .prologue-content')
+    const composer = doc.querySelector('[data-chat="input"], textarea')
+    return {
+      viewport: `${vw}x${vh}`,
+      storyTextShare: Math.round((textArea / (vw * vh)) * 1000) / 10,
+      uiShare: Math.round((uiArea / (vw * vh)) * 1000) / 10,
+      interactiveAboveFold: interactive,
+      firstChoiceAboveFold: !!(firstChoice && visible(firstChoice)),
+      freeInputVisible: !!(composer && visible(composer)),
+      rulesOff: state.rulesOff,
+    }
+  }
   const snapshot = () => {
     const doc = frame.contentDocument
     return {
+      storyFirst: storyFirst(),
+      composerValue: (() => { const el = doc.querySelector('[data-chat="input"], textarea'); return el ? el.value : null })(),
       bubbles: doc.querySelectorAll('[data-chat="message"]').length,
       statusPanels: doc.querySelectorAll('.hr-status--done').length,
       rawPanels: doc.querySelectorAll('.hr-status--raw:not(.hr-status--done)').length,
