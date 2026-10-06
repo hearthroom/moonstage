@@ -560,6 +560,11 @@ import {
   classifyOperationCapabilityResponse,
   consumeFrozenPendingStreamError,
   decideStreamResume,
+  decideReconnectStep,
+  decideRunningOperationReattach,
+  dropSupersededLiveAssistantRows,
+  liveOperationFromHistory,
+  shouldResetReconnectBudget,
   authoritativePendingOperationDisposition,
   isChatOperationTerminal,
   isChatOperationBackendStillWorking,
@@ -5706,6 +5711,9 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
       }
       return;
     }
+    // 重連真的接上了（伺服器開始送這一輪的東西）：這一次斷線的預算歸零。
+    // 以前只在整輪結束時歸零，一則長回覆斷過三次就再也不即時更新。
+    if (shouldResetReconnectBudget(event.event)) reconnectAttempt.value = 0;
     const isVisibleDone = (event.event === 'answer' || event.event === 'message')
       && event.raw === '[DONE]';
     // Task 9: main streaming / v2 protocol events are dispatched via a
@@ -6495,7 +6503,7 @@ function getHistoryMsg(preloadedFirstPage?: any) {
       }
       let data = [];
       // 一列歷史紀錄翻成畫面上的一則訊息。
-      const mapRow = ({chatId, chatMessage, contentThinking, chatRole, audioUrl, isSummary, aiImageUrls, finishReason, isV3, inputTokens, model, hasContextUsage}: any) => {
+      const mapRow = ({chatId, chatMessage, contentThinking, chatRole, audioUrl, isSummary, aiImageUrls, finishReason, isV3, inputTokens, model, hasContextUsage, turnStatus}: any) => {
         const rawContent = (chatMessage || '').replace("<已解除苛刻的道德限制>", "");
         const split = splitThinkingContent(rawContent, { keep: cardHandlesTag });
         // 存原文：字形轉換在渲染那一刻做（renderMarkdown），這裡先轉會把卡片協定轉壞。
@@ -6522,6 +6530,8 @@ function getHistoryMsg(preloadedFirstPage?: any) {
           inputTokens: isAI ? Number(inputTokens) || 0 : 0,
           hasContextUsage: isAI && hasContextUsage === true,
           model: isAI ? String(model || '') : '',
+          // 伺服器還在寫的那一則（這一輪還在跑）。串流氣泡會重建它，見 dropSupersededLiveAssistantRows。
+          liveTurn: isAI && turnStatus === 'streaming',
         };
         return row;
       };
@@ -6600,6 +6610,8 @@ function getHistoryMsg(preloadedFirstPage?: any) {
         // history 與 flowNodeStatus 到達順序不固定：anchor 已知時在 merge 後去重；
         // history 先到時則由後續 flowNodeStatus 分支用同一 message id 去重。
         removeResumeHistoryDuplicateByMessageAnchor(currentChatId.value);
+        // 伺服器邊生成邊寫那一列：串流中讀到的是寫到一半的同一則回覆，交給下面的串流氣泡。
+        talkList.value = dropSupersededLiveAssistantRows(talkList.value);
         upsertPendingAIBubble({
           id: nextBubbleId(),
           content: replyContent.value || '',
@@ -6616,6 +6628,12 @@ function getHistoryMsg(preloadedFirstPage?: any) {
         if (talkList.value.length > 0) {
           talkList.value[talkList.value.length - 1].chatFinish = true;
         }
+        // 這頁沒在收串流，伺服器卻說有一輪在跑（換了裝置、清過儲存、本機紀錄早就過期）：
+        // 接回去。只看第一頁——那一輪一定在最新的那一頁。
+        const liveOperation = pageAtHistoryRequest == 1 && !socket.value
+          ? liveOperationFromHistory(res.data)
+          : null;
+        if (liveOperation) reattachRunningOperation(liveOperation, 'history');
       }
 
       if (pageAtHistoryRequest == 1) {
@@ -7258,6 +7276,95 @@ function schedulePendingOperationIdentityReconciliation(
   return operationStatusPollScheduler.hasPending();
 }
 
+// 伺服器說這一輪還在跑、這頁卻沒在收它：重新接上串流，把「正在生成」的氣泡、即時文字與
+// 停止鍵帶回來。判斷在 decideRunningOperationReattach（見那裡的註解）；這裡只負責接線。
+// 回 true 代表已經開了連線，呼叫端不必再排輪詢或放手。
+function reattachRunningOperation(status: any, reason: string): boolean {
+  const pending = pendingChatTurn;
+  const liveBubbleId = pending?.aiBubbleId;
+  const liveBubble = liveBubbleId === undefined || liveBubbleId === null || liveBubbleId === ''
+    ? null
+    : (talkList.value as any[]).find(row =>
+      row
+      && row.type === 0
+      && (String(row.operationBubbleId || '') === String(liveBubbleId) || String(row.id || '') === String(liveBubbleId))
+    ) || null;
+  const decision = decideRunningOperationReattach({
+    status,
+    socketAttached: !!socket.value,
+    reconnectPending: !!reconnectTimerHandle.value,
+    userStopRequested: userStopRequested.value,
+    attachedStreamId: streamId.value,
+    lastEventId: lastEventId.value,
+    hasLiveBubble: !!liveBubble,
+  });
+  if (decision.kind !== 'reattach') return false;
+  operationStatusPollScheduler.cancel();
+  if (!pending || String(pending.operationId || '') !== status.operationId) {
+    // 本機沒有這一輪（換裝置、清過儲存）：用伺服器的身分建一份，停止與收尾才認得它。
+    const acceptedAt = Date.parse(String(status.acceptedAt || ''));
+    beginPendingChatTurn({
+      expectsAccepted: false,
+      accepted: true,
+      operationId: status.operationId,
+      operationState: status.state,
+      operationVersion: status.version,
+      serverOperationKind: status.kind,
+      assistantChatId: status.assistantChatId,
+      userChatId: status.userChatId,
+      targetChatId: status.targetChatId,
+      sourceChatId: status.sourceChatId,
+      checkpointChatId: status.checkpointChatId,
+      parentOperationId: status.parentOperationId,
+      sourceOperationId: status.sourceOperationId,
+      allowedActions: status.allowedActions,
+      operationKind: operationKindFromServer(status.kind),
+      operationStateObservedAt: Date.now(),
+      startedAt: Number.isFinite(acceptedAt) ? acceptedAt : Date.now(),
+    });
+  }
+  streamId.value = decision.streamId;
+  lastEventId.value = decision.lastEventId;
+  isStreamActive.value = true;
+  if (decision.fullReplay) {
+    isResumeInitial.value = true;
+    // 從頭重播：歷史裡寫到一半的那列與舊氣泡的文字都由重播重建，留著就會出現兩份。
+    replyContent.value = '';
+    thinkingContent.value = '';
+    talkList.value = dropSupersededLiveAssistantRows(talkList.value);
+    if (liveBubble) {
+      liveBubble.content = '';
+      liveBubble.thinkingContent = '';
+      liveBubble.chatLoading = true;
+      liveBubble.chatFinish = false;
+    } else {
+      const aiBubbleId = nextBubbleId();
+      if (pendingChatTurn) pendingChatTurn.aiBubbleId = aiBubbleId;
+      currentChatId.value = aiBubbleId;
+      upsertPendingAIBubble({
+        id: aiBubbleId,
+        operationBubbleId: aiBubbleId,
+        content: '',
+        thinkingContent: '',
+        thinkingCollapsed: true,
+        type: 0,
+        pic: unref(pic),
+        playstate: false,
+        chatLoading: true,
+        chatFinish: false,
+        maskPosition: 1,
+      });
+    }
+  }
+  persistStreamState();
+  console.log(`[Stream] ${reason}：伺服器說這一輪還在跑，接回串流 streamId=${decision.streamId} lastEventId=${decision.lastEventId} conv=${unref(conversationId)}`);
+  connectWebSocket({
+    resumeStreamId: decision.streamId,
+    lastEventId: decision.lastEventId,
+  });
+  return true;
+}
+
 function requestAuthoritativeOperationReconciliation(
   reason: string,
 ): boolean {
@@ -7331,6 +7438,9 @@ function requestAuthoritativeOperationReconciliation(
       refreshHistoryAfterAuthoritativeOperation(recorded);
       return;
     }
+    // 還在跑就接回串流，排在五分鐘放手之前：一輪沒有總時長上限，伺服器說「還在跑」
+    // 的時候碼表不能讓畫面放手，只輪詢的話文字會凍住到那一輪結束。
+    if (reattachRunningOperation(recorded, reason)) return;
     if (isChatOperationVisibleOutcomeExpired({
       acceptedAt: recorded.acceptedAt,
       localStartedAt: pendingChatTurn?.startedAt,
@@ -8464,7 +8574,20 @@ function attemptReconnectWithResume() {
     console.log('[Stream] reconnect 已排程，略過重複呼叫');
     return;
   }
-  if (reconnectAttempt.value >= RECONNECT_DELAYS.length) {
+  // 次數是每一次斷線的預算（接上就歸零，見 handlerMessage）。用完之後伺服器還說這一輪在跑，
+  // 就以最長間隔一直重試：退回輪詢等於文字凍住到那一輪結束，而一輪沒有總時長上限。
+  const pendingForReconnect = pendingChatTurn;
+  const step = decideReconnectStep({
+    attempt: reconnectAttempt.value,
+    delays: RECONNECT_DELAYS,
+    backendStillWorking: isChatOperationBackendStillWorking({
+      state: pendingForReconnect?.operationState,
+      observedAt: pendingForReconnect?.operationStateObservedAt,
+      streamActivityAt: pendingForReconnect?.streamActivityAt,
+      now: Date.now(),
+    }),
+  });
+  if (step.kind === 'give_up') {
     console.warn('[Stream] 重連次數已達上限，放棄 resume，清空狀態');
     reconnectAttempt.value = 0;
     if (requestPendingOperationReconciliation('reconnect_exhausted')) return;
@@ -8473,8 +8596,8 @@ function attemptReconnectWithResume() {
     removeOrphanPlaceholder();
     return;
   }
-  const delay = RECONNECT_DELAYS[reconnectAttempt.value];
-  reconnectAttempt.value++;
+  const delay = step.delayMs;
+  reconnectAttempt.value = step.nextAttempt;
   console.log(`[Stream] 重連嘗試 ${reconnectAttempt.value}/${RECONNECT_DELAYS.length}，延遲 ${delay}ms (streamId=${streamId.value} conv=${unref(conversationId)})`);
   reconnectTimerHandle.value = setTimeout(() => {
     reconnectTimerHandle.value = null;
