@@ -18,6 +18,7 @@ import { sanitizeAuthorHtml, stripUnknownTags } from './sanitize'
 import { applyStylePolicy, type AuthorStylePolicy } from '@/common/author-style-policy'
 import { withFencesProtected } from '@/common/markdown-fences'
 import { tagFrontendBlocks } from '@/common/frontend-block'
+import { drawNativeBlocks } from '@/common/native-blocks'
 
 export interface InstalledCard {
   /** 替換內容已抽掉 style/script 的規則，給渲染用。 */
@@ -117,9 +118,11 @@ export function renderContent(content: string, rules: SandboxRule[], options: Re
  * （common/author-rules，引擎 'display'、輸入是原始全文，巨集在結果回來後展開），拿回產物——或結果還沒回來時的
  * 「上次套完的產物＋之後到的原文」——再走這一段，跟 renderContent 同一條管線。
  */
-export function renderAppliedContent(applied: string, options: Pick<RenderOptions, 'doc' | 'fencedDocument'> & { macros?: RenderMacros; convert?: ((text: string) => string) | null }): string {
+export function renderAppliedContent(applied: string, options: Pick<RenderOptions, 'doc' | 'fencedDocument'> & { macros?: RenderMacros; convert?: ((text: string) => string) | null; nativeBlocks?: boolean }): string {
   const doc = options.doc || document
   if (options.macros) applied = expandMacros(applied, options.macros)
+  // 原生區塊：規則沒吃掉的 [status]／[choices] 由平台畫（只對 AI 訊息，呼叫端決定）。排在規則之後、剝殼與 Markdown 之前。
+  if (options.nativeBlocks) applied = drawNativeBlocks(applied)
   // 不在白名單的標籤（含中文尖括號那種）在進 markdown 之前就剝殼：markdown 會把它們跳脫成文字，
   // 之後的淨化就看不到、玩家會看到「<状态>」原樣印出來。反引號裡的原樣保留（stripUnknownTags 自己護）。
   const html = md.render(stripUnknownTags(applied))

@@ -28,6 +28,8 @@ import {
   unwrapSingleHtmlFence,
 } from '../../../utils/rich-text-renderer.js'
 import { stripUnknownTags, wrapDialogue } from '../canvas-platform-defaults'
+// highlightText 也畫原生 [status]／[choices] 區塊（common/native-blocks）；跟頁面裡一樣是真實函式。
+import { drawNativeBlocks } from '../../../common/native-blocks'
 
 const root = process.cwd()
 const CHAT_VUE_PATH = path.join(root, 'src/pages/canvas/canvas.vue')
@@ -54,7 +56,7 @@ function buildHighlightText(format: string): (content: string, type?: number, ca
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines,
     findStableBoundary, getStreamCacheEntry, setStreamCacheEntry, unwrapSingleHtmlFence,
-    stripUnknownTags, wrapDialogue,
+    stripUnknownTags, wrapDialogue, drawNativeBlocks,
     cardFormat: { value: format },
     convertVisibleHtml: (html: string) => html,
     displayScript: (text: string) => text,

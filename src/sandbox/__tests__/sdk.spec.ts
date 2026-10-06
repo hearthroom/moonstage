@@ -194,3 +194,23 @@ describe('text：玩家介面語言的簡繁', () => {
     expect(sdk.text.convert(undefined as unknown as string)).toBe('')
   })
 })
+
+describe('save：上限算上在途的寫入', () => {
+  it('十一個同時發出的 set 恰好一個 INVALID_ARGS；宿主拒絕的寫入釋放佔位', async () => {
+    let fail = false
+    const host = fakeHost({ request: async (op, args) => { if (op === 'save.set' && fail) throw new SdkError('NETWORK'); return null } })
+    const c = createSdk(host, createEventBus())
+    c.loadSaves({})
+    const results = await Promise.allSettled(Array.from({ length: 11 }, (_, i) => c.sdk.save.set('k' + i, i)))
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[]
+    expect(rejected.length).toBe(1)
+    expect((rejected[0].reason as SdkError).code).toBe('INVALID_ARGS')
+    expect(c.sdk.save.keys().length).toBe(10)
+    // 刪一個再寫一個新鍵，宿主拒絕：佔位要放掉，鍵數回到 9
+    await c.sdk.save.remove('k0')
+    fail = true
+    await expectCode(c.sdk.save.set('fresh', 1), 'NETWORK')
+    expect(c.sdk.save.keys()).not.toContain('fresh')
+    expect(c.sdk.save.keys().length).toBe(9)
+  })
+})

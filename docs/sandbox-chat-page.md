@@ -160,6 +160,12 @@ z-index：平台節點一律 `auto`；舞台 content 2000、full 3000；平台�
 `<script>` 收成一段在 DOM 前執行；正文過 Markdown（`*x*` → `<em>`，四空格不當程式碼塊）；
 `{{user}}`／`{{char}}` 用宿主給的巨集；對白引號包 `<font color="#DC8333">`。
 
+原生區塊（`common/native-blocks.ts`，2026-10-06）：模型在回覆末尾寫的 `[status]…[/status]`（一行一個 `key: value`）與
+`[choices]…[/choices]`（一行一個選項），卡片自己的規則沒吃掉時，平台畫成面板（值的形狀決定畫法：數字／進度條／等級／
+列表／屬性／實體／標籤／路徑／文字）與按鈕（點了填進輸入框並聚焦、不送出；末尾一顆 ✎ 只聚焦）。排在規則之後、
+剝殼與 Markdown 之前，兩條渲染路徑（殼自畫 `rules.ts`、宿主 `canvas.vue`）同一個函式，只對 AI 訊息；閉合標記可缺。
+樣式在 `canvas.css` 的 `@layer lt-base` 裡、只用 `--chat-*`，作者不分層的樣式表蓋得掉。帶自己 kit 的卡（規則先吃掉標記）不受影響。
+
 淨化（`sanitize.ts`）：第一道剝 `iframe`／`form`／`object`／`embed`／`base`／`meta`（子節點保留）、
 `data-*`／`aria-*`／`role` 屬性、`svg` 內的事件屬性；第二道由殼的 CSP 兜底
 （`connect-src 'self'`、`frame-src 'none'`、`form-action 'none'`、`base-uri 'none'`；

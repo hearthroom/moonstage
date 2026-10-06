@@ -5887,3 +5887,33 @@ iframe.lt-frontend__frame { display: block; width: 100%; min-height: 1px; border
     margin-bottom: 0;
   }
 }
+
+/* 原生區塊（common/native-blocks）：模型寫的 [status]／[choices] 沒被卡片規則吃掉時，平台畫的面板與按鈕。
+   在 layer 裡、只用 --chat-* 變數、沒有 !important：作者的樣式（不分層）要蓋就蓋得掉。 */
+@layer lt-base {
+.lt-status { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--chat-border, #333); border-radius: 10px; background: var(--chat-surface, rgba(127,127,127,.12)); color: var(--chat-text, inherit); font-size: 13px; line-height: 1.45; }
+.lt-status__row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.lt-status__row--text { color: var(--chat-text-muted, #999); }
+.lt-status__k { flex: 0 0 auto; min-width: 4.5em; color: var(--chat-text-muted, #999); font-size: 12px; }
+.lt-status__v { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+.lt-num { font-variant-numeric: tabular-nums; }
+.lt-bar { flex: 1 1 60px; min-width: 60px; max-width: 220px; height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--chat-border, #333) 60%, transparent); overflow: hidden; }
+.lt-bar__fill { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--chat-accent, #ff6d97); }
+.lt-level { flex: 0 0 auto; }
+.lt-chips, .lt-stats, .lt-kvlist, .lt-path { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.lt-chip { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--chat-border, #333); background: var(--chat-modal-surface, transparent); font-size: 12px; }
+.lt-chip--kv { display: inline-flex; gap: 6px; }
+.lt-chip__v { color: var(--chat-accent, #ff6d97); }
+.lt-stat { display: inline-flex; flex-direction: column; align-items: center; min-width: 3em; padding: 2px 8px; border-radius: 6px; background: var(--chat-modal-surface, transparent); }
+.lt-stat__k { font-size: 11px; color: var(--chat-text-muted, #999); }
+.lt-stat__v { font-weight: 600; }
+.lt-kvlist { flex-direction: column; gap: 2px; }
+.lt-kv { display: flex; gap: 8px; }
+.lt-kv__k { color: var(--chat-text-muted, #999); min-width: 3em; }
+.lt-note { width: 100%; font-size: 11px; color: var(--chat-text-muted, #999); }
+.lt-path__sep { margin: 0 4px; color: var(--chat-text-muted, #999); }
+.lt-choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+.lt-choice { padding: 8px 14px; border-radius: 10px; border: 1px solid var(--chat-border, #333); background: var(--chat-surface, transparent); color: var(--chat-text, inherit); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.lt-choice:hover, .lt-choice:focus-visible { border-color: var(--chat-accent, #ff6d97); outline: none; }
+.lt-choice--own { border-style: dashed; color: var(--chat-text-muted, #999); }
+}

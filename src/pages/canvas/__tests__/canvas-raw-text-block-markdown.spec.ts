@@ -19,6 +19,8 @@ import {
   unwrapSingleHtmlFence,
 } from '../../../utils/rich-text-renderer.js'
 import { stripUnknownTags, wrapDialogue } from '../canvas-platform-defaults'
+// highlightText 也畫原生 [status]／[choices] 區塊（common/native-blocks）；跟頁面裡一樣是真實函式。
+import { drawNativeBlocks } from '../../../common/native-blocks'
 
 /**
  * 訊息裡的 <style>／<script> 內容不得被 markdown 動到。
@@ -57,7 +59,7 @@ function buildHighlightText(macros = { user: '小明', char: '星' }): (content:
     applyTavernRules, authorRuleOptions: () => ({ macros }),
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines, findStableBoundary,
-    getStreamCacheEntry, setStreamCacheEntry, unwrapSingleHtmlFence, stripUnknownTags, wrapDialogue,
+    getStreamCacheEntry, setStreamCacheEntry, unwrapSingleHtmlFence, stripUnknownTags, wrapDialogue, drawNativeBlocks,
     cardFormat: { value: 'mmd' },
     convertVisibleHtml: (html: string) => html,
     displayScript: (text: string) => text,

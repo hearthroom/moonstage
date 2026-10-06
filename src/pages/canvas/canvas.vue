@@ -470,6 +470,7 @@ import { stylePolicyFor } from '@/common/author-style-policy'
 import { detectAuthorOwnedRegions } from './canvas-author-regions'
 import { resolveStageBackground, resolveStageLandscapeBackground } from './canvas-background'
 import { stripUnknownTags, wrapDialogue } from './canvas-platform-defaults'
+import { drawNativeBlocks } from '@/common/native-blocks'
 import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
 import { archiveRequestQuery, buildArchiveRows, isArchiveFull, nextArchiveAfterDelete } from './canvas-archives'
 import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
@@ -1436,7 +1437,24 @@ const cfImage = (url, preset) => {
 	return cfImageDesktop(url, preset);
 }
 
+// 原生選項鈕（common/native-blocks）：點了把那一行填進輸入框並聚焦，不送出——選項是草稿不是鐵軌；「✎」只聚焦。
+const onNativeChoiceClick = (event) => {
+  if (event.defaultPrevented) return;
+  const btn = event.target && typeof event.target.closest === 'function' ? event.target.closest('.lt-choice') : null;
+  if (!btn) return;
+  event.preventDefault();
+  const el = document.querySelector('textarea#send_textarea');
+  if (!el) return;
+  if (!btn.classList.contains('lt-choice--own')) {
+    el.value = (btn.getAttribute('title') || btn.textContent || '').trim();
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  el.focus();
+};
+onUnmounted(() => document.removeEventListener('click', onNativeChoiceClick));
+
 onMounted(() => {
+  document.addEventListener('click', onNativeChoiceClick);
   // 哨兵要等 DOM 掛上才觀察得到；早於首則訊息渲染也沒關係，
   // 內容一撐高就會通知（見 setupScrollAnchorObserver）。
   nextTick(() => setupScrollAnchorObserver());
@@ -3781,6 +3799,10 @@ const highlightText = (content, type, cacheKey, streaming) => {
     // 無前綴的 <style> 換掉整個頁面的背景與輸入框。
     processedContent = scopeCardHtml(processedContent, cardFormat.value);
   }
+
+  // 原生區塊：卡片規則沒吃掉的 [status]／[choices]（模型在回覆末尾寫的）由平台畫成面板與按鈕，
+  // 零卡片腳本（common/native-blocks）。只對 AI 訊息（type 0）；帶自己 kit 的卡規則先吃掉標記，這裡沒事做。
+  if (type === 0) processedContent = drawNativeBlocks(processedContent);
 
   // 非標準名字的標籤（<思维链>、<status>…）拿掉標籤、留內文；思考類標籤已在渲染前
   // 折進思考過程框（thinking-content.ts）。一定要排在卡片規則之後——<AC_UI>、
