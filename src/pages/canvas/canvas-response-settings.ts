@@ -79,7 +79,9 @@ export function readResponseSettings(raw: unknown, conversationId: string): Resp
 // 玩家只改文字、不必先重選「自訂」。
 export function responsePatch(draft: ResponseDraft, base: ResponseBase = responseDefaults): Record<string,string|null> {
  const patch:Record<string,string|null>={}
- for(const key of [...Object.keys(responseAxes),'customStyle']) patch[key]=draft[key as keyof ResponseDraft] ?? null
+ for(const key of Object.keys(responseAxes)) patch[key]=draft[key as keyof ResponseDraft] ?? null
+ // 清空的文字等於沒寫：作者預設「自訂」時，伺服器會退回作者的文字，而不是收到空字串拒絕存檔。
+ patch.customStyle=draft.customStyle?.trim() ? draft.customStyle : null
  for(const key of noteKeys) patch[key]=draft[key as ResponseNoteKey]?.trim() || null
  patch.lengthTarget=draft.length==='target' ? String(lengthTargetOf(draft,base)) : null
  if((draft.style ?? base.style)!=='custom') patch.customStyle=null
