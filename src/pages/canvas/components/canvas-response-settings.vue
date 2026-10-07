@@ -42,9 +42,9 @@
      </div>
     </div>
     <div v-if="hint(axis)" class="mode-hint" :data-hint="axis">{{ hint(axis) }}</div>
-    <div v-if="axis === 'style' && draft.style === 'custom'" class="textarea-wrapper response-custom">
+    <div v-if="axis === 'style' && selected('style') === 'custom'" class="textarea-wrapper response-custom">
      <textarea v-model="draft.customStyle" class="textarea-dark response-custom-input" rows="3" :aria-label="t('responseSettings.customLabel')"
-      :placeholder="t('responseSettings.customLabel')" :aria-invalid="customTooLong" />
+      :placeholder="customPlaceholder" :aria-invalid="customTooLong" />
      <div class="char-count" :class="{ 'response-error': customTooLong }">{{ t('responseSettings.customCount', { count: [...(draft.customStyle || '')].length }) }}</div>
     </div>
    </div>
@@ -61,7 +61,7 @@
       <label class="textarea-wrapper response-note">
        <span class="label">{{ t(`responseSettings.axes.${axis}`) }}</span>
        <textarea v-model="draft[responseNoteKeys[axis]]" class="textarea-dark response-note-input" :data-axis="axis" rows="2"
-        :placeholder="t(`responseSettings.noteExamples.${axis}.${selected(axis)}`)" :aria-invalid="noteTooLong(axis)" />
+        :placeholder="notePlaceholder(axis)" :aria-invalid="noteTooLong(axis)" />
        <span class="char-count" :class="{ 'response-error': noteTooLong(axis) }">{{ t('responseSettings.noteCount', { count: [...(draft[responseNoteKeys[axis]] || '')].length }) }}</span>
       </label>
      </template>
@@ -83,7 +83,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { lengthMode, lengthTargetLadder, lengthTargetOf, lengthZone, maxResponseNoteLength, readResponseSettings, responseAxes, responseDefaults, responseNoteKeys, responsePatch, type LengthZone, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
+import { lengthMode, lengthTargetLadder, lengthTargetOf, lengthZone, maxResponseNoteLength, readResponseSettings, responseAxes, responseBase, responseNoteKeys, responsePatch, type LengthZone, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
 const props=defineProps<{
  conversationId:string
  load:(id:string)=>Promise<unknown>
@@ -98,18 +98,23 @@ let discardAnswer:((ok:boolean)=>void)|null=null
 function askDiscard(){discardAnswer?.(false);discardAsked.value=true;return new Promise<boolean>(resolve=>{discardAnswer=resolve})}
 function answerDiscard(ok:boolean){discardAsked.value=false;const resolve=discardAnswer;discardAnswer=null;resolve?.(ok)}
 onBeforeUnmount(()=>{alive=false;answerDiscard(false)})
-const dirty=computed(()=>JSON.stringify(responsePatch(draft.value))!==JSON.stringify(responsePatch(saved.value?.overrides || {})))
+// 玩家沒改的軸顯示的是 base：平台預設，卡片有作者預設時是作者的；「恢復預設」也回到這裡。
+const base=computed(()=>responseBase(saved.value))
+const dirty=computed(()=>JSON.stringify(responsePatch(draft.value,base.value))!==JSON.stringify(responsePatch(saved.value?.overrides || {},base.value)))
 const customTooLong=computed(()=>[...(draft.value.customStyle || '')].length>1000)
 const axes=Object.keys(responseAxes) as ResponseAxis[]
 // 文風選「自訂」時已經能整段寫，不再給文風補充。
-const noteAxes=computed(()=>axes.filter(axis=>!(axis==='style' && draft.value.style==='custom')))
+const noteAxes=computed(()=>axes.filter(axis=>!(axis==='style' && selected('style')==='custom')))
 const notesOpen=ref(false)
-const customized=computed(()=>Object.keys(responsePatch(draft.value)).some(key=>responsePatch(draft.value)[key]!==null))
-function current(axis:ResponseAxis){return draft.value[axis] ?? responseDefaults[axis]}
+const customized=computed(()=>Object.values(responsePatch(draft.value,base.value)).some(value=>value!==null))
+function current(axis:ResponseAxis){return draft.value[axis] ?? base.value[axis]}
 // 藥丸上亮的是哪一個：篇幅的舊三檔值算「指定字數」。
-function selected(axis:ResponseAxis){return axis==='length' ? lengthMode(draft.value.length) : current(axis)}
+function selected(axis:ResponseAxis){return axis==='length' ? lengthMode(current('length')) : current(axis)}
 const lengthZones:LengthZone[]=['brief','balanced','detailed','long']
-const lengthTarget=computed(()=>lengthTargetOf(draft.value))
+const lengthTarget=computed(()=>lengthTargetOf(draft.value,base.value))
+// 作者預設的自訂文風與補充說明：玩家沒改那一軸時當提示字顯示，讓玩家知道作者原本怎麼寫。
+const customPlaceholder=computed(()=>(draft.value.style===undefined && base.value.customStyle) || props.t('responseSettings.customLabel'))
+function notePlaceholder(axis:ResponseAxis){return (draft.value[axis]===undefined && base.value[responseNoteKeys[axis]]) || props.t(`responseSettings.noteExamples.${axis}.${selected(axis)}`)}
 function slide(event:Event){
  const value=lengthTargetLadder[Number((event.target as HTMLInputElement).value)]
  if(value===undefined)return
@@ -123,14 +128,16 @@ function hint(axis:ResponseAxis){
  return ''
 }
 function noteTooLong(axis:ResponseAxis){return [...(draft.value[responseNoteKeys[axis]] || '')].length>maxResponseNoteLength}
-const invalid=computed(()=>(draft.value.style==='custom' && (!draft.value.customStyle?.trim() || customTooLong.value)) || axes.some(noteTooLong))
+const invalid=computed(()=>(draft.value.style==='custom' && !draft.value.customStyle?.trim()) || customTooLong.value || axes.some(noteTooLong))
 function choose(axis:ResponseAxis,value:string){
  if(axis==='length'){
-  if(value==='target'){const target=lengthTargetOf(draft.value);draft.value.length='target';draft.value.lengthTarget=String(target)}
+  if(value==='target'){const target=lengthTargetOf(draft.value,base.value);draft.value.length='target';draft.value.lengthTarget=String(target)}
   else{draft.value.length=value;delete draft.value.lengthTarget}
   return
  }
  draft.value[axis]=value;if(axis==='style' && value!=='custom')delete draft.value.customStyle;if(axis==='style' && value==='custom')delete draft.value.styleNote
+ // 重選作者已預設的「自訂」：從作者的文字開始改，而不是一片空白。
+ if(axis==='style' && value==='custom' && !draft.value.customStyle && base.value.customStyle)draft.value.customStyle=base.value.customStyle
 }
 function resetAll(){draft.value={}}
 async function mayClose(){return !saving.value && (!dirty.value || await askDiscard())}
@@ -143,7 +150,7 @@ async function reload(){
 async function submit(){
  if(!saved.value || !dirty.value || invalid.value || loading.value || saving.value || error.value==='conflict')return
  saving.value=true;error.value=''
- try{const value=readResponseSettings(await props.save(props.conversationId,saved.value.revision,responsePatch(draft.value)),props.conversationId);if(alive){saved.value=value;draft.value={...value.overrides};emit('close')}}
+ try{const value=readResponseSettings(await props.save(props.conversationId,saved.value.revision,responsePatch(draft.value,base.value)),props.conversationId);if(alive){saved.value=value;draft.value={...value.overrides};emit('close')}}
  catch(e){if(alive)error.value=((e as {status?:number})?.status ?? (e as {statusCode?:number})?.statusCode)===409?'conflict':'saveFailed'}finally{if(alive)saving.value=false}
 }
 onMounted(reload)
