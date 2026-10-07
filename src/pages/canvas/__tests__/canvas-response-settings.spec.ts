@@ -279,3 +279,15 @@ it('loads saves that still carry a legacy style value', () => {
  const loaded=readResponseSettings({...initial(),overrides:{style:'dialogue'},effective:{...initial().effective,style:'default'}},'c1')
  expect(loaded.overrides.style).toBe('default')
 })
+
+// 打了又刪光：等於沒改，作者的自訂文風照用，存檔不會被伺服器以空字串拒絕。
+it('clearing the text under the card custom style falls back to the card', async () => {
+ const save=echo()
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>withCardDefaults({agency:'protect'}),save,t:(k:string)=>k}})
+ await flushPromises()
+ await wrapper.get('.response-custom-input').setValue('Lush gothic')
+ await wrapper.get('.response-custom-input').setValue('')
+ await pill(wrapper,'pace','advance').trigger('click')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({customStyle:null,pace:'advance'}))
+})
