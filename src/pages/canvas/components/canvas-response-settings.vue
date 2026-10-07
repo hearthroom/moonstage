@@ -113,8 +113,8 @@ function selected(axis:ResponseAxis){return axis==='length' ? lengthMode(current
 const lengthZones:LengthZone[]=['brief','balanced','detailed','long']
 const lengthTarget=computed(()=>lengthTargetOf(draft.value,base.value))
 // 作者預設的自訂文風與補充說明：玩家沒改那一軸時當提示字顯示，讓玩家知道作者原本怎麼寫。
-const customPlaceholder=computed(()=>(draft.value.style===undefined && base.value.customStyle) || props.t('responseSettings.customLabel'))
-function notePlaceholder(axis:ResponseAxis){return (draft.value[axis]===undefined && base.value[responseNoteKeys[axis]]) || props.t(`responseSettings.noteExamples.${axis}.${selected(axis)}`)}
+const customPlaceholder=computed(()=>(current('style')===base.value.style && base.value.customStyle) || props.t('responseSettings.customLabel'))
+function notePlaceholder(axis:ResponseAxis){return (current(axis)===base.value[axis] && base.value[responseNoteKeys[axis]]) || props.t(`responseSettings.noteExamples.${axis}.${selected(axis)}`)}
 function slide(event:Event){
  const value=lengthTargetLadder[Number((event.target as HTMLInputElement).value)]
  if(value===undefined)return
@@ -128,16 +128,20 @@ function hint(axis:ResponseAxis){
  return ''
 }
 function noteTooLong(axis:ResponseAxis){return [...(draft.value[responseNoteKeys[axis]] || '')].length>maxResponseNoteLength}
-const invalid=computed(()=>(draft.value.style==='custom' && !draft.value.customStyle?.trim()) || customTooLong.value || axes.some(noteTooLong))
+const invalid=computed(()=>(draft.value.style==='custom' && !(draft.value.customStyle?.trim() || (base.value.style==='custom' && base.value.customStyle))) || customTooLong.value || axes.some(noteTooLong))
+// 點的是原本的預設（作者的，作者沒指定時是平台的）就不算改：作者在這一項的補充、
+// 自訂文風與字數照用，只有選了不同的選項才讓位。
 function choose(axis:ResponseAxis,value:string){
  if(axis==='length'){
+  if(value===base.value.length){if(value!=='target' || draft.value.length===undefined){delete draft.value.length;delete draft.value.lengthTarget}return}
   if(value==='target'){const target=lengthTargetOf(draft.value,base.value);draft.value.length='target';draft.value.lengthTarget=String(target)}
   else{draft.value.length=value;delete draft.value.lengthTarget}
   return
  }
- draft.value[axis]=value;if(axis==='style' && value!=='custom')delete draft.value.customStyle;if(axis==='style' && value==='custom')delete draft.value.styleNote
- // 重選作者已預設的「自訂」：從作者的文字開始改，而不是一片空白。
- if(axis==='style' && value==='custom' && !draft.value.customStyle && base.value.customStyle)draft.value.customStyle=base.value.customStyle
+ if(value===base.value[axis])delete draft.value[axis]
+ else draft.value[axis]=value
+ if(axis==='style' && value!=='custom')delete draft.value.customStyle
+ if(axis==='style' && value==='custom')delete draft.value.styleNote
 }
 function resetAll(){draft.value={}}
 async function mayClose(){return !saving.value && (!dirty.value || await askDiscard())}
