@@ -227,3 +227,55 @@ it('validates length targets in settings responses', ()=>{
  expect(lengthTargetOf({length:'balanced'})).toBe(800)
  expect(lengthTargetOf({length:'target',lengthTarget:'2500'})).toBe(2500)
 })
+
+// 卡片可以帶作者預設：玩家沒改的軸亮作者選的那一個，「恢復預設」回到作者的，而不是平台的。
+const withCardDefaults = (overrides:Record<string,string>={}) => ({...initial(),overrides,
+ defaults:{agency:'coauthor',style:'custom',customStyle:'Terse noir',perspective:'third_limited',length:'target',lengthTarget:1200,pace:'natural',paceNote:'End on a hook'},
+ effective:{agency:'coauthor',style:'custom',customStyle:'Terse noir',perspective:'third_limited',length:'target',lengthTarget:1200,pace:'natural'}})
+
+it('shows the card author defaults for axes the player has not chosen', async () => {
+ const save=echo()
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>withCardDefaults(),save,t:(k:string)=>k}})
+ await flushPromises()
+ expect(pill(wrapper,'agency','coauthor').attributes('aria-checked')).toBe('true')
+ expect(pill(wrapper,'perspective','third_limited').attributes('aria-checked')).toBe('true')
+ expect(pill(wrapper,'length','target').attributes('aria-checked')).toBe('true')
+ expect(wrapper.get('.response-length-value').text()).toContain('responseSettings.lengthValue')
+ expect((wrapper.get('.response-length-slider').element as HTMLInputElement).value).toBe(String(lengthTargetLadder.indexOf(1200)))
+ // 作者的自訂文風照樣看得到，玩家改它就是覆寫文字、不必先重選「自訂」。
+ expect((wrapper.get('.response-custom-input').element as HTMLTextAreaElement).placeholder).toBe('Terse noir')
+ expect(wrapper.find('[data-action="save"]').attributes('disabled')).toBeDefined()
+ expect(wrapper.get('.response-note-input[data-axis="pace"]').attributes('placeholder')).toBe('End on a hook')
+ await pill(wrapper,'agency','protect').trigger('click')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({agency:'protect',style:null,customStyle:null,length:null,lengthTarget:null}))
+})
+
+it('lets the player move the slider under the card target and resets back to the card', async () => {
+ const save=echo()
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>withCardDefaults({agency:'protect'}),save,t:(k:string)=>k}})
+ await flushPromises()
+ expect(pill(wrapper,'agency','protect').attributes('aria-checked')).toBe('true')
+ await wrapper.get('.response-length-slider').setValue(String(lengthTargetLadder.indexOf(2000)))
+ await wrapper.get('[data-action="toggle-notes"]').trigger('click')
+ await wrapper.get('[data-action="reset-all"]').trigger('click')
+ expect(pill(wrapper,'agency','coauthor').attributes('aria-checked')).toBe('true')
+ expect((wrapper.get('.response-length-slider').element as HTMLInputElement).value).toBe(String(lengthTargetLadder.indexOf(1200)))
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({agency:null,length:null,lengthTarget:null}))
+})
+
+it('typing over the card custom style saves only the text', async () => {
+ const save=echo()
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>withCardDefaults(),save,t:(k:string)=>k}})
+ await flushPromises()
+ await wrapper.get('.response-custom-input').setValue('Lush gothic')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({style:null,customStyle:'Lush gothic'}))
+})
+
+// 伺服器仍收舊的三個文風值並當成預設；存過舊值的存檔打開面板不能整個載入失敗。
+it('loads saves that still carry a legacy style value', () => {
+ const loaded=readResponseSettings({...initial(),overrides:{style:'dialogue'},effective:{...initial().effective,style:'default'}},'c1')
+ expect(loaded.overrides.style).toBe('default')
+})
