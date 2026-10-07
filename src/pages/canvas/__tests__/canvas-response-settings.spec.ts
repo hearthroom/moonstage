@@ -181,7 +181,7 @@ it('offers automatic length or a slider on the ladder', async()=>{
  await pill(wrapper,'length','auto').trigger('click')
  expect(wrapper.find('.response-length-slider').exists()).toBe(false)
  await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
- expect(save).toHaveBeenLastCalledWith('c1',1,expect.objectContaining({length:'auto',lengthTarget:null}))
+ expect(save).toHaveBeenLastCalledWith('c1',1,expect.objectContaining({length:null,lengthTarget:null}))
 })
 
 // 篇幅三個選項：自動（預設，完全交給 AI）、推薦（2 到 5 段、約 2500 字）、指定字數。
@@ -290,4 +290,31 @@ it('clearing the text under the card custom style falls back to the card', async
  await pill(wrapper,'pace','advance').trigger('click')
  await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
  expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({customStyle:null,pace:'advance'}))
+})
+
+// 點回原本的預設不算改：作者的補充與自訂文風照用，存檔不送那一項。
+it('picking the default option again keeps it a default', async () => {
+ const save=echo()
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>withCardDefaults(),save,t:(k:string)=>k}})
+ await flushPromises()
+ await pill(wrapper,'pace','advance').trigger('click')
+ await pill(wrapper,'pace','natural').trigger('click')
+ await pill(wrapper,'style','guided').trigger('click')
+ await pill(wrapper,'style','custom').trigger('click')
+ await pill(wrapper,'length','target').trigger('click')
+ expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeDefined()
+ expect(wrapper.get('.response-note-input[data-axis="pace"]').attributes('placeholder')).toBe('End on a hook')
+ expect((wrapper.get('.response-custom-input').element as HTMLTextAreaElement).placeholder).toBe('Terse noir')
+ await pill(wrapper,'agency','lines').trigger('click')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({agency:'lines',pace:null,style:null,customStyle:null,length:null,lengthTarget:null}))
+})
+
+// 舊存檔已經把作者的「自訂」存成玩家的選項：不必重打文字也能存。
+it('a saved pick equal to the card custom style still saves without text', async () => {
+ const save=echo()
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>withCardDefaults({style:'custom'}),save,t:(k:string)=>k}})
+ await flushPromises()
+ await pill(wrapper,'agency','lines').trigger('click')
+ expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeUndefined()
 })
