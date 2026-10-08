@@ -142,6 +142,21 @@ describe('殼：冷啟動與事件順序', () => {
     s.dispose()
   })
 
+  it('sdk.generation.get() follows the host\'s phase; generation:phase fires once per change with the time it began', () => {
+    const s = boot(config({ card: { rules: [SCRIPT_RULE(`window.__ph = []; sdk.on('generation:phase', function (g) { window.__ph.push(g.phase + ':' + (g.since > 0)); });`)], statusbar: '' } }))
+    const w = window as unknown as { __ph: string[] }
+    expect(s.sdk.generation.get().phase).toBe('idle')
+    s.handle({ type: 'generation', busy: true })
+    s.handle({ type: 'generation', busy: true, phase: 'summarizing' })
+    s.handle({ type: 'generation', busy: true, phase: 'summarizing' })
+    s.handle({ type: 'generation', busy: true, phase: 'thinking' })
+    s.handle({ type: 'generation', busy: true, phase: 'writing' })
+    expect(s.sdk.generation.get().phase).toBe('writing')
+    s.handle({ type: 'generation', busy: false, phase: 'idle' })
+    expect(w.__ph).toEqual(['preparing:true', 'summarizing:true', 'thinking:true', 'writing:true', 'idle:true'])
+    s.dispose()
+  })
+
   it('conversation:switch carries the conversationId the host sends, and sdk.archive follows the archive capability', () => {
     const s = boot(config({ capabilities: { saves: false, edit: true, send: true, archive: true }, card: { rules: [SCRIPT_RULE(`window.__sw = []; sdk.on('conversation:switch', function (p) { window.__sw.push(p ? p.conversationId : 'none'); });`)], statusbar: '' } }))
     s.handle({ type: 'conversation.switch', conversationId: 'c-9' })

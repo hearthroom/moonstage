@@ -3219,6 +3219,13 @@ function buildHudHost(): HudHost {
           };
         }),
         generation: generating ? (streamingId ? 'streaming' as const : 'starting' as const) : 'idle' as const,
+        // 沙箱殼用：這一輪在等什麼——整理劇情（伺服器壓縮記憶，擋在第一個字前）、模型思考（推理串流中、正文還沒來）、
+        // 寫正文，或剛送出什麼都還沒回來。思考的內容不送過去，只送階段。
+        generationPhase: !generating ? 'idle' as const
+          : unref(isCompacting) ? 'summarizing' as const
+          : streamingId ? 'writing' as const
+          : lastAI && !lastAI.chatFinish && String(lastAI.thinkingContent || '') ? 'thinking' as const
+          : 'preparing' as const,
         streamingMessageId: streamingId,
         inputText: String(unref(content) || ''),
         previewOnly: previewOnly.value === true,

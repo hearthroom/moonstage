@@ -18,6 +18,11 @@ export type SandboxRole = 'user' | 'ai'
  */
 export type SandboxMessageRole = SandboxRole | 'system'
 export type SandboxMessageState = 'pending' | 'streaming' | 'done'
+/**
+ * 這一輪在等什麼：preparing＝剛送出、什麼都還沒回來；summarizing＝伺服器在整理劇情（壓縮記憶，擋在第一個字前，
+ * 可能很久）；thinking＝模型在推理、正文還沒來（不是每個模型都有）；writing＝正文串流中；idle＝沒在生成。
+ */
+export type GenerationPhase = 'idle' | 'preparing' | 'summarizing' | 'thinking' | 'writing'
 export type SandboxTheme = 'dark' | 'light'
 export type StageState = 'closed' | 'content' | 'full'
 
@@ -253,7 +258,7 @@ export type HostToShell =
   | { type: 'message.stream'; id: string; content: string; view?: MessageView }
   | { type: 'message.done'; id: string; content: string; serverId: string | null; view?: MessageView }
   | { type: 'message.remove'; id: string }
-  | { type: 'generation'; busy: boolean }
+  | { type: 'generation'; busy: boolean; phase?: GenerationPhase }
   | { type: 'input'; value: string }
   | { type: 'reply'; reqId: number; ok: boolean; value?: unknown; error?: SandboxError }
   | { type: 'theme'; theme: SandboxTheme; vars?: Record<string, string> }

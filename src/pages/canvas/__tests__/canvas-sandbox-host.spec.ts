@@ -112,6 +112,25 @@ describe('沙箱宿主橋', () => {
     host.destroy()
   })
 
+  it('generation 帶上這一輪在等什麼：整理劇情、思考、寫正文各送一次，同一階段不重送', async () => {
+    const greeting = msg({ id: '10', text: '你好', opening: true })
+    const state = { current: makeState({ messages: [greeting] }) }
+    const { hud } = fakeHud(state)
+    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '1', hello })
+    host.start()
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    h.posted.length = 0
+    const phases = () => h.posted.filter((p) => p.type === 'generation').map((p) => (p as { phase?: string }).phase)
+    state.current = makeState({ generation: 'starting', messages: [greeting] }); host.sync()
+    state.current = makeState({ generation: 'starting', generationPhase: 'summarizing', messages: [greeting] }); host.sync(); host.sync()
+    state.current = makeState({ generation: 'starting', generationPhase: 'thinking', messages: [greeting] }); host.sync()
+    state.current = makeState({ generation: 'streaming', generationPhase: 'writing', messages: [greeting] }); host.sync()
+    state.current = makeState({ generation: 'idle', generationPhase: 'idle', messages: [greeting] }); host.sync()
+    expect(phases()).toEqual(['preparing', 'summarizing', 'thinking', 'writing', 'idle'])
+    host.destroy()
+  })
+
   it('只認來自 iframe 且 origin 相符的訊息；握手後送 hello + 全量訊息（開場白 id 是 greeting、歷史 h<id>）', async () => {
     const state = { current: makeState({ messages: [msg({ id: '10', text: '你好', opening: true }), msg({ id: '11', role: 'user', text: '嗨' }), msg({ id: '12', text: '哈囉', canonicalLatestAI: true })] }) }
     const { hud } = fakeHud(state)
@@ -129,7 +148,7 @@ describe('沙箱宿主橋', () => {
       { id: 'h11', role: 'user', content: '嗨', serverId: null, state: 'done' },
       { id: 'h12', role: 'ai', content: '哈囉', serverId: '12', state: 'done' },
     ] })
-    expect(h.posted[2]).toEqual({ ms: 1, type: 'generation', busy: false })
+    expect(h.posted[2]).toEqual({ ms: 1, type: 'generation', busy: false, phase: 'idle' })
     host.destroy()
   })
 

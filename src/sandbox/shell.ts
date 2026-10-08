@@ -190,6 +190,8 @@ export function createShell(options: CreateShellOptions): Shell {
   doc.addEventListener('click', onChoiceClick)
 
   let busy = false
+  // 這一輪在等什麼（宿主的 generation 訊息帶來）；since 是殼記下的進入時間，作者拿來顯示等了幾秒
+  let genPhase = 'idle', genSince = Date.now()
   let composing = false
   let stageState: StageState = 'closed'
   let composerVisible = config.composer !== false
@@ -246,6 +248,7 @@ export function createShell(options: CreateShellOptions): Shell {
     user: () => ({ nickname: config.user.nickname, avatarUrl: config.user.avatarUrl, locale: config.locale || '' }),
     text: { convert: (text) => (convert && text ? convert(text) : text), ready: () => textReady },
     model: () => modelNow(),
+    generation: () => ({ phase: genPhase, since: genSince }),
     capabilities: { saves: !!config.capabilities.saves, edit: !!config.capabilities.edit, send: config.capabilities.send !== false, archive: !!config.capabilities.archive },
     request,
     inGesture: () => gesture,
@@ -662,11 +665,14 @@ export function createShell(options: CreateShellOptions): Shell {
       case 'message.remove':
         list.remove(message.id)
         return
-      case 'generation':
+      case 'generation': {
         busy = !!message.busy
         refs.root.setAttribute('data-busy', busy ? '1' : '0')
         refs.send.disabled = busy
+        const phase = busy ? String(message.phase && message.phase !== 'idle' ? message.phase : 'preparing') : 'idle'
+        if (phase !== genPhase) { genPhase = phase; genSince = Date.now(); bus.emit('generation:phase', { phase: genPhase, since: genSince }) }
         return
+      }
       case 'prologue':
         renderPrologue(String(message.title ?? ''), Array.isArray(message.items) ? message.items.map(String) : [])
         return

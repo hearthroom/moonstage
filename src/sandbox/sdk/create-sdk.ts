@@ -1,5 +1,5 @@
 /**
- * 作者看到的 `sdk`：14 個鍵、40 個能力（後來加了 text、model、archive），全部從第一版就存在——作者腳本在頂層探測它們，
+ * 作者看到的 `sdk`：15 個鍵、41 個能力（後來加了 text、model、archive、generation），全部從第一版就存在——作者腳本在頂層探測它們，
  * 少一個就是「按鈕全不響應」而沒有任何報錯。每個能力有實作狀態：實作／宿主沒接（HOST_DENIED）。
  *
  * 錯誤慣例（作者的程式碼依賴）：
@@ -65,6 +65,8 @@ export interface SdkHost {
   text?: { convert(text: string): string; ready(): Promise<void> }
   /** 玩家目前選的模型：友善名與下一輪的點數（已格式化；動態計價是區間）。宿主還沒給時是空字串。 */
   model?: () => { name: string; cost: string }
+  /** 這一輪在等什麼與從何時開始（殼收到宿主的 generation 訊息時記下）。 */
+  generation?: () => { phase: string; since: number }
   capabilities: { saves: boolean; edit: boolean; send: boolean; archive?: boolean }
   /** 宿主代辦：送出、改寫、存檔寫入。 */
   request(op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove' | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove', args: unknown[]): Promise<unknown>
@@ -110,6 +112,11 @@ export interface Sdk {
   }
   /** 玩家目前的模型與下一輪的點數；換模型或點數變了發 model:change（載荷同 get()）。 */
   model: { get(): { name: string; cost: string } }
+  /**
+   * 這一輪在等什麼：idle｜preparing（剛送出）｜summarizing（平台在整理劇情，可能幾十秒）｜thinking（模型在思考，
+   * 正文還沒來）｜writing（正文串流中）。since 是進入這個階段的時間（毫秒）。變了發 generation:phase（載荷同 get()）。
+   */
+  generation: { get(): { phase: 'idle' | 'preparing' | 'summarizing' | 'thinking' | 'writing'; since: number } }
   on(event: string, cb: (payload?: unknown) => void): void
   debug: { log(...args: unknown[]): void }
   version: string
@@ -337,6 +344,13 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
       },
     },
     model: { get: () => { const m = host.model ? host.model() : null; return { name: String(m?.name || ''), cost: String(m?.cost || '') } } },
+    generation: {
+      get: () => {
+        const g = host.generation ? host.generation() : null
+        const phase = (['idle', 'preparing', 'summarizing', 'thinking', 'writing'].includes(String(g?.phase)) ? g!.phase : 'idle') as 'idle' | 'preparing' | 'summarizing' | 'thinking' | 'writing'
+        return { phase, since: Number(g?.since) || 0 }
+      },
+    },
     on: (event, cb) => bus.on(event, cb),
     debug: { log: (...args) => host.debug(...args) },
     version: '1',
