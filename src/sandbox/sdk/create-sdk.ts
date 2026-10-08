@@ -60,6 +60,8 @@ export interface SdkHost {
   user(): { nickname: string; avatarUrl: string; locale?: string }
   /** 顯示字形轉換（簡↔繁），方向由玩家介面語言決定；字典還沒載好或不需要轉時原樣回。 */
   text?: { convert(text: string): string; ready(): Promise<void> }
+  /** 玩家目前選的模型：友善名與下一輪的點數（已格式化；動態計價是區間）。宿主還沒給時是空字串。 */
+  model?: () => { name: string; cost: string }
   capabilities: { saves: boolean; edit: boolean; send: boolean }
   /** 宿主代辦：送出、改寫、存檔寫入。 */
   request(op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove', args: unknown[]): Promise<unknown>
@@ -87,6 +89,8 @@ export interface Sdk {
   user: { get(): { nickname: string; avatarUrl: string; locale: string } }
   /** 卡片自己畫的字也跟著玩家的簡繁：convert 同步轉一段純文字；ready 在字典載好（或確定不需要）時完成。 */
   text: { convert(text: string): string; ready(): Promise<void> }
+  /** 玩家目前的模型與下一輪的點數；換模型或點數變了發 model:change（載荷同 get()）。 */
+  model: { get(): { name: string; cost: string } }
   on(event: string, cb: (payload?: unknown) => void): void
   debug: { log(...args: unknown[]): void }
   version: string
@@ -248,6 +252,7 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
       },
       ready: () => (host.text ? host.text.ready() : Promise.resolve()),
     },
+    model: { get: () => { const m = host.model ? host.model() : null; return { name: String(m?.name || ''), cost: String(m?.cost || '') } } },
     on: (event, cb) => bus.on(event, cb),
     debug: { log: (...args) => host.debug(...args) },
     version: '1',

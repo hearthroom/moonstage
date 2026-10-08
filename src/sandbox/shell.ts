@@ -196,6 +196,9 @@ export function createShell(options: CreateShellOptions): Shell {
 
   // ── 輸入框：標準輸入區（CanvasComposer 的 textarea）或殼自己的陽春版，同一個介面給 sdk.input 用。 ──
   const chromeState = reactive<ChromeState>(config.chromeState || ({} as ChromeState))
+  // sdk.model：玩家目前的模型與下一輪的點數，從輸入區的呈現資料取（宿主換模型、改上下文或思考深度時會重送）。
+  const modelNow = () => ({ name: String(chromeState.composer?.modelName || ''), cost: String(chromeState.composer?.modelScore || '') })
+  const modelKey = () => { const m = modelNow(); return m.name + '\u0000' + m.cost }
   const inputValue = ref('')
   const composerVm = ref<{ textareaEl?: { el?: HTMLTextAreaElement; $el?: HTMLTextAreaElement } } | null>(null)
   const standardTextarea = (): HTMLTextAreaElement | null => {
@@ -242,6 +245,7 @@ export function createShell(options: CreateShellOptions): Shell {
     role: () => ({ name: config.role.name, avatarUrl: config.role.avatarUrl }),
     user: () => ({ nickname: config.user.nickname, avatarUrl: config.user.avatarUrl, locale: config.locale || '' }),
     text: { convert: (text) => (convert && text ? convert(text) : text), ready: () => textReady },
+    model: () => modelNow(),
     capabilities: { saves: !!config.capabilities.saves, edit: !!config.capabilities.edit, send: config.capabilities.send !== false },
     request,
     inGesture: () => gesture,
@@ -669,9 +673,12 @@ export function createShell(options: CreateShellOptions): Shell {
         input.set(String(message.value ?? ''))
         emitInputChange()
         return
-      case 'chrome':
+      case 'chrome': {
+        const before = modelKey()
         Object.assign(chromeState, message.state)
+        if (modelKey() !== before) bus.emit('model:change', modelNow())
         return
+      }
       case 'panels':
         if (panels) panels.set(message.state)
         return

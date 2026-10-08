@@ -2621,6 +2621,7 @@ function buildChromeState() {
       moreOpen: !!panel.value.more,
       moreItems: moreItems.value,
       modelScore: modelScoreText.value,
+      modelName: String(formData.selectModelName || ''),
       assistBusy: assistBusy.value,
       assistCost: ASSIST_COST,
       labels: composerLabels.value,

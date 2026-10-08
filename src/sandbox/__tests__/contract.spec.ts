@@ -213,6 +213,7 @@ function buildContract() {
       notProvided: ['sdk.off', 'sdk.once', 'sdk.vars', 'vars:change', '<abc_vars>'],
       role: { get: ['name', 'avatarUrl'] },
       user: { get: ['nickname', 'avatarUrl', 'locale'] },
+      model: { get: ['name', 'cost'] },
       stage: { modes: ['content', 'full'], unknownModeBecomes: 'content', elReturnsNodeWhenClosed: true, ownCloseDoesNotEmitStageClose: true },
       input: { writesThrowWhileComposing: 'INVALID_ARGS' },
       message: { sendBusy: 'BUSY', sendWithoutCapability: 'NOT_SUPPORTED', editWithoutCapability: 'HOST_DENIED', confirmOutsideGesture: true, declinedCode: 'UNAUTHORIZED', editIdIs: 'serverId (data-msg-id)' },
@@ -226,7 +227,7 @@ function buildContract() {
       replayedToLateSubscribers: ['message:mount', 'message:done'],
       readyReplayed: false,
       coldStartOrder: ['message:new', 'message:mount', 'message:done', '…', 'ready'],
-      payload: { 'message:new': ['content', 'id', 'role', 'serverId'], 'message:mount': ['content', 'id', 'role', 'serverId'], 'message:done': ['content', 'id', 'role', 'serverId'], 'message:stream': ['content', 'id', 'role'], 'message:unmount': ['content', 'id', 'role', 'serverId'], 'input:change': 'string', 'theme:change': 'none', others: 'none' },
+      payload: { 'message:new': ['content', 'id', 'role', 'serverId'], 'message:mount': ['content', 'id', 'role', 'serverId'], 'message:done': ['content', 'id', 'role', 'serverId'], 'message:stream': ['content', 'id', 'role'], 'message:unmount': ['content', 'id', 'role', 'serverId'], 'input:change': 'string', 'theme:change': 'none', 'model:change': ['cost', 'name'], others: 'none' },
       roles: ['user', 'ai'],
       systemRowsEmitNoEvents: true,
       handlerArity: 1,
@@ -300,11 +301,11 @@ describe('沙箱作者契約', () => {
     expect(current).toBe(text)
   })
 
-  it('能力數與 sdk.spec 對得上：12 鍵、32 能力、5 個非同步', () => {
+  it('能力數與 sdk.spec 對得上：13 鍵、33 能力、5 個非同步', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
     const caps = capabilitiesOf(sdk as unknown as Record<string, unknown>)
-    expect(caps.keys.length).toBe(12)
-    expect(caps.capabilities.length).toBe(32)
+    expect(caps.keys.length).toBe(13)
+    expect(caps.capabilities.length).toBe(33)
     for (const a of caps.async) expect(caps.capabilities).toContain(a)
   })
 
