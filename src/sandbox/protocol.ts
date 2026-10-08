@@ -57,6 +57,8 @@ export interface SandboxCapabilities {
   edit: boolean
   /** 宿主接了送出（message.send）。預覽環境可以不接。 */
   send: boolean
+  /** 宿主接了平台的對話存檔（sdk.archive.*）。沒接時 archive.* 回 HOST_DENIED。 */
+  archive?: boolean
 }
 
 export interface SandboxHelloConfig {
@@ -238,6 +240,8 @@ export type MessageMenuAnchor =
 export interface SandboxError {
   code: string
   message?: string
+  /** 錯誤附帶的資料（例如 LIMIT_REACHED 的 { count, limit }）。 */
+  data?: Record<string, unknown>
 }
 
 /** 宿主 → 殼 */
@@ -264,13 +268,14 @@ export type HostToShell =
   | { type: 'history'; more: boolean; loading: boolean }
   // 開場選項（MMD「你可以选择开场」）：空清單＝拿掉。玩家點一條回 ui prologue，key 是第幾條。
   | { type: 'prologue'; title: string; items: string[] }
-  | { type: 'conversation.switch' }
+  | { type: 'conversation.switch'; conversationId?: string }
   /** 宿主登出：殼刪掉作者規則的持久層、之後只用記憶體。 */
   | { type: 'storage.clear' }
   | { type: 'back' }
   | { type: 'dispose' }
 
 export type RequestOp = 'message.send' | 'message.edit' | 'save.set' | 'save.remove'
+  | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove'
 
 /** 殼上的按鈕想請宿主開的面板／做的事。 */
 export type ShellAction = 'back' | 'open-model' | 'open-persona' | 'open-archives' | 'stop' | 'regenerate' | 'more'

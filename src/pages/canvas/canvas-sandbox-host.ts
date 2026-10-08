@@ -23,8 +23,30 @@ import { observeViewport, visibleViewport } from './canvas-viewport'
 import { cardStorageScope, getAuthorRuleStorageScope, onStorageScopeChange } from '@/common/author-rules/storage-scope'
 import type { ChromeState, ChromeUiEvent, MessageMenuAnchor, MessageView, PanelsState, StageState } from '@/sandbox/protocol'
 
+/** 宿主做一個存檔操作的結果：成功帶值，失敗帶 sdk 的錯誤碼（LIMIT_REACHED 附 { count, limit }）。 */
+export type SandboxArchiveResult = { ok: true; value?: unknown } | { ok: false; code: string; message?: string; data?: Record<string, unknown> }
+
+/**
+ * 平台對話存檔給沙箱卡用的那一面（sdk.archive.*）。實作在 canvas.vue，跟存檔清單面板用同一組伺服器呼叫；
+ * 不開確認框也不開面板（確認由卡片在玩家手勢裡自己問，不在手勢裡殼先問）。
+ */
+export interface SandboxArchiveHost {
+  list(): Promise<SandboxArchiveResult>
+  /** 把目前進度留一份：從最新一則分叉，留下的那份（原本這段）取名 title；回 { id: 留下的那份, current: 接著玩的那份 }。 */
+  save(title: string): Promise<SandboxArchiveResult>
+  /** 從 messageId（伺服器的訊息 id）另開一段並切過去；回 { id }。 */
+  fork(messageId: string): Promise<SandboxArchiveResult>
+  open(id: string): Promise<SandboxArchiveResult>
+  /** 另開新檔：目前這段留在清單裡，從開場 opening（0＝主開場）重來；回 { id }。 */
+  start(opening: number): Promise<SandboxArchiveResult>
+  rename(id: string, title: string): Promise<SandboxArchiveResult>
+  remove(id: string): Promise<SandboxArchiveResult>
+}
+
 export interface SandboxHostDeps {
   hud: HudHost
+  /** 平台的對話存檔（sdk.archive.*）；不給就是這裡沒有存檔，archive.* 回 HOST_DENIED。 */
+  archive?: SandboxArchiveHost | null
   iframe: HTMLIFrameElement
   win: Window
   origin: string
@@ -74,7 +96,7 @@ export interface SandboxHost {
   /** 讀一次宿主狀態，把變化送給殼。狀態一變就呼叫（watchEffect）。 */
   sync(): void
   /** 宿主換了存檔／對話：殼清空，下一次 sync 重送全量。 */
-  conversationSwitched(): void
+  conversationSwitched(conversationId?: string): void
   postTheme(theme: 'dark' | 'light', vars?: Record<string, string>): void
   postViewport(height: number): void
   /** 宿主的返回鍵：殼處理了（關舞台）回 true；否則回 false 由宿主導頁。 */
@@ -391,7 +413,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     lastViewport = base.viewportHeight ?? viewportHeight()
     post({
       type: 'hello',
-      config: { ...base, ...(storageScope ? { storageScope } : {}), viewportHeight: lastViewport, capabilities: { saves: savesOk, edit: true, send: true }, saves, chromeState: chrome ? (JSON.parse(lastChromeKey) as ChromeState) : undefined },
+      config: { ...base, ...(storageScope ? { storageScope } : {}), viewportHeight: lastViewport, capabilities: { saves: savesOk, edit: true, send: true, archive: !!deps.archive }, saves, chromeState: chrome ? (JSON.parse(lastChromeKey) as ChromeState) : undefined },
     })
     // 殼建好之後才有東西可畫：歷史一到就送全量訊息，殼跑完冷啟動再喊 ready。
     armColdStart()
@@ -399,7 +421,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     if (tryColdStart(snapshot)) syncGeneration(snapshot)
   }
 
-  const reply = (reqId: number, ok: boolean, value?: unknown, error?: { code: string; message?: string }) => {
+  const reply = (reqId: number, ok: boolean, value?: unknown, error?: { code: string; message?: string; data?: Record<string, unknown> }) => {
     post({ type: 'reply', reqId, ok, value, error })
   }
 
@@ -432,6 +454,25 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
           if (!deps.saves) return reply(reqId, false, undefined, { code: 'HOST_DENIED' })
           await deps.saves.remove(deps.roleId, String(args[0]))
           return reply(reqId, true)
+        }
+        case 'archive.list':
+        case 'archive.save':
+        case 'archive.fork':
+        case 'archive.open':
+        case 'archive.new':
+        case 'archive.rename':
+        case 'archive.remove': {
+          const a = deps.archive
+          if (!a) return reply(reqId, false, undefined, { code: 'HOST_DENIED' })
+          const s = (i: number) => String(args[i] ?? '')
+          const r = op === 'archive.list' ? await a.list()
+            : op === 'archive.save' ? await a.save(s(0))
+            : op === 'archive.fork' ? await a.fork(s(0))
+            : op === 'archive.open' ? await a.open(s(0))
+            : op === 'archive.new' ? await a.start(Number(args[0]) || 0)
+            : op === 'archive.rename' ? await a.rename(s(0), s(1))
+            : await a.remove(s(0))
+          return r.ok ? reply(reqId, true, r.value) : reply(reqId, false, undefined, { code: r.code, ...(r.message ? { message: r.message } : {}), ...(r.data ? { data: r.data } : {}) })
         }
         default:
           return reply(reqId, false, undefined, { code: 'UNKNOWN_CAPABILITY' })
@@ -572,9 +613,9 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       syncHistory(snapshot)
       syncPrologue(snapshot)
     },
-    conversationSwitched() {
+    conversationSwitched(conversationId?: string) {
       if (!helloSent || destroyed) return
-      post({ type: 'conversation.switch' })
+      post({ type: 'conversation.switch', ...(conversationId ? { conversationId } : {}) })
       armColdStart()
       const snapshot = hud.read()
       if (tryColdStart(snapshot)) syncGeneration(snapshot)

@@ -246,10 +246,11 @@ export function createShell(options: CreateShellOptions): Shell {
     user: () => ({ nickname: config.user.nickname, avatarUrl: config.user.avatarUrl, locale: config.locale || '' }),
     text: { convert: (text) => (convert && text ? convert(text) : text), ready: () => textReady },
     model: () => modelNow(),
-    capabilities: { saves: !!config.capabilities.saves, edit: !!config.capabilities.edit, send: config.capabilities.send !== false },
+    capabilities: { saves: !!config.capabilities.saves, edit: !!config.capabilities.edit, send: config.capabilities.send !== false, archive: !!config.capabilities.archive },
     request,
     inGesture: () => gesture,
     askSendPermission: () => confirmDialog(doc, refs.root, { title: strings.allowSendTitle, body: strings.allowSendBody, ok: strings.allow, cancel: strings.deny }),
+    askArchivePermission: () => confirmDialog(doc, refs.root, { title: strings.allowArchiveTitle, body: strings.allowArchiveBody, ok: strings.allow, cancel: strings.deny }),
     busy: () => busy,
     debug: (...args) => debug.log(...args),
   }
@@ -705,7 +706,8 @@ export function createShell(options: CreateShellOptions): Shell {
         history.loading = false
         list.clear()
         bus.resetReplay()
-        bus.emit('conversation:switch')
+        // 載荷 { conversationId }（宿主有給才帶）：卡片用它對上 sdk.archive.list() 裡的那一段
+        bus.emit('conversation:switch', message.conversationId ? { conversationId: String(message.conversationId) } : undefined)
         return
       case 'back':
         transport.send({ type: 'back-handled', handled: handleBack() })

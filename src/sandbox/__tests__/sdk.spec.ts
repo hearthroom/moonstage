@@ -47,17 +47,17 @@ const expectCode = async (p: Promise<unknown> | (() => unknown), code: string) =
 }
 
 describe('sdk 的形狀', () => {
-  it('恰好 13 個鍵、33 個能力、version 是值 "1"、沒有 once/off', () => {
+  it('恰好 14 個鍵、40 個能力、version 是值 "1"、沒有 once/off', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
-    expect(Object.keys(sdk).sort()).toEqual(['cache', 'composer', 'debug', 'input', 'message', 'model', 'on', 'role', 'save', 'stage', 'text', 'user', 'version'])
+    expect(Object.keys(sdk).sort()).toEqual(['archive', 'cache', 'composer', 'debug', 'input', 'message', 'model', 'on', 'role', 'save', 'stage', 'text', 'user', 'version'])
     const caps = [
       ...Object.keys(sdk.input).map((k) => `input.${k}`), ...Object.keys(sdk.composer).map((k) => `composer.${k}`),
       ...Object.keys(sdk.message).map((k) => `message.${k}`), ...Object.keys(sdk.cache).map((k) => `cache.${k}`),
       ...Object.keys(sdk.save).map((k) => `save.${k}`), ...Object.keys(sdk.stage).map((k) => `stage.${k}`),
-      ...Object.keys(sdk.text).map((k) => `text.${k}`),
+      ...Object.keys(sdk.text).map((k) => `text.${k}`), ...Object.keys(sdk.archive).map((k) => `archive.${k}`),
       'role.get', 'user.get', 'model.get', 'on', 'debug.log', 'version',
     ]
-    expect(caps.length).toBe(33)
+    expect(caps.length).toBe(40)
     expect(sdk.version).toBe('1')
     expect((sdk as unknown as { once?: unknown }).once).toBeUndefined()
     expect((sdk as unknown as { off?: unknown }).off).toBeUndefined()
@@ -212,5 +212,74 @@ describe('save：上限算上在途的寫入', () => {
     await expectCode(c.sdk.save.set('fresh', 1), 'NETWORK')
     expect(c.sdk.save.keys()).not.toContain('fresh')
     expect(c.sdk.save.keys().length).toBe(9)
+  })
+})
+
+describe('sdk.archive（平台的對話存檔）', () => {
+  const archiveHost = (over: Parameters<typeof fakeHost>[0] & { askArchive?: boolean } = {}) => {
+    let asked = 0
+    const host = fakeHost({ capabilities: { saves: true, edit: true, send: true, archive: true }, ...over })
+    host.askArchivePermission = async () => { asked++; return over.askArchive !== false }
+    return { host, asked: () => asked }
+  }
+  const codeOf = async (p: Promise<unknown>) => { try { await p; return 'ok' } catch (e) { return (e as SdkError).code } }
+
+  it('changes run directly inside a gesture (the card asks with its own screen), and ask first outside one', async () => {
+    const a = archiveHost({ gesture: true })
+    const { sdk } = createSdk(a.host, createEventBus())
+    await sdk.archive.save('第一章・第3天')
+    await sdk.archive.fork('m-12')
+    await sdk.archive.open('c-2')
+    await sdk.archive.start(1)
+    await sdk.archive.rename('c-2', '  新名字  ')
+    await sdk.archive.remove('c-3')
+    expect(a.asked()).toBe(0)
+    expect(a.host.requests).toEqual([
+      { op: 'archive.save', args: ['第一章・第3天'] }, { op: 'archive.fork', args: ['m-12'] }, { op: 'archive.open', args: ['c-2'] },
+      { op: 'archive.new', args: [1] }, { op: 'archive.rename', args: ['c-2', '新名字'] }, { op: 'archive.remove', args: ['c-3'] },
+    ])
+    const b = archiveHost({ gesture: false })
+    await createSdk(b.host, createEventBus()).sdk.archive.open('c-2')
+    expect(b.asked()).toBe(1)
+    const denied = archiveHost({ gesture: false, askArchive: false })
+    expect(await codeOf(createSdk(denied.host, createEventBus()).sdk.archive.save())).toBe('UNAUTHORIZED')
+    expect(denied.host.requests).toEqual([])
+  })
+
+  it('list needs no gesture or permission', async () => {
+    const a = archiveHost({ gesture: false, request: async () => ({ items: [], count: 1, limit: 20 }) })
+    expect(await createSdk(a.host, createEventBus()).sdk.archive.list()).toEqual({ items: [], count: 1, limit: 20 })
+    expect(a.asked()).toBe(0)
+  })
+
+  it('refuses without the host capability, while a reply is generating, and on bad arguments', async () => {
+    const off = fakeHost({ gesture: true })
+    expect(await codeOf(createSdk(off, createEventBus()).sdk.archive.list())).toBe('HOST_DENIED')
+    expect(await codeOf(createSdk(off, createEventBus()).sdk.archive.save())).toBe('HOST_DENIED')
+    const busy = archiveHost({ gesture: true, generating: true })
+    expect(await codeOf(createSdk(busy.host, createEventBus()).sdk.archive.open('c'))).toBe('BUSY')
+    const { sdk } = createSdk(archiveHost({ gesture: true }).host, createEventBus())
+    expect(await codeOf(sdk.archive.open(''))).toBe('INVALID_ARGS')
+    expect(await codeOf(sdk.archive.start(-1))).toBe('INVALID_ARGS')
+    expect(await codeOf(sdk.archive.rename('c', 'x'.repeat(101)))).toBe('INVALID_ARGS')
+    expect(await codeOf(sdk.archive.fork(42 as unknown as string))).toBe('INVALID_ARGS')
+  })
+
+  it('a full save list comes back as LIMIT_REACHED with the count and limit', async () => {
+    const { sdkErrorFromHost } = await import('../sdk/errors')
+    const a = archiveHost({ gesture: true, request: async () => { throw sdkErrorFromHost({ code: 'LIMIT_REACHED', data: { count: 20, limit: 20 } }) } })
+    try { await createSdk(a.host, createEventBus()).sdk.archive.save(); throw new Error('no error') } catch (e) {
+      expect((e as SdkError).code).toBe('LIMIT_REACHED')
+      expect((e as SdkError).data).toEqual({ count: 20, limit: 20 })
+    }
+  })
+
+  it('changes are rate limited to 10 a minute', async () => {
+    const a = archiveHost({ gesture: true })
+    const { sdk } = createSdk(a.host, createEventBus())
+    for (let i = 0; i < RATE_LIMITS['archive.write'].count; i++) await sdk.archive.rename('c', 't' + i)
+    expect(await codeOf(sdk.archive.rename('c', 'over'))).toBe('RATE_LIMITED')
+    a.host.tick(60_000)
+    expect(await codeOf(sdk.archive.rename('c', 'again'))).toBe('ok')
   })
 })

@@ -63,7 +63,7 @@ function capabilitiesOf(sdk: Record<string, unknown>): { keys: string[]; capabil
     capabilities.push(key)
   }
   // 非同步的四個：回 Promise；其餘同步、錯誤直接 throw。
-  const async = ['message.send', 'message.edit', 'save.set', 'save.remove', 'text.ready']
+  const async = ['message.send', 'message.edit', 'save.set', 'save.remove', 'text.ready', 'archive.list', 'archive.save', 'archive.fork', 'archive.open', 'archive.start', 'archive.rename', 'archive.remove']
   return { keys, capabilities: capabilities.sort(), async }
 }
 
@@ -214,6 +214,7 @@ function buildContract() {
       role: { get: ['name', 'avatarUrl'] },
       user: { get: ['nickname', 'avatarUrl', 'locale'] },
       model: { get: ['name', 'cost'] },
+      archive: { item: ['id', 'title', 'isCurrent', 'messageCount', 'lastMessage', 'createTime', 'lastUpdateTime'], list: ['items', 'count', 'limit'], limitError: { code: 'LIMIT_REACHED', data: ['count', 'limit'] }, gesture: 'save/fork/open/start/rename/remove run directly inside a user gesture; outside one the shell asks first', rateLimit: 'archive.write 10/min' },
       stage: { modes: ['content', 'full'], unknownModeBecomes: 'content', elReturnsNodeWhenClosed: true, ownCloseDoesNotEmitStageClose: true },
       input: { writesThrowWhileComposing: 'INVALID_ARGS' },
       message: { sendBusy: 'BUSY', sendWithoutCapability: 'NOT_SUPPORTED', editWithoutCapability: 'HOST_DENIED', confirmOutsideGesture: true, declinedCode: 'UNAUTHORIZED', editIdIs: 'serverId (data-msg-id)' },
@@ -227,7 +228,7 @@ function buildContract() {
       replayedToLateSubscribers: ['message:mount', 'message:done'],
       readyReplayed: false,
       coldStartOrder: ['message:new', 'message:mount', 'message:done', '…', 'ready'],
-      payload: { 'message:new': ['content', 'id', 'role', 'serverId'], 'message:mount': ['content', 'id', 'role', 'serverId'], 'message:done': ['content', 'id', 'role', 'serverId'], 'message:stream': ['content', 'id', 'role'], 'message:unmount': ['content', 'id', 'role', 'serverId'], 'input:change': 'string', 'theme:change': 'none', 'model:change': ['cost', 'name'], others: 'none' },
+      payload: { 'message:new': ['content', 'id', 'role', 'serverId'], 'message:mount': ['content', 'id', 'role', 'serverId'], 'message:done': ['content', 'id', 'role', 'serverId'], 'message:stream': ['content', 'id', 'role'], 'message:unmount': ['content', 'id', 'role', 'serverId'], 'input:change': 'string', 'theme:change': 'none', 'model:change': ['cost', 'name'], 'conversation:switch': ['conversationId'], others: 'none' },
       roles: ['user', 'ai'],
       systemRowsEmitNoEvents: true,
       handlerArity: 1,
@@ -301,11 +302,11 @@ describe('沙箱作者契約', () => {
     expect(current).toBe(text)
   })
 
-  it('能力數與 sdk.spec 對得上：13 鍵、33 能力、5 個非同步', () => {
+  it('能力數與 sdk.spec 對得上：14 鍵、40 能力、12 個非同步', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
     const caps = capabilitiesOf(sdk as unknown as Record<string, unknown>)
-    expect(caps.keys.length).toBe(13)
-    expect(caps.capabilities.length).toBe(33)
+    expect(caps.keys.length).toBe(14)
+    expect(caps.capabilities.length).toBe(40)
     for (const a of caps.async) expect(caps.capabilities).toContain(a)
   })
 

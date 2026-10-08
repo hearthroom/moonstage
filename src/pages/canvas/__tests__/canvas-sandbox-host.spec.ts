@@ -123,7 +123,7 @@ describe('沙箱宿主橋', () => {
     expect(h.posted.length).toBe(0)
     h.fromShell({ type: 'ready-shell' })
     await flush()
-    expect(h.posted[0]).toMatchObject({ ms: SANDBOX_PROTOCOL_VERSION, type: 'hello', config: { capabilities: { saves: false, edit: true, send: true }, role: { name: '露娜' } } })
+    expect(h.posted[0]).toMatchObject({ ms: SANDBOX_PROTOCOL_VERSION, type: 'hello', config: { capabilities: { saves: false, edit: true, send: true, archive: false }, role: { name: '露娜' } } })
     expect(h.posted[1]).toEqual({ ms: 1, type: 'messages', messages: [
       { id: 'greeting', role: 'ai', content: '你好', serverId: null, state: 'done' },
       { id: 'h11', role: 'user', content: '嗨', serverId: null, state: 'done' },
@@ -306,6 +306,59 @@ describe('沙箱宿主橋', () => {
     await flush()
     expect(h.posted[0]).toMatchObject({ type: 'reply', reqId: 9, ok: false, error: { code: 'HOST_DENIED' } })
     noSaves.destroy()
+  })
+
+  it('殼的 archive.* request 轉給宿主的存檔實作；錯誤碼與附帶資料原樣帶回；握手宣告能力；換檔帶 conversationId', async () => {
+    const state = { current: makeState({ messages: [msg({ id: '60', text: 'x' })] }) }
+    const { hud } = fakeHud(state)
+    const archive = {
+      list: vi.fn(async () => ({ ok: true as const, value: { items: [], count: 3, limit: 20 } })),
+      save: vi.fn(async () => ({ ok: false as const, code: 'LIMIT_REACHED', data: { count: 20, limit: 20 } })),
+      fork: vi.fn(async () => ({ ok: true as const, value: { id: 'c-new' } })),
+      open: vi.fn(async () => ({ ok: true as const })),
+      start: vi.fn(async () => ({ ok: true as const, value: { id: 'c-2' } })),
+      rename: vi.fn(async () => ({ ok: true as const })),
+      remove: vi.fn(async () => ({ ok: false as const, code: 'BUSY', message: 'busy' })),
+    }
+    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '7', hello, archive })
+    host.start()
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    expect(h.posted[0]).toMatchObject({ type: 'hello', config: { capabilities: { archive: true } } })
+    h.posted.length = 0
+    const ops: Array<[string, unknown[]]> = [['archive.list', []], ['archive.save', ['第三天']], ['archive.fork', ['60']], ['archive.open', ['c-1']], ['archive.new', [2]], ['archive.rename', ['c-1', '名']], ['archive.remove', ['c-1']]]
+    ops.forEach(([op, args], i) => h.fromShell({ type: 'request', reqId: 20 + i, op, args }))
+    await flush()
+    expect(archive.save).toHaveBeenCalledWith('第三天')
+    expect(archive.fork).toHaveBeenCalledWith('60')
+    expect(archive.open).toHaveBeenCalledWith('c-1')
+    expect(archive.start).toHaveBeenCalledWith(2)
+    expect(archive.rename).toHaveBeenCalledWith('c-1', '名')
+    expect(archive.remove).toHaveBeenCalledWith('c-1')
+    const replies = h.posted.filter((p) => p.type === 'reply').sort((a, b) => Number(a.reqId) - Number(b.reqId))
+    expect(replies.map((r) => [r.ok, r.value, r.error])).toEqual([
+      [true, { items: [], count: 3, limit: 20 }, undefined],
+      [false, undefined, { code: 'LIMIT_REACHED', data: { count: 20, limit: 20 } }],
+      [true, { id: 'c-new' }, undefined],
+      [true, undefined, undefined],
+      [true, { id: 'c-2' }, undefined],
+      [true, undefined, undefined],
+      [false, undefined, { code: 'BUSY', message: 'busy' }],
+    ])
+    h.posted.length = 0
+    host.conversationSwitched('c-new')
+    expect(h.posted[0]).toMatchObject({ type: 'conversation.switch', conversationId: 'c-new' })
+    host.destroy()
+    const none = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '7', hello })
+    none.start()
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    expect(h.posted.find((p) => p.type === 'hello')).toMatchObject({ config: { capabilities: { archive: false } } })
+    h.posted.length = 0
+    h.fromShell({ type: 'request', reqId: 40, op: 'archive.list', args: [] })
+    await flush()
+    expect(h.posted[0]).toMatchObject({ type: 'reply', reqId: 40, ok: false, error: { code: 'HOST_DENIED' } })
+    none.destroy()
   })
 
   it('殼的舞台與輸入區狀態轉給宿主：stage → onStage、composer → onComposer', async () => {

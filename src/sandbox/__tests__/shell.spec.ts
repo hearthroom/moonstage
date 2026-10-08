@@ -142,6 +142,15 @@ describe('殼：冷啟動與事件順序', () => {
     s.dispose()
   })
 
+  it('conversation:switch carries the conversationId the host sends, and sdk.archive follows the archive capability', () => {
+    const s = boot(config({ capabilities: { saves: false, edit: true, send: true, archive: true }, card: { rules: [SCRIPT_RULE(`window.__sw = []; sdk.on('conversation:switch', function (p) { window.__sw.push(p ? p.conversationId : 'none'); });`)], statusbar: '' } }))
+    s.handle({ type: 'conversation.switch', conversationId: 'c-9' })
+    s.handle({ type: 'conversation.switch' })
+    expect((window as unknown as { __sw: string[] }).__sw).toEqual(['c-9', 'none'])
+    expect(typeof s.sdk.archive.list).toBe('function')
+    s.dispose()
+  })
+
   it('sdk.model.get() is empty strings when the host sends no model', () => {
     const s = boot(config({ card: { rules: [], statusbar: '' } }))
     expect(s.sdk.model.get()).toEqual({ name: '', cost: '' })

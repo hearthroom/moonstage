@@ -1,5 +1,5 @@
 /**
- * 作者看到的 `sdk`：11 個鍵、30 個能力，全部從第一版就存在——作者腳本在頂層探測它們，
+ * 作者看到的 `sdk`：14 個鍵、40 個能力（後來加了 text、model、archive），全部從第一版就存在——作者腳本在頂層探測它們，
  * 少一個就是「按鈕全不響應」而沒有任何報錯。每個能力有實作狀態：實作／宿主沒接（HOST_DENIED）。
  *
  * 錯誤慣例（作者的程式碼依賴）：
@@ -10,6 +10,8 @@
  *   - 限頻：save.set 20／分、message.send 手勢 3／分、自動 3／分、message.edit 10／分 → RATE_LIMITED。
  *   - 生成中再 message.send → BUSY（不排隊、不占限頻）。
  *   - 非手勢的 message.send → 殼內問使用者；拒絕 → UNAUTHORIZED。
+ *   - archive.*（平台的對話存檔）：會改變存檔的操作在手勢裡直接做（卡片用自己的確認畫面），不在手勢裡殼內先問；
+ *     10／分；生成中 → BUSY；存檔滿了 → LIMIT_REACHED（err.data = { count, limit }）。
  */
 import { SdkError } from './errors'
 import type { EventBus } from './events'
@@ -24,6 +26,7 @@ export const RATE_LIMITS = {
   'message.send.gesture': { count: 3, windowMs: 60_000 },
   'message.send.auto': { count: 3, windowMs: 60_000 },
   'message.edit': { count: 10, windowMs: 60_000 },
+  'archive.write': { count: 10, windowMs: 60_000 },
 } as const
 
 export type RateLimitKey = keyof typeof RATE_LIMITS
@@ -62,13 +65,15 @@ export interface SdkHost {
   text?: { convert(text: string): string; ready(): Promise<void> }
   /** 玩家目前選的模型：友善名與下一輪的點數（已格式化；動態計價是區間）。宿主還沒給時是空字串。 */
   model?: () => { name: string; cost: string }
-  capabilities: { saves: boolean; edit: boolean; send: boolean }
+  capabilities: { saves: boolean; edit: boolean; send: boolean; archive?: boolean }
   /** 宿主代辦：送出、改寫、存檔寫入。 */
-  request(op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove', args: unknown[]): Promise<unknown>
+  request(op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove' | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove', args: unknown[]): Promise<unknown>
   /** 現在是不是在使用者手勢裡（點擊當下）。 */
   inGesture(): boolean
   /** 非手勢送出前問使用者；回 true 表示允許。 */
   askSendPermission(text: string): Promise<boolean>
+  /** 非手勢變更存檔（archive.save/fork/open/start/rename/remove）前問使用者；沒給就當不允許。 */
+  askArchivePermission?(): Promise<boolean>
   /** 宿主正在生成回覆。 */
   busy(): boolean
   debug(...args: unknown[]): void
@@ -89,11 +94,36 @@ export interface Sdk {
   user: { get(): { nickname: string; avatarUrl: string; locale: string } }
   /** 卡片自己畫的字也跟著玩家的簡繁：convert 同步轉一段純文字；ready 在字典載好（或確定不需要）時完成。 */
   text: { convert(text: string): string; ready(): Promise<void> }
+  /**
+   * 平台的對話存檔（每張卡最多 limit 段，含目前這段；伺服器記的，跨裝置）。每段就是一段對話：讀檔＝切過去，
+   * 原本的進度原樣留著；存檔＝把目前進度留一份（從最新一則分叉、留下的那份取名）；分叉＝從某一則另開一段。
+   * 切換之後殼清空訊息、重載那一段，並發 conversation:switch（{ conversationId }）。
+   */
+  archive: {
+    list(): Promise<{ items: ArchiveItem[]; count: number; limit: number }>
+    save(title?: string): Promise<{ id: string; current: string }>
+    fork(messageId: string): Promise<{ id: string }>
+    open(id: string): Promise<void>
+    start(opening?: number): Promise<{ id: string }>
+    rename(id: string, title: string): Promise<void>
+    remove(id: string): Promise<void>
+  }
   /** 玩家目前的模型與下一輪的點數；換模型或點數變了發 model:change（載荷同 get()）。 */
   model: { get(): { name: string; cost: string } }
   on(event: string, cb: (payload?: unknown) => void): void
   debug: { log(...args: unknown[]): void }
   version: string
+}
+
+/** 存檔清單的一列。lastMessage 是最後一則的前 80 字；時間是 RFC 3339。 */
+export interface ArchiveItem {
+  id: string
+  title: string
+  isCurrent: boolean
+  messageCount: number
+  lastMessage: string
+  createTime: string
+  lastUpdateTime: string
 }
 
 export interface SdkController {
@@ -121,6 +151,25 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
     if (list.length >= limit.count) { stamps.set(key, list); throw new SdkError('RATE_LIMITED') }
     list.push(t)
     stamps.set(key, list)
+  }
+
+  // archive.*：宿主沒接就 HOST_DENIED；改變存檔的操作照 message.send 的規矩（手勢裡直接做，不在手勢裡先問）。
+  const archiveReady = () => { if (!host.capabilities.archive) throw new SdkError('HOST_DENIED', 'saves are not available here') }
+  const archiveTitle = (title: unknown) => {
+    const t = requireString(title, 'title').trim()
+    if ([...t].length > 100) throw new SdkError('INVALID_ARGS', 'title is longer than 100 characters')
+    return t
+  }
+  const archiveWrite = async (op: 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove', args: unknown[]) => {
+    archiveReady()
+    if (host.busy()) throw new SdkError('BUSY', 'a reply is still being generated')
+    if (!host.inGesture()) {
+      const ok = host.askArchivePermission ? await host.askArchivePermission() : false
+      if (!ok) throw new SdkError('UNAUTHORIZED', 'the user did not allow this change to their saves')
+      if (host.busy()) throw new SdkError('BUSY', 'a reply is still being generated')
+    }
+    takeSlot('archive.write')
+    return host.request(op, args)
   }
 
   const cache = new Map<string, unknown>()
@@ -251,6 +300,41 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
         return host.text ? host.text.convert(s) : s
       },
       ready: () => (host.text ? host.text.ready() : Promise.resolve()),
+    },
+    archive: {
+      async list() {
+        archiveReady()
+        return (await host.request('archive.list', [])) as { items: ArchiveItem[]; count: number; limit: number }
+      },
+      async save(title) {
+        const t = title == null ? '' : archiveTitle(title)
+        return (await archiveWrite('archive.save', [t])) as { id: string; current: string }
+      },
+      async fork(messageId) {
+        const id = requireString(messageId, 'messageId')
+        if (!id) throw new SdkError('INVALID_ARGS', 'messageId is empty')
+        return (await archiveWrite('archive.fork', [id])) as { id: string }
+      },
+      async open(id) {
+        const target = requireString(id, 'id')
+        if (!target) throw new SdkError('INVALID_ARGS', 'id is empty')
+        await archiveWrite('archive.open', [target])
+      },
+      async start(opening) {
+        const n = opening == null ? 0 : opening
+        if (typeof n !== 'number' || !Number.isInteger(n) || n < 0) throw new SdkError('INVALID_ARGS', 'opening must be 0 (the main opening) or an alternate index')
+        return (await archiveWrite('archive.new', [n])) as { id: string }
+      },
+      async rename(id, title) {
+        const target = requireString(id, 'id')
+        if (!target) throw new SdkError('INVALID_ARGS', 'id is empty')
+        await archiveWrite('archive.rename', [target, archiveTitle(title)])
+      },
+      async remove(id) {
+        const target = requireString(id, 'id')
+        if (!target) throw new SdkError('INVALID_ARGS', 'id is empty')
+        await archiveWrite('archive.remove', [target])
+      },
     },
     model: { get: () => { const m = host.model ? host.model() : null; return { name: String(m?.name || ''), cost: String(m?.cost || '') } } },
     on: (event, cb) => bus.on(event, cb),
