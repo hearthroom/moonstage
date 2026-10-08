@@ -435,7 +435,7 @@ import { createAuthorScope } from '@/utils/author-asset-scope.js'
 import { needsKaiFallback, ensureKaiFallback, applyFontMode } from './canvas-font-fallback'
 import { getAuthorDraftStore } from '@/common/author-draft-store'
 import { draftToAuthorAsset, draftDisplayName, type AuthorDraft } from '@/common/author-draft'
-import { createSandboxHost, type SandboxHost } from './canvas-sandbox-host'
+import { createSandboxHost, type SandboxArchiveHost, type SandboxArchiveResult, type SandboxHost } from './canvas-sandbox-host'
 import { resolveSandbox } from '@/host/sandbox-host'
 import { adoptAuthorBodyNode, hoistFixedAuthorNodes } from './canvas-author-node-hoist'
 import { bindComposerOverhang } from './canvas-composer-overhang'
@@ -2891,6 +2891,7 @@ function mountSandbox(asset: any) {
     if (!frame || !sandboxCard.value) return;
     const host = createSandboxHost({
       hud: buildHudHost(),
+      archive: allowsStagePanel(stageHost.capabilities, 'conversations') ? sandboxArchive : null,
       iframe: frame,
       win: window,
       origin: resolved.origin,
@@ -2985,7 +2986,7 @@ watchEffect(() => {
 // 開新對話會先把會話清成空字串（那一步才是切換）再拿到新的 id。
 watch(() => String(unref(conversationId) || ''), (next, prev) => {
   if (!sandboxHostRef.value || next === prev || !prev) return;
-  sandboxHostRef.value.conversationSwitched();
+  sandboxHostRef.value.conversationSwitched(next || undefined);
 });
 
 function onHeaderBack() {
@@ -5125,33 +5126,7 @@ function saveAndStartNew() {
     }
   }).then(res => {
     if (res.statusCode == 200) {
-      teardownStreamForConversationSwitch({ invalidateHistory: true });
-      conversationId.value = res.data.conversationId;
-      // 通知 right-window 更新 conversationId
-      uni.$emit('updateConversationId', { conversationId: res.data.conversationId });
-      talkList.value = [];
-      openMore.value = false;
-      const welcomeContent = res.data.defaultRelay;
-      let data: any = {
-        "id": nextBubbleId(),
-        "content": welcomeContent,
-        "type": 0,
-        "pic": pic.value,
-        'maskPosition': 1,
-        'chatFinish': true,
-      }
-      // V3 welcome: push 路径不经过 SSE / mapRow，需要在这里手动建 ast
-      // 否则 isMessageV3() && item.ast 双闸 fail，bubble 走 v-html 把 <scene>/<choice>
-      // 渲染成纯文字（issue: 新建对话第一句没样式）
-      unref(talkList).push(data);
-
-      // 換了一段對話等於換了一個捲動語境：使用者在舊對話裡往上滑過的話，
-      // autoScrollEnabled 還停在 false，接下來這次捲底會被自己的 gate 擋掉，
-      // 畫面就停在原位（2026-08-12 回報「開新對話不會自動滑到底部」）。
-      autoScrollEnabled.value = true;
-      isUserAtBottom.value = true;
-      nextTick(() => scrollToBottom(true));
-      loadArchives();
+      adoptStartedConversation(res.data);
     } else if (res.statusCode === 409 && res.data && res.data.error === 'conversation_limit_reached') {
       // 存檔滿了（伺服器數的）：講清楚、給一條去刪的路，不當成一般錯誤。
       archiveCount.value = Number(res.data.count || archiveCount.value);
@@ -5163,6 +5138,37 @@ function saveAndStartNew() {
   }).catch(e => {
     console.error(e);
   });
+}
+
+/** 另開新檔成功之後的收尾（存檔清單的「開新對話」與 sdk.archive.start 共用）：換 conversationId、推開場白、捲到底。 */
+function adoptStartedConversation(started: any) {
+  teardownStreamForConversationSwitch({ invalidateHistory: true });
+  conversationId.value = started.conversationId;
+  // 通知 right-window 更新 conversationId
+  uni.$emit('updateConversationId', { conversationId: started.conversationId });
+  talkList.value = [];
+  openMore.value = false;
+  const welcomeContent = started.defaultRelay;
+  let data: any = {
+    "id": nextBubbleId(),
+    "content": welcomeContent,
+    "type": 0,
+    "pic": pic.value,
+    'maskPosition': 1,
+    'chatFinish': true,
+  }
+  // V3 welcome: push 路径不经过 SSE / mapRow，需要在这里手动建 ast
+  // 否则 isMessageV3() && item.ast 双闸 fail，bubble 走 v-html 把 <scene>/<choice>
+  // 渲染成纯文字（issue: 新建对话第一句没样式）
+  unref(talkList).push(data);
+
+  // 換了一段對話等於換了一個捲動語境：使用者在舊對話裡往上滑過的話，
+  // autoScrollEnabled 還停在 false，接下來這次捲底會被自己的 gate 擋掉，
+  // 畫面就停在原位（2026-08-12 回報「開新對話不會自動滑到底部」）。
+  autoScrollEnabled.value = true;
+  isUserAtBottom.value = true;
+  nextTick(() => scrollToBottom(true));
+  loadArchives();
 }
 
 
@@ -11267,6 +11273,121 @@ async function forkArchive() {
   } finally {
     archiveBusy.value = false
   }
+}
+
+// ── 沙箱卡的對話存檔（sdk.archive.*）────────────────────────────────────
+//
+// 跟上面的存檔清單用同一組伺服器呼叫與收尾（adoptConversation／adoptStartedConversation），但不開確認框、
+// 不開面板、不跳提示：卡片用自己的畫面問玩家（玩家手勢裡），不在手勢裡殼會先問。結果與錯誤碼回給卡片自己呈現。
+function archiveLimitError(res: any): SandboxArchiveResult {
+  archiveCount.value = Number(res.data.count || archiveCount.value)
+  if (Number(res.data.limit) > 0) archiveLimit.value = Number(res.data.limit)
+  return { ok: false, code: 'LIMIT_REACHED', data: { count: archiveCount.value, limit: archiveLimit.value } }
+}
+const isArchiveFull = (res: any) => res && res.statusCode === 409 && res.data && res.data.error === 'conversation_limit_reached'
+const archiveFailure = (res: any): SandboxArchiveResult => ({ ok: false, code: res && res.statusCode >= 400 && res.statusCode < 500 ? 'INVALID_ARGS' : 'NETWORK', message: res && res.data && typeof res.data.error === 'string' ? res.data.error : '' })
+async function archiveGuarded(run: () => Promise<SandboxArchiveResult>): Promise<SandboxArchiveResult> {
+  if (isTimelineMutationBlocked()) return { ok: false, code: 'BUSY', message: 'a reply is still being generated' }
+  if (archiveBusy.value) return { ok: false, code: 'BUSY', message: 'another save operation is running' }
+  archiveBusy.value = true
+  try { return await run() }
+  catch (e) { return { ok: false, code: 'NETWORK', message: String((e as Error)?.message || e) } }
+  finally { archiveBusy.value = false }
+}
+const sandboxArchive: SandboxArchiveHost = {
+  async list() {
+    const targetRoleId = String(unref(roleId) || '')
+    if (!targetRoleId) return { ok: false, code: 'HOST_DENIED' }
+    try {
+      const res = await _this.http.get(_this.requestUrl.conversationArchives, { data: archiveRequestQuery(targetRoleId), showLoading: false, quietTransport: true, timeout: 8000 })
+      if (res.statusCode !== 200 || !res.data) return archiveFailure(res)
+      const items = (Array.isArray(res.data.archives) ? res.data.archives : []).map((a: any) => ({
+        id: String(a.conversationId || ''),
+        title: convertPlainText(String(a.title || ''), displayScript),
+        isCurrent: !!a.isCurrent,
+        messageCount: Number(a.messageCount || 0),
+        lastMessage: convertPlainText(String(a.lastMessage || ''), displayScript),
+        createTime: String(a.createTime || ''),
+        lastUpdateTime: String(a.lastUpdateTime || ''),
+      }))
+      archiveCount.value = Number(res.data.count || items.length)
+      if (Number(res.data.limit) > 0) archiveLimit.value = Number(res.data.limit)
+      return { ok: true, value: { items, count: archiveCount.value, limit: archiveLimit.value } }
+    } catch (e) {
+      return { ok: false, code: 'NETWORK', message: String((e as Error)?.message || e) }
+    }
+  },
+  save: (title) => archiveGuarded(async () => {
+    const id = String(unref(conversationId) || '')
+    if (!id) return { ok: false, code: 'HOST_DENIED' }
+    const res = await postArchiveAction(_this.requestUrl.conversationFork, { conversationId: id })
+    if (isArchiveFull(res)) return archiveLimitError(res)
+    if (res.statusCode !== 200 || !res.data || !res.data.conversationId) return archiveFailure(res)
+    const next = String(res.data.conversationId)
+    // 留下的那份（原本這段）取名；改名失敗不影響存檔本身
+    if (title) await postArchiveAction(_this.requestUrl.conversationTitle, { conversationId: id, title }).catch(() => null)
+    adoptConversation(next)
+    loadArchives()
+    return { ok: true, value: { id, current: next } }
+  }),
+  fork: (messageId) => archiveGuarded(async () => {
+    const id = String(unref(conversationId) || '')
+    if (!id) return { ok: false, code: 'HOST_DENIED' }
+    if (!(unref(talkList) as any[]).some((m) => String(m.id) === messageId)) return { ok: false, code: 'INVALID_ARGS', message: 'message not found' }
+    const res = await postArchiveAction(_this.requestUrl.conversationFork, { conversationId: id, chatId: messageId })
+    if (isArchiveFull(res)) return archiveLimitError(res)
+    if (res.statusCode !== 200 || !res.data || !res.data.conversationId) return archiveFailure(res)
+    const next = String(res.data.conversationId)
+    adoptConversation(next)
+    loadArchives()
+    return { ok: true, value: { id: next } }
+  }),
+  open: (key) => archiveGuarded(async () => {
+    if (key === String(unref(conversationId) || '')) return { ok: true }
+    const res = await postArchiveAction(_this.requestUrl.conversationSwitch, { conversationId: key })
+    if (res.statusCode !== 200) return archiveFailure(res)
+    adoptConversation(key)
+    loadArchives()
+    return { ok: true }
+  }),
+  start: (opening) => archiveGuarded(async () => {
+    const res = await _this.http.post(_this.requestUrl.saveAndStartNew, {
+      header: { 'content-type': 'application/json' }, showLoading: false,
+      data: { conversationId: unref(conversationId), save: true, greetingIndex: opening },
+    })
+    if (isArchiveFull(res)) return archiveLimitError(res)
+    if (res.statusCode !== 200 || !res.data || !res.data.conversationId) return archiveFailure(res)
+    adoptStartedConversation(res.data)
+    return { ok: true, value: { id: String(res.data.conversationId) } }
+  }),
+  async rename(key, title) {
+    try {
+      const res = await postArchiveAction(_this.requestUrl.conversationTitle, { conversationId: key, title })
+      if (res.statusCode !== 200) return archiveFailure(res)
+      loadArchives()
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, code: 'NETWORK', message: String((e as Error)?.message || e) }
+    }
+  },
+  remove: (key) => archiveGuarded(async () => {
+    const wasCurrent = key === String(unref(conversationId) || '')
+    if (wasCurrent) await loadArchives()
+    const successor = nextArchiveAfterDelete(archiveRows.value, key)
+    const res = await postArchiveAction(_this.requestUrl.deleteConversation, { conversationId: key })
+    if (res.statusCode !== 200) return archiveFailure(res)
+    if (wasCurrent) {
+      // 刪掉的是正在玩的這段：接手最近的另一段；一段都不剩就重新開一段（同 deleteArchive）
+      let adopted = false
+      if (successor) {
+        const sw = await postArchiveAction(_this.requestUrl.conversationSwitch, { conversationId: successor })
+        if (sw.statusCode === 200) { adoptConversation(successor); adopted = true }
+      }
+      if (!adopted) restartConversationFromScratch()
+    }
+    loadArchives()
+    return { ok: true }
+  }),
 }
 
 // ── 更換背景 ───────────────────────────────────────────────────────────

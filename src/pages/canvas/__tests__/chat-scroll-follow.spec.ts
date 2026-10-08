@@ -64,14 +64,19 @@ describe('desktop 捲底跟隨', () => {
     }
   })
 
-  it('saveAndStartNew 推完新開場白會捲到底', () => {
-    const body = fnBody('saveAndStartNew')
+  // 成功之後的收尾在 adoptStartedConversation（存檔清單的開新對話與 sdk.archive.start 共用）
+  it('saveAndStartNew 成功時交給 adoptStartedConversation 收尾', () => {
+    expect(fnBody('saveAndStartNew')).toMatch(/adoptStartedConversation\(res\.data\)/)
+  })
+
+  it('另開新檔推完新開場白會捲到底', () => {
+    const body = fnBody('adoptStartedConversation')
     const afterPush = body.slice(body.indexOf('talkList).push'))
     expect(afterPush).toMatch(/scrollToBottom/)
   })
 
-  it('saveAndStartNew 重置跟隨狀態，否則舊對話的上滑會擋掉新對話的捲底', () => {
-    const body = fnBody('saveAndStartNew')
+  it('另開新檔重置跟隨狀態，否則舊對話的上滑會擋掉新對話的捲底', () => {
+    const body = fnBody('adoptStartedConversation')
     expect(body).toMatch(/autoScrollEnabled\.value\s*=\s*true/)
   })
 
