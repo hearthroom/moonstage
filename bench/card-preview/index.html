@@ -48,6 +48,12 @@
         <option value="think">model thinks 3 s</option>
         <option value="summarize">plot summary 3 s + thinks 3 s</option>
       </select>
+      <select id="end" title="how the reply ends (sdk.generation outcome)">
+        <option value="">ends normally</option>
+        <option value="network">connection drops (retry)</option>
+        <option value="quota">out of credits (no button)</option>
+        <option value="interrupted">agent interrupted (continue)</option>
+      </select>
       <button id="stream">stream reply</button>
       <button id="instant">add instantly</button>
       <button id="user">add player line</button>

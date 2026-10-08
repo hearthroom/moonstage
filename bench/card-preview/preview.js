@@ -104,6 +104,14 @@
         return
       }
       if (String(m.op).startsWith('archive.')) { archiveRequest(m); return }
+      if (m.op === 'generation.act') {
+        // retry / continue: the platform runs the same turn again; this bench streams it and ends normally
+        post({ type: 'reply', reqId: m.reqId, ok: true, value: null })
+        const select = document.getElementById('end')
+        if (select) select.value = ''
+        if (m.args[0] === 'retry' || m.args[0] === 'continue') setTimeout(() => streamReply(state.retryText || 'OK.'), 300)
+        return
+      }
       post({ type: 'reply', reqId: m.reqId, ok: true, value: null })
       return
     }
@@ -118,6 +126,11 @@
     state.messages.push({ id, role: 'user', content: text, serverId: null })
     post({ type: 'message.new', message: { id, role: 'user', content: text, serverId: null } })
   }
+  const OUTCOMES = {
+    network: { kind: 'network-error', label: '網路連線中斷', sub: '請檢查網路後重試', actions: [{ action: 'retry', label: '重試' }] },
+    quota: { kind: 'quota', label: '積分不足，請先儲值！', sub: '請查看目前平台的餘額，儲值後再試。', actions: [] },
+    interrupted: { kind: 'interrupted', label: '這一輪還沒跑完，進度已經留著', sub: '進度已保留，可以按繼續接著跑，或換一個模型再試', actions: [{ action: 'continue', label: '繼續' }] },
+  }
   async function streamReply(text, chunks = 24) {
     if (state.busy) { log('still streaming', 'warn'); return }
     state.busy = true
@@ -129,6 +142,16 @@
     await phase('preparing', 500)
     if (wait === 'summarize') await phase('summarizing', 3000)
     if (wait === 'think' || wait === 'summarize') await phase('thinking', 3000)
+    // a turn that does not end normally, as the platform reports it (sdk.generation outcome / generation:outcome)
+    const end = (document.getElementById('end') || {}).value || ''
+    if (end && OUTCOMES[end]) {
+      post({ type: 'message.remove', id })
+      post({ type: 'generation', busy: false, phase: 'idle', outcome: OUTCOMES[end] })
+      log(`outcome ${OUTCOMES[end].kind}`)
+      state.retryText = text
+      state.busy = false
+      return
+    }
     post({ type: 'generation', busy: true, phase: 'writing' })
     const step = Math.max(1, Math.ceil(text.length / chunks))
     for (let k = step; k < text.length; k += step) {
@@ -136,7 +159,7 @@
       await new Promise((r) => setTimeout(r, 60))
     }
     post({ type: 'message.done', id, content: text, serverId: String(9000 + state.seq) })
-    post({ type: 'generation', busy: false, phase: 'idle' })
+    post({ type: 'generation', busy: false, phase: 'idle', outcome: null })
     state.messages.push({ id, role: 'ai', content: text, serverId: String(9000 + state.seq) })
     state.busy = false
   }

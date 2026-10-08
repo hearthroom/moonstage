@@ -157,6 +157,19 @@ describe('殼：冷啟動與事件順序', () => {
     s.dispose()
   })
 
+  it('generation:outcome fires when the turn\'s outcome changes (and back to null); get() carries it', () => {
+    const s = boot(config({ card: { rules: [SCRIPT_RULE(`window.__oc = []; sdk.on('generation:outcome', function (o) { window.__oc.push(o ? o.kind + ':' + o.actions.map(function (a) { return a.action }).join('+') : 'null'); });`)], statusbar: '' } }))
+    const w = window as unknown as { __oc: string[] }
+    const outcome = { kind: 'server-error', label: '伺服器暫時不穩定', sub: '', actions: [{ action: 'retry', label: '重試' }] }
+    expect(s.sdk.generation.get().outcome).toBeNull()
+    s.handle({ type: 'generation', busy: false, phase: 'idle', outcome })
+    s.handle({ type: 'generation', busy: false, phase: 'idle', outcome })
+    expect(s.sdk.generation.get().outcome).toEqual(outcome)
+    s.handle({ type: 'generation', busy: true, phase: 'preparing', outcome: null })
+    expect(w.__oc).toEqual(['server-error:retry', 'null'])
+    s.dispose()
+  })
+
   it('conversation:switch carries the conversationId the host sends, and sdk.archive follows the archive capability', () => {
     const s = boot(config({ capabilities: { saves: false, edit: true, send: true, archive: true }, card: { rules: [SCRIPT_RULE(`window.__sw = []; sdk.on('conversation:switch', function (p) { window.__sw.push(p ? p.conversationId : 'none'); });`)], statusbar: '' } }))
     s.handle({ type: 'conversation.switch', conversationId: 'c-9' })

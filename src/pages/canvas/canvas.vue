@@ -669,6 +669,7 @@ import {
   resolvePendingPrepTrailCollapsed,
 } from '@/utils/multi-pass';
 import { agentResumeFailedAgain, findResumableAgentOperation, resolveAgentResumeTarget } from '@/utils/agent-composer-action';
+import { outcomeFromInterruption, outcomeFromSystemNotice } from './canvas-generation-outcome';
 
 const store = useStore()
 
@@ -3165,6 +3166,30 @@ function systemNoticeFor(item: any, index: number) {
   };
 }
 
+/*
+  沙箱卡：上一輪沒正常結束時給作者的結局（sdk.generation.outcome）。只看最新那一列：Agent 中斷卡優先
+  （它出現時系統訊息卡被擋掉），否則是系統訊息卡。中斷卡的字跟 canvas-message.vue 那張卡同一組運算式。
+*/
+function generationOutcomeFor(list: any[]) {
+  const index = list.length - 1;
+  const item = list[index];
+  if (!item || item.type != 0) return null;
+  const id = String(item.id);
+  if (item.agentInterrupted === true) {
+    const failedAgain = agentResumeFailedAgain(unref(knownOperations), item.operationId);
+    const failedAgainSub = t('multiPass.failedAgainSub');
+    return outcomeFromInterruption(id, {
+      label: operationFailureTitle(item.failureCause, t) || t('multiPass.interruptedNotice'),
+      sub: failedAgain && failedAgainSub ? failedAgainSub : (operationFailureSub(item.failureCause, t, { agent: true }) || t('multiPass.interruptedNoticeSub')),
+      continueLabel: t('multiPass.continueAction'),
+      switchModelLabel: t('chat.switchModel'),
+      failedAgain,
+    });
+  }
+  const notice = systemNoticeFor(item, index);
+  return notice ? outcomeFromSystemNotice(id, notice) : null;
+}
+
 function buildHudHost(): HudHost {
   const indexOf = (messageId: string) => talkList.value.findIndex((it: any) => String(it.id) === messageId);
   const itemOf = (messageId: string) => { const i = indexOf(messageId); return i >= 0 ? { item: talkList.value[i] as any, index: i } : null; };
@@ -3226,6 +3251,8 @@ function buildHudHost(): HudHost {
           : streamingId ? 'writing' as const
           : lastAI && !lastAI.chatFinish && String(lastAI.thinkingContent || '') ? 'thinking' as const
           : 'preparing' as const,
+        // 沙箱殼用：上一輪沒正常結束時，最新那一列底下那張卡（作者用 sdk.generation 拿去畫自己的 UI）。
+        generationOutcome: sandboxCard.value && !generating ? generationOutcomeFor(list) : undefined,
         streamingMessageId: streamingId,
         inputText: String(unref(content) || ''),
         previewOnly: previewOnly.value === true,
@@ -4533,7 +4560,7 @@ function getSystemMsgLabel(finishReason) {
     'pause_turn':       t('systemMsg.stopped')      || '已停止生成',
     'user_stop':        t('systemMsg.stopped')      || '已停止生成',
     'agent_progress_preserved': t('multiPass.interruptedNotice') || '這一輪還沒跑完，進度已經留著',
-    'outcome_unconfirmed': t('chat.operationStatusUnavailable') || '結果還在確認中，不用重送——完成後會自動更新。',
+    'outcome_unconfirmed': t('chat.operationStatusUnavailable') || '結果還在路上，請稍等',
     'rate_limit':       t('systemMsg.rateLimit')    || '請求過於頻繁',
     // 上游把「這個模型現在用不了」分類成 service_unavailable，但終局錯誤這張表
     // 先前沒有這個鍵,於是落到通用的「AI 模型連線失敗」——使用者看不出是模型的問題,
@@ -4575,7 +4602,7 @@ function getSystemMsgSub(finishReason) {
     'error':            t('systemMsg.modelErrorSub')   || '可以重試，或換一個模型再試',
     'pause_turn':       t('systemMsg.stoppedSub')      || '你中斷了這次生成',
     'user_stop':        t('systemMsg.stoppedSub')      || '你中斷了這次生成',
-    'outcome_unconfirmed': t('chat.operationStatusUnavailableSub') || '不用重送，完成後會自動更新。若已產生回覆，會照原規則計費。',
+    'outcome_unconfirmed': t('chat.operationStatusUnavailableSub') || '好了會自動顯示在這裡，不用重送。',
     // agent 準備沒跑完時,主標只說「進度已經留著」——使用者不知道除了按繼續之外
     // 還能換模型。實測模型整條掛掉時(上游 100% 失敗),他會一直按繼續,而那個模型
     // 不會好。副標把兩條路都講出來,按鈕維持不變。
@@ -4633,6 +4660,7 @@ function getSystemMsgCta(finishReason, item, index) {
 function getSystemMsgCtas(item, index) {
   if (!allowsStageAction(stageHost.capabilities, 'continue')) return []
   if (item?.operationProjectionCapable !== true) return [];
+  if (item?.finishReason === 'outcome_unconfirmed') return [];
   return terminalUIActionsFromAllowedActions(item)
     .filter(action => isTerminalActionAllowed(talkList.value, index, action))
     .map(action => ({
@@ -4645,9 +4673,9 @@ function getSystemMsgCtaAction(finishReason, item, index) {
   if (finishReason === 'history_load_error') return 'refresh_history';
   if (finishReason === 'context_capacity_choice') return 'capacity_choice';
   if (finishReason === 'context_capacity_exceeded') return 'open_model_settings';
-  // 逃生口必須留在 App 內：refresh_history 是重載這段對話,不是叫用戶自己
-  // 重新整理瀏覽器——PWA 與原生 App 根本沒有那個動作。
-  if (finishReason === 'outcome_unconfirmed') return 'refresh_history';
+  // 結果還在確認：背景對帳一直在跑，有結果這一列會自己換掉。給鍵只會叫人去做系統本來就在做的事
+  // （owner 2026-10-09：不需要任何按鍵，讓系統自己確認）。
+  if (finishReason === 'outcome_unconfirmed') return '';
   if (finishReason === 'rewrite_target_not_latest' || finishReason === 'rewrite_target_invalid') {
     return 'refresh_history';
   }
@@ -5554,9 +5582,8 @@ const dispatchCtx: DispatchContext = {
 // 錯過就再也看不到;而且它不可行動——Apple HIG 明說「不要只為了告知而打斷,
 // 用戶不會感謝一個有資訊卻無法採取行動的打斷」。
 //
-// 轉成系統訊息之後三件事同時解決:留在對話流裡看得到、視覺是狀態級而非告警、
-// 掛得上 refresh_history CTA(App 內重載對話,不是叫用戶重新整理瀏覽器——
-// PWA 與原生 App 沒有那個動作,而 HIG 要求 App 自行恢復先前狀態)。
+// 轉成系統訊息之後:留在對話流裡看得到、視覺是狀態級而非告警。不掛按鍵——背景對帳
+// 還在跑,有結果這一列會自己換掉(owner 2026-10-09 拿掉了原本的「重新整理對話」)。
 //
 // 回傳是否真的轉換了:沒有可轉的佔位氣泡時(例如串流已經填了內容)回 false,
 // 呼叫端據此決定要不要退回舊行為。

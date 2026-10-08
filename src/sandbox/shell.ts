@@ -6,7 +6,7 @@
  *   createShell(config) → 建骨架、裝訊息作用域、建 sdk（掛到 window.sdk）、裝卡（樣式進
  *   author-css、腳本跑一次）→ 等宿主的 `messages` → 冷啟動每則 new→mount→done → `ready`。
  */
-import type { ChromeState, ChromeUiEvent, HostToShell, SandboxHelloConfig, SandboxMessage, ShellToHost, StageState } from './protocol'
+import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, RequestOp, SandboxHelloConfig, SandboxMessage, ShellToHost, StageState } from './protocol'
 import { createEventBus } from './sdk/events'
 import { createSdk, type Sdk, type SdkHost } from './sdk/create-sdk'
 import { SdkError, sdkErrorFromHost } from './sdk/errors'
@@ -136,7 +136,7 @@ export function createShell(options: CreateShellOptions): Shell {
   // ── 宿主代辦的請求 ──
   let reqSeq = 0
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: unknown) => void }>()
-  const request = (op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove', args: unknown[]) =>
+  const request = (op: RequestOp, args: unknown[]) =>
     new Promise<unknown>((resolve, reject) => {
       const reqId = ++reqSeq
       pending.set(reqId, { resolve, reject })
@@ -192,6 +192,8 @@ export function createShell(options: CreateShellOptions): Shell {
   let busy = false
   // 這一輪在等什麼（宿主的 generation 訊息帶來）；since 是殼記下的進入時間，作者拿來顯示等了幾秒
   let genPhase = 'idle', genSince = Date.now()
+  // 上一輪沒正常結束時的結局（宿主算好的那張卡）；用序列化的字比對，變了才發 generation:outcome
+  let genOutcome: GenerationOutcome | null = null, genOutcomeKey = 'null'
   let composing = false
   let stageState: StageState = 'closed'
   let composerVisible = config.composer !== false
@@ -248,7 +250,7 @@ export function createShell(options: CreateShellOptions): Shell {
     user: () => ({ nickname: config.user.nickname, avatarUrl: config.user.avatarUrl, locale: config.locale || '' }),
     text: { convert: (text) => (convert && text ? convert(text) : text), ready: () => textReady },
     model: () => modelNow(),
-    generation: () => ({ phase: genPhase, since: genSince }),
+    generation: () => ({ phase: genPhase, since: genSince, outcome: genOutcome }),
     capabilities: { saves: !!config.capabilities.saves, edit: !!config.capabilities.edit, send: config.capabilities.send !== false, archive: !!config.capabilities.archive },
     request,
     inGesture: () => gesture,
@@ -671,6 +673,10 @@ export function createShell(options: CreateShellOptions): Shell {
         refs.send.disabled = busy
         const phase = busy ? String(message.phase && message.phase !== 'idle' ? message.phase : 'preparing') : 'idle'
         if (phase !== genPhase) { genPhase = phase; genSince = Date.now(); bus.emit('generation:phase', { phase: genPhase, since: genSince }) }
+        // 舊宿主不帶 outcome：當作沒有結局。
+        const outcome = message.outcome && !busy ? message.outcome : null
+        const outcomeKey = JSON.stringify(outcome)
+        if (outcomeKey !== genOutcomeKey) { genOutcome = outcome; genOutcomeKey = outcomeKey; bus.emit('generation:outcome', JSON.parse(outcomeKey)) }
         return
       }
       case 'prologue':

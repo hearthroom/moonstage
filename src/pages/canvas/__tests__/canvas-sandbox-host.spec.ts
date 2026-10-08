@@ -131,6 +131,51 @@ describe('沙箱宿主橋', () => {
     host.destroy()
   })
 
+  it('generation 帶上這一輪的結局（不帶宿主內部的鍵與列 id）；結局變了才重送', async () => {
+    const greeting = msg({ id: '10', text: '你好', opening: true })
+    const failed = msg({ id: '11', text: '' })
+    const outcome = {
+      kind: 'network-error', label: '網路連線中斷', sub: '請檢查網路後重試', messageId: '11',
+      actions: [{ action: 'retry', label: '重試', key: 'sys:retry' }],
+    }
+    const state = { current: makeState({ messages: [greeting] }) }
+    const { hud } = fakeHud(state)
+    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '1', hello })
+    host.start()
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    h.posted.length = 0
+    const gens = () => h.posted.filter((p) => p.type === 'generation')
+    state.current = makeState({ messages: [greeting, failed], generationOutcome: outcome }); host.sync(); host.sync()
+    expect(gens()).toEqual([{ ms: 1, type: 'generation', busy: false, phase: 'idle', outcome: { kind: 'network-error', label: '網路連線中斷', sub: '請檢查網路後重試', actions: [{ action: 'retry', label: '重試' }] } }])
+    state.current = makeState({ messages: [greeting, failed], generationOutcome: null }); host.sync()
+    expect(gens().at(-1)).toEqual({ ms: 1, type: 'generation', busy: false, phase: 'idle', outcome: null })
+    expect(gens()).toHaveLength(2)
+    host.destroy()
+  })
+
+  it('generation.act 照結局裡那顆鍵交給宿主（同畫面上那張卡）；結局裡沒有的動作 → INVALID_ARGS', async () => {
+    const greeting = msg({ id: '10', text: '你好', opening: true })
+    const failed = msg({ id: '11', text: '' })
+    const state = { current: makeState({ messages: [greeting, failed], generationOutcome: {
+      kind: 'interrupted', label: '這一輪還沒跑完', sub: '', messageId: '11',
+      actions: [{ action: 'continue', label: '繼續', key: 'resume-agent' }, { action: 'switch-model', label: '切換模型', key: 'switch-model' }],
+    } }) }
+    const { hud } = fakeHud(state)
+    const acted: Array<[string, string]> = []
+    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '1', hello, onMessageAction: (id, key) => acted.push([id, key]) })
+    host.start()
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    h.fromShell({ type: 'request', reqId: 1, op: 'generation.act', args: ['continue'] })
+    h.fromShell({ type: 'request', reqId: 2, op: 'generation.act', args: ['retry'] })
+    await flush()
+    expect(acted).toEqual([['11', 'resume-agent']])
+    const replies = h.posted.filter((p) => p.type === 'reply').sort((a, b) => Number(a.reqId) - Number(b.reqId))
+    expect(replies.map((r) => [r.ok, (r.error as { code?: string } | undefined)?.code])).toEqual([[true, undefined], [false, 'INVALID_ARGS']])
+    host.destroy()
+  })
+
   it('只認來自 iframe 且 origin 相符的訊息；握手後送 hello + 全量訊息（開場白 id 是 greeting、歷史 h<id>）', async () => {
     const state = { current: makeState({ messages: [msg({ id: '10', text: '你好', opening: true }), msg({ id: '11', role: 'user', text: '嗨' }), msg({ id: '12', text: '哈囉', canonicalLatestAI: true })] }) }
     const { hud } = fakeHud(state)
@@ -148,7 +193,7 @@ describe('沙箱宿主橋', () => {
       { id: 'h11', role: 'user', content: '嗨', serverId: null, state: 'done' },
       { id: 'h12', role: 'ai', content: '哈囉', serverId: '12', state: 'done' },
     ] })
-    expect(h.posted[2]).toEqual({ ms: 1, type: 'generation', busy: false, phase: 'idle' })
+    expect(h.posted[2]).toEqual({ ms: 1, type: 'generation', busy: false, phase: 'idle', outcome: null })
     host.destroy()
   })
 

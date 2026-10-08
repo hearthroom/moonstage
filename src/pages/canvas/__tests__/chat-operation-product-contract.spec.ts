@@ -1016,12 +1016,10 @@ describe('desktop chat operation product contract', () => {
     }
   })
 
-  // 2026-08-01：「結果還在確認中」原本走 toast——會自己消失、放不下按鈕，
-  // 用戶錯過就沒了。那正是缺陷本身：它是狀態卻用打斷式呈現，而且不可行動
-  // （Apple HIG：不要只為告知而打斷；PWA/App 沒有「重新整理」，恢復成本不該
-  // 由用戶承擔）。改成留在對話流裡的系統訊息，並掛既有的 refresh_history
-  // CTA——那是 App 內重載對話，不是瀏覽器重整。
-  it('renders the unconfirmed outcome as a durable system row with an in-app escape', () => {
+  // 2026-08-01：「結果還在確認中」原本走 toast——會自己消失，用戶錯過就沒了。
+  // 改成留在對話流裡的系統訊息。2026-10-09 owner 拿掉了原本的「重新整理對話」鍵：
+  // 背景對帳一直在跑，有結果這一列會自己換掉，這張卡只需要叫人稍等。
+  it('renders the unconfirmed outcome as a durable system row with no button', () => {
     const chat = readChat()
     const kind = sliceBetween(chat, 'function getSystemMsgKind', 'function getSystemMsgLabel')
     const label = sliceBetween(chat, 'function getSystemMsgLabel', 'function getSystemMsgSub')
@@ -1029,9 +1027,10 @@ describe('desktop chat operation product contract', () => {
 
     expect(kind).toContain("'outcome_unconfirmed'")
     expect(label).toContain("t('chat.operationStatusUnavailable')")
-    // 逃生口必須是 App 內重載，而不是要求用戶自己重新整理或重開。
-    expect(ctaAction).toContain("'outcome_unconfirmed'")
-    expect(ctaAction).toContain("'refresh_history'")
+    // 不給鍵：結果確認好了會自己出現。
+    expect(ctaAction).toContain("if (finishReason === 'outcome_unconfirmed') return '';")
+    const ctas = sliceBetween(chat, 'function getSystemMsgCtas', 'function getSystemMsgCtaAction')
+    expect(ctas).toContain("if (item?.finishReason === 'outcome_unconfirmed') return [];")
     // 這是狀態不是錯誤：不得沿用 model-error 的告警視覺。
     expect(kind).not.toMatch(/'outcome_unconfirmed':\s*'model-error'/)
     // 也不能沿用 'stopped'：notice tone 是 border-radius:9999px 的單行藥丸，
