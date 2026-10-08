@@ -2,7 +2,7 @@
  * 作者事件匯流排。
  *
  * 規則（作者的腳本依賴這些，別「順手修」）：
- *   - 事件名固定 12 個；訂閱不認得的名字不報錯、也永遠不觸發。
+ *   - 事件名固定 13 個（model:change 是後來加的）；訂閱不認得的名字不報錯、也永遠不觸發。
  *   - 沒有 once／off：訂閱活到整個會話結束（腳本來源被換掉才清）。
  *   - `message:mount` 與 `message:done` 對晚訂閱者補發（所有已發過的、氣泡還在的）；
  *     `ready` 只發一次、不補發——作者靠 mount/done 做首屏。
@@ -22,6 +22,7 @@ export const SDK_EVENTS = [
   'back',
   'stage:close',
   'dispose',
+  'model:change',
 ] as const
 
 export type SdkEventName = (typeof SDK_EVENTS)[number]

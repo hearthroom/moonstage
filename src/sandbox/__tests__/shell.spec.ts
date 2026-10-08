@@ -127,6 +127,27 @@ describe('殼：冷啟動與事件順序', () => {
     s.dispose()
   })
 
+  it('sdk.model.get() reports the current model and next-turn cost; model:change fires when either changes', async () => {
+    const header = { roleName: 'Example', avatar: '', badge: '', backLabel: 'Back' }
+    const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '127–251', modelName: 'Claude Sonnet 4.5 · Ripple', assistBusy: false, assistCost: '', labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Assist', perTurn: 'Per turn' } }
+    const s = boot(config({ chromeState: { header, composer }, card: { rules: [SCRIPT_RULE(`window.__model = []; sdk.on('model:change', function (m) { window.__model.push(m.name + '|' + m.cost); });`)], statusbar: '' } }))
+    const w = window as unknown as { __model: string[] }
+    expect(s.sdk.model.get()).toEqual({ name: 'Claude Sonnet 4.5 · Ripple', cost: '127–251' })
+    // a chrome update that leaves the model alone does not fire
+    s.handle({ type: 'chrome', state: { header, composer: { ...composer, generating: true } } })
+    expect(w.__model).toEqual([])
+    s.handle({ type: 'chrome', state: { header, composer: { ...composer, modelName: 'DeepSeek V4 Flash', modelScore: '6' } } })
+    expect(s.sdk.model.get()).toEqual({ name: 'DeepSeek V4 Flash', cost: '6' })
+    expect(w.__model).toEqual(['DeepSeek V4 Flash|6'])
+    s.dispose()
+  })
+
+  it('sdk.model.get() is empty strings when the host sends no model', () => {
+    const s = boot(config({ card: { rules: [], statusbar: '' } }))
+    expect(s.sdk.model.get()).toEqual({ name: '', cost: '' })
+    s.dispose()
+  })
+
   it('the themed fullscreen header action goes to the host and reflects host exit state', async () => {
     const header = { roleName: 'Example', avatar: '', badge: '', backLabel: 'Back', fullscreenSupported: true, fullscreenActive: false, fullscreenLabel: 'Enter fullscreen' }
     const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Assist', perTurn: 'Per turn' } }

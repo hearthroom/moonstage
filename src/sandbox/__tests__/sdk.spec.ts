@@ -47,17 +47,17 @@ const expectCode = async (p: Promise<unknown> | (() => unknown), code: string) =
 }
 
 describe('sdk 的形狀', () => {
-  it('恰好 12 個鍵、32 個能力、version 是值 "1"、沒有 once/off', () => {
+  it('恰好 13 個鍵、33 個能力、version 是值 "1"、沒有 once/off', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
-    expect(Object.keys(sdk).sort()).toEqual(['cache', 'composer', 'debug', 'input', 'message', 'on', 'role', 'save', 'stage', 'text', 'user', 'version'])
+    expect(Object.keys(sdk).sort()).toEqual(['cache', 'composer', 'debug', 'input', 'message', 'model', 'on', 'role', 'save', 'stage', 'text', 'user', 'version'])
     const caps = [
       ...Object.keys(sdk.input).map((k) => `input.${k}`), ...Object.keys(sdk.composer).map((k) => `composer.${k}`),
       ...Object.keys(sdk.message).map((k) => `message.${k}`), ...Object.keys(sdk.cache).map((k) => `cache.${k}`),
       ...Object.keys(sdk.save).map((k) => `save.${k}`), ...Object.keys(sdk.stage).map((k) => `stage.${k}`),
       ...Object.keys(sdk.text).map((k) => `text.${k}`),
-      'role.get', 'user.get', 'on', 'debug.log', 'version',
+      'role.get', 'user.get', 'model.get', 'on', 'debug.log', 'version',
     ]
-    expect(caps.length).toBe(32)
+    expect(caps.length).toBe(33)
     expect(sdk.version).toBe('1')
     expect((sdk as unknown as { once?: unknown }).once).toBeUndefined()
     expect((sdk as unknown as { off?: unknown }).off).toBeUndefined()

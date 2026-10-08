@@ -195,6 +195,8 @@ export interface ChromeState {
     moreOpen: boolean
     moreItems: Array<{ key: string; label: string; disabled?: boolean }>
     modelScore: string
+    /** 目前模型的友善名（頂欄那個「模型名 · 線路名」）；空字串＝還不知道。殼不畫它，給 sdk.model.get() 用。 */
+    modelName?: string
     assistBusy: boolean
     assistCost: string | number
     labels: { stop: string; more: string; send: string; paste: string; clear: string; model: string; assist: string; perTurn: string; continue?: string }

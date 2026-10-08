@@ -97,7 +97,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 
 ## 3. `sdk` 契約（殼內作者看到的）
 
-12 個鍵、32 個能力（`text` 是後來加的；完整清單由 `contract/sandbox-contract.json` 生成），全部**從第一版就存在**（作者腳本在頂層探測它們），每個能力有實作狀態：
+13 個鍵、33 個能力（`text`、`model` 是後來加的；完整清單由 `contract/sandbox-contract.json` 生成），全部**從第一版就存在**（作者腳本在頂層探測它們），每個能力有實作狀態：
 
 | 能力 | 狀態 | 備註 |
 |---|---|---|
@@ -110,6 +110,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 | `stage.open(mode)/close/el/visible` | 實作 | `content`（蓋訊息區，z 2000）／`full`（整屏，z 3000）；`el()` 關著也回節點，開關只看 `visible()`；作者自己 `close()` 不發 `stage:close` |
 | `role.get()` / `user.get()` | 實作 | 來自 `hello.config.role/user`，欄位封閉：`{name, avatarUrl}`／`{nickname, avatarUrl, locale}`（`locale` 是玩家介面語言，來自 `hello.config.locale`） |
 | `text.convert(text)` / `text.ready()` | 實作 | 顯示字形（簡↔繁），方向跟一般聊天頁一樣由玩家介面語言決定；字典另成 `sandbox-zh.js`，只在需要轉時載入。`ready()` 在字典載好或確定不需要時完成；之前 `convert` 原樣回 |
+| `model.get()` | 實作 | `{name, cost}`：玩家目前選的模型友善名（頂欄那個「模型名 · 線路名」）與下一輪的點數（已格式化，動態計價是區間，例如 `127–251`）；宿主還沒給時是空字串。來自 `chrome.composer.modelName／modelScore`，換模型、改上下文檔位或思考深度時宿主重送，殼發 `model:change` |
 | `on(event, fn)` | 實作 | 見事件表 |
 | `debug.log(...)` | 實作 | 殼內面板 + 轉宿主 console |
 | `version` | `'1'` | |
@@ -119,8 +120,8 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 `save.get/keys` 在存檔尚未載入時同步丟 `HOST_DENIED`（跟原站一致，作者會用 try）。
 限頻（60 秒窗）：`save.set` 20、`message.send` 手勢 3／自動 3、`message.edit` 10 → `RATE_LIMITED`。
 
-事件（12）：`ready`、`message:new`、`message:done`、`message:stream`、`message:mount`、`message:unmount`、
-`input:change`、`conversation:switch`、`theme:change`、`back`、`stage:close`、`dispose`。
+事件（13）：`ready`、`message:new`、`message:done`、`message:stream`、`message:mount`、`message:unmount`、
+`input:change`、`conversation:switch`、`theme:change`、`back`、`stage:close`、`dispose`、`model:change`（載荷同 `model.get()`，模型名或點數變了才發）。
 
 順序與補發規則（作者腳本依賴這些）：
 
@@ -147,7 +148,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 `header-title`、`header-actions`）、`main:messages > div:list > div:message-frame > article:message
 [data-from][data-state][data-msg-id] > message-avatar / message-body`、開場選項 `div.prologue-scope[data-lt="prologue"] > .prologue-title + .prologue-content×n`（在 `list` 之後；點一條發 `ui { event: 'prologue', key: 第幾條 }`，宿主填輸入框、不送出）、`div:list-spacer`、
 `div:author-stage[data-stage]`、`footer:composer`（`shortcut`、`instruction-bar`、`assistant`、
-`textarea:input`、`model-chip`、`send`）。插槽：`header-extra`、`statusbar`、`left`、`right`、`toolbar`。
+`textarea:input`、`model-chip`、`send`）。殼裡的模型鍵是輸入區的 `.mind-type`（點它開宿主的模型清單）；模型名與點數請用 `sdk.model.get()`，別讀 DOM。插槽：`header-extra`、`statusbar`、`left`、`right`、`toolbar`。
 
 變數：29 個 `--chat-*` 定義在 `[data-theme="dark"]`／`[data-theme="light"]`；`--rpx: calc(100vw / 750)`；
 `--chat-viewport-height` 由宿主 `viewport` 訊息維護。
