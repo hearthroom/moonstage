@@ -228,7 +228,7 @@ function buildContract() {
       replayedToLateSubscribers: ['message:mount', 'message:done'],
       readyReplayed: false,
       coldStartOrder: ['message:new', 'message:mount', 'message:done', '…', 'ready'],
-      payload: { 'message:new': ['content', 'id', 'role', 'serverId'], 'message:mount': ['content', 'id', 'role', 'serverId'], 'message:done': ['content', 'id', 'role', 'serverId'], 'message:stream': ['content', 'id', 'role'], 'message:unmount': ['content', 'id', 'role', 'serverId'], 'input:change': 'string', 'theme:change': 'none', 'model:change': ['cost', 'name'], 'conversation:switch': ['conversationId'], others: 'none' },
+      payload: { 'message:new': ['content', 'id', 'role', 'serverId'], 'message:mount': ['content', 'id', 'role', 'serverId'], 'message:done': ['content', 'id', 'role', 'serverId'], 'message:stream': ['content', 'id', 'role'], 'message:unmount': ['content', 'id', 'role', 'serverId'], 'input:change': 'string', 'theme:change': 'none', 'model:change': ['cost', 'name'], 'generation:phase': ['phase', 'since'], 'conversation:switch': ['conversationId'], others: 'none' },
       roles: ['user', 'ai'],
       systemRowsEmitNoEvents: true,
       handlerArity: 1,
@@ -302,11 +302,11 @@ describe('沙箱作者契約', () => {
     expect(current).toBe(text)
   })
 
-  it('能力數與 sdk.spec 對得上：14 鍵、40 能力、12 個非同步', () => {
+  it('能力數與 sdk.spec 對得上：15 鍵、41 能力、12 個非同步', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
     const caps = capabilitiesOf(sdk as unknown as Record<string, unknown>)
-    expect(caps.keys.length).toBe(14)
-    expect(caps.capabilities.length).toBe(40)
+    expect(caps.keys.length).toBe(15)
+    expect(caps.capabilities.length).toBe(41)
     for (const a of caps.async) expect(caps.capabilities).toContain(a)
   })
 

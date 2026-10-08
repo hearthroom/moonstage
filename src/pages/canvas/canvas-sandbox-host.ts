@@ -124,6 +124,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   let destroyed = false
   let liveSeq = 0
   let lastBusy: boolean | null = null
+  let lastPhase: string | null = null
   let lastInputPosted: string | null = null
   let backWaiter: ((handled: boolean) => void) | null = null
   let handshakeTimer: ReturnType<typeof setTimeout> | null = null
@@ -285,9 +286,10 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
 
   const syncGeneration = (snapshot: HudHostState = hud.read()) => {
     const busy = snapshot.generation !== 'idle'
-    if (busy === lastBusy) return
-    lastBusy = busy
-    post({ type: 'generation', busy })
+    const phase = busy ? (snapshot.generationPhase && snapshot.generationPhase !== 'idle' ? snapshot.generationPhase : 'preparing') : 'idle'
+    if (busy === lastBusy && phase === lastPhase) return
+    lastBusy = busy; lastPhase = phase
+    post({ type: 'generation', busy, phase })
   }
 
   const syncHistory = (snapshot: HudHostState) => {

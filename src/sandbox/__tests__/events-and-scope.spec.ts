@@ -4,8 +4,8 @@ import { createEventBus, SDK_EVENTS } from '../sdk/events'
 import { installMessageScope } from '../scope'
 
 describe('事件匯流排：補發規則', () => {
-  it('13 個事件名固定', () => {
-    expect(SDK_EVENTS).toEqual(['ready', 'message:new', 'message:done', 'message:stream', 'message:mount', 'message:unmount', 'input:change', 'conversation:switch', 'theme:change', 'back', 'stage:close', 'dispose', 'model:change'])
+  it('14 個事件名固定', () => {
+    expect(SDK_EVENTS).toEqual(['ready', 'message:new', 'message:done', 'message:stream', 'message:mount', 'message:unmount', 'input:change', 'conversation:switch', 'theme:change', 'back', 'stage:close', 'dispose', 'model:change', 'generation:phase'])
   })
 
   it('mount／done 對晚訂閱者補發；ready 不補發；不認得的事件名不報錯', () => {

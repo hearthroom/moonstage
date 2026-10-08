@@ -70,6 +70,8 @@ export interface HudHostState {
   prologue?: { title: string; items: string[] }
   messages: HudHostMessage[]
   generation: 'idle' | 'starting' | 'streaming'
+  /** 沙箱殼用：這一輪在等什麼（見 sandbox/protocol GenerationPhase）。 */
+  generationPhase?: 'idle' | 'preparing' | 'summarizing' | 'thinking' | 'writing'
   streamingMessageId: string | null
   inputText: string
   previewOnly: boolean
