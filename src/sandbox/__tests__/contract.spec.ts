@@ -63,7 +63,7 @@ function capabilitiesOf(sdk: Record<string, unknown>): { keys: string[]; capabil
     capabilities.push(key)
   }
   // 非同步的四個：回 Promise；其餘同步、錯誤直接 throw。
-  const async = ['message.send', 'message.edit', 'save.set', 'save.remove', 'text.ready', 'archive.list', 'archive.save', 'archive.fork', 'archive.open', 'archive.start', 'archive.rename', 'archive.remove']
+  const async = ['message.send', 'message.edit', 'save.set', 'save.remove', 'text.ready', 'archive.list', 'archive.save', 'archive.fork', 'archive.open', 'archive.start', 'archive.rename', 'archive.remove', 'generation.act']
   return { keys, capabilities: capabilities.sort(), async }
 }
 
@@ -214,6 +214,16 @@ function buildContract() {
       role: { get: ['name', 'avatarUrl'] },
       user: { get: ['nickname', 'avatarUrl', 'locale'] },
       model: { get: ['name', 'cost'] },
+      generation: {
+        get: ['phase', 'since', 'outcome'],
+        phases: ['idle', 'preparing', 'summarizing', 'thinking', 'writing'],
+        outcome: ['kind', 'label', 'sub', 'actions'],
+        outcomeKinds: ['model-error', 'network-error', 'server-error', 'rate-limit', 'quota', 'filtered', 'length-cap', 'stopped', 'compact-retryable', 'outcome-unconfirmed', 'interrupted'],
+        actions: ['retry', 'continue', 'switch-model', 'model-settings', 'capacity', 'refresh'],
+        outcomeIsNullWhile: 'a reply is being generated, or the last turn ended normally',
+        labelsAre: 'the same player-language text as the platform card under that row',
+        act: { gestureOnly: 'UNAUTHORIZED outside a trusted click (no dialog)', unknownAction: 'INVALID_ARGS', whileGenerating: 'BUSY', withoutSend: 'NOT_SUPPORTED', rateLimit: 'generation.act 3/min' },
+      },
       archive: { item: ['id', 'title', 'isCurrent', 'messageCount', 'lastMessage', 'createTime', 'lastUpdateTime'], list: ['items', 'count', 'limit'], limitError: { code: 'LIMIT_REACHED', data: ['count', 'limit'] }, gesture: 'save/fork/open/start/rename/remove run directly inside a user gesture; outside one the shell asks first', rateLimit: 'archive.write 10/min' },
       stage: { modes: ['content', 'full'], unknownModeBecomes: 'content', elReturnsNodeWhenClosed: true, ownCloseDoesNotEmitStageClose: true },
       input: { writesThrowWhileComposing: 'INVALID_ARGS' },
@@ -228,7 +238,7 @@ function buildContract() {
       replayedToLateSubscribers: ['message:mount', 'message:done'],
       readyReplayed: false,
       coldStartOrder: ['message:new', 'message:mount', 'message:done', '…', 'ready'],
-      payload: { 'message:new': ['content', 'id', 'role', 'serverId'], 'message:mount': ['content', 'id', 'role', 'serverId'], 'message:done': ['content', 'id', 'role', 'serverId'], 'message:stream': ['content', 'id', 'role'], 'message:unmount': ['content', 'id', 'role', 'serverId'], 'input:change': 'string', 'theme:change': 'none', 'model:change': ['cost', 'name'], 'generation:phase': ['phase', 'since'], 'conversation:switch': ['conversationId'], others: 'none' },
+      payload: { 'message:new': ['content', 'id', 'role', 'serverId'], 'message:mount': ['content', 'id', 'role', 'serverId'], 'message:done': ['content', 'id', 'role', 'serverId'], 'message:stream': ['content', 'id', 'role'], 'message:unmount': ['content', 'id', 'role', 'serverId'], 'input:change': 'string', 'theme:change': 'none', 'model:change': ['cost', 'name'], 'generation:phase': ['phase', 'since'], 'generation:outcome': ['actions', 'kind', 'label', 'sub'], 'conversation:switch': ['conversationId'], others: 'none' },
       roles: ['user', 'ai'],
       systemRowsEmitNoEvents: true,
       handlerArity: 1,
@@ -302,11 +312,11 @@ describe('沙箱作者契約', () => {
     expect(current).toBe(text)
   })
 
-  it('能力數與 sdk.spec 對得上：15 鍵、41 能力、12 個非同步', () => {
+  it('能力數與 sdk.spec 對得上：15 鍵、42 能力、13 個非同步', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
     const caps = capabilitiesOf(sdk as unknown as Record<string, unknown>)
     expect(caps.keys.length).toBe(15)
-    expect(caps.capabilities.length).toBe(41)
+    expect(caps.capabilities.length).toBe(42)
     for (const a of caps.async) expect(caps.capabilities).toContain(a)
   })
 

@@ -72,6 +72,17 @@ export interface HudHostState {
   generation: 'idle' | 'starting' | 'streaming'
   /** 沙箱殼用：這一輪在等什麼（見 sandbox/protocol GenerationPhase）。 */
   generationPhase?: 'idle' | 'preparing' | 'summarizing' | 'thinking' | 'writing'
+  /**
+   * 沙箱殼用：上一輪沒正常結束時，最新那一列底下那張卡（系統訊息卡或 Agent 中斷卡）的樣式、字與鍵。
+   * action 是作者看到的動作名，key 是那張卡上那顆鍵交回宿主的鍵（onMessageAction 認的那個），messageId 是那一列。
+   */
+  generationOutcome?: {
+    kind: string
+    label: string
+    sub: string
+    messageId: string
+    actions: Array<{ action: string; label: string; key: string }>
+  } | null
   streamingMessageId: string | null
   inputText: string
   previewOnly: boolean

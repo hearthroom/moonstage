@@ -23,6 +23,16 @@ export type SandboxMessageState = 'pending' | 'streaming' | 'done'
  * 可能很久）；thinking＝模型在推理、正文還沒來（不是每個模型都有）；writing＝正文串流中；idle＝沒在生成。
  */
 export type GenerationPhase = 'idle' | 'preparing' | 'summarizing' | 'thinking' | 'writing'
+/**
+ * 上一輪怎麼結束的（只有沒正常結束時才有）：宿主用畫在那一列底下的那張卡（系統訊息卡或 Agent 中斷卡）算好，
+ * 字已經是玩家語系、跟那張卡一字不差。actions 是那張卡上的鍵，作者用動作名回 generation.act。
+ */
+export interface GenerationOutcome {
+  kind: string
+  label: string
+  sub: string
+  actions: Array<{ action: string; label: string }>
+}
 export type SandboxTheme = 'dark' | 'light'
 export type StageState = 'closed' | 'content' | 'full'
 
@@ -258,7 +268,7 @@ export type HostToShell =
   | { type: 'message.stream'; id: string; content: string; view?: MessageView }
   | { type: 'message.done'; id: string; content: string; serverId: string | null; view?: MessageView }
   | { type: 'message.remove'; id: string }
-  | { type: 'generation'; busy: boolean; phase?: GenerationPhase }
+  | { type: 'generation'; busy: boolean; phase?: GenerationPhase; outcome?: GenerationOutcome | null }
   | { type: 'input'; value: string }
   | { type: 'reply'; reqId: number; ok: boolean; value?: unknown; error?: SandboxError }
   | { type: 'theme'; theme: SandboxTheme; vars?: Record<string, string> }
@@ -281,6 +291,7 @@ export type HostToShell =
 
 export type RequestOp = 'message.send' | 'message.edit' | 'save.set' | 'save.remove'
   | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove'
+  | 'generation.act'
 
 /** 殼上的按鈕想請宿主開的面板／做的事。 */
 export type ShellAction = 'back' | 'open-model' | 'open-persona' | 'open-archives' | 'stop' | 'regenerate' | 'more'

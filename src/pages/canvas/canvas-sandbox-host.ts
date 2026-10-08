@@ -125,6 +125,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   let liveSeq = 0
   let lastBusy: boolean | null = null
   let lastPhase: string | null = null
+  let lastOutcomeKey: string | null = null
   let lastInputPosted: string | null = null
   let backWaiter: ((handled: boolean) => void) | null = null
   let handshakeTimer: ReturnType<typeof setTimeout> | null = null
@@ -287,9 +288,13 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   const syncGeneration = (snapshot: HudHostState = hud.read()) => {
     const busy = snapshot.generation !== 'idle'
     const phase = busy ? (snapshot.generationPhase && snapshot.generationPhase !== 'idle' ? snapshot.generationPhase : 'preparing') : 'idle'
-    if (busy === lastBusy && phase === lastPhase) return
-    lastBusy = busy; lastPhase = phase
-    post({ type: 'generation', busy, phase })
+    // 結局只送作者看得到的部分：那顆鍵交回宿主的鍵、那一列的 id 留在宿主這邊。
+    const o = !busy && snapshot.generationOutcome ? snapshot.generationOutcome : null
+    const outcome = o ? { kind: o.kind, label: o.label, sub: o.sub, actions: o.actions.map((a) => ({ action: a.action, label: a.label })) } : null
+    const outcomeKey = JSON.stringify(outcome)
+    if (busy === lastBusy && phase === lastPhase && outcomeKey === lastOutcomeKey) return
+    lastBusy = busy; lastPhase = phase; lastOutcomeKey = outcomeKey
+    post({ type: 'generation', busy, phase, outcome })
   }
 
   const syncHistory = (snapshot: HudHostState) => {
@@ -475,6 +480,18 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
             : op === 'archive.rename' ? await a.rename(s(0), s(1))
             : await a.remove(s(0))
           return r.ok ? reply(reqId, true, r.value) : reply(reqId, false, undefined, { code: r.code, ...(r.message ? { message: r.message } : {}), ...(r.data ? { data: r.data } : {}) })
+        }
+        case 'generation.act': {
+          // 按的是最新那一列底下那張卡上的鍵：照宿主現在給的結局核一次（卡已經換掉、或沒有這顆鍵就不做），
+          // 再交給跟玩家點那張卡同一條路。
+          const name = String(args[0] ?? '')
+          const snapshot = hud.read()
+          const o = snapshot.generation === 'idle' ? snapshot.generationOutcome : null
+          const entry = o ? o.actions.find((a) => a.action === name) : null
+          if (!o || !entry) return reply(reqId, false, undefined, { code: 'INVALID_ARGS', message: 'that action is not offered for the last turn' })
+          if (!deps.onMessageAction) return reply(reqId, false, undefined, { code: 'HOST_DENIED' })
+          deps.onMessageAction(o.messageId, entry.key)
+          return reply(reqId, true)
         }
         default:
           return reply(reqId, false, undefined, { code: 'UNKNOWN_CAPABILITY' })

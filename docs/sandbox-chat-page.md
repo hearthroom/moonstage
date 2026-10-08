@@ -59,7 +59,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 | `message.stream` | `{id, content}` 累積內容 | 串流中 |
 | `message.done` | `{id, content, serverId}` | 該則定稿 |
 | `message.remove` | `{id}` | 刪除／重跑覆蓋 |
-| `generation` | `{ busy: boolean }` | 生成開始／結束 |
+| `generation` | `{ busy, phase, outcome }`：生成中嗎、這一輪在等什麼、上一輪沒正常結束時的結局（見 `generation.get()`） | 任一項變了 |
 | `input` | `{ value }` | 宿主改了輸入框（例如快捷語） |
 | `reply` | `{ reqId, ok, value?, error? }` | 回應殼發出的請求（send／edit／saves） |
 | `theme` | `{ theme: 'dark' \| 'light' }` | 使用者切主題 |
@@ -97,7 +97,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 
 ## 3. `sdk` 契約（殼內作者看到的）
 
-15 個鍵、41 個能力（`text`、`model`、`archive`、`generation` 是後來加的；完整清單由 `contract/sandbox-contract.json` 生成），全部**從第一版就存在**（作者腳本在頂層探測它們），每個能力有實作狀態：
+15 個鍵、42 個能力（`text`、`model`、`archive`、`generation` 是後來加的；完整清單由 `contract/sandbox-contract.json` 生成），全部**從第一版就存在**（作者腳本在頂層探測它們），每個能力有實作狀態：
 
 | 能力 | 狀態 | 備註 |
 |---|---|---|
@@ -111,7 +111,8 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 | `role.get()` / `user.get()` | 實作 | 來自 `hello.config.role/user`，欄位封閉：`{name, avatarUrl}`／`{nickname, avatarUrl, locale}`（`locale` 是玩家介面語言，來自 `hello.config.locale`） |
 | `text.convert(text)` / `text.ready()` | 實作 | 顯示字形（簡↔繁），方向跟一般聊天頁一樣由玩家介面語言決定；字典另成 `sandbox-zh.js`，只在需要轉時載入。`ready()` 在字典載好或確定不需要時完成；之前 `convert` 原樣回 |
 | `model.get()` | 實作 | `{name, cost}`：玩家目前選的模型友善名（頂欄那個「模型名 · 線路名」）與下一輪的點數（已格式化，動態計價是區間，例如 `127–251`）；宿主還沒給時是空字串。來自 `chrome.composer.modelName／modelScore`，換模型、改上下文檔位或思考深度時宿主重送，殼發 `model:change` |
-| `generation.get()` | 實作 | `{phase, since}`：這一輪在等什麼——`idle`、`preparing`（剛送出，什麼都還沒回來）、`summarizing`（平台在整理劇情：伺服器壓縮記憶，擋在第一個字前，可能幾十秒）、`thinking`（模型在推理、正文還沒來；不推理的模型沒有這段）、`writing`（正文串流中）；`since` 是進入這個階段的時間（毫秒）。宿主從 `isCompacting`、推理串流與正文串流推得，跟 `generation` 訊息一起送（`phase`），只送階段、不送推理內容；殼發 `generation:phase` |
+| `generation.get()` | 實作 | `{phase, since}`：這一輪在等什麼——`idle`、`preparing`（剛送出，什麼都還沒回來）、`summarizing`（平台在整理劇情：伺服器壓縮記憶，擋在第一個字前，可能幾十秒）、`thinking`（模型在推理、正文還沒來；不推理的模型沒有這段）、`writing`（正文串流中）；`since` 是進入這個階段的時間（毫秒）。宿主從 `isCompacting`、推理串流與正文串流推得，跟 `generation` 訊息一起送（`phase`），只送階段、不送推理內容；殼發 `generation:phase`。`outcome`：上一輪沒正常結束時，最新那一列底下那張卡（系統訊息卡或 Agent 中斷卡）的 `{kind, label, sub, actions:[{action, label}]}`；正常結束或生成中是 `null`，變了殼發 `generation:outcome`。`kind` 是卡的樣式：`model-error`、`network-error`、`server-error`、`rate-limit`、`quota`、`filtered`、`length-cap`、`stopped`、`compact-retryable`、`outcome-unconfirmed`（結果還在路上，沒有鍵，有結果自己會換）、`interrupted`（Agent 這一輪還沒跑完）。`label`／`sub` 是那張卡上同一句玩家語系的字（宿主用 `systemNoticeFor()` 與中斷卡同一組運算式算）。`actions` 只會是 `retry`、`continue`、`switch-model`、`model-settings`、`capacity`、`refresh` |
+| `generation.act(action)` | 實作 | 按那張卡上的一顆鍵（`outcome.actions` 裡的動作名），走玩家點那張卡同一條路：重試沿用同一句、不多一則；容量與模型設定打開平台的面板。只在玩家手勢裡（不在手勢裡回 `UNAUTHORIZED`，不問——作者沒有理由替玩家自動重試）；結局裡沒有這個動作 `INVALID_ARGS`；生成中 `BUSY`；沒有送出能力 `NOT_SUPPORTED`；3／分。殼送 `request generation.act`，宿主照當下的結局核一次再交給 `onMessageAction`（`sys:<動作>`、`resume-agent`、`switch-model`） |
 | `archive.list/save/fork/open/start/rename/remove` | 實作 | 平台的對話存檔（每張卡最多 20 段，含目前這段；伺服器記的，跨裝置）。每段就是一段對話：`open(id)` 讀檔＝切過去，原本的進度原樣留著；`save(title?)` 把目前進度留一份（從最新一則分叉、留下的那份取名 title，回 `{id: 留下的那份, current: 接著玩的那份}`）；`fork(messageId)` 從某一則（氣泡的 `serverId`）另開一段並切過去；`start(opening?)` 另開新檔（目前這段留在清單裡，0＝主開場、1..＝替代開場）；`list()` 回 `{items:[{id,title,isCurrent,messageCount,lastMessage,createTime,lastUpdateTime}],count,limit}`（新的在前）。會改變存檔的操作在玩家手勢裡直接做（卡片用自己的確認畫面），不在手勢裡殼先問「允許這張卡變更你的存檔？」；生成中 `BUSY`；滿了 `LIMIT_REACHED`（`err.data = {count, limit}`）。宿主沒接（握手 `capabilities.archive` 為假）回 `HOST_DENIED`。切換後殼清空訊息、重載那一段並發 `conversation:switch` |
 | `on(event, fn)` | 實作 | 見事件表 |
 | `debug.log(...)` | 實作 | 殼內面板 + 轉宿主 console |
@@ -120,10 +121,10 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 錯誤碼：`UNAUTHORIZED`、`RATE_LIMITED`、`INVALID_ARGS`、`HOST_DENIED`、`NETWORK`、`NOT_SUPPORTED`、`BUSY`、`LIMIT_REACHED`（帶 `err.data`）
 （另有 `UNKNOWN_CAPABILITY` 備用）。非同步能力回 Promise；同步能力直接 throw `SdkError`——
 `save.get/keys` 在存檔尚未載入時同步丟 `HOST_DENIED`（跟原站一致，作者會用 try）。
-限頻（60 秒窗）：`save.set` 20、`message.send` 手勢 3／自動 3、`message.edit` 10、`archive.*` 的變更合計 10 → `RATE_LIMITED`。
+限頻（60 秒窗）：`save.set` 20、`message.send` 手勢 3／自動 3、`message.edit` 10、`archive.*` 的變更合計 10、`generation.act` 3 → `RATE_LIMITED`。
 
-事件（13）：`ready`、`message:new`、`message:done`、`message:stream`、`message:mount`、`message:unmount`、
-`input:change`、`conversation:switch`（載荷 `{conversationId}`，宿主有給才帶）、`theme:change`、`back`、`stage:close`、`dispose`、`model:change`（載荷同 `model.get()`，模型名或點數變了才發）、`generation:phase`（載荷同 `generation.get()`，階段變了才發；不補發，晚到的腳本用 `generation.get()`）。
+事件（15）：`ready`、`message:new`、`message:done`、`message:stream`、`message:mount`、`message:unmount`、
+`input:change`、`conversation:switch`（載荷 `{conversationId}`，宿主有給才帶）、`theme:change`、`back`、`stage:close`、`dispose`、`model:change`（載荷同 `model.get()`，模型名或點數變了才發）、`generation:phase`（載荷 `{phase, since}`，階段變了才發；不補發，晚到的腳本用 `generation.get()`）、`generation:outcome`（載荷同 `generation.get().outcome`，可能是 `null`；結局變了才發，例如失敗卡出現、玩家重試後收掉；不補發）。
 
 順序與補發規則（作者腳本依賴這些）：
 

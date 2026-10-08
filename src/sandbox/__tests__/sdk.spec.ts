@@ -47,7 +47,7 @@ const expectCode = async (p: Promise<unknown> | (() => unknown), code: string) =
 }
 
 describe('sdk 的形狀', () => {
-  it('恰好 15 個鍵、41 個能力、version 是值 "1"、沒有 once/off', () => {
+  it('恰好 15 個鍵、42 個能力、version 是值 "1"、沒有 once/off', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
     expect(Object.keys(sdk).sort()).toEqual(['archive', 'cache', 'composer', 'debug', 'generation', 'input', 'message', 'model', 'on', 'role', 'save', 'stage', 'text', 'user', 'version'])
     const caps = [
@@ -55,9 +55,9 @@ describe('sdk 的形狀', () => {
       ...Object.keys(sdk.message).map((k) => `message.${k}`), ...Object.keys(sdk.cache).map((k) => `cache.${k}`),
       ...Object.keys(sdk.save).map((k) => `save.${k}`), ...Object.keys(sdk.stage).map((k) => `stage.${k}`),
       ...Object.keys(sdk.text).map((k) => `text.${k}`), ...Object.keys(sdk.archive).map((k) => `archive.${k}`),
-      'role.get', 'user.get', 'model.get', 'generation.get', 'on', 'debug.log', 'version',
+      'role.get', 'user.get', 'model.get', 'generation.get', 'generation.act', 'on', 'debug.log', 'version',
     ]
-    expect(caps.length).toBe(41)
+    expect(caps.length).toBe(42)
     expect(sdk.version).toBe('1')
     expect((sdk as unknown as { once?: unknown }).once).toBeUndefined()
     expect((sdk as unknown as { off?: unknown }).off).toBeUndefined()
@@ -96,6 +96,34 @@ describe('input／composer／stage', () => {
     expect(sdk.stage.visible()).toBe(true)
     sdk.stage.close()
     expect(sdk.stage.visible()).toBe(false)
+  })
+})
+
+describe('generation', () => {
+  const OUTCOME = { kind: 'network-error', label: '網路連線中斷', sub: '', actions: [{ action: 'retry', label: '重試' }] }
+
+  it('get() 帶著結局；宿主沒給或給了壞的就是 null', () => {
+    const { sdk } = createSdk(fakeHost({ generation: () => ({ phase: 'idle', since: 5, outcome: OUTCOME }) }), createEventBus())
+    expect(sdk.generation.get()).toEqual({ phase: 'idle', since: 5, outcome: OUTCOME })
+    const { sdk: none } = createSdk(fakeHost({ generation: () => ({ phase: 'idle', since: 0 }) }), createEventBus())
+    expect(none.generation.get().outcome).toBeNull()
+  })
+
+  it('act 只在玩家手勢裡、只認結局裡有的動作；生成中 BUSY；限頻；轉給宿主', async () => {
+    const host = fakeHost({ gesture: true, generation: () => ({ phase: 'idle', since: 0, outcome: OUTCOME }) })
+    const { sdk } = createSdk(host, createEventBus())
+    await expectCode(sdk.generation.act('continue'), 'INVALID_ARGS')
+    await expectCode(sdk.generation.act(42 as unknown as string), 'INVALID_ARGS')
+    for (let i = 0; i < 3; i++) await sdk.generation.act('retry')
+    expect(host.requests).toEqual([0, 1, 2].map(() => ({ op: 'generation.act', args: ['retry'] })))
+    await expectCode(sdk.generation.act('retry'), 'RATE_LIMITED')
+    const outside = fakeHost({ gesture: false, generation: () => ({ phase: 'idle', since: 0, outcome: OUTCOME }) })
+    await expectCode(createSdk(outside, createEventBus()).sdk.generation.act('retry'), 'UNAUTHORIZED')
+    expect(outside.requests).toEqual([])
+    const busy = fakeHost({ gesture: true, generating: true, generation: () => ({ phase: 'writing', since: 0, outcome: null }) })
+    await expectCode(createSdk(busy, createEventBus()).sdk.generation.act('retry'), 'BUSY')
+    const noSend = fakeHost({ gesture: true, capabilities: { saves: true, edit: true, send: false }, generation: () => ({ phase: 'idle', since: 0, outcome: OUTCOME }) })
+    await expectCode(createSdk(noSend, createEventBus()).sdk.generation.act('retry'), 'NOT_SUPPORTED')
   })
 })
 
