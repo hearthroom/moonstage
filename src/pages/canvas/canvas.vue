@@ -476,6 +476,7 @@ import { archiveRequestQuery, buildArchiveRows, isArchiveFull, nextArchiveAfterD
 import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
 import type { ArchiveRow } from './canvas-archives'
 import { convertVisibleHtml, convertPlainText, createDisplayScriptConverter, directionFor } from './canvas-display-script'
+import { whenRoleDetail } from './canvas-role-ready'
 import CanvasPrologue from './components/canvas-prologue.vue'
 import { captureBodySnapshot, restoreBodySnapshot, sweepForeignNodes } from './canvas-body-snapshot'
 import CanvasPopup from './components/canvas-popup.vue'
@@ -3425,7 +3426,13 @@ function applyAuthorAsset(asset) {
       setActiveAuthorAsset(res.data);
       cardFormat.value = normalizeCardFormat(res.data.cardFormat);
       applyImmersiveMode(false);
-      mountSandbox(res.data);
+      // 殼的 hello 只送一次，卡名、頭像與卡片語言（簡繁方向）都讀角色細節：等它到了再掛（見 whenRoleDetail）。
+      const target = String(unref(roleId) || '');
+      const ready = previewOnly.value ? Promise.resolve() : whenRoleDetail(currentRole, () => unref(currentRole), target);
+      ready.then(() => {
+        if (authorScopeClosed || String(unref(roleId) || '') !== target) return;
+        mountSandbox(res.data);
+      });
       return;
     }
     destroySandboxHost();
