@@ -6,12 +6,32 @@
  */
 export type ScriptDirection = 'none' | 's2t' | 't2s'
 
-/** 玩家介面語言決定方向：正體看簡體卡→轉繁；簡體看繁體卡→轉簡；其他語言不動。 */
+/** 只看玩家介面語言：正體→轉繁；簡體→轉簡；其他語言不動。卡片字形不明時的退路。 */
 export function directionForLocale(locale: string | null | undefined): ScriptDirection {
   const l = String(locale || '').toLowerCase()
   if (l === 'zh-hant' || l.startsWith('zh-tw') || l.startsWith('zh-hk')) return 's2t'
   if (l === 'zh-hans' || l === 'zh-cn' || l === 'zh') return 't2s'
   return 'none'
+}
+
+/** 卡片語言標明的字形；只寫 zh、空的、其他語言都是 null（看不出來）。 */
+function cardScript(language: string | null | undefined): 'hant' | 'hans' | null {
+  const l = String(language || '').toLowerCase().replace(/_/g, '-')
+  if (l === 'zh-hant' || l.startsWith('zh-hant-') || l.startsWith('zh-tw') || l.startsWith('zh-hk') || l.startsWith('zh-mo')) return 'hant'
+  if (l === 'zh-hans' || l.startsWith('zh-hans-') || l.startsWith('zh-cn') || l.startsWith('zh-sg')) return 'hans'
+  return null
+}
+
+/**
+ * 卡片字形 → 玩家字形。卡片和玩家同一種字形就不轉：已經是玩家的字，再轉只會改壞
+ * （簡轉繁一對多，制→製、面→麵）。卡片字形看不出來才退回只看玩家介面語言、逐段判斷。
+ */
+export function directionFor(cardLanguage: string | null | undefined, locale: string | null | undefined): ScriptDirection {
+  const player = directionForLocale(locale)
+  const card = cardScript(cardLanguage)
+  if (player === 'none' || !card) return player
+  if (card === 'hant') return player === 's2t' ? 'none' : 't2s'
+  return player === 't2s' ? 'none' : 's2t'
 }
 
 export const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'CODE', 'PRE', 'TEXTAREA', 'TEMPLATE', 'KBD', 'SAMP'])

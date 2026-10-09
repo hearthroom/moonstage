@@ -24,9 +24,9 @@ import { convertChinese } from '@/common/chinese-converter'
 import TradOrSimp from '@/common/TradOrSimp'
 import { isAmbiguousChar } from '@/common/ambiguous-chars'
 
-import { directionForLocale, convertTextNodes, HAS_CJK, type ScriptDirection } from '@/common/display-script-walk'
+import { directionForLocale, directionFor, convertTextNodes, HAS_CJK, type ScriptDirection } from '@/common/display-script-walk'
 
-export { directionForLocale, type ScriptDirection }
+export { directionForLocale, directionFor, type ScriptDirection }
 
 /**
  * 逐文字節點轉換一段 HTML。converter 只收純文字、回純文字。

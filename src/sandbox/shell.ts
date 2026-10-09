@@ -67,8 +67,8 @@ export interface Shell {
 export function createShell(options: CreateShellOptions): Shell {
   const { doc, win, mount, config, transport } = options
   const strings = shellStrings(config.locale)
-  // 顯示字形：方向由玩家介面語言決定；字典載好之前 convert 是 null（照原文畫），載好後整個列表重畫。
-  const scriptDirection = scriptDirectionFor(config.locale)
+  // 顯示字形：方向由卡片語言與玩家介面語言一起決定（同字形不轉）；字典載好之前 convert 是 null（照原文畫），載好後整個列表重畫。
+  const scriptDirection = scriptDirectionFor(config.cardLanguage, config.locale)
   let convert: TextConverter | null = null
   let markTextReady: () => void = () => {}
   const textReady = new Promise<void>((resolve) => { markTextReady = resolve })

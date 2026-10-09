@@ -79,6 +79,8 @@ export interface SandboxCapabilities {
 export interface SandboxHelloConfig {
   theme: SandboxTheme
   locale: string
+  /** 卡片的語言（zh-Hant／zh-Hans…）。跟玩家同一種字形就不做簡繁轉換；沒給就只看 locale。 */
+  cardLanguage?: string
   role: { name: string; avatarUrl: string }
   user: { nickname: string; avatarUrl: string }
   card: SandboxCard

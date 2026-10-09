@@ -168,7 +168,7 @@ function buildRenderMessage(authorRules: unknown, renderMarkdown: (item: any) =>
     splitThinkingContent: (content: string) => ({ hasThinking: false, visibleContent: content }),
     cardHandlesTag: () => false,
     activeAuthorAsset: { value: { rules: [], version: 0 } },
-    displayScript: { value: 'none' },
+    displayScriptDirection: { value: 'none' },
     streamRenderTick: { value: 0 },
     streamRenderThrottle: createStreamRenderThrottle(),
     streamRenderKey,
