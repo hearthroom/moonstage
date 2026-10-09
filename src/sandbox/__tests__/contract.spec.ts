@@ -175,6 +175,14 @@ function sanitizerFacts() {
   }
 }
 
+/** 殼的 CSP，從 src/sandbox/index.html 的 meta 讀（正式站的回應標頭跟它同一份）。 */
+function shellCsp() {
+  const html = readFileSync(path.join(ROOT, 'src/sandbox/index.html'), 'utf8')
+  const csp = /http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(html)![1]
+  const get = (name: string) => (csp.split(';').map((s) => s.trim()).find((s) => s.startsWith(name + ' ')) ?? '').slice(name.length + 1)
+  return { connectSrc: get('connect-src'), frameSrc: get('frame-src'), scriptSrc: get('script-src'), styleSrc: get('style-src'), imgSrc: get('img-src'), fontSrc: get('font-src'), formAction: get('form-action'), baseUri: get('base-uri') }
+}
+
 function scriptFacts() {
   return {
     source: 'hand-maintained from src/sandbox/author-scripts.ts, rules.ts, shell.ts and index.html; the sdk.spec and shell.spec cover the testable parts',
@@ -183,13 +191,14 @@ function scriptFacts() {
     runsBeforeDom: true,
     runsAfterFunctionBarMounted: true,
     inlineScriptsRunAsScriptElements: 'top-level declarations become globals; a SyntaxError (top-level return) is retried wrapped in a function',
-    externalScripts: { httpsOnly: true, orderedNotAwaited: true, dedupedByUrl: true },
+    externalScripts: { httpsOnly: true, orderedNotAwaited: true, dedupedByUrl: true, typeModuleKept: true, nomoduleSkipped: true },
     messageBodyScripts: 'run once per distinct code string after the message is done; code already run at install does not run again',
-    moduleScripts: 'run as classic scripts',
-    documentCurrentScript: 'the running <script> element for an inline rule script (they run as real script elements); null only for the wrapped-function fallback',
+    moduleScripts: 'type="module" is kept for src and inline scripts: they run as ES modules (import, import()) after every inline classic script; external module scripts keep rule order with the other external scripts, inline module scripts run once their imports load; a nomodule script does not run',
+    documentCurrentScript: 'the running <script> element for an inline classic rule script (they run as real script elements); null in module scripts and in the wrapped-function fallback',
     previewRerunsScripts: 'the card editor preview re-runs scripts on every edit: boot must be idempotent',
     gestureRequired: ['message.send outside a trusted click asks the player', 'message.edit outside a trusted click asks the player', 'send/continue/assist/favorite/rewrite/system-card buttons ignore synthetic clicks'],
-    csp: { connectSrc: "'self'", frameSrc: "'self' about: blob:", scriptSrc: "'self' 'unsafe-inline' 'unsafe-eval' https:", styleSrc: "'self' 'unsafe-inline' https:", imgSrc: "'self' data: blob: https:", fontSrc: "'self' data: https:", formAction: "'none'", baseUri: "'none'" },
+    csp: shellCsp(),
+    assetsLibrary: { origin: 'https://assets.harperharbor.com', fetch: 'connect-src: fetch JSON, WASM (WebAssembly.instantiateStreaming) and other files', scripts: 'script-src https:: <script src>, <script type="module" src>, import()' },
     links: 'http(s) links in author HTML are intercepted and opened by the host in a new tab',
     localStorage: 'available, scoped to the card subdomain; author rule output is cached in IndexedDB keyed by storageScope',
   }

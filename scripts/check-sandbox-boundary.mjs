@@ -36,9 +36,14 @@ if (!files.length) {
   process.exit(1)
 }
 
+// 唯一的例外：殼頁 CSP 的 connect-src 放行媒體素材庫，讓卡片 fetch 自己的 JSON／WASM。那是作者的資料來源，
+// 不是宿主的請求層；只在 index.html 的 CSP 指令裡、逐字這一個值才放過。
+const ALLOWED_CSP_SOURCE = /(connect-src 'self') https:\/\/assets\.harperharbor\.com(?=;)/
+
 let bad = 0
 for (const file of files) {
-  const text = fs.readFileSync(path.join(dir, file), 'utf8')
+  let text = fs.readFileSync(path.join(dir, file), 'utf8')
+  if (file === 'index.html') text = text.replace(ALLOWED_CSP_SOURCE, '$1')
   for (const needle of FORBIDDEN) {
     const idx = text.indexOf(needle)
     if (idx === -1) continue
