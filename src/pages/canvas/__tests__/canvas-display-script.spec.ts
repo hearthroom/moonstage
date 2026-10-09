@@ -53,6 +53,8 @@ describe('接線位置', () => {
     expect(page).toContain('directionFor((roleView.value as any).language, stageHost.locale.get())')
     expect(page).toContain("cardLanguage: String(view.language || ''),")
     expect(page).toContain('script: displayScriptDirection.value,')
+    // 殼的 hello 只送一次：要等角色細節（含卡片語言）到了才掛殼
+    expect(page).toMatch(/whenRoleDetail\(currentRole, \(\) => unref\(currentRole\), target\)[\s\S]{0,200}mountSandbox\(res\.data\)/)
     expect(page).not.toContain('directionForLocale(')
 
     // 串流舊路徑與角色資料的簡轉繁，同字形時也不轉
