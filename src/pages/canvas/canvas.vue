@@ -475,12 +475,7 @@ import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greet
 import { archiveRequestQuery, buildArchiveRows, isArchiveFull, nextArchiveAfterDelete } from './canvas-archives'
 import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
 import type { ArchiveRow } from './canvas-archives'
-import { convertVisibleHtml, convertPlainText, createDisplayScriptConverter, directionForLocale } from './canvas-display-script'
-
-// 顯示字形轉換（簡↔繁）：只在畫出來那一刻、只轉玩家看得到的字。
-// 儲存與傳輸永遠是原文——卡片的正則與機讀協定都寫死在作者的字形上，
-// 早一步轉就會把它們轉壞（見 canvas-display-script.ts 檔頭與設計 §3.3.5）。
-const displayScript = createDisplayScriptConverter(directionForLocale(stageHost.locale.get()))
+import { convertVisibleHtml, convertPlainText, createDisplayScriptConverter, directionFor } from './canvas-display-script'
 import CanvasPrologue from './components/canvas-prologue.vue'
 import { captureBodySnapshot, restoreBodySnapshot, sweepForeignNodes } from './canvas-body-snapshot'
 import CanvasPopup from './components/canvas-popup.vue'
@@ -1558,6 +1553,17 @@ const roleView = computed(() => {
   const role = unref(currentRole) || {}
   return { ...role, roleAvatar: cardPortrait(role) }
 });
+
+// 顯示字形轉換（簡↔繁）：只在畫出來那一刻、只轉玩家看得到的字。
+// 儲存與傳輸永遠是原文——卡片的正則與機讀協定都寫死在作者的字形上，
+// 早一步轉就會把它們轉壞（見 canvas-display-script.ts 檔頭與設計 §3.3.5）。
+// 方向看卡片語言與玩家介面語言：同一種字形就不轉。角色細節回來之前不知道卡片語言，
+// 先照介面語言；回來後方向變了，訊息的渲染記憶以方向為鍵，會整批重畫。
+const displayScriptDirection = computed(() => directionFor((roleView.value as any).language, stageHost.locale.get()));
+const displayScriptConverter = computed(() => createDisplayScriptConverter(displayScriptDirection.value));
+function displayScript(text: string): string {
+  return displayScriptConverter.value(text);
+}
 
 
 // 舞台背景照 MMD 的兩級回退：玩家設過的 → 卡片的背景圖 → 卡片的形象圖。
@@ -2904,6 +2910,7 @@ function mountSandbox(asset: any) {
         return {
           theme: detectSandboxTheme(),
           locale: String(locale.value || ''),
+          cardLanguage: String(view.language || ''),
           role: { name: convertPlainText(view.roleName || '', displayScript), avatarUrl: view.roleAvatar ? String(cfImage(view.roleAvatar, 'avatarMedium') || '') : '' },
           user: { nickname: userDisplayName(), avatarUrl: String(info.avatar || '') },
           card: {
@@ -4241,7 +4248,7 @@ function renderMemoKey(item) {
     finish: !!item.chatFinish,
     summary: !!item.isSummary,
     version: activeAuthorAsset.value.version,
-    script: displayScript.value,
+    script: displayScriptDirection.value,
   }
 }
 
@@ -5564,7 +5571,8 @@ const dispatchCtx: DispatchContext = {
   commitPendingChatOperationAfterVisibleDone,
   onOperationStatus: handleOperationStatusEvent,
   onOperationRecoveryRequired: reason => requestPendingOperationReconciliation(reason),
-  tify: (s: string) => _this.fui.tify(s),
+  // 繁體介面的串流舊路徑會先簡轉繁；卡片本身就是繁體時不轉（同字形不轉，見 displayScriptDirection）。
+  tify: (s: string) => (displayScriptDirection.value === 'none' ? s : _this.fui.tify(s)),
   getLocale: () => stageHost.locale.get(),
   nextTick,
   t,

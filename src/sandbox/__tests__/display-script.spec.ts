@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { renderAppliedContent } from '../rules'
-import { convertTextNodes, directionForLocale } from '@/common/display-script-walk'
+import { convertTextNodes, directionForLocale, directionFor } from '@/common/display-script-walk'
 import { createShell } from '../shell'
 import type { SandboxHelloConfig } from '../protocol'
 import type { RuleRunner } from '@/common/author-rules'
@@ -28,6 +28,23 @@ describe('convertTextNodes', () => {
     expect(directionForLocale('zh-Hans')).toBe('t2s')
     expect(directionForLocale('en')).toBe('none')
   })
+  it('卡片有字形：同字形不轉，不同字形從卡片轉到玩家', () => {
+    expect(directionFor('zh-Hant', 'zh-Hant')).toBe('none')
+    expect(directionFor('zh-Hant', 'zh-TW')).toBe('none')
+    expect(directionFor('zh-TW', 'zh-HK')).toBe('none')
+    expect(directionFor('zh-Hans', 'zh-Hans')).toBe('none')
+    expect(directionFor('zh-CN', 'zh-Hans')).toBe('none')
+    expect(directionFor('zh-Hant', 'zh-Hans')).toBe('t2s')
+    expect(directionFor('zh-Hans', 'zh-Hant')).toBe('s2t')
+    expect(directionFor('zh-Hant', 'en')).toBe('none')
+  })
+  it('卡片沒有字形（空、zh、其他語言）：照玩家介面語言', () => {
+    for (const card of ['', null, undefined, 'zh', 'en', 'ja']) {
+      expect(directionFor(card, 'zh-Hant')).toBe('s2t')
+      expect(directionFor(card, 'zh-Hans')).toBe('t2s')
+      expect(directionFor(card, 'en')).toBe('none')
+    }
+  })
 })
 
 describe('renderAppliedContent 的 convert', () => {
@@ -46,9 +63,9 @@ const identityRunner: RuleRunner = {
   onSettled: () => () => {},
 } as unknown as RuleRunner
 
-function baseConfig(locale: string): SandboxHelloConfig {
+function baseConfig(locale: string, cardLanguage?: string): SandboxHelloConfig {
   return {
-    theme: 'dark', locale, role: { name: 'A', avatarUrl: '' }, user: { nickname: 'B', avatarUrl: '' },
+    theme: 'dark', locale, cardLanguage, role: { name: 'A', avatarUrl: '' }, user: { nickname: 'B', avatarUrl: '' },
     card: { rules: [], statusbar: '' }, capabilities: { saves: false, edit: false, send: true }, composer: true,
   }
 }
@@ -86,6 +103,35 @@ describe('殼：字典載好後重畫', () => {
     })
     await shell.sdk.text.ready()
     expect(asked).toEqual([])
+    shell.dispose()
+  })
+  it('繁體卡＋繁體玩家：不載字典，sdk.text.convert 回原文', async () => {
+    document.body.innerHTML = '<div id="app"></div>'
+    const asked: string[] = []
+    const shell = createShell({
+      doc: document, win: window, mount: document.getElementById('app')!, config: baseConfig('zh-Hant', 'zh-Hant'),
+      transport: { send: () => {} }, ruleRunner: identityRunner,
+      displayScript: (dir) => { asked.push(dir); return Promise.resolve((t: string) => t.replace(/制/g, '製')) },
+    })
+    shell.handle({ type: 'messages', messages: [{ id: 'm1', role: 'ai', content: '穿制服', state: 'done' }] } as never)
+    await shell.sdk.text.ready()
+    await new Promise((r) => setTimeout(r, 30))
+    expect(asked).toEqual([])
+    expect(document.body.textContent).toContain('穿制服')
+    expect(shell.sdk.text.convert('穿制服')).toBe('穿制服')
+    shell.dispose()
+  })
+  it('繁體卡＋簡體玩家：載轉簡的字典', async () => {
+    document.body.innerHTML = '<div id="app"></div>'
+    const asked: string[] = []
+    const shell = createShell({
+      doc: document, win: window, mount: document.getElementById('app')!, config: baseConfig('zh-Hans', 'zh-Hant'),
+      transport: { send: () => {} }, ruleRunner: identityRunner,
+      displayScript: (dir) => { asked.push(dir); return Promise.resolve(toHans) },
+    })
+    await shell.sdk.text.ready()
+    expect(asked).toEqual(['t2s'])
+    expect(shell.sdk.text.convert('傳')).toBe('传')
     shell.dispose()
   })
 })

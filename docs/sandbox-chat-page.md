@@ -109,7 +109,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 | `save.get/set/remove/keys` | 分階段 | 宿主沒宣告 `saves` 能力時 `HOST_DENIED`；key 只許 `[A-Za-z0-9_-]{1,64}`，否則 `INVALID_ARGS`；最多 10 個 key、單值 64 KB |
 | `stage.open(mode)/close/el/visible` | 實作 | `content`（蓋訊息區，z 2000）／`full`（整屏，z 3000）；`el()` 關著也回節點，開關只看 `visible()`；作者自己 `close()` 不發 `stage:close` |
 | `role.get()` / `user.get()` | 實作 | 來自 `hello.config.role/user`，欄位封閉：`{name, avatarUrl}`／`{nickname, avatarUrl, locale}`（`locale` 是玩家介面語言，來自 `hello.config.locale`） |
-| `text.convert(text)` / `text.ready()` | 實作 | 顯示字形（簡↔繁），方向跟一般聊天頁一樣由玩家介面語言決定；字典另成 `sandbox-zh.js`，只在需要轉時載入。`ready()` 在字典載好或確定不需要時完成；之前 `convert` 原樣回 |
+| `text.convert(text)` / `text.ready()` | 實作 | 顯示字形（簡↔繁），方向跟一般聊天頁一樣：卡片語言（`hello.config.cardLanguage`）和玩家介面語言同一種字形就不轉、`convert` 原樣回；不同才從卡片字形轉到玩家字形；卡片字形不明時只看玩家介面語言。字典另成 `sandbox-zh.js`，只在需要轉時載入。`ready()` 在字典載好或確定不需要時完成；之前 `convert` 原樣回 |
 | `model.get()` | 實作 | `{name, cost}`：玩家目前選的模型友善名（頂欄那個「模型名 · 線路名」）與下一輪的點數（已格式化，動態計價是區間，例如 `127–251`）；宿主還沒給時是空字串。來自 `chrome.composer.modelName／modelScore`，換模型、改上下文檔位或思考深度時宿主重送，殼發 `model:change` |
 | `generation.get()` | 實作 | `{phase, since}`：這一輪在等什麼——`idle`、`preparing`（剛送出，什麼都還沒回來）、`summarizing`（平台在整理劇情：伺服器壓縮記憶，擋在第一個字前，可能幾十秒）、`thinking`（模型在推理、正文還沒來；不推理的模型沒有這段）、`writing`（正文串流中）；`since` 是進入這個階段的時間（毫秒）。宿主從 `isCompacting`、推理串流與正文串流推得，跟 `generation` 訊息一起送（`phase`），只送階段、不送推理內容；殼發 `generation:phase`。`outcome`：上一輪沒正常結束時，最新那一列底下那張卡（系統訊息卡或 Agent 中斷卡）的 `{kind, label, sub, actions:[{action, label}]}`；正常結束或生成中是 `null`，變了殼發 `generation:outcome`。`kind` 是卡的樣式：`model-error`、`network-error`、`server-error`、`rate-limit`、`quota`、`filtered`、`length-cap`、`stopped`、`compact-retryable`、`outcome-unconfirmed`（結果還在路上，沒有鍵，有結果自己會換）、`interrupted`（Agent 這一輪還沒跑完）。`label`／`sub` 是那張卡上同一句玩家語系的字（宿主用 `systemNoticeFor()` 與中斷卡同一組運算式算）。`actions` 只會是 `retry`、`continue`、`switch-model`、`model-settings`、`capacity`、`refresh` |
 | `generation.act(action)` | 實作 | 按那張卡上的一顆鍵（`outcome.actions` 裡的動作名），走玩家點那張卡同一條路：重試沿用同一句、不多一則；容量與模型設定打開平台的面板。只在玩家手勢裡（不在手勢裡回 `UNAUTHORIZED`，不問——作者沒有理由替玩家自動重試）；結局裡沒有這個動作 `INVALID_ARGS`；生成中 `BUSY`；沒有送出能力 `NOT_SUPPORTED`；3／分。殼送 `request generation.act`，宿主照當下的結局核一次再交給 `onMessageAction`（`sys:<動作>`、`resume-agent`、`switch-model`） |
@@ -287,6 +287,18 @@ z-index：平台節點一律 `auto`；舞台 content 2000、full 3000；平台�
 
 跟一般聊天頁同一套規則：儲存與傳輸永遠是原文，轉換排在卡片正則之後、只轉看得到的文字節點；屬性、class、`<script>`／`<style>`、`translate="no"`／`class="notranslate"` 的子樹不碰。
 
+方向由卡片語言（宿主在 `hello.config.cardLanguage` 帶角色細節的 `language`）和玩家介面語言一起決定：
+
+| 卡片 | 玩家 | 方向 |
+|---|---|---|
+| 繁體（zh-Hant／zh-TW／zh-HK） | 繁體 | 不轉 |
+| 簡體（zh-Hans／zh-CN） | 簡體 | 不轉 |
+| 繁體 | 簡體 | 轉簡 |
+| 簡體 | 繁體 | 轉繁 |
+| 沒標字形（空、`zh`、其他語言） | 中文 | 照玩家介面語言，逐段判斷 |
+
+同一種字形不轉，也不下載字典：已經是玩家的字，再轉只會改壞（簡轉繁一對多，制→製、面→麵）。
+
 - 宿主算好的訊息（`view.html`）與功能欄（`statusbarHtml`）由宿主轉。
-- 殼自己渲染的內容（沒有 `view` 時）由殼轉：字典在 `sandbox-zh.js`，玩家介面語言需要轉時才載入；載好之前照原文畫，載好後整個列表經虛擬化同一條路拆掉重建（重發 `message:unmount`／`message:mount`）。
+- 殼自己渲染的內容（沒有 `view` 時）由殼轉：字典在 `sandbox-zh.js`，需要轉時才載入；載好之前照原文畫，載好後整個列表經虛擬化同一條路拆掉重建（重發 `message:unmount`／`message:mount`）。
 - 卡片腳本自己畫的字用 `sdk.text.convert()`；要在字典載好後重畫，等 `sdk.text.ready()`。

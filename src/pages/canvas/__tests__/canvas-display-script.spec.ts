@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { convertVisibleHtml, convertPlainText, directionForLocale, createDisplayScriptConverter } from '../canvas-display-script'
+import { convertVisibleHtml, convertPlainText, directionForLocale, directionFor, createDisplayScriptConverter } from '../canvas-display-script'
 
 // 真的轉換器（OpenCC＋主站原本的判斷）：混排、已是繁體、一簡對多繁的單字都不能誤轉。
 describe('真轉換器沿用主站那套判斷', () => {
@@ -47,6 +47,18 @@ describe('接線位置', () => {
     expect(restoreAt).toBeGreaterThan(convertAt)
     expect(page).not.toContain('_this.fui.tify(split.visibleContent)')
     expect(page).not.toContain('_this.fui.tify(rawContent)')
+  })
+  it('方向看卡片語言（角色細節的 language）；沙箱殼也拿到卡片語言；渲染記憶以方向為鍵', () => {
+    const page = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
+    expect(page).toContain('directionFor((roleView.value as any).language, stageHost.locale.get())')
+    expect(page).toContain("cardLanguage: String(view.language || ''),")
+    expect(page).toContain('script: displayScriptDirection.value,')
+    expect(page).not.toContain('directionForLocale(')
+
+    // 串流舊路徑與角色資料的簡轉繁，同字形時也不轉
+    expect(page).toContain("tify: (s: string) => (displayScriptDirection.value === 'none' ? s : _this.fui.tify(s)),")
+    const mixin = readFileSync(resolve(__dirname, '../../../mixins/UserDefine.js'), 'utf8')
+    expect(mixin).toContain("uni.getLocale() == 'zh-Hant' && directionFor(res.data.language, 'zh-Hant') === 's2t'")
   })
 })
 
@@ -91,6 +103,15 @@ describe('顯示字形轉換', () => {
     expect(convertPlainText('', fake)).toBe('')
   })
 
+  it('繁體卡在繁體玩家面前原樣顯示（不再逐段猜字形）', () => {
+    const convert = createDisplayScriptConverter(directionFor('zh-Hant', 'zh-Hant'))
+    expect(convert('范先生穿制服，午后')).toBe('范先生穿制服，午后')
+    expect(convertVisibleHtml('<b>皇后</b>的斷面', convert)).toBe('<b>皇后</b>的斷面')
+  })
+  it('簡體卡在簡體玩家面前原樣顯示', () => {
+    const convert = createDisplayScriptConverter(directionFor('zh-Hans', 'zh-CN'))
+    expect(convert('乾隆的頭髮')).toBe('乾隆的頭髮')
+  })
   it('方向依介面語言：正體轉繁、簡體轉簡、其他不動', () => {
     expect(directionForLocale('zh-Hant')).toBe('s2t')
     expect(directionForLocale('zh-Hans')).toBe('t2s')

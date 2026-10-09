@@ -1,4 +1,5 @@
 import { useStageHost } from '@/host/stage-host'
+import { directionFor } from '@/common/display-script-walk'
 import {
 	computed,
 	ref,
@@ -299,7 +300,8 @@ export const useUserDefine = () => {
 		}).then(res => {
 			if (res.statusCode == 200) {
 				var role = {};
-				if (uni.getLocale() == 'zh-Hant') {
+				// 繁體介面才轉；卡片本身就是繁體就不轉（同字形不轉）。
+				if (uni.getLocale() == 'zh-Hant' && directionFor(res.data.language, 'zh-Hant') === 's2t') {
 					role = {
 						...res.data,
 						// 转换属性格式
