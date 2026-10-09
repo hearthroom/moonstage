@@ -3,7 +3,9 @@ import { describe, it, expect } from 'vitest'
 import { sanitizeAuthorHtml, stripUnknownTags } from '../sanitize'
 import { stylePolicyFor } from '@/common/author-style-policy'
 import { installCard, renderContent, expandMacros } from '../rules'
-import { topLevelNames, wrapInlineScript } from '../author-scripts'
+import { topLevelNames, wrapInlineScript, runAuthorScripts } from '../author-scripts'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 
 const opts = { macros: { user: '小明', char: '露娜' }, doc: document }
 
@@ -63,6 +65,54 @@ describe('裝卡：抽 style／script', () => {
     expect(card.rules[0].replace).toBe('剩下')
     expect(card.rules[1].replace).toBe('<b>HP</b>')
     expect(card.rules[2].replace).toBe('<style>.no{}</style>')
+  })
+})
+
+describe('裝卡：ES 模組腳本', () => {
+  // 卡片從素材庫載自己的程式：<script type="module" src="https://assets.harperharbor.com/…">，或內聯模組裡 import。
+  // 以前 type 被丟掉、當傳統腳本跑，import 語法直接報錯。
+  it('type="module" 留著（外鏈與內聯都是）；外鏈模組照樣只認 https；nomodule 標出來', () => {
+    const card = installCard([
+      { id: 1, name: 'kit', find: '{{kit}}', replace: '<script type="module" src="https://assets.harperharbor.com/u/a.js"></script><script type=module src="http://a/b.js"></script><script type="MODULE">import x from "https://assets.harperharbor.com/u/x.js"</script><script nomodule src="https://a/legacy.js"></script><script type="text/javascript">var a = 1</script>' },
+    ], stylePolicyFor('mmd'))
+    expect(card.scripts).toEqual([
+      { kind: 'external', src: 'https://assets.harperharbor.com/u/a.js', ruleName: 'kit', module: true },
+      { kind: 'inline', code: 'import x from "https://assets.harperharbor.com/u/x.js"', ruleName: 'kit', module: true },
+      { kind: 'external', src: 'https://a/legacy.js', ruleName: 'kit', nomodule: true },
+      { kind: 'inline', code: 'var a = 1', ruleName: 'kit' },
+    ])
+  })
+
+  it('重新掛回去時 <script> 帶 type="module"；外鏈模組保留 src 且按順序（async=false）', () => {
+    const doc = document.implementation.createHTMLDocument('t')
+    runAuthorScripts([
+      { kind: 'external', src: 'https://assets.harperharbor.com/u/a.js', ruleName: 'kit', module: true },
+      { kind: 'inline', code: 'import x from "https://assets.harperharbor.com/u/x.js"', ruleName: 'kit', module: true },
+      { kind: 'external', src: 'https://a/legacy.js', ruleName: 'kit', nomodule: true },
+      { kind: 'external', src: 'https://a/classic.js', ruleName: 'kit' },
+    ], { doc, win: window as Window & typeof globalThis, onError: () => {}, onExternalError: () => {} })
+    const els = Array.from(doc.head.querySelectorAll('script'))
+    const ext = els.find((e) => e.getAttribute('src') === 'https://assets.harperharbor.com/u/a.js')!
+    expect(ext.type).toBe('module')
+    expect(ext.async).toBe(false)
+    const inline = els.find((e) => (e.textContent || '').includes('import x'))!
+    expect(inline.type).toBe('module')
+    expect(els.find((e) => e.getAttribute('src') === 'https://a/legacy.js')!.hasAttribute('nomodule')).toBe(true)
+    const classic = els.find((e) => e.getAttribute('src') === 'https://a/classic.js')!
+    expect(classic.type).toBe('')
+    expect(classic.async).toBe(false)
+  })
+})
+
+describe('殼的 CSP（index.html 的 meta；正式站的回應標頭是同一份）', () => {
+  const html = readFileSync(path.resolve(__dirname, '../index.html'), 'utf8')
+  const csp = /http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(html)![1]
+  const directive = (name: string) => csp.split(';').map((s) => s.trim()).find((s) => s.startsWith(name + ' ')) ?? ''
+  it('卡片可以 fetch 素材庫（JSON、WASM），但不能連到別的外站', () => {
+    expect(directive('connect-src')).toBe("connect-src 'self' https://assets.harperharbor.com")
+  })
+  it('外鏈與 import() 的模組走 script-src https:；WASM 編譯由 unsafe-eval 涵蓋', () => {
+    expect(directive('script-src')).toBe("script-src 'self' 'unsafe-inline' 'unsafe-eval' https:")
   })
 })
 

@@ -7,6 +7,10 @@
  *
  * 外鏈 `<script src>` 只認 https；按順序插進 head，不等前一個載完（跟原站一樣——作者的
  * 關鍵訂閱要寫在外鏈之前的內聯腳本裡）。載入失敗不中斷整張卡，除錯面板留一行。
+ *
+ * `type="module"`（外鏈與內聯）原樣掛成模組腳本：卡片從素材庫載自己的 ES 模組、import()。模組天生非同步——
+ * 一定在所有內聯傳統腳本之後；外鏈模組跟外鏈傳統腳本一樣設 async=false，按規則順序跑；內聯模組等它的 import 載完就跑。內聯模組不走間接 eval 的退路（import 在傳統
+ * 腳本裡不合法），執行期錯誤經 window 的 error 事件出去、不帶規則名。`nomodule` 帶著屬性掛上去，交給瀏覽器略過。
  */
 import type { AuthorScript } from './rules'
 
@@ -93,6 +97,11 @@ export function runInlineScript(code: string, ruleName: string, deps: RunScripts
   }
 }
 
+function markModule(el: HTMLScriptElement, script: AuthorScript) {
+  if (script.module) el.type = 'module'
+  if (script.nomodule) el.setAttribute('nomodule', '')
+}
+
 export function runAuthorScripts(scripts: AuthorScript[], deps: RunScriptsDeps) {
   const loaded = new Set<string>()
   for (const script of scripts) {
@@ -100,9 +109,18 @@ export function runAuthorScripts(scripts: AuthorScript[], deps: RunScriptsDeps) 
       if (loaded.has(script.src)) continue
       loaded.add(script.src)
       const el = deps.doc.createElement('script')
+      markModule(el, script)
       el.src = script.src
       el.async = false
       el.addEventListener('error', () => deps.onExternalError(script.ruleName, script.src))
+      deps.doc.head.appendChild(el)
+      continue
+    }
+    if (script.module || script.nomodule) {
+      const el = deps.doc.createElement('script')
+      markModule(el, script)
+      el.setAttribute('data-chat', 'author-script')
+      el.textContent = script.code
       deps.doc.head.appendChild(el)
       continue
     }

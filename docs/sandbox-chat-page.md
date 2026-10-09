@@ -172,8 +172,10 @@ z-index：平台節點一律 `auto`；舞台 content 2000、full 3000；平台�
 
 淨化（`sanitize.ts`）：第一道剝 `iframe`／`form`／`object`／`embed`／`base`／`meta`（子節點保留）、
 `data-*`／`aria-*`／`role` 屬性、`svg` 內的事件屬性；第二道由殼的 CSP 兜底
-（`connect-src 'self'`、`frame-src 'none'`、`form-action 'none'`、`base-uri 'none'`；
-`script-src 'self' 'unsafe-inline' 'unsafe-eval' https:`）。一般元素上的 `onclick` 等**保留**——
+（`connect-src 'self' https://assets.harperharbor.com`、`frame-src 'self' about: blob:`、`form-action 'none'`、`base-uri 'none'`；
+`script-src 'self' 'unsafe-inline' 'unsafe-eval' https:`）。卡片能 `fetch()` 素材庫（`https://assets.harperharbor.com`）裡的
+JSON、WASM 等檔案（含 `WebAssembly.instantiateStreaming`），別的外站連不到；規則裡的 `<script src>`、`<script type="module">`
+（外鏈與內聯）與 `import()` 從任何 https 網址載，`type="module"` 保留成 ES 模組跑。一般元素上的 `onclick` 等**保留**——
 作者的互動按鈕就是靠它們，這是功能不是漏洞（見 `trust-model.md`）。
 
 ## 5. 宿主側

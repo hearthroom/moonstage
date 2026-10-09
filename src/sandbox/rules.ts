@@ -29,13 +29,16 @@ export interface InstalledCard {
   scripts: AuthorScript[]
 }
 
+/** module：作者寫了 type="module"，要當 ES 模組跑（能 import）。nomodule：支援模組的瀏覽器不跑它。 */
 export type AuthorScript =
-  | { kind: 'inline'; code: string; ruleName: string }
-  | { kind: 'external'; src: string; ruleName: string }
+  | { kind: 'inline'; code: string; ruleName: string; module?: true; nomodule?: true }
+  | { kind: 'external'; src: string; ruleName: string; module?: true; nomodule?: true }
 
 const STYLE_RE = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi
 const SCRIPT_RE = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi
 const SRC_RE = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i
+const TYPE_RE = /\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i
+const NOMODULE_RE = /(?:^|\s)nomodule(?=[\s=]|$)/i
 
 export function installCard(rules: SandboxRule[], policy: AuthorStylePolicy): InstalledCard {
   const styles: string[] = []
@@ -51,11 +54,16 @@ export function installCard(rules: SandboxRule[], policy: AuthorStylePolicy): In
       .replace(SCRIPT_RE, (_m, attrs: string, code: string) => {
         const src = SRC_RE.exec(attrs || '')
         const url = src ? (src[1] || src[2] || src[3] || '') : ''
+        const type = TYPE_RE.exec(attrs || '')
+        // type="module" 留下來：卡片從素材庫載自己的 ES 模組（import／import()）。其他 type 照舊當傳統腳本。
+        const flags: { module?: true; nomodule?: true } = {}
+        if (type && (type[1] || type[2] || type[3] || '').trim().toLowerCase() === 'module') flags.module = true
+        else if (NOMODULE_RE.test(attrs || '')) flags.nomodule = true
         if (url) {
-          // 只認 https；http 直接跳過（不跑、不報錯，除錯面板留一行由呼叫端處理）。
-          if (/^https:\/\//i.test(url)) scripts.push({ kind: 'external', src: url, ruleName })
+          // 只認 https（模組也一樣）；http 直接跳過（不跑、不報錯，除錯面板留一行由呼叫端處理）。
+          if (/^https:\/\//i.test(url)) scripts.push({ kind: 'external', src: url, ruleName, ...flags })
         } else if (code.trim()) {
-          scripts.push({ kind: 'inline', code, ruleName })
+          scripts.push({ kind: 'inline', code, ruleName, ...flags })
         }
         return ''
       }))
