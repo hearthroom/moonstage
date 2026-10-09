@@ -44,7 +44,11 @@
       <div v-if="sandboxFailed" class="canvas-sandbox-notice" data-lt="sandbox-notice" role="status">
         {{ t('canvas.sandbox.unsupported') }}
       </div>
+      <!-- 殼網址定了才建 iframe，換網址就重建：iframe 的 sandbox 屬性只在導航開始時生效，
+           先以空屬性存在、再更新 src 的話，殼頁會用「不准腳本」載入（Vue 先改 src 再改 sandbox）。 -->
       <iframe
+        v-if="sandboxUrl"
+        :key="sandboxUrl"
         ref="sandboxFrame"
         class="canvas-sandbox-iframe"
         :src="sandboxUrl"
