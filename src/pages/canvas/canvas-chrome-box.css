@@ -84,6 +84,18 @@
 .mind-type {
     padding: 0 8px
 }
+.lt-meter.has-context .mind-type {
+    padding: 0 8px 0 2px
+}
+.lt-context-ring {
+    padding-left: 4px
+}
+.lt-meter-hint {
+    padding: 12px 16px
+}
+.lt-meter-hint-ok {
+    padding: 4px 12px
+}
 .more-options-scope {
     padding-bottom: 6px
 }

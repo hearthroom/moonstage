@@ -108,6 +108,8 @@
       :more-items="moreItems"
       :model-score="modelScoreText"
       :context-ring="contextRing"
+      :score-hint="modelScoreLabel"
+      :meter-hint="meterHint"
       :labels="composerLabels"
       @update:value="content = $event"
       @send="onCanvasSend"
@@ -121,6 +123,7 @@
       @more-pick="onPanelPick"
       @model="openModelSelect"
       @context="openContextBreakdownSheet()"
+      @meter-hint-done="onMeterHintDone"
       @shortcut="onShortcut"
     />
 
@@ -2650,6 +2653,8 @@ function buildChromeState() {
       moreItems: moreItems.value,
       modelScore: modelScoreText.value,
       contextRing: contextRing.value,
+      scoreHint: modelScoreLabel.value,
+      meterHint: meterHint.value,
       modelName: String(formData.selectModelName || ''),
       assistBusy: assistBusy.value,
       assistCost: ASSIST_COST,
@@ -2984,6 +2989,7 @@ function mountSandbox(asset: any) {
           case 'more-pick': onPanelPick(String(key || '')); return;
           case 'model': openModelSelect(); return;
           case 'context': openContextBreakdownSheet(); return;
+          case 'meter-hint-done': onMeterHintDone(); return;
           case 'fullscreen': toggleFullscreen(); return;
           case 'favorite': void toggleFavorite(); return;
           case 'comments': openComments(); return;
@@ -10564,6 +10570,20 @@ const contextRing = computed(() => {
   const ring = contextRingFromReport(latestContextReport.value)
   return ring ? { ...ring, label: t('canvas.context.ring', { percent: ring.percent }) } : null
 })
+
+// 圓環第一次出現時，在輸入框上方講一次圓環與數字各是什麼（手機沒有懸停說明）。
+// 看過就記在這個瀏覽器；記不住（隱私模式）就每次開頁講一次，總比沒講好。
+const METER_HINT_KEY = 'moonstage.meterHintSeen'
+const meterHintSeen = ref((() => { try { return localStorage.getItem(METER_HINT_KEY) === '1' } catch { return false } })())
+const meterHint = computed(() => (meterHintSeen.value ? null : {
+  ring: t('canvas.context.hintRing'),
+  score: t('canvas.context.hintScore'),
+  ok: t('canvas.context.hintOk'),
+}))
+function onMeterHintDone() {
+  meterHintSeen.value = true
+  try { localStorage.setItem(METER_HINT_KEY, '1') } catch { /* 記不住就算了 */ }
+}
 
 function resetContextBreakdown() {
   contextBreakdownGate.invalidate()

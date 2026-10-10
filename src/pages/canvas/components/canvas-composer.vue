@@ -121,6 +121,13 @@
               :class="stateClass"
               @pointerdown="onScopePointerDown"
             >
+              <!-- 第一次看到膠囊時講清楚兩件事：圓環是什麼、數字是什麼。手機沒有懸停，所以不能只靠 title。
+                   看過與否由頁面記（沙箱卡的殼在另一個源，記不住）。 -->
+              <div v-if="meterHint && contextRing" class="lt-meter-hint" role="note">
+                <div class="lt-meter-hint-line">{{ meterHint.ring }}</div>
+                <div class="lt-meter-hint-line">{{ meterHint.score }}</div>
+                <div class="lt-meter-hint-ok" role="button" tabindex="0" @click="$emit('meter-hint-done')" @keydown.enter.prevent="$emit('meter-hint-done')">{{ meterHint.ok }}</div>
+              </div>
               <!--
                 隱藏的送出代理。卡片腳本抓的是 `.send-msg .btn-icon` 的第一顆然後原生點擊它，
                 MMD 也是這樣做的（display:none、寬高 0）；酒館腳本點的是 #send_but。
@@ -176,36 +183,41 @@
 
               <div v-show="!expanded" class="chat-input-collapsed-row">
                 <div class="chat-input-row-lead">
-                  <div
-                    class="mind-type"
-                    role="button"
-                    tabindex="0"
-                    :aria-label="labels.model"
-                    @click="$emit('model')"
-                    @keydown.enter.prevent="$emit('model')"
-                  >
-                    <span class="mind-type-score">{{ modelScore }}</span>
-                    <!-- 圖示是硬幣不是閃電：閃電讓作者把每輪費用讀成「電量在燒」而害怕（2026-09-15 社群回報）。
-                         節點名照 MMD（作者的卡對 .icon-box .icon-battery 寫了外觀），
-                         裡面放一道閃電：那個數字講的是這一輪要花多少點。 -->
-                    <span class="icon-box"><span class="icon-battery" :title="labels.perTurn" :aria-label="labels.perTurn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3.5" /></svg></span></span>
-                  </div>
-                  <div
-                    v-if="contextRing"
-                    class="lt-context-ring"
-                    :class="'is-' + contextRing.level"
-                    data-lt="context-usage"
-                    role="button"
-                    tabindex="0"
-                    :title="contextRing.label"
-                    :aria-label="contextRing.label"
-                    @click="$emit('context')"
-                    @keydown.enter.prevent="$emit('context')"
-                  >
-                    <svg viewBox="0 0 20 20" fill="none" stroke-width="3" aria-hidden="true" focusable="false">
-                      <circle class="ring-track" cx="10" cy="10" r="7.5" />
-                      <circle class="ring-fill" cx="10" cy="10" r="7.5" pathLength="100" :stroke-dasharray="Math.max(2, contextRing.percent) + ' 100'" />
-                    </svg>
+                  <!-- 上下文用量與每輪點數合成一顆膠囊：左邊圓環開上下文用量，右邊數字開模型設定。
+                       兩顆是並排的兄弟節點，各自一個點擊區與讀屏說明，不是按鍵裡再包按鍵。 -->
+                  <div class="lt-meter" :class="{ 'has-context': !!contextRing }">
+                    <div
+                      v-if="contextRing"
+                      class="lt-context-ring"
+                      :class="'is-' + contextRing.level"
+                      data-lt="context-usage"
+                      role="button"
+                      tabindex="0"
+                      :title="contextRing.label"
+                      :aria-label="contextRing.label"
+                      @click="$emit('context')"
+                      @keydown.enter.prevent="$emit('context')"
+                    >
+                      <svg viewBox="0 0 20 20" fill="none" stroke-width="3" aria-hidden="true" focusable="false">
+                        <circle class="ring-track" cx="10" cy="10" r="7.5" />
+                        <circle class="ring-fill" cx="10" cy="10" r="7.5" pathLength="100" :stroke-dasharray="Math.max(2, contextRing.percent) + ' 100'" />
+                      </svg>
+                    </div>
+                    <div
+                      class="mind-type"
+                      role="button"
+                      tabindex="0"
+                      :title="scoreHint || labels.perTurn"
+                      :aria-label="(scoreHint || labels.perTurn) + ' · ' + labels.model"
+                      @click="$emit('model')"
+                      @keydown.enter.prevent="$emit('model')"
+                    >
+                      <span class="mind-type-score">{{ modelScore }}</span>
+                      <!-- 圖示是硬幣不是閃電：閃電讓作者把每輪費用讀成「電量在燒」而害怕（2026-09-15 社群回報）。
+                           節點名照 MMD（作者的卡對 .icon-box .icon-battery 寫了外觀）。有圓環時硬幣收起來省位置，
+                           節點仍在給作者；數字的意思改由懸停說明與第一次出現時的提示講。 -->
+                      <span v-show="!contextRing" class="icon-box"><span class="icon-battery" :title="labels.perTurn" :aria-label="labels.perTurn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3.5" /></svg></span></span>
+                    </div>
                   </div>
                 </div>
                 <div
@@ -239,36 +251,41 @@
 
               <div v-show="expanded" class="chat-input-bottom-row">
                 <div class="chat-input-row-lead">
-                  <div
-                    class="mind-type"
-                    role="button"
-                    tabindex="0"
-                    :aria-label="labels.model"
-                    @click="$emit('model')"
-                    @keydown.enter.prevent="$emit('model')"
-                  >
-                    <span class="mind-type-score">{{ modelScore }}</span>
-                    <!-- 圖示是硬幣不是閃電：閃電讓作者把每輪費用讀成「電量在燒」而害怕（2026-09-15 社群回報）。
-                         節點名照 MMD（作者的卡對 .icon-box .icon-battery 寫了外觀），
-                         裡面放一道閃電：那個數字講的是這一輪要花多少點。 -->
-                    <span class="icon-box"><span class="icon-battery" :title="labels.perTurn" :aria-label="labels.perTurn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3.5" /></svg></span></span>
-                  </div>
-                  <div
-                    v-if="contextRing"
-                    class="lt-context-ring"
-                    :class="'is-' + contextRing.level"
-                    data-lt="context-usage"
-                    role="button"
-                    tabindex="0"
-                    :title="contextRing.label"
-                    :aria-label="contextRing.label"
-                    @click="$emit('context')"
-                    @keydown.enter.prevent="$emit('context')"
-                  >
-                    <svg viewBox="0 0 20 20" fill="none" stroke-width="3" aria-hidden="true" focusable="false">
-                      <circle class="ring-track" cx="10" cy="10" r="7.5" />
-                      <circle class="ring-fill" cx="10" cy="10" r="7.5" pathLength="100" :stroke-dasharray="Math.max(2, contextRing.percent) + ' 100'" />
-                    </svg>
+                  <!-- 上下文用量與每輪點數合成一顆膠囊：左邊圓環開上下文用量，右邊數字開模型設定。
+                       兩顆是並排的兄弟節點，各自一個點擊區與讀屏說明，不是按鍵裡再包按鍵。 -->
+                  <div class="lt-meter" :class="{ 'has-context': !!contextRing }">
+                    <div
+                      v-if="contextRing"
+                      class="lt-context-ring"
+                      :class="'is-' + contextRing.level"
+                      data-lt="context-usage"
+                      role="button"
+                      tabindex="0"
+                      :title="contextRing.label"
+                      :aria-label="contextRing.label"
+                      @click="$emit('context')"
+                      @keydown.enter.prevent="$emit('context')"
+                    >
+                      <svg viewBox="0 0 20 20" fill="none" stroke-width="3" aria-hidden="true" focusable="false">
+                        <circle class="ring-track" cx="10" cy="10" r="7.5" />
+                        <circle class="ring-fill" cx="10" cy="10" r="7.5" pathLength="100" :stroke-dasharray="Math.max(2, contextRing.percent) + ' 100'" />
+                      </svg>
+                    </div>
+                    <div
+                      class="mind-type"
+                      role="button"
+                      tabindex="0"
+                      :title="scoreHint || labels.perTurn"
+                      :aria-label="(scoreHint || labels.perTurn) + ' · ' + labels.model"
+                      @click="$emit('model')"
+                      @keydown.enter.prevent="$emit('model')"
+                    >
+                      <span class="mind-type-score">{{ modelScore }}</span>
+                      <!-- 圖示是硬幣不是閃電：閃電讓作者把每輪費用讀成「電量在燒」而害怕（2026-09-15 社群回報）。
+                           節點名照 MMD（作者的卡對 .icon-box .icon-battery 寫了外觀）。有圓環時硬幣收起來省位置，
+                           節點仍在給作者；數字的意思改由懸停說明與第一次出現時的提示講。 -->
+                      <span v-show="!contextRing" class="icon-box"><span class="icon-battery" :title="labels.perTurn" :aria-label="labels.perTurn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3.5" /></svg></span></span>
+                    </div>
                   </div>
                 </div>
                 <div class="chat-input-row-tail">
@@ -382,6 +399,10 @@ const props = withDefaults(defineProps<{
   modelScore?: string
   /** 上下文用量的小圓環；供應商沒給容量時是 null，不畫。label 是給讀屏與懸停看的那句話。 */
   contextRing?: { percent: number; level: string; label: string } | null
+  /** 數字的意思（例如「下一輪約 12–18 點」）；懸停與讀屏用 */
+  scoreHint?: string
+  /** 第一次出現膠囊時的說明；null 不畫 */
+  meterHint?: { ring: string; score: string; ok: string } | null
   /** 幫答進行中：按鈕鎖住，不重複扣點 */
   assistEnabled?: boolean
   assistBusy?: boolean
@@ -396,6 +417,8 @@ const props = withDefaults(defineProps<{
   moreItems: () => [],
   modelScore: '',
   contextRing: null,
+  scoreHint: '',
+  meterHint: null,
   assistEnabled: true,
   assistBusy: false,
   assistCost: '',
@@ -412,6 +435,7 @@ const emit = defineEmits<{
   (e: 'more-pick', key: string): void
   (e: 'model'): void
   (e: 'context'): void
+  (e: 'meter-hint-done'): void
   (e: 'shortcut', key: string): void
   (e: 'focus'): void
   (e: 'blur'): void
