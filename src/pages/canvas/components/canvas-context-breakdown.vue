@@ -52,13 +52,10 @@
         <span v-if="view.hasWindow" class="cb-summary-percent">{{ view.percent }}%</span>
         <span v-else class="cb-summary-percent">{{ labels.totalTokens }}</span>
       </div>
-      <!-- 用量條用 SVG 畫：有些手機的 WebView 吃不到 color-mix 與空的彈性元素，用 div 拼的條整條看不見
-           （owner 2026-10-10 手機截圖）。座標是 0–100，寬度跟著容器拉伸。 -->
-      <svg v-if="view" class="cb-bar" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <rect class="cb-bar-track" x="0" y="0" width="100" height="4" fill="currentColor" />
-        <rect v-for="seg in barSegments" :key="seg.key" class="cb-bar-seg" :data-key="seg.key" :x="seg.x" y="0" :width="seg.width" height="4" :fill="seg.color" />
-        <rect v-if="view.compactAt != null" class="cb-bar-line" :x="Math.max(0, view.compactAt - 0.4)" y="0" width="0.8" height="4" fill="currentColor" />
-      </svg>
+      <div v-if="view" class="cb-bar" aria-hidden="true">
+        <span v-for="row in view.rows" :key="row.key" class="cb-bar-seg" :data-key="row.key" :style="{ width: row.width + '%', background: row.color }"></span>
+        <span v-if="view.compactAt != null" class="cb-bar-line" :style="{ left: view.compactAt + '%' }"></span>
+      </div>
       <div v-if="view && view.hasWindow" class="cb-hint">{{ hintText }}</div>
 
       <div v-if="view" class="cb-list">
@@ -193,15 +190,6 @@ const statusText = computed(() => {
 })
 
 const view = computed(() => promptUsageView(props.report))
-
-const barSegments = computed(() => {
-  let x = 0
-  return (view.value ? view.value.rows : []).map((row) => {
-    const seg = { key: row.key, color: row.color, x, width: Math.max(0, Math.min(row.width, 100 - x)) }
-    x += seg.width
-    return seg
-  })
-})
 
 const hintText = computed(() => {
   const v = view.value
