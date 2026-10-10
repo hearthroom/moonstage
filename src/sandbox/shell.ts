@@ -485,6 +485,7 @@ export function createShell(options: CreateShellOptions): Shell {
         onAssist: () => sendUi('assist'),
         onMorePick: (key: string) => sendUi('more-pick', key),
         onModel: () => sendUi('model'),
+        onContext: () => sendUi('context'),
         onShortcut: (key: string) => sendUi('shortcut', key),
       } as Record<string, unknown>),
     })

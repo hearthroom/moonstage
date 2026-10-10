@@ -49,7 +49,7 @@ const AI_MESSAGE = {
 
 const PROLOGUE = { title: '你可以選擇開場', items: ['開場一', '開場二'] }
 
-// 組成彈窗要有資料才會畫出圓環與清單；餵兩個桶就夠契約問「節點在不在」。
+// 組成彈窗要有資料才會畫出用量條與清單；餵兩個桶就夠契約問「節點在不在」。
 const CONTEXT_BREAKDOWN_REPORT = normalizeServerReport({
   schemaVersion: 2,
   supported: true,
@@ -62,16 +62,16 @@ const CONTEXT_BREAKDOWN_REPORT = normalizeServerReport({
   total: { charCount: 400, estimatedTokens: 100 },
   cache: { available: false },
   billing: { available: true, totalPoints: 12, inputPoints: 4, cacheReadPoints: 1, outputPoints: 7, cacheHitRate: 50 },
+  window: { available: true, usedTokens: 100, limitTokens: 64000, compactAtTokens: 58880, percent: 0, turnsLeft: 20 },
 })
 const CONTEXT_BREAKDOWN_LABELS = {
   title: '這則回覆的組成', subtitle: '依最近一次完成的回覆估算', close: '關閉', retry: '重試',
   loadFailed: '讀不到', unsupportedModel: '不支援', notReady: '完成一輪後可看',
-  totalTokens: '估算 Token', totalChars: '字元', tokenUnit: 'Tokens', pointUnit: '點', unavailable: '尚無資料',
-  billingTotal: '本輪消耗', inputPoints: '輸入', cacheReadPoints: '快取讀取', outputPoints: '輸出',
-  cacheHitRateFull: '快取命中率', localEstimateNote: '本機估算。',
+  totalTokens: '估算 Token', tokenUnit: 'Tokens', pointUnit: '點',
+  billingTotal: '本輪消耗', cacheHitRateFull: '快取命中率', localEstimateNote: '各部分是估算。',
+  free: '剩餘空間', hintTurns: '較早的劇情大約再過 {n} 輪會濃縮成摘要。', hintLine: '到線時濃縮。', hintNow: '很快會濃縮。',
   expandModDetails: '展開', collapseModDetails: '收起', modDetailsUnavailable: '暫無', modDetailsLegacy: '下一輪後可看',
   items: { system: '系統與策略', history: '歷史對話' } as Record<string, string>,
-  sources: (n: number) => `${n} 項來源`,
   modsUsed: (n: number) => `本輪使用 ${n} 個 MOD`,
 }
 
@@ -107,6 +107,7 @@ function mountRegion(region: string) {
         props: {
           value: '', placeholder: '說點什麼', sendState: 'send', generating: false,
           shortcuts: [{ key: 'new-chat', label: '新的對話' }],
+          contextRing: { percent: 37, level: 'low', label: '上下文已用 37%' },
         },
       })
     case 'menu':

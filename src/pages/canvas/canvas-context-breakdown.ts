@@ -1,3 +1,5 @@
+import { contextUsageLevel, type ContextUsageLevel } from './canvas-context-usage'
+
 /**
  * 「上下文用量」（舊名「這則回覆的組成」）——把伺服器回的 breakdownVersion=2 報告整理成彈窗要畫的形狀。
  *
@@ -87,6 +89,21 @@ export interface PromptBreakdownCache {
   writeTokens: number
 }
 
+/**
+ * 這段對話的上下文用到哪裡了，跟伺服器的記憶整理同一把尺：用量、玩家選的容量、
+ * 從哪裡開始把較早的劇情濃縮成摘要，以及照最近幾輪的速度大約還剩幾輪。
+ * 沒有容量可比的供應商（LunaTalk、按位元組計的模型、舊回合）available 是 false。
+ */
+export interface PromptContextWindow {
+  available: boolean
+  usedTokens: number
+  limitTokens: number
+  compactAtTokens: number
+  percent: number
+  /** 只有最新一輪、而且最近至少兩輪在變長時才有 */
+  turnsLeft: number | null
+}
+
 export interface PromptBreakdownReport {
   chatId?: string
   schemaVersion?: number
@@ -98,16 +115,7 @@ export interface PromptBreakdownReport {
   total: PromptUsageValue
   cache: PromptBreakdownCache
   billing: PromptBreakdownBilling
-}
-
-export interface PromptDonutSegment {
-  key: PromptBreakdownKey
-  labelKey: string
-  color: string
-  percent: number
-  path: string
-  transform: string
-  isActive: boolean
+  window: PromptContextWindow
 }
 
 export const BREAKDOWN_META: Array<Pick<PromptBreakdownItem, 'key' | 'labelKey' | 'color'>> = [
@@ -421,6 +429,25 @@ function applyPercents(items: PromptBreakdownItem[]): PromptBreakdownItem[] {
   return items.map((item, index) => ({ ...item, percent: percentByIndex.get(index) || 0 }))
 }
 
+const NO_WINDOW: PromptContextWindow = { available: false, usedTokens: 0, limitTokens: 0, compactAtTokens: 0, percent: 0, turnsLeft: null }
+
+function normalizeServerWindow(window: any): PromptContextWindow {
+  if (!window || typeof window !== 'object' || window.available !== true) return NO_WINDOW
+  const used = nonNegativeNumber(window.usedTokens)
+  const limit = nonNegativeNumber(window.limitTokens)
+  const compactAt = nonNegativeNumber(window.compactAtTokens)
+  if (used == null || !limit || compactAt == null || compactAt > limit) return NO_WINDOW
+  const turnsLeft = nonNegativeNumber(window.turnsLeft)
+  return {
+    available: true,
+    usedTokens: used,
+    limitTokens: limit,
+    compactAtTokens: compactAt,
+    percent: Math.min(100, Math.floor(used * 100 / limit)),
+    turnsLeft: turnsLeft == null ? null : Math.floor(turnsLeft),
+  }
+}
+
 export function normalizeServerReport(report: any): PromptBreakdownReport | null {
   if (!report || typeof report !== 'object' || !Array.isArray(report.items)) return null
   const supported = report.supported !== false
@@ -461,6 +488,7 @@ export function normalizeServerReport(report: any): PromptBreakdownReport | null
     total,
     cache: normalizeServerCache(report.cache),
     billing: normalizeServerBilling(report.billing),
+    window: supported ? normalizeServerWindow(report.window) : NO_WINDOW,
   }
 }
 
@@ -487,97 +515,94 @@ export function visiblePromptBreakdownItems(items: PromptBreakdownItem[] | null 
   return promptBreakdownHasModData({ items: list }) ? list : list.filter((item) => item && item.key !== 'mod')
 }
 
-// ── 選中的桶 ──────────────────────────────────────────────────────────
+// ── 用量條 ────────────────────────────────────────────────────────────
+//
+// 面板上那一條：有容量可比時（window.available）每一段的寬度與百分比都是「占容量幾成」，
+// 後面接著剩餘空間，條上畫一條線標出從哪裡開始濃縮舊劇情；沒有容量可比時退回
+// 「占這次提示詞幾成」，不畫剩餘空間也不畫線。
+//
+// 各段的 token 是伺服器按字元把整份請求的計數分下去的；有容量時再換成記憶整理用的
+// 那把尺（window.usedTokens／total.estimatedTokens），各段加起來就是條上的用量。
 
-/** 可以點的桶：有 token；或是 MOD 那桶雖然 0 token 但有明細可看。 */
-export function promptBreakdownItemSelectable(item: PromptBreakdownItem | null | undefined): boolean {
-  return !!(item && item.available !== false && (
-    Number(item.estimatedTokens) > 0 ||
-    (item.key === 'mod' && item.detailsAvailable && Array.isArray(item.details) && item.details.length > 0)
-  ))
+export interface PromptUsageRow {
+  key: PromptBreakdownKey
+  color: string
+  tokens: number
+  /** 占容量（或沒有容量時占這次提示詞）的百分比，整數 */
+  percent: number
+  /** 條上的寬度，0–100 */
+  width: number
 }
 
-function emptySystemItem(): PromptBreakdownItem {
-  return {
-    ...BREAKDOWN_META[0],
-    available: false,
-    sourceCount: 0,
-    charCount: 0,
-    estimatedTokens: 0,
-    percent: 0,
-    ...emptyModFields(),
-  }
+export interface PromptUsageView {
+  hasWindow: boolean
+  usedTokens: number
+  limitTokens: number
+  percent: number
+  /** 濃縮線在條上的位置，0–100；沒有容量時 null */
+  compactAt: number | null
+  freeTokens: number
+  freePercent: number
+  turnsLeft: number | null
+  /** 已經到了濃縮線：下一輪會先整理較早的劇情 */
+  condensing: boolean
+  rows: PromptUsageRow[]
 }
 
-/** 選中的桶：玩家點過的那個；沒點過或點的不可選就退到第一個可選的；連可選的都沒有就給第一列。 */
-export function resolvePromptBreakdownActiveItem(items: PromptBreakdownItem[] | null | undefined, activeKey: string): PromptBreakdownItem {
-  const list = Array.isArray(items) ? items : []
-  const active = list.find((item) => item && item.key === activeKey && promptBreakdownItemSelectable(item))
-  if (active) return active
-  return list.find((item) => promptBreakdownItemSelectable(item)) || list[0] || emptySystemItem()
-}
-
-// ── 圓環 ──────────────────────────────────────────────────────────────
-
-function donutNumber(value: number): number {
-  return Number.parseFloat(Number(value).toFixed(3))
-}
-
-function donutPoint(cx: number, cy: number, radius: number, angle: number) {
-  const radians = (angle - 90) * Math.PI / 180
-  return {
-    x: donutNumber(cx + radius * Math.cos(radians)),
-    y: donutNumber(cy + radius * Math.sin(radians)),
-  }
-}
-
-function donutSegmentPath(startAngle: number, endAngle: number, outerRadius = 47, innerRadius = 29): string {
-  const cx = 50
-  const cy = 50
-  const sweep = Math.max(0.01, endAngle - startAngle)
-  const safeEndAngle = startAngle + Math.min(359.99, sweep)
-  const outerStart = donutPoint(cx, cy, outerRadius, startAngle)
-  const outerEnd = donutPoint(cx, cy, outerRadius, safeEndAngle)
-  const innerEnd = donutPoint(cx, cy, innerRadius, safeEndAngle)
-  const innerStart = donutPoint(cx, cy, innerRadius, startAngle)
-  const largeArc = safeEndAngle - startAngle > 180 ? 1 : 0
-  return [
-    `M ${outerStart.x} ${outerStart.y}`,
-    `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
-    `L ${innerEnd.x} ${innerEnd.y}`,
-    `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y}`,
-    'Z',
-  ].join(' ')
-}
-
-export function buildPromptDonutSegments(items: PromptBreakdownItem[] = [], selectedKey = ''): PromptDonutSegment[] {
-  const visible = (Array.isArray(items) ? items : []).filter((item) =>
-    item && item.available !== false && Number(item.estimatedTokens) > 0)
-  if (!visible.length) return []
-  const totalTokens = visible.reduce((sum, item) => sum + (Number(item.estimatedTokens) || 0), 0)
-  if (totalTokens <= 0) return []
-  const activeKey = selectedKey || visible[0].key
-  let cursor = 0
-  return visible.map((item, index) => {
-    const share = (Number(item.estimatedTokens) || 0) / totalTokens
-    const startAngle = cursor
-    const endAngle = index === visible.length - 1 ? 360 : cursor + share * 360
-    cursor = endAngle
-    const midAngle = (startAngle + endAngle) / 2
-    const isActive = item.key === activeKey
-    const radians = (midAngle - 90) * Math.PI / 180
-    const dx = donutNumber(Math.cos(radians) * 4.5)
-    const dy = donutNumber(Math.sin(radians) * 4.5)
+export function promptUsageView(report: PromptBreakdownReport | null | undefined): PromptUsageView | null {
+  if (!report || report.supported === false || report.status !== 'ok') return null
+  const items = visiblePromptBreakdownItems(report.items).filter((item) => item.available !== false && item.estimatedTokens > 0)
+  const total = report.total.estimatedTokens || items.reduce((sum, item) => sum + item.estimatedTokens, 0)
+  const w = report.window
+  if (w && w.available) {
+    const scale = total > 0 ? w.usedTokens / total : 0
+    const rows = items.map((item) => {
+      const tokens = Math.round(item.estimatedTokens * scale)
+      return { key: item.key, color: item.color, tokens, percent: Math.round(tokens * 100 / w.limitTokens), width: Math.min(100, tokens * 100 / w.limitTokens) }
+    })
+    const free = Math.max(0, w.limitTokens - w.usedTokens)
     return {
-      key: item.key,
-      labelKey: item.labelKey,
-      color: item.color,
-      percent: item.percent || Math.round(share * 100),
-      path: donutSegmentPath(startAngle, endAngle),
-      transform: isActive ? `translate(${dx} ${dy}) translate(50 50) scale(1.045) translate(-50 -50)` : '',
-      isActive,
+      hasWindow: true,
+      usedTokens: w.usedTokens,
+      limitTokens: w.limitTokens,
+      percent: w.percent,
+      compactAt: w.compactAtTokens * 100 / w.limitTokens,
+      freeTokens: free,
+      freePercent: Math.max(0, 100 - w.percent),
+      turnsLeft: w.turnsLeft,
+      condensing: w.usedTokens >= w.compactAtTokens,
+      rows,
     }
-  })
+  }
+  if (total <= 0) return null
+  return {
+    hasWindow: false,
+    usedTokens: total,
+    limitTokens: 0,
+    percent: 0,
+    compactAt: null,
+    freeTokens: 0,
+    freePercent: 0,
+    turnsLeft: null,
+    condensing: false,
+    rows: items.map((item) => ({ key: item.key, color: item.color, tokens: item.estimatedTokens, percent: item.percent, width: item.estimatedTokens * 100 / total })),
+  }
+}
+
+/** 輸入框旁那顆小圓環：只在有容量可比時畫，等級門檻跟記憶整理同一條線。 */
+export function contextRingFromReport(report: PromptBreakdownReport | null | undefined): { percent: number; level: ContextUsageLevel } | null {
+  const w = report && report.status === 'ok' ? report.window : null
+  if (!w || !w.available) return null
+  return { percent: w.percent, level: contextUsageLevel(w.percent, w.compactAtTokens * 100 / w.limitTokens) }
+}
+
+/** token 數給人看的寫法：1,000 以下照寫，以上用 k、M，一位小數（23.5k、1M）。 */
+export function formatTokenCount(value: unknown): string {
+  const n = Math.max(0, Number(value) || 0)
+  const short = (v: number, unit: string) => `${Number.parseFloat(v.toFixed(1))}${unit}`
+  if (n >= 999950) return short(n / 1000000, 'M')
+  if (n >= 1000) return short(n / 1000, 'k')
+  return String(Math.round(n))
 }
 
 export function formatPromptNumber(value: unknown): string {

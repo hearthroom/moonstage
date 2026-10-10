@@ -190,6 +190,23 @@
                          裡面放一道閃電：那個數字講的是這一輪要花多少點。 -->
                     <span class="icon-box"><span class="icon-battery" :title="labels.perTurn" :aria-label="labels.perTurn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3.5" /></svg></span></span>
                   </div>
+                  <div
+                    v-if="contextRing"
+                    class="lt-context-ring"
+                    :class="'is-' + contextRing.level"
+                    data-lt="context-usage"
+                    role="button"
+                    tabindex="0"
+                    :title="contextRing.label"
+                    :aria-label="contextRing.label"
+                    @click="$emit('context')"
+                    @keydown.enter.prevent="$emit('context')"
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" stroke-width="3" aria-hidden="true" focusable="false">
+                      <circle class="ring-track" cx="10" cy="10" r="7.5" />
+                      <circle class="ring-fill" cx="10" cy="10" r="7.5" pathLength="100" :stroke-dasharray="Math.max(2, contextRing.percent) + ' 100'" />
+                    </svg>
+                  </div>
                 </div>
                 <div
                   class="chat-input-collapsed-display"
@@ -235,6 +252,23 @@
                          節點名照 MMD（作者的卡對 .icon-box .icon-battery 寫了外觀），
                          裡面放一道閃電：那個數字講的是這一輪要花多少點。 -->
                     <span class="icon-box"><span class="icon-battery" :title="labels.perTurn" :aria-label="labels.perTurn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3.5" /></svg></span></span>
+                  </div>
+                  <div
+                    v-if="contextRing"
+                    class="lt-context-ring"
+                    :class="'is-' + contextRing.level"
+                    data-lt="context-usage"
+                    role="button"
+                    tabindex="0"
+                    :title="contextRing.label"
+                    :aria-label="contextRing.label"
+                    @click="$emit('context')"
+                    @keydown.enter.prevent="$emit('context')"
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" stroke-width="3" aria-hidden="true" focusable="false">
+                      <circle class="ring-track" cx="10" cy="10" r="7.5" />
+                      <circle class="ring-fill" cx="10" cy="10" r="7.5" pathLength="100" :stroke-dasharray="Math.max(2, contextRing.percent) + ' 100'" />
+                    </svg>
                   </div>
                 </div>
                 <div class="chat-input-row-tail">
@@ -346,6 +380,8 @@ const props = withDefaults(defineProps<{
   moreItems?: Array<{ key: string; label: string; disabled?: boolean }>
   /** 這一輪要花多少點（已格式化；動態計價是區間）。空字串＝還不知道，不顯示數字。 */
   modelScore?: string
+  /** 上下文用量的小圓環；供應商沒給容量時是 null，不畫。label 是給讀屏與懸停看的那句話。 */
+  contextRing?: { percent: number; level: string; label: string } | null
   /** 幫答進行中：按鈕鎖住，不重複扣點 */
   assistEnabled?: boolean
   assistBusy?: boolean
@@ -359,6 +395,7 @@ const props = withDefaults(defineProps<{
   moreOpen: false,
   moreItems: () => [],
   modelScore: '',
+  contextRing: null,
   assistEnabled: true,
   assistBusy: false,
   assistCost: '',
@@ -374,6 +411,7 @@ const emit = defineEmits<{
   (e: 'assist'): void
   (e: 'more-pick', key: string): void
   (e: 'model'): void
+  (e: 'context'): void
   (e: 'shortcut', key: string): void
   (e: 'focus'): void
   (e: 'blur'): void

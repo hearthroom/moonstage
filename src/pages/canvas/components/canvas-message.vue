@@ -148,19 +148,6 @@
         </div>
 
         <div
-          v-if="message.contextUsage"
-          class="lt-context-chip hover-pill"
-          :class="'is-' + message.contextUsage.level"
-          data-lt="context-usage"
-          role="button"
-          tabindex="0"
-          :title="message.contextUsage.tip"
-          :aria-label="message.contextUsage.tip"
-          @click.stop="$emit('action', 'context-usage')"
-          @keydown.enter.prevent.stop="$emit('action', 'context-usage')"
-        >{{ message.contextUsage.label }}</div>
-
-        <div
           ref="hintEl"
           class="extraMesButtonsHint icon"
           role="button"
@@ -268,8 +255,6 @@ const props = withDefaults(defineProps<{
     latest?: boolean
     /** 最新的那一則 AI 回覆——只有它能重新生成、改寫、繼續 */
     latestAI?: boolean
-    /** 這一輪的上下文用量，已經是給玩家看的字；沒有資料就不畫 */
-    contextUsage?: { label: string; tip: string; level: string } | null
     swipes?: { index: number; total: number } | null
   }
   labels?: { copy: string; edit: string; regenerate: string; reasoning: string; prepTrail: string; prev: string; next: string; interruptedNotice?: string; interruptedNoticeSub?: string; continueAction?: string; failedAgainSub?: string; switchModel?: string; waitSeconds?: string; waitMinutes?: string }
