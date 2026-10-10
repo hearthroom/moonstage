@@ -10534,13 +10534,14 @@ const contextBreakdownLabels = computed(() => ({
 }))
 
 // 輸入框旁那顆小圓環：這段對話最近一輪的用量（同一條診斷路徑、不帶 chatId）。
-// 每輪收尾讀一次、換對話讀一次；讀不到就不畫，不打擾玩家。
+// 每輪收尾讀一次、換對話與登入時讀一次；讀不到就不畫，不打擾玩家。
+// 遊客與作者預覽不讀：這條要登入，被拒會把人整頁送去登入（見 previewOnly 的說明）。
 const latestContextReport = ref<PromptBreakdownReport | null>(null)
 let contextRingSeq = 0
 async function refreshContextRing() {
   const id = String(unref(conversationId) || '').trim()
   const seq = ++contextRingSeq
-  if (!id) { latestContextReport.value = null; return }
+  if (!id || !unref(hasLogin) || previewOnly.value) { latestContextReport.value = null; return }
   try {
     const res = await _this.http.get(_this.requestUrl.promptDiagnostics, {
       data: { conversationId: id, breakdownVersion: 2 },
@@ -10554,7 +10555,7 @@ async function refreshContextRing() {
     if (seq === contextRingSeq) latestContextReport.value = null
   }
 }
-watch(() => String(unref(conversationId) || ''), () => {
+watch(() => [String(unref(conversationId) || ''), !!unref(hasLogin), previewOnly.value], () => {
   latestContextReport.value = null
   void refreshContextRing()
 }, { immediate: true })
