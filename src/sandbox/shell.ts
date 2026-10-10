@@ -486,6 +486,7 @@ export function createShell(options: CreateShellOptions): Shell {
         onMorePick: (key: string) => sendUi('more-pick', key),
         onModel: () => sendUi('model'),
         onContext: () => sendUi('context'),
+        onMeterHintDone: () => sendUi('meter-hint-done'),
         onShortcut: (key: string) => sendUi('shortcut', key),
       } as Record<string, unknown>),
     })
