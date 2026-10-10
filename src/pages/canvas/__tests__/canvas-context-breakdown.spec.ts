@@ -231,7 +231,8 @@ describe('組成：彈窗畫出來的東西', () => {
     expect(el.querySelector('.cb-summary-used')!.textContent).toBe('2k / 64k')
     expect(el.querySelector('.cb-summary-percent')!.textContent).toBe('3%')
     expect(el.querySelectorAll('.cb-bar-seg').length).toBe(8)
-    expect((el.querySelector('.cb-bar-line') as HTMLElement).style.left).toBe('92%')
+    // 用量條是 SVG（0–100 座標）：濃縮線畫在 92 的位置
+    expect(Number(el.querySelector('.cb-bar-line')!.getAttribute('x'))).toBeCloseTo(91.6)
     expect(el.querySelector('.cb-hint')!.textContent).toBe('較早的劇情大約再過 12 輪會濃縮成摘要。')
     const rows = Array.from(el.querySelectorAll('.cb-row'))
     expect(rows.map((r) => r.getAttribute('data-key'))).toEqual(['system', 'roleCard', 'mod', 'notepad', 'userProfile', 'history', 'memory', 'currentInput', 'free'])

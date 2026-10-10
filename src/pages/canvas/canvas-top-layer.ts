@@ -31,9 +31,12 @@ export function leaveTopLayer(el: HTMLElement | null | undefined): void {
   if (isOpen(target)) target.hidePopover()
 }
 
-/** 彈層打開後呼叫：停止鍵若正在 top layer 裡，重新抬到彈層之上。 */
+/** 彈層打開後呼叫：停止鍵與上下文用量的說明若正在 top layer 裡，重新抬到彈層之上。
+ *  說明跟著上下文用量一起出來，那一片晚一拍才進 top layer，不重抬就被它蓋住。 */
 export function raiseStopAboveDialogs(): void {
   if (typeof document === 'undefined') return
-  const stop = document.getElementById('mes_stop') as PopoverEl | null
-  if (stop && typeof stop.showPopover === 'function' && isOpen(stop)) raiseToTopLayer(stop)
+  for (const id of ['lt-meter-hint', 'mes_stop']) {
+    const el = document.getElementById(id) as PopoverEl | null
+    if (el && typeof el.showPopover === 'function' && isOpen(el)) raiseToTopLayer(el)
+  }
 }

@@ -121,12 +121,13 @@
               :class="stateClass"
               @pointerdown="onScopePointerDown"
             >
-              <!-- 第一次看到膠囊時講清楚兩件事：圓環是什麼、數字是什麼。手機沒有懸停，所以不能只靠 title。
-                   看過與否由頁面記（沙箱卡的殼在另一個源，記不住）。 -->
-              <div v-if="meterHint && contextRing" ref="meterHintEl" class="lt-meter-hint" popover="manual" role="note">
-                <div class="lt-meter-hint-line">{{ meterHint.ring }}</div>
-                <div class="lt-meter-hint-line">{{ meterHint.score }}</div>
-                <div class="lt-meter-hint-ok" role="button" tabindex="0" @click="$emit('meter-hint-done')" @keydown.enter.prevent="$emit('meter-hint-done')">{{ meterHint.ok }}</div>
+              <!-- 講清楚兩件事：圓環是什麼、數字是什麼（手機沒有懸停，不能只靠 title）。不自己彈：
+                   很多卡在第一次進來時有自己的開場與全畫面覆蓋，多一層會打壞它們（owner 2026-10-10）。
+                   沒看過的人第一次點圓環，跟上下文用量一起出來、疊在最前面。看過與否由頁面記。 -->
+              <div v-if="hintVisible" id="lt-meter-hint" ref="meterHintEl" class="lt-meter-hint" popover="manual" role="note">
+                <div class="lt-meter-hint-line">{{ meterHint!.ring }}</div>
+                <div class="lt-meter-hint-line">{{ meterHint!.score }}</div>
+                <div class="lt-meter-hint-ok" role="button" tabindex="0" @click="onHintDone" @keydown.enter.prevent="onHintDone">{{ meterHint!.ok }}</div>
               </div>
               <!--
                 隱藏的送出代理。卡片腳本抓的是 `.send-msg .btn-icon` 的第一顆然後原生點擊它，
@@ -195,8 +196,8 @@
                       tabindex="0"
                       :title="contextRing.label"
                       :aria-label="contextRing.label"
-                      @click="$emit('context')"
-                      @keydown.enter.prevent="$emit('context')"
+                      @click="onRing"
+                      @keydown.enter.prevent="onRing"
                     >
                       <svg viewBox="0 0 20 20" fill="none" stroke-width="3" aria-hidden="true" focusable="false">
                         <circle class="ring-track" cx="10" cy="10" r="7.5" />
@@ -263,8 +264,8 @@
                       tabindex="0"
                       :title="contextRing.label"
                       :aria-label="contextRing.label"
-                      @click="$emit('context')"
-                      @keydown.enter.prevent="$emit('context')"
+                      @click="onRing"
+                      @keydown.enter.prevent="onRing"
                     >
                       <svg viewBox="0 0 20 20" fill="none" stroke-width="3" aria-hidden="true" focusable="false">
                         <circle class="ring-track" cx="10" cy="10" r="7.5" />
@@ -542,7 +543,18 @@ function watchMeterHintViewport(on: boolean) {
   window[method]('resize', onMeterHintViewport)
   vv?.[method]('resize', onMeterHintViewport)
 }
-watch(() => !!(props.meterHint && props.contextRing), (on) => {
+// 只在玩家點了圓環之後才出現；說明送來了（還沒看過）才會開。
+const hintOpen = ref(false)
+const hintVisible = computed(() => hintOpen.value && !!props.meterHint && !!props.contextRing)
+function onRing() {
+  if (props.meterHint) hintOpen.value = true
+  emit('context')
+}
+function onHintDone() {
+  hintOpen.value = false
+  emit('meter-hint-done')
+}
+watch(hintVisible, (on) => {
   nextTick(() => {
     watchMeterHintViewport(on)
     if (!on) return
