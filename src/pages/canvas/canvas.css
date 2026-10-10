@@ -4822,12 +4822,31 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
   }
 
-  .cb-title {
-    font-size: 15px;
-    font-weight: 600;
+  /* 標題與「已用 / 容量 (%)」同一行，右側那段跟清單的數字一樣用等寬數字 */
+  /* 很窄的螢幕（摺疊機外屏）放不下同一行時，總數整段換到下一行，標題本身永遠不斷字 */
+  .cb-title-row {
+    min-height: 32px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px 12px;
+  }
+
+  .cb-title-row .cb-title {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .cb-usage {
+    flex: 0 0 auto;
+    font-size: 13px;
+    color: var(--lt-canvas-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   .cb-subtitle,
@@ -4917,27 +4936,6 @@
     font-size: 13px;
     color: var(--lt-canvas-accent);
     cursor: pointer;
-  }
-
-  /* 一行總數＋用量條：寬度是占容量幾成，那條線是較早劇情開始濃縮的位置 */
-  .cb-summary {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .cb-summary-used {
-    font-size: 15px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .cb-summary-percent {
-    font-size: 13px;
-    color: var(--lt-canvas-muted);
-    white-space: nowrap;
   }
 
   /* 條裡沒有字：面板在矮螢幕（摺疊機外屏）上內容比面板高時，彈性欄會把沒有內容的節點壓成 0 高，
@@ -5535,7 +5533,6 @@
   .mp-title,
   .np-title,
   .mem-title,
-  .cb-title,
   .cl-title-text,
   .modify-title,
   .custom-instruction-scope .header-scope .title,
@@ -5549,6 +5546,14 @@
 
   .role-setting .header-scope .header-box {
     justify-content: flex-start;
+  }
+
+  /* 上下文用量的資訊多，標題收小一階，跟總數擠在同一行 */
+  .cb-title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: 0.01em;
   }
 
   /* 標題底下那一行說明：比正文小一階，但要讀得到（11px 在亮底上讀不到） */

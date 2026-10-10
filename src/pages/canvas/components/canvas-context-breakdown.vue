@@ -13,9 +13,14 @@
     這一片的字色全部 inherit，底色與分隔線都從殼的文字色調出來。
   -->
     <div class="cb-top">
+      <!-- 標題與總數同一行（照 Claude Code 的上下文面板）；副標只在有話要說時才出現：
+           不支援、還沒聊過、或看的是某一則回覆而不是最新一輪。 -->
       <div class="cb-heading">
-        <div class="cb-title">{{ labels.title }}</div>
-        <div class="cb-subtitle">{{ statusText }}</div>
+        <div class="cb-title-row">
+          <div class="cb-title">{{ labels.title }}</div>
+          <div v-if="view" class="cb-usage">{{ usageText }}</div>
+        </div>
+        <div v-if="statusNote" class="cb-subtitle">{{ statusNote }}</div>
       </div>
       <div class="cb-close" role="button" tabindex="0"
            :aria-label="labels.close"
@@ -47,11 +52,6 @@
 
     <template v-else>
       <!-- 一行總數＋一條用量條：有容量可比時是「用了多少／容量」，條上那條線是較早劇情開始濃縮的位置 -->
-      <div v-if="view" class="cb-summary">
-        <span class="cb-summary-used">{{ formatTokens(view.usedTokens) }}<template v-if="view.hasWindow"> / {{ formatTokens(view.limitTokens) }}</template></span>
-        <span v-if="view.hasWindow" class="cb-summary-percent">{{ view.percent }}%</span>
-        <span v-else class="cb-summary-percent">{{ labels.totalTokens }}</span>
-      </div>
       <div v-if="view" class="cb-bar" aria-hidden="true">
         <span v-for="row in view.rows" :key="row.key" class="cb-bar-seg" :data-key="row.key" :style="{ width: row.width + '%', background: row.color }"></span>
         <span v-if="view.compactAt != null" class="cb-bar-line" :style="{ left: view.compactAt + '%' }"></span>
@@ -190,6 +190,20 @@ const statusText = computed(() => {
 })
 
 const view = computed(() => promptUsageView(props.report))
+
+const usageText = computed(() => {
+  const v = view.value
+  if (!v) return ''
+  return v.hasWindow
+    ? `${formatTokenCount(v.usedTokens)} / ${formatTokenCount(v.limitTokens)} (${v.percent}%)`
+    : `${formatTokenCount(v.usedTokens)} ${props.labels.totalTokens}`
+})
+
+const statusNote = computed(() => {
+  const report = props.report
+  if (!report || report.status !== 'ok' || report.supported === false || report.chatId) return statusText.value
+  return ''
+})
 
 const hintText = computed(() => {
   const v = view.value
