@@ -228,8 +228,9 @@ describe('組成：彈窗畫出來的東西', () => {
   it('有容量時：一行「用了多少／容量」、用量條上有濃縮線、各部分一列、最後是剩餘空間', () => {
     const wrapper = mountSheet({ report: normalizeServerReport(serverReport({ window: WINDOW })) })
     const el = wrapper.element as HTMLElement
-    expect(el.querySelector('.cb-summary-used')!.textContent).toBe('2k / 64k')
-    expect(el.querySelector('.cb-summary-percent')!.textContent).toBe('3%')
+    // 標題與總數同一行；最新一輪不再寫「依最近一次完成的回覆估算」
+    expect(el.querySelector('.cb-title-row .cb-usage')!.textContent).toBe('2k / 64k (3%)')
+    expect(el.querySelector('.cb-subtitle')).toBeNull()
     expect(el.querySelectorAll('.cb-bar-seg').length).toBe(8)
     expect((el.querySelector('.cb-bar-line') as HTMLElement).style.left).toBe('92%')
     expect(el.querySelector('.cb-hint')!.textContent).toBe('較早的劇情大約再過 12 輪會濃縮成摘要。')
@@ -264,8 +265,7 @@ describe('組成：彈窗畫出來的東西', () => {
 
   it('沒有容量時：只寫估算總數，不畫剩餘空間、濃縮線與說明', () => {
     const el = mountSheet({ report: normalizeServerReport(serverReport()) }).element as HTMLElement
-    expect(el.querySelector('.cb-summary-used')!.textContent).toBe('995')
-    expect(el.querySelector('.cb-summary-percent')!.textContent).toBe('估算 Token')
+    expect(el.querySelector('.cb-usage')!.textContent).toBe('995 估算 Token')
     expect(el.querySelector('.cb-bar-line')).toBeNull()
     expect(el.querySelector('.cb-hint')).toBeNull()
     expect(el.querySelector('[data-key="free"]')).toBeNull()
@@ -365,7 +365,9 @@ it('keeps the selected reply and actual usage separate from estimated compositio
  const report = normalizeServerReport({supported:true,status:'ok',schemaVersion:2,conversationId:'fixture',chatId:'reply-one',items:[],total:{estimatedTokens:120,charCount:360},cache:{available:true,inputTokens:100,readTokens:20,hitRate:20},billing:{available:true,totalPoints:1,componentsAvailable:false,cacheHitRate:20}})!
  expect(report.chatId).toBe('reply-one')
  const wrapper=mount(CanvasContextBreakdown,{props:{report,loading:false,loadFailed:false,modDetailsExpanded:false,locale:'en',labels:{...LABELS,actualInputTokens:'Actual input'}}})
- expect(wrapper.find('.cb-summary-used').text()).toBe('120')
+ expect(wrapper.find('.cb-usage').text()).toBe('120 估算 Token')
+ // 看的是某一則回覆：副標說清楚
+ expect(wrapper.find('.cb-subtitle').text()).toBe(LABELS.subtitle)
  expect(wrapper.find('.cb-foot').text()).toContain('Actual input 100')
  expect(wrapper.find('.cb-foot').text()).toContain('快取命中率 20%')
 })

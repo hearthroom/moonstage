@@ -350,7 +350,7 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   // mobile 那份上下文用量彈窗搬過來的；MMD 沒有這個功能，名字是我們自己的。
   // 殼仍是 `.u-popup__content`，作者的底色與圓角照樣生效；裡面的字色全部 inherit。
   { selector: '.context-breakdown-scope', region: 'context-breakdown', origin: 'lt', why: '我方的組成面板；MMD 無對應功能' },
-  { selector: '.cb-summary', region: 'context-breakdown', origin: 'lt', why: '「用了多少／容量」那一行' },
+  { selector: '.cb-usage', region: 'context-breakdown', origin: 'lt', why: '標題同一行右側的「已用 / 容量 (%)」' },
   { selector: '.cb-bar', region: 'context-breakdown', origin: 'lt', why: '用量條（各部分一段，加上開始濃縮舊劇情的那條線）' },
   { selector: '.cb-list', region: 'context-breakdown', origin: 'lt', why: '各部分的清單，最後一列是剩餘空間' },
   { selector: '.cb-row', region: 'context-breakdown', origin: 'lt', why: '一個部分' },
