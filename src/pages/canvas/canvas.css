@@ -1671,11 +1671,17 @@
   }
 
   /* 第一次看到膠囊時的說明：貼在輸入框上方，講圓環與數字各是什麼，按「知道了」收起。 */
+  /* popover：進 top layer 後以視窗定位，left／bottom 由元件照輸入框的位置算；
+     沒有 popover API 的瀏覽器退回貼著輸入框上緣。蓋掉 popover 預設的置中與邊框。 */
   .lt-meter-hint {
     position: absolute;
+    inset: auto;
     left: 8px;
     bottom: calc(100% + 8px);
     z-index: 40;
+    margin: 0;
+    border: 0;
+    overflow: visible;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -1688,6 +1694,10 @@
     box-shadow: var(--luna-shadow-md, 0 4px 16px rgba(0, 0, 0, 0.18));
     font-size: 13px;
     line-height: 1.5;
+  }
+
+  .lt-meter-hint:popover-open {
+    position: fixed;
   }
 
   .lt-meter-hint-line {

@@ -123,7 +123,7 @@
             >
               <!-- 第一次看到膠囊時講清楚兩件事：圓環是什麼、數字是什麼。手機沒有懸停，所以不能只靠 title。
                    看過與否由頁面記（沙箱卡的殼在另一個源，記不住）。 -->
-              <div v-if="meterHint && contextRing" class="lt-meter-hint" role="note">
+              <div v-if="meterHint && contextRing" ref="meterHintEl" class="lt-meter-hint" popover="manual" role="note">
                 <div class="lt-meter-hint-line">{{ meterHint.ring }}</div>
                 <div class="lt-meter-hint-line">{{ meterHint.score }}</div>
                 <div class="lt-meter-hint-ok" role="button" tabindex="0" @click="$emit('meter-hint-done')" @keydown.enter.prevent="$emit('meter-hint-done')">{{ meterHint.ok }}</div>
@@ -520,6 +520,37 @@ function onScopePointerDown() {
     collapseIfIdle()
   }, 300)
 }
+
+// 第一次的說明進 top layer：卡片常把自己的浮鈕寫到極高的 z-index，比 z-index 一定輸
+// （正式頁 2026-10-10：一張卡的「回到冒險」蓋住了「知道了」）。top layer 以視窗定位，
+// 所以照輸入框的位置把它放到正上方，視窗或鍵盤變了就重放。
+const meterHintEl = ref<HTMLElement | null>(null)
+function placeMeterHint() {
+  const el = meterHintEl.value
+  const scope = el && el.parentElement
+  // 沒有 popover API 就留在輸入框裡，用樣式表貼著上緣，不寫以視窗為準的位置
+  if (!el || !scope || typeof window === 'undefined' || typeof (el as any).showPopover !== 'function') return
+  const r = scope.getBoundingClientRect()
+  el.style.left = `${Math.max(8, r.left + 8)}px`
+  el.style.bottom = `${Math.max(8, window.innerHeight - r.top + 8)}px`
+}
+function onMeterHintViewport() { placeMeterHint() }
+function watchMeterHintViewport(on: boolean) {
+  if (typeof window === 'undefined') return
+  const vv = window.visualViewport
+  const method = on ? 'addEventListener' : 'removeEventListener'
+  window[method]('resize', onMeterHintViewport)
+  vv?.[method]('resize', onMeterHintViewport)
+}
+watch(() => !!(props.meterHint && props.contextRing), (on) => {
+  nextTick(() => {
+    watchMeterHintViewport(on)
+    if (!on) return
+    placeMeterHint()
+    raiseToTopLayer(meterHintEl.value)
+  })
+}, { immediate: true })
+onBeforeUnmount(() => { watchMeterHintViewport(false); leaveTopLayer(meterHintEl.value) })
 
 // 底部快捷列在桌機也要拉得動（同模型選單的 rail）。
 const shortcutBarEl = ref<HTMLElement | null>(null)

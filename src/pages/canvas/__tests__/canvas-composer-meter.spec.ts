@@ -56,3 +56,23 @@ describe('點數與圓環合成一顆膠囊', () => {
     expect(mount(CanvasComposer, { props: { ...base, contextRing: RING, meterHint: null } }).find('.lt-meter-hint').exists()).toBe(false)
   })
 })
+
+describe('第一次的說明蓋在卡片的浮鈕之上', () => {
+  it('說明是 popover，出現時進 top layer、放在輸入框正上方', async () => {
+    const shown: HTMLElement[] = []
+    const proto = HTMLElement.prototype as any
+    const had = proto.showPopover
+    proto.showPopover = function () { shown.push(this) }
+    try {
+      const w = mount(CanvasComposer, { props: { ...base, contextRing: RING, meterHint: HINT }, attachTo: document.body })
+      await new Promise((r) => setTimeout(r, 0))
+      const hint = w.find('.lt-meter-hint').element as HTMLElement
+      expect(hint.getAttribute('popover')).toBe('manual')
+      expect(shown).toContain(hint)
+      expect(hint.style.bottom).toMatch(/px$/)
+      w.unmount()
+    } finally {
+      proto.showPopover = had
+    }
+  })
+})
