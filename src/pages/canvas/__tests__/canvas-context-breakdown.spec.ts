@@ -231,8 +231,7 @@ describe('組成：彈窗畫出來的東西', () => {
     expect(el.querySelector('.cb-summary-used')!.textContent).toBe('2k / 64k')
     expect(el.querySelector('.cb-summary-percent')!.textContent).toBe('3%')
     expect(el.querySelectorAll('.cb-bar-seg').length).toBe(8)
-    // 用量條是 SVG（0–100 座標）：濃縮線畫在 92 的位置
-    expect(Number(el.querySelector('.cb-bar-line')!.getAttribute('x'))).toBeCloseTo(91.6)
+    expect((el.querySelector('.cb-bar-line') as HTMLElement).style.left).toBe('92%')
     expect(el.querySelector('.cb-hint')!.textContent).toBe('較早的劇情大約再過 12 輪會濃縮成摘要。')
     const rows = Array.from(el.querySelectorAll('.cb-row'))
     expect(rows.map((r) => r.getAttribute('data-key'))).toEqual(['system', 'roleCard', 'mod', 'notepad', 'userProfile', 'history', 'memory', 'currentInput', 'free'])
@@ -340,6 +339,12 @@ describe('組成：吃得到作者的美化', () => {
     for (const tag of ['view', 'text', 'image', 'textarea', 'input', 'scroll-view', 'button', 'navigator']) {
       expect(template).not.toMatch(new RegExp(`<${tag}[\\s/>]`))
     }
+  })
+
+  it('用量條不會被壓扁：矮螢幕上面板內容比面板高時，沒有字的條也要保住高度', () => {
+    const start = css.indexOf('  .cb-bar {')
+    const body = css.slice(start, css.indexOf('}', start))
+    expect(body).toMatch(/flex: none;/)
   })
 
   it('這一段不寫 margin、不寫死深色底與灰字——底色與字色都從卡片的文字色調出來', () => {

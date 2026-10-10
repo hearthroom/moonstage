@@ -4940,20 +4940,32 @@
     white-space: nowrap;
   }
 
+  /* 條裡沒有字：面板在矮螢幕（摺疊機外屏）上內容比面板高時，彈性欄會把沒有內容的節點壓成 0 高，
+     整條就不見了（owner 2026-10-10）。flex: none 讓它永遠保住自己的高度，其他東西去捲動。 */
   .cb-bar {
-    display: block;
-    width: 100%;
+    position: relative;
+    display: flex;
+    flex: none;
     height: 6px;
     border-radius: 9999px;
+    background: var(--lt-canvas-sheet-item-bg);
     overflow: hidden;
   }
 
-  .cb-bar-track {
-    opacity: 0.12;
+  .cb-bar-seg {
+    flex: 0 0 auto;
+    height: 100%;
   }
 
   .cb-bar-line {
-    opacity: 0.8;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 1;
+    width: 2px;
+    transform: translateX(-1px);
+    background: currentColor;
+    opacity: 0.7;
   }
 
   .cb-hint {
