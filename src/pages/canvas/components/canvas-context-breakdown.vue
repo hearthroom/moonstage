@@ -1,8 +1,10 @@
 <template>
   <div class="context-breakdown-scope">
   <!--
-    上下文用量：上下文由哪些部分組成、各占多少。mobile 聊天頁那份彈窗搬過來的，
-    同一份口徑（估算 token、字元、百分比、快取命中率、本輪點數、MOD 明細）。
+    上下文用量：一行「用了多少／容量」、一條用量條、每一部分各占容量幾成、剩餘空間。
+    先前是一個大圓環加四格數字，百分比是「占這次提示詞幾成」，玩家最想知道的「離上限
+    還多遠、什麼時候開始濃縮舊劇情」反而看不出來（owner 2026-10-10，參考 Claude 的上下文面板）。
+    供應商沒給容量時（LunaTalk、舊回合）退回「占提示詞幾成」，不畫剩餘空間與那條線。
     MOD 那一列只在報告真的帶著 MOD 用量時才畫（HarperHarbor 沒有 MOD，見 visiblePromptBreakdownItems）。
 
     元件不打 API：資料由頁面整理好餵進來（canvas-context-breakdown.ts 正規化過，
@@ -44,141 +46,58 @@
     </div>
 
     <template v-else>
-      <div class="cb-overview">
-        <div class="cb-donut">
-          <svg class="cb-donut-svg" viewBox="0 0 100 100" fill="none" aria-hidden="true" focusable="false">
-            <path
-              v-for="segment in donutSegments"
-              :key="segment.key"
-              class="cb-donut-segment"
-              :class="{ 'is-active': segment.isActive }"
-              :data-key="segment.key"
-              :d="segment.path"
-              :fill="segment.color"
-              :transform="segment.transform || undefined"
-              @click.stop="onSelect(segment.key)"
-              @mousemove.stop="onSelect(segment.key)"
-            ></path>
-          </svg>
-          <div class="cb-donut-inner">
-            <span class="cb-donut-value">{{ formatNumber(activeItem.estimatedTokens) }}</span>
-            <span class="cb-donut-label">{{ itemLabel(activeItem.key) }}</span>
-            <span class="cb-donut-percent">{{ activeItem.percent }}%</span>
-          </div>
-        </div>
-        <div class="cb-metrics">
-          <template v-if="report.cache.available && labels.actualInputTokens">
-            <div class="cb-metric"><span class="cb-metric-value">{{ formatNumber(report.cache.inputTokens) }}</span><span class="cb-metric-label">{{ labels.actualInputTokens }}</span></div>
-            <div class="cb-metric"><span class="cb-metric-value">{{ formatNumber(report.cache.readTokens) }}</span><span class="cb-metric-label">{{ labels.cachedInputTokens }}</span></div>
-          </template>
-          <div class="cb-metric">
-            <span class="cb-metric-value">{{ formatNumber(report.total.estimatedTokens) }}</span>
-            <span class="cb-metric-label">{{ labels.totalTokens }}</span>
-          </div>
-          <div class="cb-metric">
-            <span class="cb-metric-value">{{ formatNumber(report.total.charCount) }}</span>
-            <span class="cb-metric-label">{{ labels.totalChars }}</span>
-          </div>
-        </div>
+      <!-- 一行總數＋一條用量條：有容量可比時是「用了多少／容量」，條上那條線是較早劇情開始濃縮的位置 -->
+      <div v-if="view" class="cb-summary">
+        <span class="cb-summary-used">{{ formatTokens(view.usedTokens) }}<template v-if="view.hasWindow"> / {{ formatTokens(view.limitTokens) }}</template></span>
+        <span v-if="view.hasWindow" class="cb-summary-percent">{{ view.percent }}%</span>
+        <span v-else class="cb-summary-percent">{{ labels.totalTokens }}</span>
       </div>
+      <div v-if="view" class="cb-bar" aria-hidden="true">
+        <span v-for="row in view.rows" :key="row.key" class="cb-bar-seg" :data-key="row.key" :style="{ width: row.width + '%', background: row.color }"></span>
+        <span v-if="view.compactAt != null" class="cb-bar-line" :style="{ left: view.compactAt + '%' }"></span>
+      </div>
+      <div v-if="view && view.hasWindow" class="cb-hint">{{ hintText }}</div>
 
-      <!-- 選中 MOD 時：那一格可以展開看每個 MOD 各占多少 -->
-      <div v-if="activeItem.key === 'mod'" class="cb-mod-section">
-        <div class="cb-mod-head cb-active-detail"
-             :class="{ 'is-expandable': canExpandMod, 'is-expanded': canExpandMod && modDetailsExpanded }"
-             :role="canExpandMod ? 'button' : undefined"
-             :tabindex="canExpandMod ? 0 : undefined"
-             :aria-expanded="canExpandMod ? (modDetailsExpanded ? 'true' : 'false') : undefined"
-             :aria-label="canExpandMod ? (modDetailsExpanded ? labels.collapseModDetails : labels.expandModDetails) : undefined"
-             @click="onToggleMod"
-             @keydown.enter.prevent="onToggleMod"
-             @keydown.space.prevent="onToggleMod">
-          <div class="cb-row-main">
-            <span class="cb-dot" :style="{ background: activeItem.color }"></span>
-            <div class="cb-row-text">
-              <span class="cb-row-title">{{ itemLabel('mod') }}</span>
-              <span class="cb-row-sub cb-mod-subtitle">{{ modStatusText }}</span>
+      <div v-if="view" class="cb-list">
+        <template v-for="row in view.rows" :key="row.key">
+          <div
+            class="cb-row"
+            :class="{ 'is-expandable': row.key === 'mod' && canExpandMod, 'is-expanded': row.key === 'mod' && canExpandMod && modDetailsExpanded }"
+            :data-key="row.key"
+            :role="row.key === 'mod' && canExpandMod ? 'button' : undefined"
+            :tabindex="row.key === 'mod' && canExpandMod ? 0 : undefined"
+            :aria-expanded="row.key === 'mod' && canExpandMod ? (modDetailsExpanded ? 'true' : 'false') : undefined"
+            :aria-label="row.key === 'mod' && canExpandMod ? (modDetailsExpanded ? labels.collapseModDetails : labels.expandModDetails) : undefined"
+            @click="row.key === 'mod' && onToggleMod()"
+            @keydown.enter.prevent="row.key === 'mod' && onToggleMod()"
+            @keydown.space.prevent="row.key === 'mod' && onToggleMod()"
+          >
+            <span class="cb-dot" :style="{ background: row.color }"></span>
+            <span class="cb-row-title">{{ itemLabel(row.key) }}<span v-if="row.key === 'mod'" class="cb-row-sub"> · {{ modStatusText }}</span></span>
+            <span class="cb-row-tokens">{{ formatTokens(row.tokens) }}</span>
+            <span class="cb-row-percent">{{ row.percent }}%</span>
+            <span v-if="row.key === 'mod' && canExpandMod" class="cb-mod-chevron" aria-hidden="true"></span>
+          </div>
+          <div v-if="row.key === 'mod' && canExpandMod && modDetailsExpanded" class="cb-mod-details" aria-live="polite">
+            <div v-for="detail in modItem.details" :key="detail.modId" class="cb-mod-detail-row">
+              <span class="cb-mod-detail-name">{{ modDisplayName(detail) }}</span>
+              <span class="cb-mod-detail-tokens">{{ formatNumber(detail.estimatedTokens) }} {{ labels.tokenUnit }}</span>
             </div>
           </div>
-          <div class="cb-row-value">
-            <span class="cb-row-tokens">{{ formatNumber(activeItem.estimatedTokens) }} {{ labels.tokenUnit }}</span>
-            <span class="cb-row-percent">{{ activeItem.percent }}%</span>
-          </div>
-          <span v-if="canExpandMod" class="cb-mod-chevron" aria-hidden="true"></span>
-        </div>
-        <div v-if="canExpandMod && modDetailsExpanded" class="cb-mod-details" aria-live="polite">
-          <div v-for="detail in activeItem.details" :key="detail.modId" class="cb-mod-detail-row">
-            <span class="cb-mod-detail-name">{{ modDisplayName(detail) }}</span>
-            <span class="cb-mod-detail-tokens">{{ formatNumber(detail.estimatedTokens) }} {{ labels.tokenUnit }}</span>
-          </div>
-        </div>
-      </div>
-      <div v-else class="cb-active-detail">
-        <div class="cb-row-main">
-          <span class="cb-dot" :style="{ background: activeItem.color }"></span>
-          <div class="cb-row-text">
-            <span class="cb-row-title">{{ itemLabel(activeItem.key) }}</span>
-            <span class="cb-row-sub">{{ sourceLabel(activeItem) }}</span>
-          </div>
-        </div>
-        <div class="cb-row-value">
-          <span class="cb-row-tokens">{{ formatNumber(activeItem.estimatedTokens) }} {{ labels.tokenUnit }}</span>
-          <span class="cb-row-percent">{{ activeItem.percent }}%</span>
+        </template>
+        <div v-if="view.hasWindow" class="cb-row is-free" data-key="free">
+          <span class="cb-dot"></span>
+          <span class="cb-row-title">{{ labels.free }}</span>
+          <span class="cb-row-tokens">{{ formatTokens(view.freeTokens) }}</span>
+          <span class="cb-row-percent">{{ view.freePercent }}%</span>
         </div>
       </div>
 
-      <div class="cb-list">
-        <div
-          v-for="item in visibleItems"
-          :key="item.key"
-          class="cb-row"
-          :class="{ 'is-unavailable': !item.available, 'is-active': activeItem.key === item.key, 'is-selectable': selectable(item) }"
-          :role="selectable(item) ? 'button' : undefined"
-          :tabindex="selectable(item) ? 0 : undefined"
-          :aria-pressed="selectable(item) ? (activeItem.key === item.key ? 'true' : 'false') : undefined"
-          @click="onSelect(item.key)"
-          @keydown.enter.prevent="onSelect(item.key)"
-          @keydown.space.prevent="onSelect(item.key)"
-        >
-          <div class="cb-row-main">
-            <span class="cb-dot" :style="{ background: item.color }"></span>
-            <div class="cb-row-text">
-              <span class="cb-row-title">{{ itemLabel(item.key) }}</span>
-              <span class="cb-row-sub">{{ sourceLabel(item) }}</span>
-            </div>
-          </div>
-          <div class="cb-row-value">
-            <span class="cb-row-tokens">{{ formatNumber(item.estimatedTokens) }} {{ labels.tokenUnit }}</span>
-            <span class="cb-row-percent">{{ item.percent }}%</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="cb-billing" :class="{ 'is-unavailable': !report.billing.available }">
-        <div class="cb-billing-head">
-          <div class="cb-billing-total">
-            <span class="cb-billing-label">{{ labels.billingTotal }}</span>
-            <span v-if="report.billing.available" class="cb-billing-total-value">{{ formatNumber(report.billing.totalPoints) }} {{ labels.pointUnit }}</span>
-            <span v-else class="cb-billing-total-value is-empty">{{ labels.unavailable }}</span>
-          </div>
-          <span v-if="report.billing.available" class="cb-billing-hit">
-            {{ labels.cacheHitRateFull }} {{ formatHitRate(report.billing.cacheHitRate) }}%
-          </span>
-        </div>
-        <div v-if="report.billing.available && report.billing.componentsAvailable !== false" class="cb-billing-grid">
-          <div class="cb-billing-item">
-            <span class="cb-billing-item-label">{{ labels.inputPoints }}</span>
-            <span class="cb-billing-item-value">{{ formatNumber(report.billing.inputPoints) }}</span>
-          </div>
-          <div class="cb-billing-item is-cache">
-            <span class="cb-billing-item-label">{{ labels.cacheReadPoints }}</span>
-            <span class="cb-billing-item-value">{{ formatNumber(report.billing.cacheReadPoints) }}</span>
-          </div>
-          <div class="cb-billing-item">
-            <span class="cb-billing-item-label">{{ labels.outputPoints }}</span>
-            <span class="cb-billing-item-value">{{ formatNumber(report.billing.outputPoints) }}</span>
-          </div>
-        </div>
+      <!-- 模型自己回報的數字：實際讀入多少、快取省了多少、這一輪花了幾點 -->
+      <div class="cb-foot">
+        <span v-if="report.cache.available && labels.actualInputTokens" class="cb-foot-item">{{ labels.actualInputTokens }} {{ formatNumber(report.cache.inputTokens) }}</span>
+        <span v-if="report.billing.available && report.billing.cacheHitRate != null" class="cb-foot-item">{{ labels.cacheHitRateFull }} {{ formatHitRate(report.billing.cacheHitRate) }}%</span>
+        <span v-if="report.billing.available" class="cb-foot-item">{{ labels.billingTotal }} {{ formatNumber(report.billing.totalPoints) }} {{ labels.pointUnit }}</span>
       </div>
       <div class="cb-note">{{ labels.localEstimateNote }}</div>
     </template>
@@ -188,16 +107,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import {
-  buildPromptDonutSegments,
+  formatHitRate,
   formatPromptNumber,
-  promptBreakdownItemSelectable,
+  formatTokenCount,
   promptBreakdownModDisplayName,
-  resolvePromptBreakdownActiveItem,
-  visiblePromptBreakdownItems,
-  type PromptBreakdownItem,
+  promptUsageView,
   type PromptBreakdownReport,
   type PromptModUsageDetail,
-  formatHitRate,
 } from '../canvas-context-breakdown'
 
 export interface ContextBreakdownLabels {
@@ -210,17 +126,18 @@ export interface ContextBreakdownLabels {
   notReady: string
   totalTokens: string
   actualInputTokens?: string
-  cachedInputTokens?: string
-  totalChars: string
   tokenUnit: string
   pointUnit: string
-  unavailable: string
   billingTotal: string
-  inputPoints: string
-  cacheReadPoints: string
-  outputPoints: string
   cacheHitRateFull: string
   localEstimateNote: string
+  free: string
+  /** 帶 {n} 的字串樣板：較早的劇情大約再過幾輪開始濃縮 */
+  hintTurns: string
+  /** 還算不出剩幾輪時，說明那條線是什麼 */
+  hintLine: string
+  /** 已經到線上了：下一輪就會濃縮 */
+  hintNow: string
   expandModDetails: string
   collapseModDetails: string
   modDetailsUnavailable: string
@@ -228,7 +145,6 @@ export interface ContextBreakdownLabels {
   /** 每個桶的名字，key 對 PromptBreakdownKey */
   items: Record<string, string>
   /** 也可以是帶 {n} 的字串樣板：沙箱殼收到的是 JSON，函式帶不過去 */
-  sources: ((n: number) => string) | string
   modsUsed: ((n: number) => string) | string
 }
 
@@ -239,8 +155,6 @@ const props = withDefaults(defineProps<{
   report?: PromptBreakdownReport | null
   loading?: boolean
   loadFailed?: boolean
-  /** 玩家點過的桶；沒點過就退到第一個可選的 */
-  activeKey?: string
   modDetailsExpanded?: boolean
   locale?: string
   labels?: ContextBreakdownLabels
@@ -248,18 +162,16 @@ const props = withDefaults(defineProps<{
   report: null,
   loading: false,
   loadFailed: false,
-  activeKey: '',
   modDetailsExpanded: false,
   locale: '',
   labels: () => ({
     title: '', subtitle: '', close: 'Close', retry: 'Retry',
     loadFailed: '', unsupportedModel: '', notReady: '',
-    totalTokens: '', totalChars: '', tokenUnit: '', pointUnit: '', unavailable: '',
-    billingTotal: '', inputPoints: '', cacheReadPoints: '', outputPoints: '',
-    cacheHitRateFull: '', localEstimateNote: '',
+    totalTokens: '', tokenUnit: '', pointUnit: '',
+    billingTotal: '', cacheHitRateFull: '', localEstimateNote: '',
+    free: '', hintTurns: '', hintLine: '', hintNow: '',
     expandModDetails: '', collapseModDetails: '', modDetailsUnavailable: '', modDetailsLegacy: '',
     items: {},
-    sources: (n: number) => String(n),
     modsUsed: (n: number) => String(n),
   }),
 })
@@ -267,7 +179,6 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'retry'): void
-  (e: 'select', key: string): void
   (e: 'toggle-mod-details'): void
 }>()
 
@@ -278,50 +189,45 @@ const statusText = computed(() => {
   return props.labels.subtitle
 })
 
-const visibleItems = computed(() => visiblePromptBreakdownItems(props.report ? props.report.items : []))
+const view = computed(() => promptUsageView(props.report))
 
-const activeItem = computed(() => resolvePromptBreakdownActiveItem(visibleItems.value, props.activeKey))
+const hintText = computed(() => {
+  const v = view.value
+  if (!v || !v.hasWindow) return ''
+  // 剩一輪以內就說「很快」：句子裡的輪數因此至少是 2，英文不必分單複數。
+  if (v.condensing || (v.turnsLeft != null && v.turnsLeft <= 1)) return props.labels.hintNow
+  if (v.turnsLeft != null) return fmtN(props.labels.hintTurns, v.turnsLeft)
+  return props.labels.hintLine
+})
 
-const donutSegments = computed(() => buildPromptDonutSegments(props.report ? props.report.items : [], activeItem.value.key))
+const modItem = computed(() => (props.report ? props.report.items.find((item) => item.key === 'mod') : undefined) || { details: [] as PromptModUsageDetail[], detailsUnavailableReason: '' })
 
 const canExpandMod = computed(() => {
-  const item = activeItem.value
-  return !!(item && item.key === 'mod' && item.available && item.detailsAvailable && Array.isArray(item.details) && item.details.length > 0)
+  const item = modItem.value as any
+  return !!(item && item.available && item.detailsAvailable && Array.isArray(item.details) && item.details.length > 0)
 })
 
 const modStatusText = computed(() => {
-  const item = activeItem.value
+  const item = modItem.value
   if (canExpandMod.value) return fmtN(props.labels.modsUsed, item.details.length)
   if (item && item.detailsUnavailableReason === 'legacy_snapshot') return props.labels.modDetailsLegacy
   return props.labels.modDetailsUnavailable
 })
 
-function selectable(item: PromptBreakdownItem) {
-  return promptBreakdownItemSelectable(item)
-}
-
 function itemLabel(key: string) {
   return props.labels.items[key] || key
-}
-
-function sourceLabel(item: PromptBreakdownItem) {
-  if (!item || !item.available) return props.labels.unavailable
-  return fmtN(props.labels.sources, item.sourceCount || 0)
 }
 
 function formatNumber(value: unknown) {
   return formatPromptNumber(value)
 }
 
-function modDisplayName(detail: PromptModUsageDetail) {
-  return promptBreakdownModDisplayName(detail, props.locale)
+function formatTokens(value: unknown) {
+  return formatTokenCount(value)
 }
 
-function onSelect(key: string) {
-  const items = props.report ? props.report.items : []
-  const item = items.find((entry) => entry.key === key)
-  if (!item || !selectable(item)) return
-  emit('select', key)
+function modDisplayName(detail: PromptModUsageDetail) {
+  return promptBreakdownModDisplayName(detail, props.locale)
 }
 
 function onToggleMod() {

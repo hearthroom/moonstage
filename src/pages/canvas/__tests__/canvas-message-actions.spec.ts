@@ -5,7 +5,7 @@
  * 舊版把動作列絕對定位在氣泡右上角、觸控裝置整組 display:none；MMD 卡的作者 HTML
  * 蓋住右上角、長按又被卡片自己的互動吃掉，玩家就什麼都找不到。
  * 這裡釘住：動作列在 .mes_block 的文流裡、緊接氣泡之後；重新生成只有最新一則 AI 有；
- * 上下文 chip 有資料才畫。
+ * 上下文用量不再掛在每一則底下（2026-10-10 搬到輸入框旁的小圓環與選單裡的「這一輪的用量」）。
  */
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -70,18 +70,8 @@ describe('重新生成', () => {
   })
 })
 
-describe('上下文 chip', () => {
-  it('有資料才畫，顯示的就是給它的那一句', () => {
-    const w = mountMessage({ contextUsage: { label: '上下文 13%', tip: '說明', level: 'low' } })
-    const chip = w.find('[data-lt="context-usage"]')
-    expect(chip.exists()).toBe(true)
-    expect(chip.text()).toBe('上下文 13%')
-    expect(chip.attributes('title')).toBe('說明')
-    expect(chip.classes()).toContain('is-low')
-  })
-
-  it('沒有資料整顆不畫', () => {
-    expect(mountMessage({ contextUsage: null }).find('[data-lt="context-usage"]').exists()).toBe(false)
+describe('上下文用量不在氣泡底下', () => {
+  it('每一則都不畫用量標籤', () => {
     expect(mountMessage({}).find('[data-lt="context-usage"]').exists()).toBe(false)
   })
 })
@@ -173,16 +163,15 @@ describe('手機長按', () => {
   而且節點名是新的，作者對舊頁面寫的外觀對不上。
 */
 describe('動作列的顏色跟著卡片走', () => {
-  it('列與兩顆按鈕帶舊聊天頁的節點名，作者對那套寫的外觀對得上', () => {
-    const w = mountMessage({ contextUsage: { label: '上下文 13%', tip: '說明', level: 'low' } })
+  it('列與重新生成鍵帶舊聊天頁的節點名，作者對那套寫的外觀對得上', () => {
+    const w = mountMessage({})
     expect(w.find('[data-lt="message-actions"]').classes()).toContain('ai-hover-toolbar')
     expect(w.find('[data-lt="message-regenerate"]').classes()).toContain('hover-pill')
-    expect(w.find('[data-lt="context-usage"]').classes()).toContain('hover-pill')
   })
 
-  it('兩顆按鈕的文字色與邊框都從 currentColor 來，不寫死自己的灰', () => {
+  it('重新生成鍵的文字色與邊框都從 currentColor 來，不寫死自己的灰', () => {
     const css = readFileSync(resolve(__dirname, '../canvas.css'), 'utf8')
-    for (const sel of ['.lt-msg-regen {', '.lt-context-chip {']) {
+    for (const sel of ['.lt-msg-regen {']) {
       const start = css.indexOf(sel)
       expect(start, sel).toBeGreaterThan(-1)
       const body = css.slice(start, css.indexOf('}', start))
@@ -190,12 +179,6 @@ describe('動作列的顏色跟著卡片走', () => {
       expect(body).toMatch(/border: var\(--lt-canvas-pill-border, 1px solid color-mix\(in srgb, currentColor/)
       expect(body).not.toMatch(/--lt-canvas-muted/)
     }
-  })
-
-  it('上下文 chip 點了送出 context-usage 動作（開這則回覆的組成）', async () => {
-    const w = mountMessage({ contextUsage: { label: '上下文 13%', tip: '說明', level: 'low' } })
-    await w.find('[data-lt="context-usage"]').trigger('click')
-    expect(w.emitted('action')).toEqual([['context-usage']])
   })
 })
 

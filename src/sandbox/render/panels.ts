@@ -43,7 +43,7 @@ const EVENTS: Record<string, string[]> = {
   persona: ['save', 'close'],
   directives: ['add', 'edit', 'save-edit', 'cancel-edit', 'ask-delete', 'confirm-delete', 'cancel-delete', 'retry', 'close', 'update:draft', 'update:editing-text'],
   notepad: ['save', 'retry', 'close', 'toggle-templates', 'apply-template', 'save-template', 'update:code', 'preview-code', 'cancel-preview', 'confirm-import', 'share-template', 'delete-template', 'copy-share-code', 'revoke-share', 'close-share', 'toggle-copy', 'copy-from', 'update:draft'],
-  'context-breakdown': ['close', 'retry', 'select', 'toggle-mod-details'],
+  'context-breakdown': ['close', 'retry', 'toggle-mod-details'],
   memory: ['close', 'retry', 'delete', 'toggle-expand'],
   confirm: ['ok', 'cancel'],
   assist: ['confirm','cancel','refresh','pick'],

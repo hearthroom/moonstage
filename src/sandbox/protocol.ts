@@ -214,6 +214,8 @@ export interface ChromeState {
     moreOpen: boolean
     moreItems: Array<{ key: string; label: string; disabled?: boolean }>
     modelScore: string
+    /** 上下文用量的小圓環（canvas-composer.vue 的 contextRing）；點它送 ui 'context'。 */
+    contextRing?: { percent: number; level: string; label: string } | null
     /** 目前模型的友善名（頂欄那個「模型名 · 線路名」）；空字串＝還不知道。殼不畫它，給 sdk.model.get() 用。 */
     modelName?: string
     assistBusy: boolean
@@ -247,7 +249,7 @@ export interface PanelsState {
 }
 
 /** 標準頁首與輸入區上的按鍵，交給宿主做。 */
-export type ChromeUiEvent = 'send' | 'stop' | 'continue' | 'more' | 'assist' | 'more-pick' | 'model' | 'shortcut' | 'back' | 'fullscreen' | 'favorite' | 'comments' | 'prologue'
+export type ChromeUiEvent = 'send' | 'stop' | 'continue' | 'more' | 'assist' | 'more-pick' | 'model' | 'context' | 'shortcut' | 'back' | 'fullscreen' | 'favorite' | 'comments' | 'prologue'
 
 /** 三個點選單從哪裡呼出（座標是 iframe 內的；宿主自己換算）。 */
 export type MessageMenuAnchor =

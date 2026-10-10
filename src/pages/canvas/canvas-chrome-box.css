@@ -409,26 +409,14 @@
 .cb-retry {
     padding: 0 16px
 }
-.cb-metric {
-    padding: 10px 12px
-}
-.cb-active-detail {
-    padding: 10px 12px
-}
 .cb-mod-detail-row {
     padding: 8px 12px
 }
 .cb-row {
-    padding: 8px 12px
+    padding: 4px 8px
 }
-.cb-billing {
-    padding: 12px
-}
-.cb-billing-hit {
-    padding: 3px 8px
-}
-.cb-billing-item {
-    padding: 6px 4px
+.cb-foot {
+    padding-top: 12px
 }
 .mem-top {
     padding-right: 36px

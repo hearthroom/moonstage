@@ -1,5 +1,5 @@
 /**
- * 「這則回覆的組成」彈窗——mobile 那份搬到畫布之後，玩家看得到的東西還在不在。
+ * 上下文用量面板：一行總數、一條用量條、各部分占容量幾成與剩餘空間。
  *
  * 元件不打 API：資料由頁面整理好餵進來，所以這裡直接餵伺服器回的那種 JSON，
  * 從正規化一路驗到畫出來的列。
@@ -12,12 +12,12 @@ import { resolve } from 'node:path'
 import CanvasContextBreakdown from '../components/canvas-context-breakdown.vue'
 import {
   BREAKDOWN_META,
-  buildPromptDonutSegments,
+  contextRingFromReport,
   createPromptDiagnosticsRequestGate,
+  formatTokenCount,
   normalizeServerReport,
   promptBreakdownHasModData,
-  promptBreakdownItemSelectable,
-  resolvePromptBreakdownActiveItem,
+  promptUsageView,
   visiblePromptBreakdownItems,
 } from '../canvas-context-breakdown'
 
@@ -30,7 +30,7 @@ const ITEM_LABELS: Record<string, string> = {
   userProfile: '使用者設定',
   summary: '劇情總結',
   history: '歷史對話',
-  worldbook: '世界書召回',
+  worldbook: '世界書',
   memory: '記憶錨點',
   currentInput: '目前輸入',
 }
@@ -44,22 +44,21 @@ const LABELS = {
   unsupportedModel: '目前的模型不支援',
   notReady: '完成一輪回覆後可查看',
   totalTokens: '估算 Token',
-  totalChars: '字元',
   tokenUnit: 'Tokens',
   pointUnit: '點',
-  unavailable: '尚無資料',
   billingTotal: '本輪消耗',
-  inputPoints: '輸入',
-  cacheReadPoints: '快取讀取',
-  outputPoints: '輸出',
   cacheHitRateFull: '快取命中率',
-  localEstimateNote: '本機估算，實際用量可能不同。',
+  localEstimateNote: '各部分的 Token 數為估算。',
+  actualInputTokens: '實際輸入 Token',
+  free: '剩餘空間',
+  hintTurns: '較早的劇情大約再過 {n} 輪會濃縮成摘要。',
+  hintLine: '較早的劇情會在用量到達那條線時濃縮成摘要。',
+  hintNow: '較早的劇情很快會濃縮成摘要。',
   expandModDetails: '展開各 MOD 用量',
   collapseModDetails: '收起各 MOD 用量',
   modDetailsUnavailable: 'MOD 明細暫時無法顯示',
   modDetailsLegacy: '下一次回覆後可看 MOD 明細',
   items: ITEM_LABELS,
-  sources: (n: number) => `${n} 項來源`,
   modsUsed: (n: number) => `本輪使用 ${n} 個 MOD`,
 }
 
@@ -112,6 +111,9 @@ function serverReport(overrides: Record<string, unknown> = {}) {
     ...overrides,
   }
 }
+
+/** Harbor 的報告多帶一個 window：用量（記憶整理那把尺）、玩家選的容量、開始濃縮的位置。 */
+const WINDOW = { available: true, usedTokens: 1990, limitTokens: 64000, compactAtTokens: 58880, percent: 3, turnsLeft: 12 }
 
 function mountSheet(props: Record<string, unknown> = {}) {
   return mount(CanvasContextBreakdown, { props: { labels: LABELS, ...props } })
@@ -167,22 +169,47 @@ describe('組成：伺服器回覆正規化', () => {
     expect(report.items.every((i) => i.estimatedTokens === 0 && i.percent === 0)).toBe(true)
   })
 
-  it('圓環只畫有 token 的桶，最後一段收在 360 度，選中的那段外推', () => {
-    const report = normalizeServerReport(serverReport())!
-    const segments = buildPromptDonutSegments(report.items, 'history')
-    expect(segments.map((s) => s.key)).toEqual(['system', 'roleCard', 'mod', 'notepad', 'userProfile', 'history', 'memory', 'currentInput'])
-    expect(segments.find((s) => s.key === 'history')!.isActive).toBe(true)
-    expect(segments.find((s) => s.key === 'history')!.transform).toContain('translate')
-    expect(segments.find((s) => s.key === 'system')!.transform).toBe('')
+  it('有容量時：各部分換成記憶整理那把尺，占容量幾成；剩餘空間與濃縮線一起算出來', () => {
+    const view = promptUsageView(normalizeServerReport(serverReport({ window: WINDOW })))!
+    expect(view.hasWindow).toBe(true)
+    expect(view.rows.map((r) => r.key)).toEqual(['system', 'roleCard', 'mod', 'notepad', 'userProfile', 'history', 'memory', 'currentInput'])
+    // 1990 / 995：每一部分乘 2
+    expect(view.rows[0]).toMatchObject({ key: 'system', tokens: 600, percent: 1 })
+    expect(view.usedTokens).toBe(1990)
+    expect(view.freeTokens).toBe(62010)
+    expect(view.freePercent).toBe(97)
+    expect(view.compactAt).toBeCloseTo(92)
+    expect(view.turnsLeft).toBe(12)
+    expect(view.condensing).toBe(false)
   })
 
-  it('可選的桶：有 token、或是有明細的 MOD；預設選第一個可選的', () => {
-    const report = normalizeServerReport(serverReport())!
-    expect(promptBreakdownItemSelectable(report.items.find((i) => i.key === 'directive')!)).toBe(false)
-    expect(promptBreakdownItemSelectable(report.items.find((i) => i.key === 'worldbook')!)).toBe(false)
-    expect(resolvePromptBreakdownActiveItem(report.items, '').key).toBe('system')
-    expect(resolvePromptBreakdownActiveItem(report.items, 'directive').key).toBe('system')
-    expect(resolvePromptBreakdownActiveItem(report.items, 'mod').key).toBe('mod')
+  it('沒有容量時（LunaTalk、舊回合）退回占提示詞幾成，不算剩餘空間也不畫線', () => {
+    const view = promptUsageView(normalizeServerReport(serverReport()))!
+    expect(view.hasWindow).toBe(false)
+    expect(view.compactAt).toBeNull()
+    expect(view.rows[0]).toMatchObject({ key: 'system', tokens: 300, percent: 30 })
+  })
+
+  it('window 不完整或濃縮線超過容量就當沒有，不猜', () => {
+    for (const window of [{ ...WINDOW, available: false }, { ...WINDOW, limitTokens: 0 }, { ...WINDOW, compactAtTokens: 70000 }, null]) {
+      expect(normalizeServerReport(serverReport({ window }))!.window.available).toBe(false)
+    }
+  })
+
+  it('小圓環：有容量才有；到了濃縮線就是 full', () => {
+    expect(contextRingFromReport(normalizeServerReport(serverReport()))).toBeNull()
+    expect(contextRingFromReport(normalizeServerReport(serverReport({ window: WINDOW })))).toEqual({ percent: 3, level: 'low' })
+    const full = { ...WINDOW, usedTokens: 59000 }
+    expect(contextRingFromReport(normalizeServerReport(serverReport({ window: full })))).toEqual({ percent: 92, level: 'full' })
+    expect(contextRingFromReport(normalizeServerReport(serverReport({ status: 'notReady', window: WINDOW })))).toBeNull()
+  })
+
+  it('token 數寫成 23.5k、1M 這種', () => {
+    expect(formatTokenCount(950)).toBe('950')
+    expect(formatTokenCount(23534)).toBe('23.5k')
+    expect(formatTokenCount(64000)).toBe('64k')
+    expect(formatTokenCount(117400)).toBe('117.4k')
+    expect(formatTokenCount(1000000)).toBe('1M')
   })
 
   it('請求閘：同一段對話進行中不重複發，換對話就作廢舊的', () => {
@@ -198,50 +225,61 @@ describe('組成：伺服器回覆正規化', () => {
 })
 
 describe('組成：彈窗畫出來的東西', () => {
-  it('每個桶一列，列上有名字、token 與百分比；沒資料的桶標成不可用', () => {
-    const wrapper = mountSheet({ report: normalizeServerReport(serverReport()) })
+  it('有容量時：一行「用了多少／容量」、用量條上有濃縮線、各部分一列、最後是剩餘空間', () => {
+    const wrapper = mountSheet({ report: normalizeServerReport(serverReport({ window: WINDOW })) })
     const el = wrapper.element as HTMLElement
+    expect(el.querySelector('.cb-summary-used')!.textContent).toBe('2k / 64k')
+    expect(el.querySelector('.cb-summary-percent')!.textContent).toBe('3%')
+    expect(el.querySelectorAll('.cb-bar-seg').length).toBe(8)
+    expect((el.querySelector('.cb-bar-line') as HTMLElement).style.left).toBe('92%')
+    expect(el.querySelector('.cb-hint')!.textContent).toBe('較早的劇情大約再過 12 輪會濃縮成摘要。')
     const rows = Array.from(el.querySelectorAll('.cb-row'))
-    expect(rows.length).toBe(BREAKDOWN_META.length)
-    const titles = rows.map((r) => r.querySelector('.cb-row-title')!.textContent)
-    expect(titles).toEqual(BREAKDOWN_META.map((m) => ITEM_LABELS[m.key]))
-    const system = rows[0]
-    expect(system.querySelector('.cb-row-tokens')!.textContent).toContain('300')
-    expect(system.querySelector('.cb-row-percent')!.textContent).toBe('30%')
-    const worldbook = rows.find((r) => r.querySelector('.cb-row-title')!.textContent === '世界書召回')!
-    expect(worldbook.classList.contains('is-unavailable')).toBe(true)
-    expect(worldbook.querySelector('.cb-row-sub')!.textContent).toBe('尚無資料')
-    // 圓環中央是選中那桶的數字
-    expect(el.querySelector('.cb-donut-value')!.textContent).toBe('300')
-    expect(el.querySelector('.cb-donut-label')!.textContent).toBe('系統與策略')
-    expect(el.querySelector('.cb-donut-percent')!.textContent).toBe('30%')
-    // 總計與計費
-    expect(el.querySelectorAll('.cb-metric-value')[0].textContent).toBe('995')
-    expect(el.querySelectorAll('.cb-metric-value')[1].textContent).toBe('3,980')
-    expect(el.querySelector('.cb-billing-total-value')!.textContent).toContain('42')
-    expect(el.querySelector('.cb-billing-hit')!.textContent).toContain('80%')
+    expect(rows.map((r) => r.getAttribute('data-key'))).toEqual(['system', 'roleCard', 'mod', 'notepad', 'userProfile', 'history', 'memory', 'currentInput', 'free'])
+    expect(rows[0].querySelector('.cb-row-tokens')!.textContent).toBe('600')
+    expect(rows[0].querySelector('.cb-row-percent')!.textContent).toBe('1%')
+    const free = rows[rows.length - 1]
+    expect(free.querySelector('.cb-row-title')!.textContent).toBe('剩餘空間')
+    expect(free.querySelector('.cb-row-tokens')!.textContent).toBe('62k')
+    expect(free.querySelector('.cb-row-percent')!.textContent).toBe('97%')
+    // 模型回報的數字收在最後一行
+    expect(el.querySelector('.cb-foot')!.textContent).toContain('實際輸入 Token 1,000')
+    expect(el.querySelector('.cb-foot')!.textContent).toContain('快取命中率 80%')
+    expect(el.querySelector('.cb-foot')!.textContent).toContain('本輪消耗 42 點')
     // 內部欄位不出現在畫面上
     expect(el.textContent).not.toContain('secret-model-name')
     wrapper.unmount()
   })
 
-  it('點一列把 key 交出去；不可選的列點了不會發', async () => {
-    const wrapper = mountSheet({ report: normalizeServerReport(serverReport()) })
-    const rows = Array.from((wrapper.element as HTMLElement).querySelectorAll<HTMLElement>('.cb-row'))
-    rows.find((r) => r.querySelector('.cb-row-title')!.textContent === '歷史對話')!.click()
-    expect(wrapper.emitted('select')).toEqual([['history']])
-    rows.find((r) => r.querySelector('.cb-row-title')!.textContent === '長期指令')!.click()
-    expect(wrapper.emitted('select')!.length).toBe(1)
-    wrapper.unmount()
+  it('濃縮線說明：剩一輪以內或已經到線就說「很快」，算不出輪數就說那條線是什麼', () => {
+    const hint = (window: Record<string, unknown>) => {
+      const wrapper = mountSheet({ report: normalizeServerReport(serverReport({ window: { ...WINDOW, ...window } })) })
+      const text = (wrapper.element as HTMLElement).querySelector('.cb-hint')!.textContent
+      wrapper.unmount()
+      return text
+    }
+    expect(hint({ turnsLeft: 1 })).toBe('較早的劇情很快會濃縮成摘要。')
+    expect(hint({ turnsLeft: null, usedTokens: 60000 })).toBe('較早的劇情很快會濃縮成摘要。')
+    expect(hint({ turnsLeft: null })).toBe('較早的劇情會在用量到達那條線時濃縮成摘要。')
   })
 
-  it('選中 MOD 時可以展開明細，每個 MOD 一列、名字跟著語言走', async () => {
-    const wrapper = mountSheet({ report: normalizeServerReport(serverReport()), activeKey: 'mod', modDetailsExpanded: true, locale: 'en' })
+  it('沒有容量時：只寫估算總數，不畫剩餘空間、濃縮線與說明', () => {
+    const el = mountSheet({ report: normalizeServerReport(serverReport()) }).element as HTMLElement
+    expect(el.querySelector('.cb-summary-used')!.textContent).toBe('995')
+    expect(el.querySelector('.cb-summary-percent')!.textContent).toBe('估算 Token')
+    expect(el.querySelector('.cb-bar-line')).toBeNull()
+    expect(el.querySelector('.cb-hint')).toBeNull()
+    expect(el.querySelector('[data-key="free"]')).toBeNull()
+    expect(el.querySelector('.cb-row .cb-row-percent')!.textContent).toBe('30%')
+  })
+
+  it('MOD 那一列可以展開明細，每個 MOD 一列、名字跟著語言走', async () => {
+    const wrapper = mountSheet({ report: normalizeServerReport(serverReport()), modDetailsExpanded: true, locale: 'en' })
     const el = wrapper.element as HTMLElement
     const names = Array.from(el.querySelectorAll('.cb-mod-detail-name')).map((n) => n.textContent)
     expect(names).toEqual(['Alpha', 'Beta'])
-    expect(el.querySelector('.cb-mod-subtitle')!.textContent).toBe('本輪使用 2 個 MOD')
-    el.querySelector<HTMLElement>('.cb-mod-head')!.click()
+    const mod = el.querySelector<HTMLElement>('.cb-row[data-key="mod"]')!
+    expect(mod.querySelector('.cb-row-sub')!.textContent).toContain('本輪使用 2 個 MOD')
+    mod.click()
     expect(wrapper.emitted('toggle-mod-details')?.length).toBe(1)
     wrapper.unmount()
   })
@@ -261,21 +299,21 @@ describe('組成：彈窗畫出來的東西', () => {
     wrapper.unmount()
   })
 
-  it('不支援的模型：明確空狀態，不畫全 0 的圓環', () => {
+  it('不支援的模型：明確空狀態，不畫全 0 的用量條', () => {
     const el = mountSheet({ report: normalizeServerReport(serverReport({ supported: false, status: 'unsupportedModel' })) }).element as HTMLElement
     expect(el.querySelector('.cb-empty-text')!.textContent).toBe('目前的模型不支援')
-    expect(el.querySelector('.cb-donut')).toBeNull()
+    expect(el.querySelector('.cb-bar')).toBeNull()
     expect(el.querySelector('.cb-subtitle')!.textContent).toBe('目前的模型不支援')
   })
 
-  it('還沒完成一輪：副標寫「完成一輪回覆後可查看」，桶全 0 但列還在', () => {
+  it('還沒完成一輪：副標寫「完成一輪回覆後可查看」，不畫用量條也沒有列', () => {
     const raw = serverReport({ status: 'notReady', total: { charCount: 0, estimatedTokens: 0 }, billing: { available: false } })
     raw.items.forEach((i: any) => { i.estimatedTokens = 0; i.charCount = 0; i.percent = 0; i.sourceCount = 0 })
     const el = mountSheet({ report: normalizeServerReport(raw) }).element as HTMLElement
     expect(el.querySelector('.cb-subtitle')!.textContent).toBe('完成一輪回覆後可查看')
-    // 沒有 MOD 資料時 MOD 那列不畫（見下方「沒有 MOD 的供應商」），其餘十列都在
-    expect(el.querySelectorAll('.cb-row').length).toBe(BREAKDOWN_META.length - 1)
-    expect(el.querySelector('.cb-billing-total-value')!.textContent).toBe('尚無資料')
+    expect(el.querySelector('.cb-bar')).toBeNull()
+    expect(el.querySelectorAll('.cb-row').length).toBe(0)
+    expect(el.querySelector('.cb-foot')!.textContent).not.toContain('本輪消耗')
   })
 
   it('關閉鍵發 close', async () => {
@@ -311,7 +349,7 @@ describe('組成：吃得到作者的美化', () => {
     const block = css.slice(start, end).replace(/\/\*[\s\S]*?\*\//g, '')
     expect(block).not.toMatch(/(^|[^-])margin(-\w+)?\s*:/)
     expect(block).not.toMatch(/!\s*important/)
-    // 只有圓環分段用語意色（來自資料的 inline fill），樣式本身不寫任何色碼
+    // 只有用量條的分段用語意色（來自資料的 inline background），樣式本身不寫任何色碼
     expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
     expect(block).not.toMatch(/rgba?\(/)
   })
@@ -320,11 +358,10 @@ describe('組成：吃得到作者的美化', () => {
 it('keeps the selected reply and actual usage separate from estimated composition', () => {
  const report = normalizeServerReport({supported:true,status:'ok',schemaVersion:2,conversationId:'fixture',chatId:'reply-one',items:[],total:{estimatedTokens:120,charCount:360},cache:{available:true,inputTokens:100,readTokens:20,hitRate:20},billing:{available:true,totalPoints:1,componentsAvailable:false,cacheHitRate:20}})!
  expect(report.chatId).toBe('reply-one')
- const wrapper=mount(CanvasContextBreakdown,{props:{report,loading:false,loadFailed:false,activeKey:'',modDetailsExpanded:false,locale:'en',labels:{...LABELS,actualInputTokens:'Actual input',cachedInputTokens:'Cached input'}}})
- expect(wrapper.text()).toContain('Actual input')
- expect(wrapper.text()).toContain('Cached input')
- expect(wrapper.find('.cb-billing-grid').exists()).toBe(false)
- expect(wrapper.findAll('.cb-metric-value').map(x=>x.text())).toEqual(['100','20','120','360'])
+ const wrapper=mount(CanvasContextBreakdown,{props:{report,loading:false,loadFailed:false,modDetailsExpanded:false,locale:'en',labels:{...LABELS,actualInputTokens:'Actual input'}}})
+ expect(wrapper.find('.cb-summary-used').text()).toBe('120')
+ expect(wrapper.find('.cb-foot').text()).toContain('Actual input 100')
+ expect(wrapper.find('.cb-foot').text()).toContain('快取命中率 20%')
 })
 
 it('rejects a late response when another reply in the same conversation is selected',()=>{
@@ -364,7 +401,7 @@ describe('上下文用量：沒有 MOD 的供應商', () => {
     const el = wrapper.element as HTMLElement
     const titles = Array.from(el.querySelectorAll('.cb-row-title')).map((n) => n.textContent)
     expect(titles).not.toContain('MOD')
-    expect(el.querySelectorAll('.cb-row').length).toBe(BREAKDOWN_META.length - 1)
+    expect(el.querySelectorAll('.cb-row').length).toBe(7)
     expect(el.textContent).not.toContain('MOD')
     wrapper.unmount()
   })
@@ -383,12 +420,15 @@ describe('上下文用量：五語文案', () => {
     'zh-Hant': '上下文用量', 'zh-Hans': '上下文用量', en: 'Context usage', ja: 'コンテキスト使用量', ko: '컨텍스트 사용량',
   }
 
-  it('標題叫「上下文用量」，跟氣泡底下的入口同名', () => {
+  it('標題叫「上下文用量」；圓環的說明帶百分比，選單裡有「這一輪的用量」', () => {
     for (const l of locales) {
       const t = table(l)
       expect(t['promptBreakdown.title']).toBe(expectedTitle[l])
-      expect(t['promptBreakdown.entry']).toBe(expectedTitle[l])
-      expect(t['canvas.context.details']).toBe(expectedTitle[l])
+      expect(t['canvas.context.ring'], l).toContain('{percent}')
+      expect(t['canvas.context.hintTurns'], l).toContain('{n}')
+      for (const key of ['canvas.context.thisTurn', 'canvas.context.free', 'canvas.context.hintLine', 'canvas.context.hintNow']) {
+        expect(t[key], l + ' ' + key).toBeTruthy()
+      }
     }
   })
 

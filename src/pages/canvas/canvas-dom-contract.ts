@@ -150,8 +150,6 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '.mes[is_user="true"]', region: 'message-user', origin: 'st', why: '酒館用屬性分辨誰說的' },
   { selector: '.lt-msg-regen', region: 'message', origin: 'lt', why: '重新生成（只有最新一則 AI 有）' },
   { selector: '[data-lt="message-regenerate"]', region: 'message', origin: 'lt', why: '我方穩定鉤子' },
-  { selector: '.lt-context-chip', region: 'message', origin: 'lt', why: '這一輪的上下文用量（只露百分比與等級；沒有資料就不畫）' },
-  { selector: '[data-lt="context-usage"]', region: 'message', origin: 'lt', why: '我方穩定鉤子' },
   { selector: '.extraMesButtonsHint', region: 'message', origin: 'st', why: '三個點（在我們這裡是「更多」，呼出浮層）' },
   { selector: '.extraMesButtons', region: 'message', origin: 'st', why: '展開後的動作' },
   { selector: '.mes_copy', region: 'message', origin: 'st', why: '複製' },
@@ -177,6 +175,10 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '.sb-text', region: 'composer', origin: 'mmd', why: '快捷鍵文字' },
   { selector: '.shortcut-button-scope .item', region: 'composer', origin: 'mmd', why: '卡片實際寫的是這組舊名，兩套都要在' },
   { selector: '[data-lt="function-bar"]', region: 'composer', origin: 'lt', why: '我方穩定鉤子' },
+  // 上下文用量先前是每則 AI 回覆底下一顆「上下文 NN%」，2026-10-10 搬到模型鍵旁邊的小圓環；
+  // 鉤子名跟著搬過來，作者對它寫的（多半是藏起來）照樣作用在同一件事上。
+  { selector: '.lt-context-ring', region: 'composer', origin: 'lt', why: '上下文用量的小圓環（供應商沒給容量時不畫）' },
+  { selector: '[data-lt="context-usage"]', region: 'composer', origin: 'lt', why: '我方穩定鉤子' },
   { selector: '.send-msg', region: 'composer', origin: 'mmd', why: '卡片改輸入區底色；腳本用它找送出鍵' },
   { selector: '#send_form', region: 'composer', origin: 'st', why: '酒館輸入區外框' },
   { selector: '[data-lt="composer"]', region: 'composer', origin: 'lt', why: '我方穩定鉤子' },
@@ -348,12 +350,12 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   // mobile 那份上下文用量彈窗搬過來的；MMD 沒有這個功能，名字是我們自己的。
   // 殼仍是 `.u-popup__content`，作者的底色與圓角照樣生效；裡面的字色全部 inherit。
   { selector: '.context-breakdown-scope', region: 'context-breakdown', origin: 'lt', why: '我方的組成面板；MMD 無對應功能' },
-  { selector: '.cb-overview', region: 'context-breakdown', origin: 'lt', why: '圓環＋總計那一排' },
-  { selector: '.cb-donut', region: 'context-breakdown', origin: 'lt', why: '圓環（inline SVG）' },
-  { selector: '.cb-list', region: 'context-breakdown', origin: 'lt', why: '十一個桶的清單' },
-  { selector: '.cb-row', region: 'context-breakdown', origin: 'lt', why: '一個桶' },
-  { selector: '.cb-billing', region: 'context-breakdown', origin: 'lt', why: '本輪消耗與快取命中率' },
-  { selector: '.cb-note', region: 'context-breakdown', origin: 'lt', why: '「本機估算」那句話' },
+  { selector: '.cb-summary', region: 'context-breakdown', origin: 'lt', why: '「用了多少／容量」那一行' },
+  { selector: '.cb-bar', region: 'context-breakdown', origin: 'lt', why: '用量條（各部分一段，加上開始濃縮舊劇情的那條線）' },
+  { selector: '.cb-list', region: 'context-breakdown', origin: 'lt', why: '各部分的清單，最後一列是剩餘空間' },
+  { selector: '.cb-row', region: 'context-breakdown', origin: 'lt', why: '一個部分' },
+  { selector: '.cb-foot', region: 'context-breakdown', origin: 'lt', why: '模型回報的實際輸入、快取命中率、本輪消耗' },
+  { selector: '.cb-note', region: 'context-breakdown', origin: 'lt', why: '「各部分是估算」那句話' },
 
   // ── AI 記事本／永久記憶 ───────────────────────────────────────────
   // mobile memoryPage 搬過來的彈窗版；MMD 沒有這個功能，名字是我們自己的。

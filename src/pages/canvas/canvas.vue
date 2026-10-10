@@ -107,6 +107,7 @@
       :more-open="panel.more"
       :more-items="moreItems"
       :model-score="modelScoreText"
+      :context-ring="contextRing"
       :labels="composerLabels"
       @update:value="content = $event"
       @send="onCanvasSend"
@@ -119,6 +120,7 @@
       @assist="onAssist"
       @more-pick="onPanelPick"
       @model="openModelSelect"
+      @context="openContextBreakdownSheet()"
       @shortcut="onShortcut"
     />
 
@@ -317,11 +319,9 @@
         :report="contextBreakdown.report"
         :loading="contextBreakdown.loading"
         :load-failed="contextBreakdown.loadFailed"
-        :active-key="contextBreakdown.activeKey"
         :mod-details-expanded="contextBreakdown.modDetailsExpanded"
         :locale="String(locale)"
         :labels="contextBreakdownLabels"
-        @select="onSelectContextBreakdownItem"
         @toggle-mod-details="onToggleContextBreakdownModDetails"
         @retry="loadContextBreakdown"
         @close="closeCanvasSheet"
@@ -515,10 +515,10 @@ import {
   type CanvasPanelState, type CanvasSheet,
 } from './canvas-panel-state'
 import { findVariant, resolveVariant, scoreParts, priceMeaning } from './canvas-model-catalog'
-import { resolveStoredModel, composeModelDisplayName, createModelLookup } from './canvas-model-lanes'
-import { contextUsageDisplayForRow, contextBudgetTokens } from './canvas-context-usage'
+import { resolveStoredModel, composeModelDisplayName } from './canvas-model-lanes'
 import {
   BREAKDOWN_META,
+  contextRingFromReport,
   createPromptDiagnosticsRequestGate,
   promptBreakdownHasModData,
   normalizeServerReport,
@@ -2649,6 +2649,7 @@ function buildChromeState() {
       moreOpen: !!panel.value.more,
       moreItems: moreItems.value,
       modelScore: modelScoreText.value,
+      contextRing: contextRing.value,
       modelName: String(formData.selectModelName || ''),
       assistBusy: assistBusy.value,
       assistCost: ASSIST_COST,
@@ -2757,7 +2758,7 @@ function buildPanelsState() {
     case 'context-breakdown':
       title = t('promptBreakdown.title');
       // 兩個帶數字的文案是函式，JSON 帶不過去：改成帶 {n} 的字串樣板，元件那邊自己代入
-      props = { report: contextBreakdown.value.report, loading: contextBreakdown.value.loading, loadFailed: contextBreakdown.value.loadFailed, activeKey: contextBreakdown.value.activeKey, modDetailsExpanded: contextBreakdown.value.modDetailsExpanded, locale: String(locale.value), labels: { ...contextBreakdownLabels.value, sources: t('promptBreakdown.sources', { n: '{n}' }), modsUsed: t('promptBreakdown.modsUsed', { n: '{n}' }) } };
+      props = { report: contextBreakdown.value.report, loading: contextBreakdown.value.loading, loadFailed: contextBreakdown.value.loadFailed, modDetailsExpanded: contextBreakdown.value.modDetailsExpanded, locale: String(locale.value), labels: { ...contextBreakdownLabels.value, modsUsed: t('promptBreakdown.modsUsed', { n: '{n}' }) } };
       break;
     case 'memory':
       title = memoryLabels.value.title;
@@ -2853,8 +2854,7 @@ function onSandboxPanelUi(panelName: string, event: string, args: unknown[]) {
       }
       return;
     case 'context-breakdown':
-      if (event === 'select') onSelectContextBreakdownItem(str());
-      else if (event === 'toggle-mod-details') onToggleContextBreakdownModDetails();
+      if (event === 'toggle-mod-details') onToggleContextBreakdownModDetails();
       else if (event === 'retry') loadContextBreakdown();
       return;
     case 'memory':
@@ -2983,6 +2983,7 @@ function mountSandbox(asset: any) {
           case 'assist': onAssist(); return;
           case 'more-pick': onPanelPick(String(key || '')); return;
           case 'model': openModelSelect(); return;
+          case 'context': openContextBreakdownSheet(); return;
           case 'fullscreen': toggleFullscreen(); return;
           case 'favorite': void toggleFavorite(); return;
           case 'comments': openComments(); return;
@@ -9296,7 +9297,6 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     // 「最新一則 AI」，鍵還亮著就會再送一次（owner 2026-09-05：跑到 182 個 token 時還能按）。
     // 開場白是作者寫的，不是模型生成的：沒有「重新生成」。
     latestAI: allowsStageAction(stageHost.capabilities, 'rewrite') && !previewOnly.value && !isUser && !isSystemOnly && !!item.chatFinish && !isStreamActive.value && isLatestCanonicalAIIndex(index) && !isOpeningIndex(talkList.value, index),
-    contextUsage: (!isUser && !isSystemOnly) ? contextUsageForRow(item) : null,
     swipes: (index === 0 && showGreetingSwipes.value)
       ? { index: greeting.index, total: greeting.list.length }
       : null,
@@ -9373,6 +9373,11 @@ const menuActions = computed(() => {
   if (isAI && item.id !== 0) {
     actions.push({ key: 'fork', label: t('canvas.archive.forkHere'), disabled: archivesFull.value })
   }
+  // 這一輪送進模型的上下文由什麼組成（先前是每則底下一顆「上下文 NN%」，搬進選單；
+  // 輸入框旁的小圓環看的是最新一輪）。
+  if (isAI && item.hasContextUsage) {
+    actions.push({ key: 'context-usage', label: t('canvas.context.thisTurn') })
+  }
   actions.push({ key: 'copy', label: t('chat.copy') })
   if (item.id !== 0) {
     actions.push({ key: 'delete', label: t('chat.delete') })
@@ -9397,7 +9402,8 @@ function closeMessageMenu() {
 }
 
 function onMenuPick(key: string) {
-  if (!allowsStageAction(stageHost.capabilities, key)) return
+  // 看用量不改對話，不受宿主的動作清單管（先前那顆 chip 也不經這道閘）。
+  if (key !== 'context-usage' && !allowsStageAction(stageHost.capabilities, key)) return
   const index = menuIndex.value
   const item = talkList.value[index]
   if (!item) return
@@ -9405,6 +9411,10 @@ function onMenuPick(key: string) {
     case 'copy':
       copyText(null, item.content, t('canvas.copied'))
       closeMessageMenu()
+      break
+    case 'context-usage':
+      closeMessageMenu()
+      openContextBreakdownSheet(String(item.chatId || item.assistantChatId || item.id || ''))
       break
     case 'rewrite':
       closeMessageMenu()
@@ -9476,30 +9486,14 @@ function onMessageAction(key: string, index: number) {
     openModelSelect()
     return
   }
-  // 氣泡底下的「上下文 NN%」chip：不經選單，直接彈這段對話最近一次完成回覆的組成（mobile 同一份）。
-  if (key === 'context-usage') {
- const row = talkList.value[index]
- openContextBreakdownSheet(row?.hasContextUsage ? String(row.chatId || row.assistantChatId || row.id || '') : '')
- return
- }
   menuIndex.value = index
   onMenuPick(key)
 }
 
-// ── 上下文用量 chip ──────────────────────────────────────────────────
+// ── 上下文用量 ────────────────────────────────────────────────────────
 //
-// 分子是那一則 AI 回覆存下來的輸入 token（歷史列有、串流終態沒有——所以每一輪
-// 收尾後另外去讀一次歷史，只補這個欄位），分母是它所用模型在玩家目前檔位下的
-// 容量。口徑、脫敏、等級門檻都在 canvas-context-usage.ts。
-//
-// 每則都查一次模型、串流中每個 chunk 整串重畫：查表按目錄記住（見 createModelLookup）。
-const variantForModel = computed(() => createModelLookup(toRaw(modelGroups.value)))
-
-function contextUsageForRow(item: any) {
-  const variant = variantForModel.value(String(item?.model || ''))
-  const budget = contextBudgetTokens(variant?.contextBudgetOptions, formData.context)
-  return contextUsageDisplayForRow(item || {}, budget, t)
-}
+// 歷史列的 hasContextUsage（選單裡「這一輪的用量」看它）與輸入框旁那顆小圓環都要等
+// 一輪收尾、用量落盤之後才讀得到；口徑與等級門檻在 canvas-context-breakdown.ts。
 
 let contextUsageRefreshTimers: any[] = []
 
@@ -9555,6 +9549,8 @@ function scheduleContextUsageRefresh() {
     // 用量是收尾之後才落盤的，實測有時要等好幾秒；沒讀到就拉長間隔再試兩次。
     if (!patched && retryLeft > 0) {
       contextUsageRefreshTimers.push(setTimeout(() => attempt(retryLeft - 1), retryLeft >= 2 ? 4000 : 8000))
+    } else {
+      void refreshContextRing()
     }
   }
   contextUsageRefreshTimers.push(setTimeout(() => attempt(2), 1200))
@@ -10503,7 +10499,6 @@ const contextBreakdown = ref({
   report: null as PromptBreakdownReport | null,
   loading: false,
   loadFailed: false,
-  activeKey: '',
   modDetailsExpanded: false,
 })
 const contextBreakdownGate = createPromptDiagnosticsRequestGate()
@@ -10520,31 +10515,59 @@ const contextBreakdownLabels = computed(() => ({
   unsupportedModel: t('promptBreakdown.unsupportedModel'),
   notReady: t('promptBreakdown.notReady'),
   totalTokens: t('promptBreakdown.totalTokens'),
-  totalChars: t('promptBreakdown.totalChars'),
   tokenUnit: t('promptBreakdown.tokenUnit'),
   pointUnit: t('promptBreakdown.pointUnit'),
-  unavailable: t('promptBreakdown.unavailable'),
   billingTotal: t('promptBreakdown.billingTotal'),
-  inputPoints: t('promptBreakdown.inputPoints'),
-  cacheReadPoints: t('promptBreakdown.cacheReadPoints'),
-  outputPoints: t('promptBreakdown.outputPoints'),
   cacheHitRateFull: t('promptBreakdown.cacheHitRateFull'),
-  localEstimateNote: t(contextBreakdown.value.report?.chatId ? 'canvas.context.estimateNote' : 'promptBreakdown.localEstimateNote'),
+  localEstimateNote: t('canvas.context.estimateNote'),
   actualInputTokens: t('canvas.context.actualInputTokens'),
-  cachedInputTokens: t('canvas.context.cachedInputTokens'),
+  free: t('canvas.context.free'),
+  hintTurns: t('canvas.context.hintTurns', { n: '{n}' }),
+  hintLine: t('canvas.context.hintLine'),
+  hintNow: t('canvas.context.hintNow'),
   expandModDetails: t('promptBreakdown.expandModDetails'),
   collapseModDetails: t('promptBreakdown.collapseModDetails'),
   modDetailsUnavailable: t('promptBreakdown.modDetailsUnavailable'),
   modDetailsLegacy: t('promptBreakdown.modDetailsLegacy'),
   items: Object.fromEntries(BREAKDOWN_META.map((meta) => [meta.key, t(meta.labelKey)])) as Record<string, string>,
-  sources: (n: number) => t('promptBreakdown.sources', { n }),
   modsUsed: (n: number) => t('promptBreakdown.modsUsed', { n }),
 }))
+
+// 輸入框旁那顆小圓環：這段對話最近一輪的用量（同一條診斷路徑、不帶 chatId）。
+// 每輪收尾讀一次、換對話讀一次；讀不到就不畫，不打擾玩家。
+const latestContextReport = ref<PromptBreakdownReport | null>(null)
+let contextRingSeq = 0
+async function refreshContextRing() {
+  const id = String(unref(conversationId) || '').trim()
+  const seq = ++contextRingSeq
+  if (!id) { latestContextReport.value = null; return }
+  try {
+    const res = await _this.http.get(_this.requestUrl.promptDiagnostics, {
+      data: { conversationId: id, breakdownVersion: 2 },
+      showLoading: false,
+      quietTransport: true,
+      timeout: 8000,
+    })
+    if (seq !== contextRingSeq || String(unref(conversationId) || '').trim() !== id) return
+    latestContextReport.value = res && res.statusCode === 200 ? normalizeServerReport(res.data) : null
+  } catch (e) {
+    if (seq === contextRingSeq) latestContextReport.value = null
+  }
+}
+watch(() => String(unref(conversationId) || ''), () => {
+  latestContextReport.value = null
+  void refreshContextRing()
+}, { immediate: true })
+
+const contextRing = computed(() => {
+  const ring = contextRingFromReport(latestContextReport.value)
+  return ring ? { ...ring, label: t('canvas.context.ring', { percent: ring.percent }) } : null
+})
 
 function resetContextBreakdown() {
   contextBreakdownGate.invalidate()
   contextBreakdownChatId = ''
-  contextBreakdown.value = { report: null, loading: false, loadFailed: false, activeKey: '', modDetailsExpanded: false }
+  contextBreakdown.value = { report: null, loading: false, loadFailed: false, modDetailsExpanded: false }
 }
 
 let contextBreakdownChatId = ''
@@ -10579,6 +10602,7 @@ async function loadContextBreakdown() {
       return
     }
     contextBreakdown.value = { ...contextBreakdown.value, report, loadFailed: false, modDetailsExpanded: false }
+    if (!contextBreakdownChatId) latestContextReport.value = report
   } catch (e) {
     if (!contextBreakdownGate.isCurrent(token)) return
     if (!contextBreakdown.value.report) contextBreakdown.value = { ...contextBreakdown.value, loadFailed: true }
@@ -10586,10 +10610,6 @@ async function loadContextBreakdown() {
   } finally {
     if (contextBreakdownGate.finish(token)) contextBreakdown.value = { ...contextBreakdown.value, loading: false }
   }
-}
-
-function onSelectContextBreakdownItem(key: string) {
-  contextBreakdown.value = { ...contextBreakdown.value, activeKey: key, modDetailsExpanded: false }
 }
 
 function onToggleContextBreakdownModDetails() {

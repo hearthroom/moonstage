@@ -2,10 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
-import { computed, defineComponent, h, nextTick, ref, unref } from 'vue'
-import { mount } from '@vue/test-utils'
-import CanvasMessage from '../components/canvas-message.vue'
-import { contextUsageDisplayForRow } from '../canvas-context-usage'
+import { nextTick, ref, unref } from 'vue'
 import { findOperationCandidate } from '../chat-operation-ui-state'
 import {
   normalizeChatOperationStatus, shouldApplyOperationStatus,
@@ -42,13 +39,7 @@ function harness() {
     bindings[key] = ref('')
   }
   const handle = new Function(...Object.keys(bindings), js + '\nreturn handleOperationStatusEvent;')(...Object.values(bindings))
-  const view = mount(defineComponent({ setup() {
-    const message = computed(() => ({ id: 'reply', mesid: 1, role: 'ai', name: 'Test', avatar: '',
-      html: row.value.content, finished: row.value.chatFinish, latest: true,
-      contextUsage: contextUsageDisplayForRow(row.value, null, (key: string) => key) }))
-    return () => h(CanvasMessage, { message: message.value as any })
-  } }))
-  return { handle, view, row, getHistoryMsg, clearStreamState }
+  return { handle, row, getHistoryMsg, clearStreamState }
 }
 
 const terminal = { operationId: 'op-1', conversationId: 'conv-1', kind: 'send',
@@ -57,22 +48,18 @@ const terminal = { operationId: 'op-1', conversationId: 'conv-1', kind: 'send',
   contextUsage: { inputTokens: 200, outputTokens: 30, cachedTokens: 20, cacheWriteTokens: 0 } }
 
 describe('context usage on the newly completed reply', () => {
-  it.each(['stream', 'polled', 'wrapped'] as const)('%s completion exposes the button without history or page reload', async (path) => {
+  // 選單裡「這一輪的用量」看的是列上的 hasContextUsage 與 chatId：剛收尾的那則不必重新整理就要有。
+  it.each(['stream', 'polled', 'wrapped'] as const)('%s completion marks the reply as measured without history or page reload', async (path) => {
     const app = harness()
-    expect(app.view.find('[data-lt="context-usage"]').exists()).toBe(false)
+    expect(app.row.value.hasContextUsage).toBeUndefined()
     const event = path === 'polled' ? normalizeChatOperationStatus(terminal)
       : path === 'wrapped' ? { schemaVersion: 'outcome_v1', operation: terminal } : terminal
     expect(() => app.handle(event)).not.toThrow()
     await nextTick()
     expect(app.row.value).toMatchObject({ chatFinish: true, chatLoading: false,
       hasContextUsage: true, inputTokens: 200, chatId: 'reply-1', model: 'test-model' })
-    const button = app.view.find('[data-lt="context-usage"]')
-    expect(button.exists()).toBe(true)
-    await button.trigger('click')
-    expect(app.view.findComponent(CanvasMessage).emitted('action')?.[0]).toEqual(['context-usage'])
     expect(app.clearStreamState).toHaveBeenCalledOnce()
     expect(app.getHistoryMsg).toHaveBeenCalledOnce()
-    app.view.unmount()
   })
 
   it('keeps usage through repeated normalization without inventing missing counts', () => {
