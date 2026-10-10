@@ -37,6 +37,11 @@ export interface StageAuth {
   getAccessToken(): Promise<string | null>
   /** 伺服器回 401 且換不到 token：宿主決定要送去登入還是提示。 */
   onUnauthorized(): void
+  /**
+   * 沒登入的人按了送出（畫布丟 notLogin）。宿主可以在原地請他登入（例如底部的登入框）；
+   * 沒給就照舊走 onUnauthorized。舞台送出前已把草稿存好，登入回來同一張卡會拿回去。
+   */
+  onSignInRequired?(): void
   /** 目前登入的人（給畫布顯示用）。給了就視為已登入；沒給就當訪客——訪客送訊息會被畫布擋下並丟 notLogin。 */
   user?: { id: string; nickName?: string; avatar?: string }
   /**
@@ -94,7 +99,7 @@ export async function installMoonStage(app: App, options: InstallMoonStageOption
     store.commit('setSignedIn', true)
     store.commit('setUserInfo', { ...store.state.userInfo, id: String(auth.user.id), nickName: auth.user.nickName || '', avatar: auth.user.avatar || '' })
   }
-  host.events.on('notLogin', () => auth.onUnauthorized())
+  host.events.on('notLogin', () => (auth.onSignInRequired ?? auth.onUnauthorized)())
 
   const toast = hostToast(host)
   setupHttp(http, {

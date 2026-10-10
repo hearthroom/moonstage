@@ -481,6 +481,7 @@ import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
 import type { ArchiveRow } from './canvas-archives'
 import { convertVisibleHtml, convertPlainText, createDisplayScriptConverter, directionFor } from './canvas-display-script'
 import { whenRoleDetail } from './canvas-role-ready'
+import { guestDraftStorage, saveGuestDraft, takeGuestDraft } from './canvas-guest'
 import CanvasPrologue from './components/canvas-prologue.vue'
 import { captureBodySnapshot, restoreBodySnapshot, sweepForeignNodes } from './canvas-body-snapshot'
 import CanvasPopup from './components/canvas-popup.vue'
@@ -1645,9 +1646,12 @@ function bootRole(targetRoleId: any, draft: AuthorDraft | null) {
   Object.assign(formData, ROLE_SETTINGS_DEFAULTS);
   formData.selectModelName = '';
   // 遊玩設定要在第一次送出之前到手：送出那一輪帶的模型就是從這裡讀的。
-  ensureRoleSettings().then(loadModelCatalog);
   // Agent 模式開沒開要等遊玩設定到手（支不支援按這張卡挑的模型算）。
-  ensureRoleSettings().then(loadMultiPassPreference);
+  // 遊客不讀：這兩份要登入，被拒會把他整頁送去登入（canvas-guest）。登入後 watch(hasLogin) 會補讀。
+  if (unref(hasLogin)) {
+    ensureRoleSettings().then(loadModelCatalog);
+    ensureRoleSettings().then(loadMultiPassPreference);
+  }
   uni.$on('multiPassPreferenceUpdated', onMultiPassPreferenceUpdated);
   formData.roleId = options.roleId;
 
@@ -1657,6 +1661,18 @@ function bootRole(targetRoleId: any, draft: AuthorDraft | null) {
     greeting.list = buildGreetingList(data);
     prologue.value = buildPrologueList(data);
     if (data) pic.value = cardPortrait(data);
+    // 遊客送出前存下的草稿（canvas-guest）：登入回來，開場白選到哪、輸入框的字都還在。
+    const guestDraft = takeGuestDraft(guestDraftStorage(), String(options.roleId));
+    if (guestDraft) {
+      greeting.index = Math.min(Math.max(guestDraft.greetingIndex, 0), Math.max(greeting.list.length - 1, 0));
+      content.value = guestDraft.content;
+    }
+    // 遊客：只畫開場白（有替代開場白照樣能左右挑），不開對話——開對話要登入。送出時才請他登入。
+    if (!unref(hasLogin)) {
+      pendingGreetingStart.value = true;
+      renderGreetingPreview();
+      return;
+    }
     // 選開場白只在「這張卡還沒開始過」時才有意義。
     // 回頭玩的人押後開對話，畫面上會變成一張沒有歷史的空白對話頁加一個選單——
     // 而他的紀錄好好地在伺服器上。
@@ -3315,7 +3331,8 @@ function buildHudHost(): HudHost {
         })),
       };
     },
-    sendMessage: (text) => { content.value = text; onCanvasSend(); return true; },
+    // 遊客：送出會請宿主登入，這一句沒送出去——回 false（HOST_DENIED），作者的腳本才知道別等回覆。草稿已存，登入回來還在。
+    sendMessage: (text) => { const signedIn = !!unref(hasLogin); content.value = text; onCanvasSend(); return signedIn; },
     setInputText: (text) => { content.value = text; return true; },
     // 沙箱殼捲到頂附近：跟一般卡的捲動處理同一條路（翻頁 + getHistoryMsg），守同樣的開關與節流。
     loadMoreHistory: () => {
@@ -8320,8 +8337,9 @@ function send() {
     previewEcho();
     return;
   }
-  // 未登录时触发登录弹窗
+  // 未登录时触发登录弹窗。登入是整頁來回：先把草稿存起來，回來同一張卡拿回去（canvas-guest）。
   if (!unref(hasLogin)) {
+    saveGuestDraft(guestDraftStorage(), { roleId: String(unref(roleId) || ''), content: String(unref(content) || ''), greetingIndex: greeting.index });
     uni.$emit('notLogin', {});
     return;
   }
@@ -11634,6 +11652,9 @@ function downloadConversationFile(text: string) {
  */
 async function startPendingGreeting(): Promise<boolean> {
   if (!pendingGreetingStart.value) return true
+  // 遊客不開對話：開對話要登入，被拒了畫面會卡在等回覆。直接往下交給 send() 的登入檢查——
+  // 它會存草稿、請宿主登入（canvas-guest）。
+  if (!unref(hasLogin)) return true
   const index = greetingIndexForStart(greeting)
   const draft = content.value
   pendingGreetingStart.value = false
