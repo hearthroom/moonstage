@@ -1,6 +1,7 @@
 /**
  * 上下文用量與每輪點數合成一顆膠囊：圓環在左、數字在右，各自一個點擊區；
- * 第一次出現時在輸入框上方講清楚兩樣東西各是什麼（手機沒有懸停說明）。
+ * 沒看過說明的人第一次點圓環，說明跟上下文用量一起出來（手機沒有懸停說明）；
+ * 不自己彈，免得打壞卡片自己的開場與全畫面覆蓋。
  */
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -45,26 +46,33 @@ describe('點數與圓環合成一顆膠囊', () => {
     expect(w.find('.lt-context-ring').attributes('aria-label')).toBe(RING.label)
   })
 
-  it('第一次的說明：有圓環才畫，兩句都在，按「知道了」交回頁面記住', async () => {
-    expect(mount(CanvasComposer, { props: { ...base, contextRing: null, meterHint: HINT } }).find('.lt-meter-hint').exists()).toBe(false)
+  it('說明不自己彈；第一次點圓環才跟上下文用量一起出來，按「知道了」交回頁面記住', async () => {
     const w = mount(CanvasComposer, { props: { ...base, contextRing: RING, meterHint: HINT } })
+    expect(w.find('.lt-meter-hint').exists()).toBe(false)
+    await w.find('.chat-input-collapsed-row .lt-context-ring').trigger('click')
+    expect(w.emitted('context')).toHaveLength(1)
     const hint = w.find('.lt-meter-hint')
     expect(hint.text()).toContain(HINT.ring)
     expect(hint.text()).toContain(HINT.score)
     await hint.find('.lt-meter-hint-ok').trigger('click')
     expect(w.emitted('meter-hint-done')).toHaveLength(1)
-    expect(mount(CanvasComposer, { props: { ...base, contextRing: RING, meterHint: null } }).find('.lt-meter-hint').exists()).toBe(false)
+    expect(w.find('.lt-meter-hint').exists()).toBe(false)
+    // 看過了：再點圓環只開上下文用量
+    const seen = mount(CanvasComposer, { props: { ...base, contextRing: RING, meterHint: null } })
+    await seen.find('.chat-input-collapsed-row .lt-context-ring').trigger('click')
+    expect(seen.find('.lt-meter-hint').exists()).toBe(false)
   })
 })
 
 describe('第一次的說明蓋在卡片的浮鈕之上', () => {
-  it('說明是 popover，出現時進 top layer、放在輸入框正上方', async () => {
+  it('說明是 popover，出現時進 top layer、放在輸入框正上方，彈層打開後再抬一次', async () => {
     const shown: HTMLElement[] = []
     const proto = HTMLElement.prototype as any
     const had = proto.showPopover
     proto.showPopover = function () { shown.push(this) }
     try {
       const w = mount(CanvasComposer, { props: { ...base, contextRing: RING, meterHint: HINT }, attachTo: document.body })
+      await w.find('.chat-input-collapsed-row .lt-context-ring').trigger('click')
       await new Promise((r) => setTimeout(r, 0))
       const hint = w.find('.lt-meter-hint').element as HTMLElement
       expect(hint.getAttribute('popover')).toBe('manual')
