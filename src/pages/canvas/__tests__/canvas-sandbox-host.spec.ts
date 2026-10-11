@@ -78,6 +78,21 @@ describe('沙箱宿主橋', () => {
   beforeEach(() => { h = harness() })
   afterEach(() => { h.iframe.remove() })
 
+  // 宿主（站台）在殼畫好之前蓋著載入畫面：殼喊 ready 就要讓宿主知道，而且只認自己的殼。
+  it('殼喊 ready 就通知宿主（別的來源喊的不算）', async () => {
+    const onReady = vi.fn()
+    const { hud } = fakeHud({ current: makeState() })
+    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '1', hello, onReady })
+    host.start()
+    h.fromShell({ type: 'ready' }, 'https://evil.test')
+    expect(onReady).not.toHaveBeenCalled()
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    h.fromShell({ type: 'ready' })
+    expect(onReady).toHaveBeenCalledTimes(1)
+    host.destroy()
+  })
+
   it('Agent 響應式呈現資料可跨沙箱複製，進度、串流、交稿後正常解除 busy', async () => {
     h.iframe.remove()
     h = harness(true)
