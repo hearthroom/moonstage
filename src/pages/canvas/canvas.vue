@@ -381,6 +381,7 @@ import { bindCanvasViewport } from './canvas-viewport';
 import { mountGeometryDebug, rectText } from '@/common/geometry-debug';
 import { instructionsFromAPI } from '@/api/instruction-fields'
 import { usableFirstPage } from './canvas-first-page'
+import { contentShown, createContentReady } from './canvas-content-ready'
 import {computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, toRaw, unref, getCurrentInstance, nextTick, watch, watchEffect} from 'vue';
 import {
   onLoad,
@@ -1660,7 +1661,7 @@ function bootRole(targetRoleId: any, draft: AuthorDraft | null) {
 
   setCurrentRoleId(options.roleId);
   getRole(async (error, data) => {
-    if (error) return;
+    if (error) { contentReady.mark(); return; }
     greeting.list = buildGreetingList(data);
     prologue.value = buildPrologueList(data);
     if (data) pic.value = cardPortrait(data);
@@ -2486,6 +2487,19 @@ const authorRules = {
 // 舊頁的規則引擎、作者範圍、HUD 橋在沙箱模式下一律不啟動（見 applyAuthorAsset）。
 const sandboxCard = ref(false);
 const sandboxFailed = ref(false);
+const sandboxShellReady = ref(false);
+
+// 首屏就緒（canvas-content-ready）：宿主蓋著的載入畫面等這一刻才收。
+const authorAssetSettled = ref(false);
+const contentReady = createContentReady(() => stageHost.ui.contentReady?.());
+watch(() => contentShown({
+  sandboxCard: sandboxCard.value,
+  sandboxShellReady: sandboxShellReady.value,
+  sandboxFailed: sandboxFailed.value,
+  authorAssetSettled: authorAssetSettled.value,
+  messageCount: talkList.value.length,
+}), (shown) => { if (shown) contentReady.mark(); }, { immediate: true });
+onUnmounted(() => contentReady.dispose());
 const sandboxUrl = ref('');
 const sandboxAttr = ref('');
 const sandboxFrame = ref<HTMLIFrameElement | null>(null);
@@ -2909,6 +2923,7 @@ function destroySandboxHost() {
   if (sandboxThemeObserver) { sandboxThemeObserver.disconnect(); sandboxThemeObserver = null; }
   sandboxStage.value = 'closed';
   sandboxComposerHidden.value = false;
+  sandboxShellReady.value = false;
 }
 
 function mountSandbox(asset: any) {
@@ -3003,6 +3018,7 @@ function mountSandbox(asset: any) {
       onDebug: (level, args) => { (console as any)[level === 'log' ? 'info' : level]('[sandbox]', ...args); },
       onHandshakeTimeout: () => { sandboxFailed.value = true; },
       onHandshake: () => { sandboxFailed.value = false; },
+      onReady: () => { sandboxShellReady.value = true; },
     });
     sandboxHostRef.value = host;
     host.start();
@@ -3403,7 +3419,7 @@ function savePlayerPreference(payload) {
 // 8 秒抓不完；抓不完就靜靜地不套版面，作者以為卡壞了。60 秒是「慢也讓它到」，
 // 卡本身不等這一步，對話照常開始。
 async function loadAuthorAsset(targetRoleId) {
-  if (!targetRoleId) return;
+  if (!targetRoleId) { authorAssetSettled.value = true; return; }
   try {
     const res = await _this.http.get(_this.requestUrl.authorAssetServe, {
       data: { roleId: targetRoleId },
@@ -3416,6 +3432,8 @@ async function loadAuthorAsset(targetRoleId) {
   } catch (e) {
     // 資產載入失敗不能影響對話本身——沒有資產就是正常狀態。
     console.warn('[AuthorAsset] 載入失敗，本次對話不套用版面規則');
+  } finally {
+    authorAssetSettled.value = true;
   }
 }
 
@@ -3532,6 +3550,8 @@ function applyAuthorAsset(asset) {
   } catch (e) {
     // 套用失敗不能影響對話本身——沒有資產就是正常狀態。
     console.warn('[AuthorAsset] 套用失敗，本次對話不套用版面規則');
+  } finally {
+    authorAssetSettled.value = true;
   }
 }
 

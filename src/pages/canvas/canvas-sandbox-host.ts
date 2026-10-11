@@ -89,6 +89,8 @@ export interface SandboxHostDeps {
   onHandshakeTimeout?(): void
   /** 逾時提示之後殼才到、握手完成：宿主把提示收掉。 */
   onHandshake?(): void
+  /** 殼把畫面畫好了（ready）：宿主可以收掉自己蓋在上面的載入畫面。 */
+  onReady?(): void
 }
 
 export interface SandboxHost {
@@ -535,6 +537,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
         return
       case 'ready':
         shellReady = true
+        if (deps.onReady) deps.onReady()
         return
       case 'request':
         void handleRequest(message.reqId, message.op, message.args || [])
