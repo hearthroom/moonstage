@@ -10,7 +10,20 @@ import type { SandboxMessage } from '../protocol'
 
 const tick = () => new Promise((r) => setTimeout(r, 0))
 
+// jsdom 沒有 ResizeObserver：換成手動的，layout() 模擬瀏覽器排版後回報「這些外框量過了」。
+type FakeObserver = { cb: ResizeObserverCallback; targets: Set<Element> }
+const observers: FakeObserver[] = []
+;(window as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
+  o: FakeObserver
+  constructor(cb: ResizeObserverCallback) { this.o = { cb, targets: new Set() }; observers.push(this.o) }
+  observe(t: Element) { this.o.targets.add(t) }
+  unobserve(t: Element) { this.o.targets.delete(t) }
+  disconnect() { this.o.targets.clear() }
+}
+const layout = () => { for (const o of observers) o.cb(Array.from(o.targets, (target) => ({ target }) as ResizeObserverEntry), {} as ResizeObserver) }
+
 function harness(over: { clientHeight?: number } = {}) {
+  observers.length = 0
   document.body.innerHTML = '<div id="list"></div>'
   const list = document.getElementById('list')!
   const bus = createEventBus()
@@ -150,8 +163,10 @@ describe('訊息列表視窗化', () => {
     f.getBoundingClientRect = () => ({ top: -600, bottom: rebuilt ? -200 : -440, height: rebuilt ? 400 : 160 } as DOMRect)
     const origMount = h.bus.emit
     h.bus.emit = (ev, p, o) => { if (ev === 'message:mount' && (p as { id: string }).id === 'h1') { rebuilt = true; height += 240 } return origMount(ev, p, o) }
+    layout()
     h.say('h1', true)
     await tick()
+    layout()
     expect(h.ml.mountedIds()).toContain('h1')
     expect(h.scroller.scrollTop).toBe(1240)
 
@@ -163,6 +178,35 @@ describe('訊息列表視窗化', () => {
     await tick()
     // 貼底＝scrollTop 設成 scrollHeight（瀏覽器會夾到最大值；假容器不夾）
     expect(h.scroller.scrollTop).toBe(height)
+  })
+
+  it('畫面上方掛回來的氣泡先矮後高（作者腳本 mount 之後才補畫面板）：每次變化都補，正在看的內容不動', async () => {
+    const h = harness({ clientHeight: 800 })
+    h.ml.reset(msgs(20))
+    expect(h.ml.mountedIds()).not.toContain('h1')
+    Object.defineProperty(h.scroller, 'scrollHeight', { get: () => 5000, configurable: true })
+    h.scroller.scrollTop = 1000
+    const f = h.frameOf('h1')
+    // 空殼 160；重建當下只有 100（面板還沒畫）；面板畫好後 400。整則都在視窗頂之上。
+    let height = 160
+    f.getBoundingClientRect = () => ({ top: -900, bottom: -900 + height, height } as DOMRect)
+    const g = h.frameOf('h6')
+    let gh = 300
+    g.getBoundingClientRect = () => ({ top: -100, bottom: -100 + gh, height: gh } as DOMRect)
+    const origMount = h.bus.emit
+    h.bus.emit = (ev, p, o) => { if (ev === 'message:mount' && (p as { id: string }).id === 'h1') height = 100; return origMount(ev, p, o) }
+    layout()
+    h.say('h1', true)
+    await tick()
+    layout()
+    expect(h.scroller.scrollTop).toBe(940)
+    height = 400
+    layout()
+    expect(h.scroller.scrollTop).toBe(1240)
+    // 跨在視窗頂上的那則（玩家正在看）長高不補
+    gh = 500
+    layout()
+    expect(h.scroller.scrollTop).toBe(1240)
   })
 
   it('remove 空殼不發 unmount（已經拆過）；remove 掛著的照發', async () => {

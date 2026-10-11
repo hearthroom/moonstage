@@ -329,7 +329,8 @@ export function createMessageList(deps: MessageListDeps): MessageList {
       if (i > 0 && now() > deadline) break
       const { entry, rect } = rebuilds[i]
       rebuild(entry)
-      if (rect.bottom <= viewTop) delta += entry.frame.getBoundingClientRect().height - rect.height
+      // 有尺寸觀察者時由它補（見下面的 sizes）；沒有的舊瀏覽器只能補重建當下這一次。
+      if (!sizes && rect.bottom <= viewTop) delta += entry.frame.getBoundingClientRect().height - rect.height
     }
     for (; i < rebuilds.length; i++) dirty.add(rebuilds[i].entry)
     if (atBottom) scroller.scrollTop = scroller.scrollHeight
@@ -340,9 +341,35 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     dirty.add(entry)
     if (batchTimer == null) batchTimer = setTimeout(flush, 0)
   }
+  // 畫面上方的外框高度一變，正在看的內容就被推開：差額補進 scrollTop（殼關掉了瀏覽器的捲動錨定，
+  // 見 shell.css；Safari 本來就沒有）。只在重建當下量一次不夠：作者腳本在 mount 之後才補畫面板、
+  // 圖片晚到，重建那一刻比空殼矮、之後才長回來。只補那一刻，玩家每往上捲過一則就被往上甩一段
+  // （owner 2026-10-11 回報，卡 100195：一次上滑多跳約 2000px，總高不變）。所以盯著每個外框，變多少補多少。
+  const heights = new WeakMap<Element, number>()
+  const RO = (doc.defaultView as (Window & typeof globalThis) | null)?.ResizeObserver
+  const sizes = virtualize && RO ? new RO((records) => {
+    const scroller = virtualize.scroller
+    const viewTop = scroller.getBoundingClientRect().top
+    let delta = 0
+    for (const r of records) {
+      const rect = r.target.getBoundingClientRect()
+      const before = heights.get(r.target)
+      heights.set(r.target, rect.height)
+      if (before === undefined || Math.abs(rect.height - before) < 1) continue
+      // 矮的那個版本整則都在視窗頂之上才補；跨在視窗頂上的那則是玩家正在看的，不動它
+      if (rect.top + Math.min(before, rect.height) <= viewTop) delta += rect.height - before
+    }
+    if (delta) scroller.scrollTop += delta
+  }) : null
   const observe = (entry: Entry) => {
     if (!virtualize || entry.unobserve) return
-    entry.unobserve = virtualize.observe(entry.frame, (near) => { entry.near = near; queue(entry) })
+    const stop = virtualize.observe(entry.frame, (near) => { entry.near = near; queue(entry) })
+    if (!sizes) { entry.unobserve = stop; return }
+    // 基準高度等觀察者第一次回報（observe 之後一定會先報一次當下尺寸），不在這裡量：
+    // 冷啟動幾百則，每則量一次就是幾百次強制排版。
+    const frame = entry.frame
+    sizes.observe(frame)
+    entry.unobserve = () => { stop(); sizes.unobserve(frame) }
   }
   /** 釘住的集合變了（新訊息進來、定稿）：已經不在視窗附近又不再釘住的，下一批拆掉。 */
   const reconcile = () => {
