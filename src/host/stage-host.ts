@@ -25,6 +25,11 @@ export interface StageHost {
      * null＝離開對話頁，宿主把狀態列還原成自己的顏色。不實作就不塗。
      */
     themeColor?(color: string | null): void
+    /**
+     * 對話頁第一次畫出內容（訊息、或沙箱殼畫好、或明確的失敗提示）：宿主可以收掉自己蓋在上面的載入畫面。
+     * 每次進對話頁只叫一次。不實作就不叫。
+     */
+    contentReady?(): void
   }
   storage: {
     get(key: string): string | null
