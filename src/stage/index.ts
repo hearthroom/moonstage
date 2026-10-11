@@ -94,9 +94,10 @@ export async function installMoonStage(app: App, options: InstallMoonStageOption
   const store = (await import('@/store')).default
   app.use(store)
   // 畫布送訊息前看的是 store 的 hasLogin（沒登入就丟 notLogin 回頭），playground 是登入流程寫進去的；
-  // 嵌入時登入態在宿主手上，這裡照宿主給的填。
+  // 嵌入時登入態在宿主手上，這裡照宿主給的填。hasLogin 會持久化，沒給 user 也要寫回 false：
+  // 否則上次登入、這次 session 已失效的遊客被當成已登入，畫布替他開對話，整排 401。
+  store.commit('setSignedIn', !!auth.user)
   if (auth.user) {
-    store.commit('setSignedIn', true)
     store.commit('setUserInfo', { ...store.state.userInfo, id: String(auth.user.id), nickName: auth.user.nickName || '', avatar: auth.user.avatar || '' })
   }
   host.events.on('notLogin', () => (auth.onSignInRequired ?? auth.onUnauthorized)())
