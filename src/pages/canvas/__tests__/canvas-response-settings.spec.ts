@@ -29,7 +29,7 @@ it('explains only the selected option under each setting', async () => {
  const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k}})
  await flushPromises()
  expect(wrapper.get('[data-hint="agency"]').text()).toBe('responseSettings.agencyHints.protect')
- for(const value of ['assist','lines','coauthor']) {
+ for(const value of ['coauthor']) {
   await pill(wrapper,'agency',value).trigger('click')
   expect(wrapper.get('[data-hint="agency"]').text()).toBe(`responseSettings.agencyHints.${value}`)
  }
@@ -68,10 +68,10 @@ it('keeps draft on conflict and never saves assumed defaults after failed load',
  expect(wrapper.find('[data-action="save"]').exists()).toBe(false)
  load.mockResolvedValue(initial())
  await wrapper.get('[data-action="reload"]').trigger('click');await flushPromises()
- await pill(wrapper,'agency','assist').trigger('click')
+ await pill(wrapper,'agency','coauthor').trigger('click')
  await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
  expect(wrapper.get('[role="alert"]').text()).toContain('conflict')
- expect(pill(wrapper,'agency','assist').attributes('aria-checked')).toBe('true')
+ expect(pill(wrapper,'agency','coauthor').attributes('aria-checked')).toBe('true')
  expect(wrapper.emitted('close')).toBeUndefined()
 })
 
@@ -98,7 +98,7 @@ it('asks to discard inside the panel, not through a system dialog', async()=>{
  await flushPromises()
  expect(wrapper.get('.response-discard').attributes('hidden')).toBeDefined()
  expect(await (wrapper.vm as any).mayClose()).toBe(true)
- await pill(wrapper,'agency','assist').trigger('click')
+ await pill(wrapper,'agency','coauthor').trigger('click')
  const closing=(wrapper.vm as any).mayClose()
  await flushPromises()
  const bar=wrapper.get('.response-discard')
@@ -118,9 +118,9 @@ it('keeps per-setting notes under a collapsed advanced section guided by the sel
  expect(wrapper.get('.advanced-body').attributes('hidden')).toBeUndefined()
  expect(wrapper.findAll('.response-note-input')).toHaveLength(5)
  expect(wrapper.get('.advanced-body').text()).toContain('responseSettings.noteHint')
- await pill(wrapper,'agency','lines').trigger('click')
+ await pill(wrapper,'agency','coauthor').trigger('click')
  const note=wrapper.get('.response-note-input[data-axis="agency"]')
- expect(note.attributes('placeholder')).toBe('responseSettings.noteExamples.agency.lines')
+ expect(note.attributes('placeholder')).toBe('responseSettings.noteExamples.agency.coauthor')
  await pill(wrapper,'agency','coauthor').trigger('click')
  expect(note.attributes('placeholder')).toBe('responseSettings.noteExamples.agency.coauthor')
  await note.setValue('字'.repeat(201))
@@ -147,7 +147,7 @@ it('opens saved notes, clears blank notes and hides the style note for custom st
 
 it('resets every setting and note back to default in one step', async()=>{
  const save=echo()
- const custom={...initial(),revision:1,overrides:{agency:'lines',length:'brief',lengthNote:'Longer fights'}}
+ const custom={...initial(),revision:1,overrides:{agency:'coauthor',length:'brief',lengthNote:'Longer fights'}}
  const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>custom,save,t:(k:string)=>k}})
  await flushPromises()
  expect(wrapper.findAll('.response-reset')).toHaveLength(0)
@@ -305,9 +305,9 @@ it('picking the default option again keeps it a default', async () => {
  expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeDefined()
  expect(wrapper.get('.response-note-input[data-axis="pace"]').attributes('placeholder')).toBe('End on a hook')
  expect((wrapper.get('.response-custom-input').element as HTMLTextAreaElement).placeholder).toBe('Terse noir')
- await pill(wrapper,'agency','lines').trigger('click')
+ await pill(wrapper,'agency','protect').trigger('click')
  await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
- expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({agency:'lines',pace:null,style:null,customStyle:null,length:null,lengthTarget:null}))
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({agency:'protect',pace:null,style:null,customStyle:null,length:null,lengthTarget:null}))
 })
 
 // 舊存檔已經把作者的「自訂」存成玩家的選項：不必重打文字也能存。
@@ -315,6 +315,16 @@ it('a saved pick equal to the card custom style still saves without text', async
  const save=echo()
  const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>withCardDefaults({style:'custom'}),save,t:(k:string)=>k}})
  await flushPromises()
- await pill(wrapper,'agency','lines').trigger('click')
+ await pill(wrapper,'agency','protect').trigger('click')
  expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeUndefined()
+})
+
+// 搶話收成兩檔之後，舊存檔的「只補細節」「只代寫台詞」要讀得進來並亮在對應的新藥丸上，
+// 不能丟「Unsupported override」讓整個面板打不開。
+it('reads saved assist and lines as the two remaining agency options', () => {
+ const base={...initial(),effective:{agency:'coauthor',style:'default',perspective:'card',length:'auto',pace:'natural'}}
+ expect(readResponseSettings({...base,overrides:{agency:'coauthor'}},'c1').overrides.agency).toBe('coauthor')
+ expect(readResponseSettings({...base,overrides:{agency:'assist'}},'c1').overrides.agency).toBe('protect')
+ expect(() => readResponseSettings({...base,overrides:{agency:'everything'}},'c1')).toThrow('Unsupported override')
+ expect(readResponseSettings({...base,overrides:{style:'vivid'}},'c1').overrides.style).toBe('vivid')
 })
