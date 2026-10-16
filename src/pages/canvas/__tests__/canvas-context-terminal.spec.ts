@@ -33,13 +33,15 @@ function harness() {
     clearStreamCache: vi.fn(), clearStreamState, removeOrphanPlaceholder: vi.fn(),
     closeWebSocket: vi.fn(), bumpConversationGeneration: vi.fn(),
     ajax: ref({ flag: false, page: 2 }), getHistoryMsg,
+    refreshContextRing: vi.fn(), panel: ref({ sheet: '' }),
+    loadContextBreakdown: vi.fn(), loadMemory: vi.fn(),
   }
   for (const key of ['lastFinishReason', 'tempContent', 'replyContent', 'thinkingContent',
     'pendingMessageMeta', 'currentChatId', 'pendingResendPayload', 'isResumeInitial', 'userStopRequested']) {
     bindings[key] = ref('')
   }
   const handle = new Function(...Object.keys(bindings), js + '\nreturn handleOperationStatusEvent;')(...Object.values(bindings))
-  return { handle, row, getHistoryMsg, clearStreamState }
+  return { handle, row, getHistoryMsg, clearStreamState, bindings }
 }
 
 const terminal = { operationId: 'op-1', conversationId: 'conv-1', kind: 'send',
@@ -60,6 +62,24 @@ describe('context usage on the newly completed reply', () => {
       hasContextUsage: true, inputTokens: 200, chatId: 'reply-1', model: 'test-model' })
     expect(app.clearStreamState).toHaveBeenCalledOnce()
     expect(app.getHistoryMsg).toHaveBeenCalledOnce()
+  })
+
+  // 輸入框旁的小圓環看最新一輪：伺服器確認這一輪結束時重讀，不必等玩家離開再進來。
+  it('re-reads the composer ring once the server confirms the turn ended', () => {
+    const app = harness()
+    app.handle(terminal)
+    expect(app.bindings.refreshContextRing).toHaveBeenCalledOnce()
+    expect(app.bindings.loadContextBreakdown).not.toHaveBeenCalled()
+  })
+
+  it('reloads an open usage or memory sheet so it shows the turn that just ended', () => {
+    for (const sheet of ['context-breakdown', 'memory']) {
+      const app = harness()
+      app.bindings.panel.value.sheet = sheet
+      app.handle(terminal)
+      expect(app.bindings.loadContextBreakdown).toHaveBeenCalledTimes(sheet === 'context-breakdown' ? 1 : 0)
+      expect(app.bindings.loadMemory).toHaveBeenCalledTimes(sheet === 'memory' ? 1 : 0)
+    }
   })
 
   it('keeps usage through repeated normalization without inventing missing counts', () => {
