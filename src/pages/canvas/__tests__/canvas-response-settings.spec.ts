@@ -381,3 +381,12 @@ it('still lets the card-level section save when the conversation settings fail t
  await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
  expect(saveFrame).toHaveBeenCalledWith({sandboxLevel:'light',jailbreak:''})
 })
+
+it('opens the content rules section when a saved one arrives after the panel opened', async()=>{
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k,frame:frame(),saveFrame:vi.fn()}})
+ await flushPromises()
+ expect(wrapper.get('.response-jailbreak .advanced-body').attributes('hidden')).toBeDefined()
+ await wrapper.setProps({frame:frame({jailbreak:'Saved rules'})})
+ expect(wrapper.get('.response-jailbreak .advanced-body').attributes('hidden')).toBeUndefined()
+ expect((wrapper.get('.response-jailbreak-input').element as HTMLTextAreaElement).value).toBe('Saved rules')
+})

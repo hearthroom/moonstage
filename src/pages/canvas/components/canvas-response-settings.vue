@@ -139,9 +139,10 @@ onBeforeUnmount(()=>{alive=false;answerDiscard(false)})
 // 玩家沒改的軸顯示的是 base：平台預設，卡片有作者預設時是作者的；「恢復預設」也回到這裡。
 const base=computed(()=>responseBase(saved.value))
 const dirty=computed(()=>JSON.stringify(responsePatch(draft.value,base.value))!==JSON.stringify(responsePatch(saved.value?.overrides || {},base.value)))
-const frameDraft=reactive({sandboxLevel:props.frame?.sandboxLevel || '',jailbreak:props.frame?.jailbreak || ''})
-watch(()=>[props.frame?.sandboxLevel,props.frame?.jailbreak],()=>{frameDraft.sandboxLevel=props.frame?.sandboxLevel || '';frameDraft.jailbreak=props.frame?.jailbreak || ''})
 const jailbreakOpen=ref(!!props.frame?.jailbreak)
+const frameDraft=reactive({sandboxLevel:props.frame?.sandboxLevel || '',jailbreak:props.frame?.jailbreak || ''})
+// 卡的設定可能在面板打開後才讀回來：讀回自己寫過的破限詞時把進階打開，玩家看得到它在生效。
+watch(()=>[props.frame?.sandboxLevel,props.frame?.jailbreak],()=>{frameDraft.sandboxLevel=props.frame?.sandboxLevel || '';frameDraft.jailbreak=props.frame?.jailbreak || '';if(frameDraft.jailbreak)jailbreakOpen.value=true})
 // 沒設過就標在「標準」上：破甲永遠有一個正在生效的值，不標出來玩家會以為它沒開。
 const frameLevel=computed(()=>frameDraft.sandboxLevel || 'standard')
 const frameHint=computed(()=>props.frame?.options.find(o=>o.value===frameLevel.value)?.hint || props.t('chat.sandboxLevelDesc'))
