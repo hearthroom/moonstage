@@ -141,12 +141,14 @@ const base=computed(()=>responseBase(saved.value))
 const dirty=computed(()=>JSON.stringify(responsePatch(draft.value,base.value))!==JSON.stringify(responsePatch(saved.value?.overrides || {},base.value)))
 const jailbreakOpen=ref(!!props.frame?.jailbreak)
 const frameDraft=reactive({sandboxLevel:props.frame?.sandboxLevel || '',jailbreak:props.frame?.jailbreak || ''})
+// 上一次存進去（或讀回來）的值：存好之後不必等頁面把新值傳回來，才不會把剛存的當成沒存。
+const frameSaved=reactive({...frameDraft})
 // 卡的設定可能在面板打開後才讀回來：讀回自己寫過的破限詞時把進階打開，玩家看得到它在生效。
-watch(()=>[props.frame?.sandboxLevel,props.frame?.jailbreak],()=>{frameDraft.sandboxLevel=props.frame?.sandboxLevel || '';frameDraft.jailbreak=props.frame?.jailbreak || '';if(frameDraft.jailbreak)jailbreakOpen.value=true})
+watch(()=>[props.frame?.sandboxLevel,props.frame?.jailbreak],()=>{frameDraft.sandboxLevel=props.frame?.sandboxLevel || '';frameDraft.jailbreak=props.frame?.jailbreak || '';Object.assign(frameSaved,frameDraft);if(frameDraft.jailbreak)jailbreakOpen.value=true})
 // 沒設過就標在「標準」上：破甲永遠有一個正在生效的值，不標出來玩家會以為它沒開。
 const frameLevel=computed(()=>frameDraft.sandboxLevel || 'standard')
 const frameHint=computed(()=>props.frame?.options.find(o=>o.value===frameLevel.value)?.hint || props.t('chat.sandboxLevelDesc'))
-const frameDirty=computed(()=>!!props.frame && (frameDraft.sandboxLevel!==(props.frame.sandboxLevel || '') || frameDraft.jailbreak!==(props.frame.jailbreak || '')))
+const frameDirty=computed(()=>!!props.frame && (frameDraft.sandboxLevel!==frameSaved.sandboxLevel || frameDraft.jailbreak!==frameSaved.jailbreak))
 const customTooLong=computed(()=>[...(draft.value.customStyle || '')].length>1000)
 const axes=Object.keys(responseAxes) as ResponseAxis[]
 // 文風選「自訂」時已經能整段寫，不再給文風補充。
@@ -201,15 +203,23 @@ async function reload(){
 }
 // 兩邊各存各的：這張卡那一段走玩家對卡的設定，存檔那一段走存檔偏好。先存卡那一段，
 // 失敗就停在面板上，存檔那一段不動。
+// 存完才叫頁面關：頁面關之前會先問 mayClose，那時還在「儲存中」就會被擋下，面板停在畫面上。
 async function submit(){
  if(!canSave.value)return
  saving.value=true;error.value=''
+ let done=false
  try{
-  if(frameDirty.value && props.saveFrame && !await props.saveFrame({sandboxLevel:frameDraft.sandboxLevel,jailbreak:frameDraft.jailbreak})){if(alive)error.value='saveFailed';return}
+  if(frameDirty.value && props.saveFrame){
+   const value={sandboxLevel:frameDraft.sandboxLevel,jailbreak:frameDraft.jailbreak}
+   if(!await props.saveFrame(value)){if(alive)error.value='saveFailed';return}
+   Object.assign(frameSaved,value)
+  }
   if(responseDirty.value && saved.value){const value=readResponseSettings(await props.save(props.conversationId,saved.value.revision,responsePatch(draft.value,base.value)),props.conversationId);if(!alive)return;saved.value=value;draft.value={...value.overrides}}
-  if(alive)emit('close')
+  done=true
  }
- catch(e){if(alive)error.value=((e as {status?:number})?.status ?? (e as {statusCode?:number})?.statusCode)===409?'conflict':'saveFailed'}finally{if(alive)saving.value=false}
+ catch(e){if(alive)error.value=((e as {status?:number})?.status ?? (e as {statusCode?:number})?.statusCode)===409?'conflict':'saveFailed'}
+ finally{if(alive)saving.value=false}
+ if(done && alive)emit('close')
 }
 onMounted(reload)
 defineExpose({mayClose})
