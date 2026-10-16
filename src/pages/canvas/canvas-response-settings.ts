@@ -1,5 +1,6 @@
 export const responseAxes = {
- agency: ['protect', 'coauthor'],
+ // 允許搶話排前面、也是平台預設（owner 2026-10-17）。
+ agency: ['coauthor', 'protect'],
  style: ['default', 'vivid', 'guided', 'card', 'custom'],
  perspective: ['card', 'first_character', 'second_user', 'third_limited', 'third_omniscient'],
  length: ['auto', 'recommended', 'target'],
@@ -37,7 +38,7 @@ export function lengthTargetOf(draft:ResponseDraft, base?:ResponseBase):number {
 }
 const noteKeys:readonly string[] = Object.values(responseNoteKeys)
 const lengthValues:readonly string[] = [...responseAxes.length, ...Object.keys(legacyLengthTargets)]
-export const responseDefaults: Record<ResponseAxis, string> = {agency:'protect',style:'default',perspective:'card',length:'auto',pace:'natural'}
+export const responseDefaults: Record<ResponseAxis, string> = {agency:'coauthor',style:'default',perspective:'card',length:'auto',pace:'natural'}
 // 伺服器仍收這三個舊文風值並當成 default；面板照樣顯示成 default，下次存檔就換掉。
 const legacyStyles:readonly string[] = ['plain','dialogue','descriptive']
 // 搶話 2026-10-16 收成兩檔：舊存檔的「只補細節」當防搶話、「只代寫台詞」當允許搶話，跟伺服器同一張表。

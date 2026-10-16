@@ -80,6 +80,8 @@ function mountRegion(region: string) {
     case 'response-settings':
       return mount(CanvasResponseSettings, { props: {
         conversationId: 'fixture', t: (key: string) => key,
+        frame: { sandboxLevel: '', jailbreak: '', defaultJailbreak: '', maxLength: 2000, options: [{ value: 'standard', label: '標準', hint: '推薦' }] },
+        saveFrame: async () => true,
         save: async () => ({}), load: async () => ({ conversationId: 'fixture', scope: 'conversation', schemaVersion: 1, revision: 0,
           overrides: { style: 'custom', customStyle: 'Natural prose' },
           effective: { agency: 'protect', style: 'custom', perspective: 'card', length: 'auto', pace: 'natural' } }),
