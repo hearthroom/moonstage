@@ -114,4 +114,21 @@ describe('人設彈層', () => {
     const saved = w.emitted('save')![0][0] as any
     expect(saved.userName).toBe('存檔二')
   })
+
+  // 回覆偏好打得開時，破甲強度與破限詞在那邊；這裡不重複，存出去的值也不變。
+  it('showFrame=false：不畫破甲強度與破限詞，存出去照原值', async () => {
+    const w = mountPersona({ showFrame: false, sandboxLevel: 'deep', jailbreak: '我的規則' })
+    expect(w.find('.sandbox-box').exists()).toBe(false)
+    expect(w.find('.advanced-scope').exists()).toBe(false)
+    await w.find('.complete-btn').trigger('click')
+    const saved = w.emitted('save')![0][0] as any
+    expect(saved.sandboxLevel).toBe('deep')
+    expect(saved.jailbreak).toBe('我的規則')
+  })
+
+  it('預設照舊畫破甲強度與破限詞（回覆偏好打不開時玩家才改得到）', () => {
+    const w = mountPersona()
+    expect(w.find('.sandbox-box').exists()).toBe(true)
+    expect(w.find('.advanced-scope').exists()).toBe(true)
+  })
 })

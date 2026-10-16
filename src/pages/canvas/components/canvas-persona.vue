@@ -87,8 +87,9 @@
       虛構框架的強度。四檔是一條軸（由弱到強），不是四個並列選項——所以排成一列
       而不是四張卡，而且每一檔底下寫出「什麼時候該用它」。少了那句話，玩家只能
       靠猜；猜錯的代價是角色開始拒演，而他不會知道是這裡造成的。
+      回覆偏好打得開時這兩項在那裡（owner 2026-10-17），這裡不重複；打不開時留在這裡，玩家才改得到。
     -->
-    <div class="card sandbox-box">
+    <div v-if="showFrame" class="card sandbox-box">
       <div class="label">{{ labels.sandboxLabel }}</div>
       <div class="radio-group">
         <div
@@ -110,7 +111,7 @@
       破限詞收在「進階」底下：絕大多數玩家不需要它，而它擺在外面會讓這一頁看起來
       像一份設定表。節點常駐（用 hidden 收起來），作者的卡打得到。
     -->
-    <div class="advanced-scope">
+    <div v-if="showFrame" class="advanced-scope">
       <div class="advanced-toggle" role="button" tabindex="0"
            :aria-expanded="advancedOpen ? 'true' : 'false'"
            @click="advancedOpen = !advancedOpen"
@@ -183,6 +184,8 @@ const props = withDefaults(defineProps<{
   userName?: string
   userSex?: string
   userDefine?: string
+  /** 破甲強度與破限詞畫在這裡；回覆偏好打得開時由那邊畫，這裡傳 false。 */
+  showFrame?: boolean
   sandboxLevel?: string
   jailbreak?: string
   /** 這張卡（或平台）的預設破限詞，當作輸入框的提示 */
@@ -226,6 +229,7 @@ const props = withDefaults(defineProps<{
   }
 }>(), {
   personaMode: '', globalPersona: null, conversationPersona: null, hasConversation: false, nickName: '',
+  showFrame: true,
   userName: '', userSex: '', userDefine: '', sandboxLevel: '', jailbreak: '',
   defaultJailbreak: '',
   sexOptions: () => [],

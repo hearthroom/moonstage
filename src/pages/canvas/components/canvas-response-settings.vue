@@ -72,9 +72,44 @@
    </div>
   </template>
 
+  <!--
+    破甲強度與自定義破限詞跟著這張卡（玩家對這張卡的設定），不是這個存檔：從用戶人設搬過來
+    （owner 2026-10-17），存的地方沒變。上面幾項只管這個存檔，所以這一段另起一句範圍說明。
+    讀不到存檔偏好時這一段照樣能改、能存。
+  -->
+  <template v-if="frame">
+   <div class="mode-hint response-scope response-frame-scope">{{ t('responseSettings.frameScope') }}</div>
+   <div class="card mode-box response-frame" data-lt="response-frame">
+    <div class="label">{{ t('chat.sandboxLevel') }}</div>
+    <div class="radio-group" role="radiogroup" :aria-label="t('chat.sandboxLevel')">
+     <button v-for="option in frame.options" :key="option.value" type="button" class="mode-item" data-axis="sandbox" :data-value="option.value"
+      :class="{ selected: frameLevel === option.value }" role="radio" :aria-checked="frameLevel === option.value ? 'true' : 'false'"
+      :disabled="saving" @click="frameDraft.sandboxLevel = option.value">{{ option.label }}</button>
+    </div>
+    <div class="mode-hint" data-hint="sandbox">{{ frameHint }}</div>
+   </div>
+   <div class="advanced-scope response-jailbreak">
+    <div class="advanced-toggle" role="button" tabindex="0" data-action="toggle-jailbreak" :aria-expanded="jailbreakOpen ? 'true' : 'false'"
+     @click="jailbreakOpen = !jailbreakOpen" @keydown.enter.prevent="jailbreakOpen = !jailbreakOpen">
+     <span class="advanced-title">{{ t('responseSettings.jailbreakAdvanced') }}</span>
+     <span class="advanced-caret" aria-hidden="true">{{ jailbreakOpen ? '−' : '+' }}</span>
+    </div>
+    <div class="card textarea-wrapper advanced-body" :hidden="!jailbreakOpen">
+     <div class="advanced-desc">{{ t('chat.jailbreakTips') }}</div>
+     <textarea v-model="frameDraft.jailbreak" class="textarea-dark response-jailbreak-input" rows="4" :aria-label="t('chat.jailbreak')"
+      :maxlength="frame.maxLength" :placeholder="frame.defaultJailbreak || t('chat.jailbreakTips')" />
+     <div class="advanced-actions">
+      <!-- 清空＝回到預設，不是刪除資料。 -->
+      <button type="button" class="advanced-reset" data-action="reset-jailbreak" :hidden="!frameDraft.jailbreak" @click="frameDraft.jailbreak = ''">{{ t('chat.jailbreakResetDefault') }}</button>
+      <div class="char-count">{{ frameDraft.jailbreak.length }}/{{ frame.maxLength }}</div>
+     </div>
+    </div>
+   </div>
+  </template>
+
   <div class="role-setting__actions">
    <button type="button" class="icon-back" data-action="cancel" :disabled="saving" @click="$emit('close')">{{ t('main.cancel') }}</button>
-   <button v-if="saved" type="button" class="complete-btn" data-action="save" :disabled="!dirty || invalid || loading || saving || error === 'conflict'" @click="submit">
+   <button v-if="saved || frame" type="button" class="complete-btn" data-action="save" :disabled="!canSave" @click="submit">
     {{ t(saving ? 'responseSettings.saving' : 'responseSettings.save') }}
    </button>
   </div>
@@ -82,13 +117,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { lengthMode, lengthTargetLadder, lengthTargetOf, lengthZone, maxResponseNoteLength, readResponseSettings, responseAxes, responseBase, responseNoteKeys, responsePatch, type LengthZone, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
 const props=defineProps<{
  conversationId:string
  load:(id:string)=>Promise<unknown>
  save:(id:string,revision:number,patch:Record<string,string|null>)=>Promise<unknown>
  t:(key:string, values?:Record<string,unknown>)=>string
+ // 這張卡的破甲強度與破限詞；沒給就不畫這一段（仍留在用戶人設裡）。
+ frame?:{sandboxLevel:string,jailbreak:string,defaultJailbreak:string,options:Array<{value:string,label:string,hint?:string}>,maxLength:number}
+ saveFrame?:(value:{sandboxLevel:string,jailbreak:string})=>Promise<boolean>
 }>()
 const emit=defineEmits<{ (e: 'close'): void }>()
 const saved=ref<ResponseSettings|null>(null),draft=ref<ResponseDraft>({}),loading=ref(false),saving=ref(false),error=ref('')
@@ -101,6 +139,13 @@ onBeforeUnmount(()=>{alive=false;answerDiscard(false)})
 // 玩家沒改的軸顯示的是 base：平台預設，卡片有作者預設時是作者的；「恢復預設」也回到這裡。
 const base=computed(()=>responseBase(saved.value))
 const dirty=computed(()=>JSON.stringify(responsePatch(draft.value,base.value))!==JSON.stringify(responsePatch(saved.value?.overrides || {},base.value)))
+const frameDraft=reactive({sandboxLevel:props.frame?.sandboxLevel || '',jailbreak:props.frame?.jailbreak || ''})
+watch(()=>[props.frame?.sandboxLevel,props.frame?.jailbreak],()=>{frameDraft.sandboxLevel=props.frame?.sandboxLevel || '';frameDraft.jailbreak=props.frame?.jailbreak || ''})
+const jailbreakOpen=ref(!!props.frame?.jailbreak)
+// 沒設過就標在「標準」上：破甲永遠有一個正在生效的值，不標出來玩家會以為它沒開。
+const frameLevel=computed(()=>frameDraft.sandboxLevel || 'standard')
+const frameHint=computed(()=>props.frame?.options.find(o=>o.value===frameLevel.value)?.hint || props.t('chat.sandboxLevelDesc'))
+const frameDirty=computed(()=>!!props.frame && (frameDraft.sandboxLevel!==(props.frame.sandboxLevel || '') || frameDraft.jailbreak!==(props.frame.jailbreak || '')))
 const customTooLong=computed(()=>[...(draft.value.customStyle || '')].length>1000)
 const axes=Object.keys(responseAxes) as ResponseAxis[]
 // 文風選「自訂」時已經能整段寫，不再給文風補充。
@@ -144,17 +189,25 @@ function choose(axis:ResponseAxis,value:string){
  if(axis==='style' && value==='custom')delete draft.value.styleNote
 }
 function resetAll(){draft.value={}}
-async function mayClose(){return !saving.value && (!dirty.value || await askDiscard())}
+const responseDirty=computed(()=>!!saved.value && dirty.value)
+const canSave=computed(()=>!saving.value && !loading.value && (frameDirty.value || responseDirty.value) && !(responseDirty.value && (invalid.value || error.value==='conflict')))
+async function mayClose(){return !saving.value && (!(responseDirty.value || frameDirty.value) || await askDiscard())}
 async function reload(){
- if(loading.value || saving.value || (dirty.value && !await mayClose()))return
+ if(loading.value || saving.value || (responseDirty.value && !await askDiscard()))return
  loading.value=true;error.value=''
  try{const value=readResponseSettings(await props.load(props.conversationId),props.conversationId);if(alive){saved.value=value;draft.value={...value.overrides};notesOpen.value=axes.some(axis=>!!value.overrides[responseNoteKeys[axis]])}}
  catch{if(alive)error.value='loadFailed'}finally{if(alive)loading.value=false}
 }
+// 兩邊各存各的：這張卡那一段走玩家對卡的設定，存檔那一段走存檔偏好。先存卡那一段，
+// 失敗就停在面板上，存檔那一段不動。
 async function submit(){
- if(!saved.value || !dirty.value || invalid.value || loading.value || saving.value || error.value==='conflict')return
+ if(!canSave.value)return
  saving.value=true;error.value=''
- try{const value=readResponseSettings(await props.save(props.conversationId,saved.value.revision,responsePatch(draft.value,base.value)),props.conversationId);if(alive){saved.value=value;draft.value={...value.overrides};emit('close')}}
+ try{
+  if(frameDirty.value && props.saveFrame && !await props.saveFrame({sandboxLevel:frameDraft.sandboxLevel,jailbreak:frameDraft.jailbreak})){if(alive)error.value='saveFailed';return}
+  if(responseDirty.value && saved.value){const value=readResponseSettings(await props.save(props.conversationId,saved.value.revision,responsePatch(draft.value,base.value)),props.conversationId);if(!alive)return;saved.value=value;draft.value={...value.overrides}}
+  if(alive)emit('close')
+ }
  catch(e){if(alive)error.value=((e as {status?:number})?.status ?? (e as {statusCode?:number})?.statusCode)===409?'conflict':'saveFailed'}finally{if(alive)saving.value=false}
 }
 onMounted(reload)

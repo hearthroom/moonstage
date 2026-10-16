@@ -221,6 +221,7 @@
         :user-name="formData.userName"
         :user-sex="formData.userSex"
         :user-define="formData.userDefine"
+        :show-frame="!responseSettingsOffered"
         :sandbox-level="formData.sandboxLevel"
         :jailbreak="formData.jailbreak"
         :default-jailbreak="defaultJailbreak"
@@ -237,7 +238,7 @@
     <CanvasPopup v-if="responseSettingsSupported && panel.sheet === 'response-settings'" :open="true"
       :title="t('responseSettings.title')" :close-label="t('main.cancel')" @close="closeCanvasSheet">
       <CanvasResponseSettings :key="String(conversationId)" ref="responseSettingsPanel" :conversation-id="String(conversationId)" @close="closeCanvasSheet"
-        :load="loadResponseSettings" :save="saveResponseSettings" :t="t" />
+        :load="loadResponseSettings" :save="saveResponseSettings" :t="t" :frame="responseFrame" :save-frame="saveResponseFrame" />
     </CanvasPopup>
 
     <CanvasPopup :open="panel.sheet === 'directives'" v-if="!sandboxCard" :title="t('directive.title')"
@@ -2764,7 +2765,7 @@ function buildPanelsState() {
       break;
     case 'persona':
       title = t('canvas.panel.persona');
-      props = { supportedModes: stageHost.capabilities?.personaModes, personaMode: asPersonaMode(formData.personaMode), globalPersona: globalPersona.value, conversationPersona: conversationPersona.value, hasConversation: Boolean(unref(conversationId)), nickName: playerNickName.value, userName: formData.userName, userSex: formData.userSex, userDefine: formData.userDefine, sandboxLevel: formData.sandboxLevel, jailbreak: formData.jailbreak, defaultJailbreak: defaultJailbreak.value, sexOptions: personaSexOptions.value, sandboxOptions: personaSandboxOptions.value, saving: personaSaving.value, error: personaError.value, labels: personaLabels.value };
+      props = { supportedModes: stageHost.capabilities?.personaModes, personaMode: asPersonaMode(formData.personaMode), globalPersona: globalPersona.value, conversationPersona: conversationPersona.value, hasConversation: Boolean(unref(conversationId)), nickName: playerNickName.value, userName: formData.userName, userSex: formData.userSex, userDefine: formData.userDefine, showFrame: !responseSettingsOffered.value, sandboxLevel: formData.sandboxLevel, jailbreak: formData.jailbreak, defaultJailbreak: defaultJailbreak.value, sexOptions: personaSexOptions.value, sandboxOptions: personaSandboxOptions.value, saving: personaSaving.value, error: personaError.value, labels: personaLabels.value };
       break;
     case 'directives':
       title = t('directive.title');
@@ -9697,6 +9698,8 @@ const shortcutItems = computed(() => previewOnly.value ? [] : [
   ...mentionShortcuts(worldMembers(roleView.value), mention.value),
   // 頁首不再放模型，玩家從這顆看得到自己現在用的是哪個模型。
   { key: 'model', label: String(formData.selectModelName || '') || t('canvas.panel.model') },
+  // 順序：模型、回覆偏好、用戶人設（owner 2026-10-17）。
+  ...(responseSettingsOffered.value ? [{ key: 'response-settings', label: t('responseSettings.title') }] : []),
   { key: 'persona', label: t('canvas.panel.persona') },
   { key: 'directives', label: t('directive.entry') },
   { key: 'notepad', label: t('notepad.entry') },
@@ -10321,6 +10324,22 @@ function openPersonaSheet() {
   personaError.value = ''
   ensureRoleSettings()
   panel.value = openSheet(panel.value, 'persona')
+}
+
+// 回覆偏好裡「這張卡」那一段：破甲強度與破限詞。存的地方跟用戶人設同一份（玩家對這張卡的設定）；
+// 存不進去就把畫面退回去，面板留著讓玩家再按一次。
+const responseFrame = computed(() => ({
+  sandboxLevel: String(formData.sandboxLevel || ''), jailbreak: String(formData.jailbreak || ''),
+  defaultJailbreak: String(defaultJailbreak.value || ''), options: personaSandboxOptions.value, maxLength: 2000,
+}))
+async function saveResponseFrame(value: { sandboxLevel: string; jailbreak: string }) {
+  await ensureRoleSettings()
+  const before = { sandboxLevel: formData.sandboxLevel, jailbreak: formData.jailbreak }
+  formData.sandboxLevel = value.sandboxLevel
+  formData.jailbreak = value.jailbreak
+  const ok = await persistRoleSettings()
+  if (!ok) Object.assign(formData, before)
+  return ok
 }
 
 async function onSavePersona(value: any) {
@@ -11754,6 +11773,7 @@ async function onCanvasSend() {
 // 回覆偏好存在對話上：還沒開對話就先開（選定畫面上這條開場白），第一句送出前就能設定。
 async function openResponseSettings() {
   if (!await startPendingGreeting()) return
+  ensureRoleSettings()
   if (responseSettingsSupported.value) panel.value = openSheet(panel.value, 'response-settings')
 }
 

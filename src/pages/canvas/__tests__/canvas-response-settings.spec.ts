@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import Panel from '../components/canvas-response-settings.vue'
 import { lengthTargetLadder, lengthTargetOf, readResponseSettings } from '../canvas-response-settings'
 
-const initial = () => ({conversationId:'c1',scope:'conversation',schemaVersion:1,revision:0,overrides:{},effective:{agency:'protect',style:'card',perspective:'card',length:'auto',pace:'natural'}})
+const initial = () => ({conversationId:'c1',scope:'conversation',schemaVersion:1,revision:0,overrides:{},effective:{agency:'coauthor',style:'card',perspective:'card',length:'auto',pace:'natural'}})
 const echo = () => vi.fn().mockImplementation(async (_id, rev, patch)=>({...initial(),revision:rev+1,overrides:Object.fromEntries(Object.entries(patch).filter(([,v])=>v!==null))}))
 const pill = (wrapper:any, axis:string, value:string) => wrapper.get(`.mode-item[data-axis="${axis}"][data-value="${value}"]`)
 
@@ -15,9 +15,9 @@ it('uses the persona panel layout with one card and one selected pill per settin
  expect(wrapper.get('.header-scope .page-title').text()).toBe('responseSettings.title')
  expect(wrapper.findAll('.card.mode-box')).toHaveLength(5)
  expect(wrapper.findAll('.mode-item.selected')).toHaveLength(5)
- await pill(wrapper,'agency','coauthor').trigger('click')
- expect(wrapper.get('.mode-item[data-axis="agency"].selected').attributes('data-value')).toBe('coauthor')
- expect(pill(wrapper,'agency','coauthor').attributes('aria-checked')).toBe('true')
+ await pill(wrapper,'agency','protect').trigger('click')
+ expect(wrapper.get('.mode-item[data-axis="agency"].selected').attributes('data-value')).toBe('protect')
+ expect(pill(wrapper,'agency','protect').attributes('aria-checked')).toBe('true')
  expect(wrapper.get('.role-setting__actions .complete-btn').attributes('data-action')).toBe('save')
  await pill(wrapper,'style','custom').trigger('click')
  expect(wrapper.find('.response-custom .response-custom-input').exists()).toBe(true)
@@ -28,8 +28,8 @@ it('uses the persona panel layout with one card and one selected pill per settin
 it('explains only the selected option under each setting', async () => {
  const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k}})
  await flushPromises()
- expect(wrapper.get('[data-hint="agency"]').text()).toBe('responseSettings.agencyHints.protect')
- for(const value of ['coauthor']) {
+ expect(wrapper.get('[data-hint="agency"]').text()).toBe('responseSettings.agencyHints.coauthor')
+ for(const value of ['protect']) {
   await pill(wrapper,'agency',value).trigger('click')
   expect(wrapper.get('[data-hint="agency"]').text()).toBe(`responseSettings.agencyHints.${value}`)
  }
@@ -49,14 +49,14 @@ it('saves independent axes, clears hidden custom text and closes after the serve
  const save=echo()
  const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save,t:(k:string)=>k}})
  await flushPromises()
- await pill(wrapper,'agency','coauthor').trigger('click')
+ await pill(wrapper,'agency','protect').trigger('click')
  await pill(wrapper,'perspective','second_user').trigger('click')
  await pill(wrapper,'style','custom').trigger('click')
  await wrapper.get('.response-custom-input').setValue('Sparse prose')
  await pill(wrapper,'style','guided').trigger('click')
  expect(wrapper.find('.response-custom-input').exists()).toBe(false)
  await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
- expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({agency:'coauthor',perspective:'second_user',style:'guided',customStyle:null}))
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({agency:'protect',perspective:'second_user',style:'guided',customStyle:null}))
  expect(wrapper.emitted('close')).toHaveLength(1)
 })
 
@@ -68,10 +68,10 @@ it('keeps draft on conflict and never saves assumed defaults after failed load',
  expect(wrapper.find('[data-action="save"]').exists()).toBe(false)
  load.mockResolvedValue(initial())
  await wrapper.get('[data-action="reload"]').trigger('click');await flushPromises()
- await pill(wrapper,'agency','coauthor').trigger('click')
+ await pill(wrapper,'agency','protect').trigger('click')
  await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
  expect(wrapper.get('[role="alert"]').text()).toContain('conflict')
- expect(pill(wrapper,'agency','coauthor').attributes('aria-checked')).toBe('true')
+ expect(pill(wrapper,'agency','protect').attributes('aria-checked')).toBe('true')
  expect(wrapper.emitted('close')).toBeUndefined()
 })
 
@@ -98,7 +98,7 @@ it('asks to discard inside the panel, not through a system dialog', async()=>{
  await flushPromises()
  expect(wrapper.get('.response-discard').attributes('hidden')).toBeDefined()
  expect(await (wrapper.vm as any).mayClose()).toBe(true)
- await pill(wrapper,'agency','coauthor').trigger('click')
+ await pill(wrapper,'agency','protect').trigger('click')
  const closing=(wrapper.vm as any).mayClose()
  await flushPromises()
  const bar=wrapper.get('.response-discard')
@@ -118,16 +118,16 @@ it('keeps per-setting notes under a collapsed advanced section guided by the sel
  expect(wrapper.get('.advanced-body').attributes('hidden')).toBeUndefined()
  expect(wrapper.findAll('.response-note-input')).toHaveLength(5)
  expect(wrapper.get('.advanced-body').text()).toContain('responseSettings.noteHint')
- await pill(wrapper,'agency','coauthor').trigger('click')
+ await pill(wrapper,'agency','protect').trigger('click')
  const note=wrapper.get('.response-note-input[data-axis="agency"]')
- expect(note.attributes('placeholder')).toBe('responseSettings.noteExamples.agency.coauthor')
- await pill(wrapper,'agency','coauthor').trigger('click')
- expect(note.attributes('placeholder')).toBe('responseSettings.noteExamples.agency.coauthor')
+ expect(note.attributes('placeholder')).toBe('responseSettings.noteExamples.agency.protect')
+ await pill(wrapper,'agency','protect').trigger('click')
+ expect(note.attributes('placeholder')).toBe('responseSettings.noteExamples.agency.protect')
  await note.setValue('字'.repeat(201))
  expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeDefined()
  await note.setValue('  Never accept invitations for me  ')
  await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
- expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({agency:'coauthor',agencyNote:'Never accept invitations for me',paceNote:null}))
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({agency:'protect',agencyNote:'Never accept invitations for me',paceNote:null}))
 })
 
 it('opens saved notes, clears blank notes and hides the style note for custom style', async()=>{
@@ -147,12 +147,12 @@ it('opens saved notes, clears blank notes and hides the style note for custom st
 
 it('resets every setting and note back to default in one step', async()=>{
  const save=echo()
- const custom={...initial(),revision:1,overrides:{agency:'coauthor',length:'brief',lengthNote:'Longer fights'}}
+ const custom={...initial(),revision:1,overrides:{agency:'protect',length:'brief',lengthNote:'Longer fights'}}
  const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>custom,save,t:(k:string)=>k}})
  await flushPromises()
  expect(wrapper.findAll('.response-reset')).toHaveLength(0)
  await wrapper.get('[data-action="reset-all"]').trigger('click')
- expect(wrapper.get('.mode-item[data-axis="agency"].selected').attributes('data-value')).toBe('protect')
+ expect(wrapper.get('.mode-item[data-axis="agency"].selected').attributes('data-value')).toBe('coauthor')
  expect(wrapper.get('[data-action="reset-all"]').attributes('hidden')).toBeDefined()
  await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
  expect(save).toHaveBeenLastCalledWith('c1',1,expect.objectContaining({agency:null,length:null,lengthNote:null}))
@@ -327,4 +327,57 @@ it('reads saved assist and lines as the two remaining agency options', () => {
  expect(readResponseSettings({...base,overrides:{agency:'assist'}},'c1').overrides.agency).toBe('protect')
  expect(() => readResponseSettings({...base,overrides:{agency:'everything'}},'c1')).toThrow('Unsupported override')
  expect(readResponseSettings({...base,overrides:{style:'vivid'}},'c1').overrides.style).toBe('vivid')
+})
+
+// 允許搶話排在前面，也是沒選過時亮的那一個（owner 2026-10-17）。
+it('lists allow-writing first and uses it as the platform default', async()=>{
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>({...initial(),effective:{agency:'coauthor',style:'default',perspective:'card',length:'auto',pace:'natural'}}),save:vi.fn(),t:(k:string)=>k}})
+ await flushPromises()
+ expect(wrapper.findAll('.mode-item[data-axis="agency"]').map(b=>b.attributes('data-value'))).toEqual(['coauthor','protect'])
+ expect(wrapper.get('.mode-item[data-axis="agency"].selected').attributes('data-value')).toBe('coauthor')
+})
+
+// 破甲強度與破限詞從用戶人設搬到這裡：跟著這張卡，另一句範圍說明，存的地方是玩家對卡的設定。
+const frame = (over:Record<string,unknown>={}) => ({sandboxLevel:'',jailbreak:'',defaultJailbreak:'Card rules',maxLength:2000,
+ options:[{value:'light',label:'L',hint:'hl'},{value:'standard',label:'S',hint:'hs'},{value:'immersive',label:'I',hint:'hi'},{value:'deep',label:'D',hint:'hd'}],...over})
+it('edits the card-level bypass strength and content rules in their own section', async()=>{
+ const save=echo(), saveFrame=vi.fn().mockResolvedValue(true)
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save,t:(k:string)=>k,frame:frame(),saveFrame}})
+ await flushPromises()
+ expect(wrapper.get('.response-frame-scope').text()).toBe('responseSettings.frameScope')
+ expect(wrapper.get('.response-frame .label').text()).toBe('chat.sandboxLevel')
+ expect(wrapper.get('.mode-item[data-axis="sandbox"].selected').attributes('data-value')).toBe('standard')
+ expect(wrapper.get('[data-hint="sandbox"]').text()).toBe('hs')
+ expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeDefined()
+ await pill(wrapper,'sandbox','deep').trigger('click')
+ expect(wrapper.get('[data-hint="sandbox"]').text()).toBe('hd')
+ await wrapper.get('[data-action="toggle-jailbreak"]').trigger('click')
+ expect(wrapper.get('.response-jailbreak-input').attributes('placeholder')).toBe('Card rules')
+ await wrapper.get('.response-jailbreak-input').setValue('My rules')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(saveFrame).toHaveBeenCalledWith({sandboxLevel:'deep',jailbreak:'My rules'})
+ expect(save).not.toHaveBeenCalled()
+ expect(wrapper.emitted('close')).toHaveLength(1)
+})
+
+it('keeps the panel open and skips conversation saving when the card-level save fails', async()=>{
+ const save=echo(), saveFrame=vi.fn().mockResolvedValue(false)
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save,t:(k:string)=>k,frame:frame({sandboxLevel:'light'}),saveFrame}})
+ await flushPromises()
+ await pill(wrapper,'sandbox','immersive').trigger('click')
+ await pill(wrapper,'agency','protect').trigger('click')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).not.toHaveBeenCalled()
+ expect(wrapper.get('[role="alert"]').text()).toContain('saveFailed')
+ expect(wrapper.emitted('close')).toBeUndefined()
+ expect(await (async()=>{const closing=(wrapper.vm as any).mayClose();await flushPromises();return wrapper.get('.response-discard').attributes('hidden')})()).toBeUndefined()
+})
+
+it('still lets the card-level section save when the conversation settings fail to load', async()=>{
+ const saveFrame=vi.fn().mockResolvedValue(true)
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:vi.fn().mockRejectedValue(new Error('offline')),save:vi.fn(),t:(k:string)=>k,frame:frame(),saveFrame}})
+ await flushPromises()
+ await pill(wrapper,'sandbox','light').trigger('click')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(saveFrame).toHaveBeenCalledWith({sandboxLevel:'light',jailbreak:''})
 })

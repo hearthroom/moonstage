@@ -289,6 +289,8 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '.response-settings .advanced-scope .advanced-body', region: 'response-settings', origin: 'lt', why: '補充說明收在進階；收起來時節點仍在' },
   { selector: '.response-settings .textarea-dark', region: 'response-settings', origin: 'mmd', why: '補充說明輸入框，跟人設頁的輸入框同一個外觀' },
   { selector: '.response-settings .role-setting__actions .complete-btn', region: 'response-settings', origin: 'mmd', why: '儲存鍵' },
+  { selector: '[data-lt="response-frame"]', region: 'response-settings', origin: 'lt', why: '這張卡的破甲強度（從用戶人設搬來）' },
+  { selector: '.response-settings .response-jailbreak .advanced-body', region: 'response-settings', origin: 'lt', why: '自定義破限詞收在進階；收起來時節點仍在' },
   { selector: '.response-discard', region: 'response-settings', origin: 'lt', why: '關掉前問一次有沒存的修改；只在問的時候出現' },
 
   // ── 用戶人設 ────────────────────────────────────────────────────────
