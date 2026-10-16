@@ -243,7 +243,8 @@ describe('快捷列', () => {
       source.indexOf('const panel = ref<CanvasPanelState>'),
     )
     const keys = Array.from(block.matchAll(/key: '([a-z-]+)'/g)).map((m) => m[1])
-    expect(keys).toEqual(['model', 'persona', 'directives', 'notepad', 'conversations'])
+    // 回覆偏好在模型與用戶人設之間（owner 2026-10-17）。
+    expect(keys).toEqual(['model', 'response-settings', 'persona', 'directives', 'notepad', 'conversations'])
   })
 
   it('「＋」裝得下全部——快捷列上的五樣也留著，玩家不必記得哪一樣在哪裡', () => {
