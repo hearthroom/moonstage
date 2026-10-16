@@ -390,3 +390,15 @@ it('opens the content rules section when a saved one arrives after the panel ope
  expect(wrapper.get('.response-jailbreak .advanced-body').attributes('hidden')).toBeUndefined()
  expect((wrapper.get('.response-jailbreak-input').element as HTMLTextAreaElement).value).toBe('Saved rules')
 })
+
+// 頁面收到 close 會先問面板能不能關；那時面板必須已經不在儲存中，不然存好了面板還停在畫面上。
+it('is ready to close by the time it asks the page to close after saving', async()=>{
+ let closable:boolean|undefined
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:echo(),t:(k:string)=>k,frame:frame(),saveFrame:vi.fn().mockResolvedValue(true),
+  onClose:async()=>{closable=await (wrapper.vm as any).mayClose()}}})
+ await flushPromises()
+ await pill(wrapper,'agency','protect').trigger('click')
+ await pill(wrapper,'sandbox','deep').trigger('click')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(closable).toBe(true)
+})
