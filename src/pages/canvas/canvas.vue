@@ -7269,6 +7269,12 @@ function refreshHistoryAfterAuthoritativeOperation(status: any) {
   } catch (error) {
     console.error('[ChatOperation] 權威 terminal 後重抓 history 失敗:', error);
   }
+  // [DONE] 分支收尾時會重讀的用量，這裡也要讀：上面說的那個 [DONE] 被丟掉了，
+  // 少了這幾行，輸入框旁的小圓環只在重新進入對話時才更新（2026-10-16：線上兩天零次收尾重讀）。
+  // 這一輪的組成在開始生成前就落盤，終結時讀得到；這一則自己的用量已由上面的狀態帶到列上。
+  void refreshContextRing();
+  if (panel.value.sheet === 'context-breakdown') loadContextBreakdown();
+  if (panel.value.sheet === 'memory') loadMemory();
 }
 
 function handleOperationStatusEvent(input: any) {
