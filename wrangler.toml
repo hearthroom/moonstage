@@ -10,6 +10,8 @@ routes = [
   { pattern = "playground.sukisuki.ai/*", zone_name = "sukisuki.ai" },
   { pattern = "playground.sukisuki.chat", custom_domain = true },
   { pattern = "playground.sukisuki.chat/*", zone_name = "sukisuki.chat" },
+  { pattern = "playground.sukisuki.pro", custom_domain = true },
+  { pattern = "playground.sukisuki.pro/*", zone_name = "sukisuki.pro" },
   { pattern = "playground.hearthroom.club/*", zone_name = "hearthroom.club" }
 ]
 
