@@ -36,30 +36,14 @@ const AUTHOR_EVENTS = [
 ]
 
 const CONTAINER_ATTR = 'data-stage-author-layer'
-const MOUNT_STYLE_ATTR = 'data-stage-author-mount-style'
-
-// 容器不吃事件（沒畫東西的地方要點得到底下的 App），但 pointer-events **會繼承**：
-// 不做任何事的話，作者掛進來的每一個元素都不可點。
+// 平台不替作者決定 pointer-events。
 //
-// 原本把它當成「作者自己寫 pointer-events: auto」的 opt-in。那對匯入的卡不成立——
-// 在別的平台上容器就是普通 DOM，作者沒有理由寫那一行。症狀是整張卡看起來好好的、
-// 按下去什麼都沒發生，而他查不出原因。
-//
-// 用屬性選擇器而不是在子元素上寫 inline style：特異性只有 (0,1,0)，作者要讓某個
-// 裝飾層點擊穿透時，他自己的 class 規則仍然蓋得過我們；inline 則會把那條路堵死。
-const MOUNT_STYLE_TEXT = '[' + CONTAINER_ATTR + ']>*{pointer-events:auto}'
-
-// 這份樣式不描述任何一張卡，dispose 時刻意不移除：換卡時還要用，
-// 反覆增刪只是白費工，也多一次「移除後還沒加回來」的空窗。
-function ensureMountStyle(doc) {
-  if (!doc) return
-  if (doc.querySelector('style[' + MOUNT_STYLE_ATTR + ']')) return
-  const style = doc.createElement('style')
-  style.setAttribute(MOUNT_STYLE_ATTR, '')
-  style.textContent = MOUNT_STYLE_TEXT
-  const head = doc.head || doc.documentElement
-  if (head) head.appendChild(style)
-}
+// 容器曾經是 pointer-events: none（讓沒畫東西的地方點得到底下的 App），再補一條
+// [容器]>*{pointer-events:auto} 把作者的元素救回可點。後面那條是外層文件的規則，
+// CSS 層疊上一律贏過 Shadow DOM 宿主自己寫在 shadow root 裡的 :host 規則——作者用
+// :host{pointer-events:none} 做的全螢幕透明殼被翻成可點，蓋住整頁（2026-10-17，MMD
+// 搬來的柚子島）。容器是 0×0 並裁切（見 applyContainerBox），本身擋不到任何點擊，
+// 所以兩條都不需要：作者的元素跟在 MMD 上一樣從頁面繼承 auto，要穿透由他自己寫。
 
 function isKnownLayer(layer) {
   return AUTHOR_LAYERS.indexOf(layer) >= 0
@@ -116,11 +100,6 @@ function createAuthorAssetRuntime(options) {
     el.style.isolation = 'isolate'
     applyContainerBox(el)
     el.style.zIndex = String(layerZIndex[layer] == null ? 0 : layerZIndex[layer])
-    // 容器不吃事件，讓沒畫東西的地方點得到底下的 App。
-    // 直接子元素由 MOUNT_STYLE_TEXT 恢復成 auto（見該常數的說明），
-    // 所以「滿版容器鎖死整個 App」只會發生在作者真的畫了滿版元素的時候。
-    el.style.pointerEvents = 'none'
-    ensureMountStyle(doc)
 
     // 容器內的真實點擊 = 一次使用者手勢。
     //
@@ -129,7 +108,7 @@ function createAuthorAssetRuntime(options) {
     //
     // 這裡放寬的是手勢的「來源」，不是送出本身：登記手勢只讓作者**自己呼叫**的
     // send() 過得了關，作者沒呼叫就什麼都不會送。範圍也是窄的——容器是
-    // pointer-events: none，點在 App 自己的 UI 上時事件不以容器為目標、也不會冒泡
+    // 0×0 並裁切，點在 App 自己的 UI 上時事件不以容器為目標、也不會冒泡
     // 到這裡，所以不存在「所有人點擊都自動送出」。
     //
     // 用捕獲階段：要在作者的 onclick 之前登記，否則同一次點擊裡的 send() 仍會被擋。
