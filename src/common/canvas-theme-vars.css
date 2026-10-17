@@ -152,6 +152,9 @@
   /* 模型選單上「官方」線路的標籤色。跟金色的「實惠」並排時要一眼分得開。 */
   --lt-canvas-official: #8b9bff;
   --lt-canvas-official-bg: rgba(139, 155, 255, 0.14);
+  /* Steam-style discount strip; keep its contrast in either theme. */
+  --lt-canvas-discount: #beee11;
+  --lt-canvas-discount-bg: #4c6b22;
 
   /*
     彈層「裡面那一層」的取值。

@@ -32,6 +32,12 @@ export interface PriceDisplay {
 type Variant = Record<string, any>
 type Family = Record<string, any>
 
+// A platform chat discount is already reflected in billing; do not apply it again.
+export function variantDiscountPercent(variant: Variant | null | undefined): number {
+  const value = Number(variant?.chatDiscountPercent || variant?.providerDiscountPercent || 0)
+  return Number.isFinite(value) && value > 0 && value < 100 ? Math.round(value) : 0
+}
+
 export function isFreeModelValue(value: any): boolean {
   const v = String(value || '').trim().toLowerCase()
   return v === FREE_MODEL_BASE.toLowerCase() || v.startsWith(FREE_MODEL_BASE.toLowerCase() + '-')
