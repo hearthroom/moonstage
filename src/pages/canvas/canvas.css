@@ -3006,7 +3006,7 @@
     transform: rotate(180deg);
   }
 
-  /* 徽章：整頁只有「目前使用」與折扣是金色，其餘退到背景 */
+  /* 折扣用綠條，其餘徽章保留各自語意。 */
   .ms-badge {
     display: inline-flex;
     align-items: center;
@@ -3029,6 +3029,15 @@
     border-color: var(--lt-canvas-official);
     background: var(--lt-canvas-official-bg);
     color: var(--lt-canvas-official);
+  }
+
+  .ms-badge.is-discount {
+    border-radius: 0;
+    border-color: var(--lt-canvas-discount-bg);
+    background: var(--lt-canvas-discount-bg);
+    color: var(--lt-canvas-discount);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
   }
 
   /* 狀態燈：只有例外態才亮 */

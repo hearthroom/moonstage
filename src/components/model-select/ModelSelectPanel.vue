@@ -219,7 +219,7 @@
 									<div v-if="isFamilySelected(family)" class="ms-badge is-accent">
 										<span class="ms-badge-text">{{ t('modelSelect.currentInUse') }}</span>
 									</div>
-									<div v-if="family.discountUntilTs > 0" class="ms-badge is-accent">
+									<div v-if="getDiscountPercent(family) > 0" class="ms-badge is-discount">
 										<span class="ms-badge-text">-{{ getDiscountPercent(family) }}%</span>
 									</div>
 									<div v-else-if="isFreeFamily(family)" class="ms-badge">
@@ -340,10 +340,9 @@
 												:class="{ 'is-accent': laneTagOf(variant) === 'value', 'is-official': laneTagOf(variant) === 'official' }">
 												<span class="ms-badge-text">{{ t(laneTagOf(variant) === 'official' ? 'modelSelect.laneOfficial' : 'modelSelect.laneValue') }}</span>
 											</div>
-											<!-- 上游供應商此刻掛著的折扣。扣費是跟著它走的（server 端用供應商現價
-												 算成本），所以這個數字不是裝飾。它沒有截止時間，隨時會結束。 -->
-											<div v-if="variant.providerDiscountPercent > 0" class="ms-badge is-accent">
-												<span class="ms-badge-text">-{{ variant.providerDiscountPercent }}%</span>
+											<!-- 對話調價或上游折扣均已包含在售價，徽章只顯示、不再折價。 -->
+											<div v-if="variantDiscountPercent(variant) > 0" class="ms-badge is-discount">
+												<span class="ms-badge-text">-{{ variantDiscountPercent(variant) }}%</span>
 											</div>
 											<div
 												v-if="variantDotTone(variant)"
@@ -513,6 +512,7 @@
 		dedupeFamilies,
 		familyKey,
 		familyPriceDisplay,
+		variantDiscountPercent,
 		familyStatusTone,
 		isFreeModelValue,
 		mergeFreeModelFamilies,
@@ -1948,6 +1948,8 @@ const truncationText = (completionRate: number) => {
 	};
 
 	const getDiscountPercent = (family) => {
+		const discounts = (family?.variants || []).map(variantDiscountPercent);
+		if (discounts.length && discounts.every((percent) => percent > 0)) return Math.min(...discounts);
 		if (!family || !family.originalCostScore || !family.variants?.length) return 0;
 		const v = family.variants[0];
 		const original = v.originalCostScore || 0;

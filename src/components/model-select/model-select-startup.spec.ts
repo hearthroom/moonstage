@@ -128,3 +128,22 @@ it('explains the price of the chosen tier and reports the unsaved choice', async
     expect(vm.variantPriceText(lane)).toBe('modelSelect.priceAgent')
   } finally { wrapper.unmount() }
 })
+
+it('shows the actual chat discount as a green strip on the family and its lane', async () => {
+  const live = [{ group: 'Gemini', families: [{ family: 'Gemini-4-Argon(Test)', variants: [{
+    name: 'Gemini-4-Argon(Test)', value: 'gemini-4-argon-dew', channel: 'lane:dew', channelLabel: 'Dew',
+    billingType: 'dynamic', estMinScore: 100, estMaxScore: 200, chatDiscountPercent: 50,
+    contextBudgetOptions: [{ value: 1, tokens: 64000, text: '64K' }],
+  }] }] }]
+  const get = vi.fn(async (url: string) => ({ statusCode: 200, data: url === '/models' ? live : [] }))
+  const wrapper = shallowMount(ModelSelectPanel, {
+    props: { open: true, roleId: 'fixture-role', selectModel: 'gemini-4-argon-dew' },
+    global: { config: { globalProperties: { http: { get }, requestUrl: { playerAgentMode: '/agent-mode', getModelListV2: '/models' } } } },
+  })
+  try {
+    await flushPromises()
+    expect(wrapper.find('.ms-row .ms-badge.is-discount').text()).toBe('-50%')
+    expect(wrapper.find('.ms-opt .ms-badge.is-discount').text()).toBe('-50%')
+    expect(wrapper.find('.ms-badge.is-accent').text()).not.toBe('-50%')
+  } finally { wrapper.unmount() }
+})
