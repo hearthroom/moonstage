@@ -47,7 +47,7 @@ describe('playground API proxy', () => {
 
 it('deploys standalone playgrounds on each official community domain', () => {
  const config=readFileSync(new URL('../../wrangler.toml', import.meta.url),'utf8');
- for(const root of ['hearthroom.club','sukisuki.ai','sukisuki.chat']) {
+ for(const root of ['hearthroom.club','sukisuki.ai','sukisuki.chat','sukisuki.pro']) {
   expect(config).toContain(`pattern = "playground.${root}", custom_domain = true`);
   expect(config).toContain(`pattern = "playground.${root}/*", zone_name = "${root}"`);
  }
