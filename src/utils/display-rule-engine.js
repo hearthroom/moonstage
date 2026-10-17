@@ -309,9 +309,22 @@ const RELATIVE_MEDIA_SRC = /(<(?:img|source|video|audio|iframe|embed)\b[^>]*?\s(
  * `data:,` 是空的 data URL：不發網路請求，但不是合法圖片，onerror 照樣觸發，點火語意不變。
  * 只動相對路徑（含以 / 開頭的）：有協定的、//、data:、blob:、# 都原樣保留；卡片不會有
  * 真的相對圖片，聊天頁的網址底下沒有任何它能指到的檔案。
+ *
+ * <script> 裡是程式碼不是標記，整塊跳過：卡片腳本常用模板字串拼 `<img src="${url}">`，
+ * 改成 data:, 等於把作者的圖片地址刪掉（2026-10-17 一張匯入卡的立繪全部空白）。
  */
 function neutralizeRelativeMediaSources(html) {
   if (typeof html !== 'string' || html.indexOf('<') === -1) return html
+  // split 帶捕獲組：奇數位是 script 塊，原樣留著
+  return html.split(SCRIPT_BLOCK).map(function (part, i) {
+    return i % 2 ? part : neutralizeMarkup(part)
+  }).join('')
+}
+
+// 沒收尾的 <script> 一路算到結尾，跟瀏覽器一樣
+const SCRIPT_BLOCK = /(<script\b[^>]*>[\s\S]*?(?:<\/script\s*>|$))/i
+
+function neutralizeMarkup(html) {
   return html.replace(RELATIVE_MEDIA_SRC, function (whole, head, dq, sq, bare) {
     const value = dq != null ? dq : sq != null ? sq : bare
     const v = String(value == null ? '' : value).trim()
