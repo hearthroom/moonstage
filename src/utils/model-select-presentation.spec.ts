@@ -847,17 +847,24 @@ describe('orderModelGroups — 分類列的順序', () => {
   it('固定的幾家照指定順序排在最前面，不管它們在用量榜上的名次', () => {
     const out = orderModelGroups([
       g('Ling'), g('Kimi', 38), g('GLM', 7), g('MiMo', 13), g('Claude', 43), g('MiniMax'),
-      g('Gemini', 9), g('DeepSeek', 1), g('Hunyuan', 4),
+      g('Gemini', 9), g('DeepSeek', 1), g('Hunyuan', 4), g('Grok', 90),
     ]).map(x => x.group)
-    expect(out.slice(0, 7)).toEqual(['DeepSeek', 'MiMo', 'Claude', 'Gemini', 'GLM', 'Kimi', 'MiniMax'])
+    expect(out.slice(0, 7)).toEqual(['DeepSeek', 'Claude', 'Grok', 'Gemini', 'GLM', 'Kimi', 'MiniMax'])
+    expect(out[out.length - 1]).toBe('MiMo')
   })
 
   it('其餘照旗下最好的名次排；沒有名次的放最後、維持原順序', () => {
     const out = orderModelGroups([
       g('Ling'), g('Nemotron', undefined), g('Qwen', 26, undefined), g('Seed'),
-      g('Hunyuan', undefined, 4), g('Grok'), g('Gemma', 18, 11), g('GPT', 16, 22),
+      g('Hunyuan', undefined, 4), g('NewBrand'), g('Gemma', 18, 11), g('GPT', 16, 22),
     ]).map(x => x.group)
-    expect(out).toEqual(['Hunyuan', 'Gemma', 'GPT', 'Qwen', 'Ling', 'Nemotron', 'Seed', 'Grok'])
+    expect(out).toEqual(['Hunyuan', 'Gemma', 'GPT', 'Qwen', 'Ling', 'Nemotron', 'Seed', 'NewBrand'])
+  })
+
+  it('MiMo 固定在所有分類之後，即使用量第一或新增分類沒有名次', () => {
+    expect(orderModelGroups([
+      g(' MiMo ', 1), g('NewBrand'), g('Ling', 2), g('Unknown'),
+    ]).map(x => x.group)).toEqual(['Ling', 'NewBrand', 'Unknown', ' MiMo '])
   })
 
   it('分類名大小寫與前後空白不影響', () => {

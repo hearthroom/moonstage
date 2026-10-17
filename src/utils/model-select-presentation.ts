@@ -527,10 +527,11 @@ export function detailMetrics(family: Family | null | undefined): DetailMetrics 
  * Claude 在用量榜上排得後面是因為它在別處貴，不是因為它不好用——這裡價格低，
  * 所以照玩家實際會想找的順序放在前面，而不是照榜單。
  *
+ * owner 2026-10-18：前四家改為 DeepSeek、Claude、Grok、Gemini，MiMo 固定最後。
  * 其餘分類照「旗下最好的那個模型在全球角色扮演用量的名次」排，越前面越靠前；
- * 沒有名次的排最後，彼此之間維持伺服器給的原順序。
+ * 沒有名次的放在有名次的後面，彼此維持伺服器原順序，仍排在 MiMo 之前。
  */
-export const PINNED_MODEL_GROUPS = ['deepseek', 'mimo', 'claude', 'gemini', 'glm', 'kimi', 'minimax']
+export const PINNED_MODEL_GROUPS = ['deepseek', 'claude', 'grok', 'gemini', 'glm', 'kimi', 'minimax']
 
 export function orderModelGroups<T extends { group?: string; families?: Array<{ usageRank?: unknown }> }>(groups: T[]): T[] {
   const bestRank = (g: T) => {
@@ -545,9 +546,11 @@ export function orderModelGroups<T extends { group?: string; families?: Array<{ 
     .map((g, index) => ({
       g, index,
       pin: PINNED_MODEL_GROUPS.indexOf(String(g.group || '').trim().toLowerCase()),
+      last: String(g.group || '').trim().toLowerCase() === 'mimo',
       rank: bestRank(g),
     }))
     .sort((a, b) => {
+      if (a.last !== b.last) return a.last ? 1 : -1
       if (a.pin !== -1 || b.pin !== -1) {
         if (a.pin === -1) return 1
         if (b.pin === -1) return -1
