@@ -224,6 +224,14 @@ describe('neutralizeRelativeMediaSources', () => {
     expect(neutralizeRelativeMediaSources('plain text')).toBe('plain text')
   })
 
+  it('<script> 裡的程式碼不動：模板字串拼的 src="${url}" 原樣留著，腳本外的點火圖片照改', () => {
+    const code = '<script>const img=u=>`<img class="a" src="${e(u)}" alt="">`;</script>'
+    expect(neutralizeRelativeMediaSources(code + '<img src="x-boot" onerror="go()">')).toBe(code + '<img src="data:," onerror="go()">')
+    // 沒收尾的 <script>：瀏覽器把到結尾的內容都當腳本
+    const open = '<script type="module">document.body.innerHTML=`<img src="${a}">`'
+    expect(neutralizeRelativeMediaSources(open)).toBe(open)
+  })
+
   it('applyDisplayRules 的輸出已經處理過：規則產出的點火圖片不會再打站台', () => {
     const out = applyDisplayRules('<st>hi</st>', [{ id: 'r', find: '/<st>([\\s\\S]*?)<\\/st>/g', replace: '<div><img src="x-sao-v153-turn" onerror="fire()">$1</div>', enabled: true }])
     expect(out.html).toBe('<div><img src="data:," onerror="fire()">hi</div>')
