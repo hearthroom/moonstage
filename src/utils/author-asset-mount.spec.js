@@ -442,40 +442,69 @@ describe('author asset mount', () => {
   })
 })
 
-// 匯入的卡整片點不動，只有渲染在訊息氣泡裡的部分有反應——因為容器是
-// pointer-events: none，而這個屬性**會繼承**：作者掛進容器的每一個元素預設都不可點。
+// 匯入的卡整片點不動。兩次都是同一個根因：平台替作者決定了 pointer-events。
 //
-// 原本把它當成「作者自己寫 pointer-events: auto」的 opt-in，那對匯入的卡不成立：
-// 別的平台上容器就是普通 DOM，作者沒有理由寫那一行。預設不可點的結果是整張卡看起來
-// 好好的、按下去什麼都沒發生——最糟的失敗模式。
+// 第一次：容器是 pointer-events: none，這個屬性會繼承，作者掛進來的每個元素都不可點。
+// 第二次：補了一條 [容器]>*{pointer-events:auto} 讓直接子元素恢復可點。它蓋得過作者的
+// 一般 class 規則以外的一切——包括 Shadow DOM 宿主自己在 shadow root 裡寫的
+// :host{pointer-events:none}。CSS 層疊先比封裝情境、再比特異性：一般宣告是外層文件
+// 的規則贏。於是用 Shadow DOM 做「全螢幕透明殼、裡面的面板才可點」的卡（MMD 搬來的
+// 柚子島，2026-10-17 社群回報），四層透明殼全被翻成可點，蓋住整頁。
 //
-// 改成容器仍不吃事件（沒畫東西的地方要點得到底下的 App），但直接子元素恢復 auto。
-// 用屬性選擇器而不是 inline style：特異性低，作者要讓某個裝飾層點擊穿透時，
-// 他自己的 class 規則仍然蓋得過我們。
-describe('作者掛進來的東西預設可點', () => {
-  it('容器不吃事件，但直接子元素恢復 auto', () => {
+// 容器早就是 0×0 並裁切（見 applyContainerBox），它自己不可能擋到點擊；那條 none
+// 只是在製造一個要我們再用 auto 去補的洞。現在兩者都不寫：作者的元素跟在 MMD 上
+// 一樣從頁面繼承 auto，要穿透就由作者自己的樣式決定，平台不插手。
+describe('作者元素的 pointer-events 由作者決定', () => {
+  it('容器本身不設 pointer-events', () => {
     const rt = createAuthorAssetRuntime({ doc: document, layerZIndex: LAYER_Z_INDEX.desktop })
     const el = rt.mount({ mountLayer: 'over', html: '<div class="btn">點我</div>' })
-    expect(el.style.pointerEvents).toBe('none')
-
-    const rules = collectAuthorMountStyleRules(document)
-    expect(rules).toContain('[data-stage-author-layer]>*')
-    expect(rules).toContain('pointer-events:auto')
+    expect(el.style.pointerEvents).toBe('')
   })
 
-  it('樣式只注入一次，重複掛載不會愈疊愈多', () => {
+  it('容器仍是 0×0 並裁切，所以不需要靠 pointer-events 讓開底下的 App', () => {
     const rt = createAuthorAssetRuntime({ doc: document, layerZIndex: LAYER_Z_INDEX.desktop })
-    rt.mount({ mountLayer: 'over', html: '<div>a</div>' })
-    rt.mount({ mountLayer: 'under', html: '<div>b</div>' })
-    rt.mount({ mountLayer: 'cover', html: '<div>c</div>' })
-    expect(document.querySelectorAll('style[data-stage-author-mount-style]').length).toBe(1)
+    const el = rt.mount({ mountLayer: 'cover', html: '<div>x</div>' })
+    expect(el.style.width).toBe('0px')
+    expect(el.style.height).toBe('0px')
+    expect(el.style.overflow).toBe('hidden')
   })
 
-  it('dispose 之後樣式留著：它不描述任何一張卡，重掛時還要用', () => {
+  it('不在頁面上注入任何改寫作者元素 pointer-events 的樣式', () => {
     const rt = createAuthorAssetRuntime({ doc: document, layerZIndex: LAYER_Z_INDEX.desktop })
-    rt.mount({ mountLayer: 'over', html: '<div>a</div>' })
-    rt.dispose()
-    expect(document.querySelectorAll('style[data-stage-author-mount-style]').length).toBe(1)
+    rt.mount({ mountLayer: 'over', html: '<div id="yzdirector-host"></div>' })
+    const platformCss = [...document.head.querySelectorAll('style')]
+      .map(function (s) { return s.textContent || '' })
+      .join('')
+      .replace(/\s+/g, '')
+    expect(platformCss).not.toContain('[' + CONTAINER_ATTR + ']')
+    expect(platformCss).not.toContain('pointer-events')
+  })
+
+  it('作者 Shadow DOM 宿主的 :host 規則是它 pointer-events 的唯一來源', () => {
+    const rt = createAuthorAssetRuntime({ doc: document, layerZIndex: LAYER_Z_INDEX.desktop })
+    const layer = rt.mount({ mountLayer: 'over', html: '' })
+    const host = document.createElement('div')
+    host.id = 'yzdirector-host'
+    const shadow = host.attachShadow({ mode: 'open' })
+    const style = document.createElement('style')
+    style.textContent = ':host{position:fixed;inset:0;pointer-events:none}'
+    shadow.appendChild(style)
+    layer.appendChild(host)
+    expect(host.style.pointerEvents).toBe('')
+    expect(layer.style.pointerEvents).toBe('')
+  })
+
+  it('容器內的真實點擊仍登記為使用者手勢', () => {
+    let gestures = 0
+    const rt = createAuthorAssetRuntime({
+      doc: document,
+      layerZIndex: LAYER_Z_INDEX.desktop,
+      onUserGesture: function () { gestures++ },
+      isTrustedEvent: function () { return true },
+    })
+    const el = rt.mount({ mountLayer: 'over', html: '<button id="b">送出</button>' })
+    el.querySelector('#b').click()
+    expect(gestures).toBe(1)
   })
 })
 
@@ -506,9 +535,3 @@ describe('掛載內容最外層的裸文字不畫', () => {
   })
 })
 
-function collectAuthorMountStyleRules(doc) {
-  return [...doc.querySelectorAll('style[data-stage-author-mount-style]')]
-    .map(function (s) { return s.textContent || '' })
-    .join('')
-    .replace(/\s+/g, '')
-}
