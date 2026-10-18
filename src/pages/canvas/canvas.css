@@ -3836,6 +3836,13 @@
     box-sizing: border-box;
   }
 
+  .bg-picker-label { flex: 1; }
+  .bg-picker-check { flex: 0 0 auto; }
+  .modify-scope .bg-picker-item.is-current {
+    border-color: currentColor;
+    background: color-mix(in srgb, var(--lt-canvas-text) 10%, var(--lt-canvas-panel-item-bg));
+  }
+
   .bg-picker-swatch {
     position: relative;
     flex: 0 0 auto;

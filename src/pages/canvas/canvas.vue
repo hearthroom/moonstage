@@ -469,6 +469,7 @@ import { createAssistSession } from './canvas-assist-state'
 import CanvasAssist from './components/canvas-assist.vue'
 import CanvasHeader from './components/canvas-header.vue'
 import CanvasStage from './components/canvas-stage.vue'
+import { useStaticBackground, useStillImage } from './canvas-background-still'
 import CanvasBackgroundPicker from './components/canvas-background-picker.vue'
 import CanvasIntro from './components/canvas-intro.vue'
 import CanvasMessage from './components/canvas-message.vue'
@@ -1646,7 +1647,8 @@ watch(() => [preferenceSettled.roleId, preferenceSettled.ok], () => {
   backgroundChoice.value = choice;
   writeLocalChoice(stageHost.storage, backgroundChoiceRole, choice);
 });
-const stageBackground = computed(() => resolvePlayerBackground(stageBackgroundInput.value, backgroundChoice.value));
+// 靜態畫格的 watcher 會立即讀值；pending 時不提早讀卡片（預覽資料可能還沒初始化）。
+const stageBackground = useStaticBackground(computed(() => resolvePlayerBackground(backgroundChoice.value ? stageBackgroundInput.value : {}, backgroundChoice.value)));
 const playerBackgroundUrl = computed(() => stageBackground.value.portrait);
 const playerBackgroundLandscapeUrl = computed(() => stageBackground.value.landscape);
 
@@ -11713,6 +11715,8 @@ const BACKGROUND_COLOR_LABEL_KEYS: Record<string, string> = {
 
 const backgroundCanUpload = computed(() => !previewOnly.value && !!unref(hasLogin) && stageHost.capabilities?.preferences !== false);
 
+const backgroundBlurPreview = useStillImage(() => panel.value.sheet === 'background'
+  ? resolveStageBackground({ ...stageBackgroundInput.value, backgroundOff: false }) : '');
 const backgroundPickerProps = computed(() => {
   const choice = backgroundChoice.value || backgroundChoiceFrom({});
   const params = { formats: BACKGROUND_FORMATS_TEXT.value, maxSize: BACKGROUND_MAX_TEXT };
@@ -11737,7 +11741,7 @@ const backgroundPickerProps = computed(() => {
     color: choice.color,
     customUrl: choice.customUrl,
     // 模糊那一列的小方塊：卡片現在畫的那張，在方塊裡糊掉。
-    blurPreviewUrl: resolveStageBackground({ ...stageBackgroundInput.value, backgroundOff: false }),
+    blurPreviewUrl: backgroundBlurPreview.value,
     colors: BACKGROUND_COLORS.map((c) => ({ value: c.value, label: t(BACKGROUND_COLOR_LABEL_KEYS[c.key]) })),
     uploading: backgroundUploading.value,
     canUpload: backgroundCanUpload.value,
