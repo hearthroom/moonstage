@@ -88,7 +88,11 @@ export const LOGOUT_CLEARED_STORAGE_KEYS = [
 					clearTempParam(state) {
 						state.tempParam = null;
 					},
+					// currentRole 跟著 app_data 存在本機，新文件拿到的是上一次讀到的那張卡。
+					// 換成別張卡就丟掉它：頁首與介紹讀它，角色細節讀不到時會一直顯示別張卡。
 					setCurrentRoleId(state, roleId) {
+						const held = state.currentRole && String(state.currentRole.characterRoleId || '').toLowerCase();
+						if (held !== String(roleId || '').toLowerCase()) state.currentRole = null;
 						state.currentRoleId = roleId;
 					},
 					setCurrentRole(state, role){
