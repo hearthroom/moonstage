@@ -970,7 +970,11 @@ describe('desktop chat operation product contract', () => {
     expect(scheduler).toContain('recoverOperationStatusPollingExhausted')
     expect(foreground).toContain('resumePendingOperationReconciliationOnForeground')
     expect(unload).toContain('preservePersistedOperation: hasPersistedPendingOperationIdentity()')
-    expect(backPress).toContain('preservePersistedOperation: hasPersistedPendingOperationIdentity()')
+    // A handled Back closes an overlay and leaves the reply alone. Only an
+    // actual departure reaches onUnload, which preserves durable recovery.
+    expect(backPress).toContain('void closeTopCanvasOverlay()')
+    expect(backPress).toContain('return true')
+    expect(backPress.slice(0, backPress.indexOf('});'))).not.toContain('teardownStreamForConversationSwitch')
   })
 
   it('routes toolbar regeneration through Rewrite even when the latest AI was created by Continue', () => {
