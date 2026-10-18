@@ -629,3 +629,15 @@ describe('原生區塊：沒有規則的卡也有面板與選項', () => {
     expect(bodies[1].textContent).toContain('[status]')
   })
 })
+
+describe('功能欄掛載檔案的格式字元', () => {
+  it('不讓頂層獨立 BOM 排出一條空行；保留正常功能欄、行內空格與內容中的字元', () => {
+    const s=boot(config({card:{rules:[],statusbar:'mount',statusbarHtml:'\n\ufeff<div class="rail" style="position:fixed">Rail</div><span>A</span> <span>B\ufeffC</span>'}}))
+    const slot=s.refs.statusbar!
+    const stray=Array.from(slot.childNodes).filter(n=>n.nodeType===3&&n.textContent?.includes('\ufeff')&&!n.textContent.trim())
+    expect(stray).toHaveLength(0)
+    expect(slot.querySelector('.rail')).not.toBeNull()
+    expect(slot.querySelectorAll('span')[1].textContent).toBe('B\ufeffC')
+    expect(Array.from(slot.childNodes).some(n=>n.nodeType===3&&n.textContent===' ')).toBe(true)
+  })
+})
