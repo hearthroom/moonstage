@@ -230,10 +230,10 @@ describe('作者固定寬內容保留，超過視窗時在內容內可橫捲', (
     rect(bubble,{left:10,right:330});rect(body,{left:24,right:316})
     Object.defineProperty(body,'scrollWidth',{configurable:true,value:700})
     expect(clampWideBubble(bubble,{left:8,right:352},window)).toBe(true)
-    expect(body.hasAttribute('data-lt-overflow-scroll')).toBe(true)
+    expect(bubble.hasAttribute('data-lt-overflow-scroll')).toBe(true)
     expect((body.firstElementChild as HTMLElement).style.width).toBe('700px')
     resetBubbleFit(document.body)
-    expect(body.hasAttribute('data-lt-overflow-scroll')).toBe(false)
+    expect(bubble.hasAttribute('data-lt-overflow-scroll')).toBe(false)
   })
   it('內容只伸出外框但仍在視窗內，就保持原樣', () => {
     document.body.innerHTML='<div class="mes_text" id="bubble"><div class="lt-bubble-body"></div></div>'
@@ -241,6 +241,24 @@ describe('作者固定寬內容保留，超過視窗時在內容內可橫捲', (
     rect(bubble,{left:10,right:330});rect(body,{left:24,right:316})
     Object.defineProperty(body,'scrollWidth',{configurable:true,value:320})
     expect(clampWideBubble(bubble,{left:8,right:352},window)).toBe(false)
-    expect(body.hasAttribute('data-lt-overflow-scroll')).toBe(false)
+    expect(bubble.hasAttribute('data-lt-overflow-scroll')).toBe(false)
+  })
+})
+
+// Browser reproduction: flex-end keeps a fixed 700px panel aligned to the right,
+// so its negative overflow is absent from the LTR body's scrollWidth.
+describe('向左溢出的作者固定寬內容', () => {
+  it('偵測負向溢出，保留作者寬度並把兩端放進氣泡可捲範圍', () => {
+    document.body.innerHTML='<div class="mes_text" id="bubble"><div class="lt-bubble-body"><div style="display:flex;justify-content:flex-end"><div id="wide" style="width:700px;flex-shrink:0">Panel</div></div></div></div>'
+    const bubble=document.getElementById('bubble')!,body=bubble.firstElementChild as HTMLElement
+    rect(bubble,{left:10,right:358});rect(body,{left:24,right:344})
+    rect(body.firstElementChild!,{left:24,right:344});rect(document.getElementById('wide')!,{left:-356,right:344})
+    Object.defineProperty(body,'scrollWidth',{configurable:true,value:320})
+    expect(clampWideBubble(bubble,{left:8,right:382},window)).toBe(true)
+    expect(bubble.hasAttribute('data-lt-overflow-scroll')).toBe(true)
+    expect(body.style.getPropertyValue('--lt-overflow-offset')).toBe('380px')
+    expect(document.getElementById('wide')!.style.width).toBe('700px')
+    resetBubbleFit(document.body)
+    expect(body.style.getPropertyValue('--lt-overflow-offset')).toBe('')
   })
 })

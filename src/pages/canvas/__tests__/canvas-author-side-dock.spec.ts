@@ -295,7 +295,7 @@ describe('側欄只避開文字，不重複計入氣泡 padding', () => {
 
 
 describe('DOM：用實際氣泡 padding 抵扣側欄避讓', () => {
-  it('含 padding 的氣泡扣重複留白；作者清零後外部刷新回到全額', () => {
+  it('氣泡 padding 動態清零後自動回到全額，不靠外部刷新或 resize', async () => {
     document.body.innerHTML = '<div id="lane"><div data-lt="bubble" style="padding:10px 14px">Text</div></div><div id="rail"></div>'
     const lane=document.getElementById('lane')!, rail=document.getElementById('rail')!
     const bubble=lane.firstElementChild as HTMLElement
@@ -304,12 +304,11 @@ describe('DOM：用實際氣泡 padding 抵扣側欄避讓', () => {
     bubble.getBoundingClientRect=()=>({left:10,right:350,top:120,bottom:300,width:340,height:180}) as DOMRect
     const raf=window.requestAnimationFrame
     window.requestAnimationFrame=fn=>{fn(0);return 1}
-    let refresh=()=>{}
     try {
-      const dispose=bindAuthorSideDock({doc:document,win:window,lane,scroll:lane,candidates:()=>[rail],observe:[],target:document.documentElement,subscribe:fn=>{refresh=fn}})
+      const dispose=bindAuthorSideDock({doc:document,win:window,lane,scroll:lane,candidates:()=>[rail],observe:[],target:document.documentElement})
       expect(document.documentElement.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('8px')
       bubble.style.padding='0px'
-      refresh()
+      await new Promise(resolve => setTimeout(resolve, 0))
       expect(document.documentElement.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('22px')
       dispose()
     } finally { window.requestAnimationFrame=raf }

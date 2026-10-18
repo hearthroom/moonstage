@@ -271,6 +271,7 @@ export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
     if (raf === -1) raf = id
   }
   let observer: MutationObserver | null = null
+  let bubbleObserver: MutationObserver | null = null
   const MO = (win as Window & { MutationObserver?: typeof MutationObserver }).MutationObserver || (typeof MutationObserver === 'function' ? MutationObserver : null)
   if (MO) {
     observer = new MO(schedule)
@@ -278,6 +279,17 @@ export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
       if (node) observer.observe(node, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] })
     }
     for (const node of observeShallow) if (node) observer.observe(node, { childList: true })
+    // Padding is now an input, so author style/class changes and newly mounted
+    // bubbles must refresh it too. Ignore streaming/decorative descendants.
+    const hasBubble = (node: Node) => node.nodeType === 1 && (
+      (node as Element).matches('[data-lt="bubble"]') || !!(node as Element).querySelector('[data-lt="bubble"]')
+    )
+    bubbleObserver = new MO((records) => {
+      if (records.some((record) => record.type === 'attributes'
+        ? hasBubble(record.target)
+        : Array.from(record.addedNodes).concat(Array.from(record.removedNodes)).some(hasBubble))) schedule()
+    })
+    bubbleObserver.observe(lane, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] })
   }
   win.addEventListener('resize', schedule)
   if (subscribe) { try { subscribe(schedule) } catch { /* 訂不到就只靠觀察器 */ } }
@@ -285,6 +297,7 @@ export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
   return () => {
     disposed = true
     if (observer) { try { observer.disconnect() } catch { /* 收尾不得拋錯 */ } observer = null }
+    if (bubbleObserver) { try { bubbleObserver.disconnect() } catch { /* 收尾不得拋錯 */ } bubbleObserver = null }
     win.removeEventListener('resize', schedule)
     try { target.style.removeProperty(SIDE_DOCK_LEFT_VAR); target.style.removeProperty(SIDE_DOCK_RIGHT_VAR) } catch { /* 同上 */ }
   }

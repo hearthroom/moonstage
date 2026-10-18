@@ -25,15 +25,44 @@ export function bubbleCap(bubble: Span, limit: Span): number | null {
 }
 
 /** 作者內容可以伸出氣泡，但伸出視窗時要能捲到，而不是被外層裁掉。 */
-function fitContentOverflow(bubble: HTMLElement, limit: Span): boolean {
+function clearContentOverflow(bubble: HTMLElement): void {
+  bubble.removeAttribute(OVERFLOW_ATTR)
+  const body = bubble.querySelector('.lt-bubble-body') as HTMLElement | null
+  if (!body) return
+  for (const name of ['--lt-overflow-offset', '--lt-overflow-body-width']) body.style.removeProperty(name)
+}
+
+function fitContentOverflow(bubble: HTMLElement, limit: Span, win: Window): boolean {
   const body = bubble.querySelector('.lt-bubble-body') as HTMLElement | null
   if (!body) return false
-  const left = body.scrollLeft
-  body.removeAttribute(OVERFLOW_ATTR)
+  const left = bubble.scrollLeft
+  clearContentOverflow(bubble)
   const rect = body.getBoundingClientRect()
-  if (!(body.scrollWidth > limit.right - rect.left + 0.5)) return false
-  body.setAttribute(OVERFLOW_ATTR, '')
-  body.scrollLeft = left
+  let minLeft = rect.left
+  // LTR scrollWidth excludes negative overflow (for example a flex-end fixed
+  // panel). Measure normal-flow descendants too; nested scrollports already
+  // own their overflow, and fixed/absolute decorations keep their author intent.
+  const stack = Array.from(body.children).reverse()
+  let seen = 0
+  while (stack.length && seen++ < MAX_NODES) {
+    const el = stack.pop() as HTMLElement
+    const style = win.getComputedStyle(el)
+    if (style.display === 'none' || style.position === 'fixed' || style.position === 'absolute') continue
+    const box = el.getBoundingClientRect()
+    if (box.width > 0) minLeft = Math.min(minLeft, box.left)
+    if (style.overflowX && style.overflowX !== 'visible') continue
+    for (let i = el.children.length - 1; i >= 0; i--) stack.push(el.children[i])
+  }
+  const negative = minLeft < limit.left - 0.5 ? Math.ceil(rect.left - minLeft) : 0
+  if (!negative && !(body.scrollWidth > limit.right - rect.left + 0.5)) return false
+  // Scroll the existing bubble, keeping the body's original used width.
+  // Positive margin moves negative content into its reachable scroll range;
+  // unlike transform/wrapping it creates no new fixed-position containing block.
+  const margin = parseFloat(win.getComputedStyle(body).marginLeft) || 0
+  body.style.setProperty('--lt-overflow-offset', (margin + negative) + 'px')
+  body.style.setProperty('--lt-overflow-body-width', rect.width + 'px')
+  bubble.setAttribute(OVERFLOW_ATTR, '')
+  bubble.scrollLeft = left
   return true
 }
 
@@ -44,7 +73,7 @@ function fitContentOverflow(bubble: HTMLElement, limit: Span): boolean {
 export function clampWideBubble(bubble: HTMLElement, limit: Span, win: Window): boolean {
   const r = bubble.getBoundingClientRect()
   const cap = bubbleCap(r, limit)
-  if (cap == null || !(cap > 0)) return fitContentOverflow(bubble, limit)
+  if (cap == null || !(cap > 0)) return fitContentOverflow(bubble, limit, win)
   // cap 是外框（含內距與邊框）的寬；作者設成 content-box 的氣泡要扣掉再寫，外框才正好停在上限。
   const style = win.getComputedStyle(bubble)
   const px = (v: string) => parseFloat(v) || 0
@@ -79,13 +108,13 @@ export function clampWideBubble(bubble: HTMLElement, limit: Span, win: Window): 
     }
     for (let i = el.children.length - 1; i >= 0; i--) stack.push(el.children[i])
   }
-  fitContentOverflow(bubble, limit)
+  fitContentOverflow(bubble, limit, win)
   return true
 }
 
 /** 拿掉這裡加的寬度（只拿自己加的屬性，作者原本的 inline 樣式留著）。 */
 export function resetBubbleFit(root: ParentNode): void {
-  root.querySelectorAll('[' + OVERFLOW_ATTR + ']').forEach(el => el.removeAttribute(OVERFLOW_ATTR))
+  root.querySelectorAll('[' + OVERFLOW_ATTR + ']').forEach(el => clearContentOverflow(el as HTMLElement))
   root.querySelectorAll('[' + FIT_ATTR + ']').forEach((el) => {
     const h = el as HTMLElement
     h.style.removeProperty('width')
