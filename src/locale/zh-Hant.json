@@ -5,7 +5,7 @@
 	"canvas.favorite.add": "收藏",
 	"canvas.favorite.remove": "取消收藏",
 	"canvas.favorite.failed": "收藏沒有成功，請再試一次。",
-	"canvas.roleLoadFailed": "讀不到這張卡的資料，重新整理後再試一次。",
+	"canvas.roleLoadFailed": "這張卡沒有載入成功，請重新整理再試一次。",
 	"canvas.comments.open": "查看評論",
 
 	"error.contextCapacityTitle": "內容超過模型容量",
