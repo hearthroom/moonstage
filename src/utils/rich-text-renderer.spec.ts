@@ -113,3 +113,16 @@ describe('official SukiSuki links', () => {
     });
   }
 });
+
+describe('indented author images', () => {
+  test('renders an indented image while retaining an explicit source-code fence', () => {
+    const image = '<img src="data:," style="display:none" onerror="boot(this)">'
+    const holder = document.createElement('div')
+    holder.innerHTML = renderRichText('Intro\n\n    ' + image)
+    expect(holder.querySelector('img')?.getAttribute('onerror')).toBe('boot(this)')
+    expect(holder.textContent).not.toContain('<img')
+    holder.innerHTML = renderRichText('Example:\n\n```html\n    ' + image + '\n```')
+    expect(holder.querySelector('img')).toBeNull()
+    expect(holder.querySelector('pre code')?.textContent).toContain('<img')
+  })
+})

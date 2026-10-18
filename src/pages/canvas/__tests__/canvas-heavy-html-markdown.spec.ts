@@ -1,4 +1,5 @@
 import { applyTavernRules } from '../canvas-rule-engine'
+import { installCard, renderContent } from '../../../sandbox/rules'
 // highlightText 現在也綁這兩支（圍欄保護與前端區塊標記），跟頁面裡一樣是真實函式。
 import { withFencesProtected } from '../../../common/markdown-fences'
 import { tagFrontendBlocks } from '../../../common/frontend-block'
@@ -111,5 +112,40 @@ describe('重 HTML 訊息裡的 Markdown', () => {
     const el = render('早安。\n\n<div class="card">卡</div>\n\n---\n\n*輕聲*')
     expect(el.querySelector('hr')).not.toBeNull()
     expect(el.querySelector('div.card')).not.toBeNull()
+  })
+})
+
+// Author HTML can be indented independently of its surrounding panel. The display
+// engine normalizes relative trigger sources, but the whole tag must stay live HTML.
+describe('indented display-rule image triggers', () => {
+  const handler = "this.closest('.panel').setAttribute('title', 'ready'); this.remove()"
+  const image = `<img src="x" style="display:none" onerror="${handler}">`
+
+  it.each(['    ', '        ', '\t'])('keeps the image after a panel and a blank line (%j)', (indent) => {
+    const rules = [{ id: 'boot', find: '{{panel}}', replace: `<div class="panel">Choose\n\n${indent}${image}\n</div>\n\n**Next**` }]
+    const applied = applyTavernRules('{{panel}}', rules).html
+    const el = render(applied)
+    expect(el.querySelector('img')?.getAttribute('src')).toBe('data:,')
+    expect(el.querySelector('img')?.getAttribute('onerror')).toBe(handler)
+    expect(el.querySelector('img')?.getAttribute('style')).toBe('display:none')
+    expect(el.textContent).not.toContain('<img')
+    expect(el.querySelector('strong')?.textContent).toBe('Next')
+    const img = el.querySelector('img')!
+    new Function(img.getAttribute('onerror')!).call(img)
+    expect(el.querySelector('.panel')?.getAttribute('title')).toBe('ready')
+    expect(el.querySelector('img')).toBeNull()
+
+    const installed = installCard(rules, stylePolicyFor('mmd'))
+    const sandbox = document.createElement('div')
+    sandbox.innerHTML = renderContent('{{panel}}', installed.rules, { macros: { user: 'Player', char: 'Card' }, doc: document })
+    expect(sandbox.querySelector('img')?.getAttribute('src')).toBe('data:,')
+    expect(sandbox.querySelector('img')?.getAttribute('onerror')).toBe(handler)
+    expect(sandbox.textContent).not.toContain('<img')
+  })
+
+  it('keeps intentionally fenced image source visible', () => {
+    const el = render('Example:\n\n```html\n    ' + image + '\n```')
+    expect(el.querySelector('img')).toBeNull()
+    expect(el.querySelector('pre code')?.textContent).toContain('<img')
   })
 })
