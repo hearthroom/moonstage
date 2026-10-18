@@ -16,7 +16,8 @@
     data-*，作者 CSS 則原樣生效，兩種頁面才能用同一種寫法。
   - 讓完之後欄寬不到原本四分之三（或 240px）就整個不讓，小螢幕不擠成一條。
 
-  寫出去的是「內距至少要多少」，CSS 用 max(原內距, 變數)：量出來比原內距小（桌機欄置中，側欄
+  避開的是文字：側欄侵入量加原本 6px 間隙，再扣掉實際氣泡 padding（作者清成 0 就全額讓）。
+  寫出去的是「欄內距至少要多少」，CSS 用 max(原內距, 變數)：量出來比原內距小（桌機欄置中，側欄
   碰不到氣泡）就等於沒變。量的是 #chat 的外框，不受這份內距影響，不會自己觸發自己。
 */
 
@@ -35,6 +36,8 @@ export type DockInput = {
   /** 左右取 #chat 的外框，上下取捲動區看得到的那一段 */
   lane: Box
   candidates: DockCandidate[]
+  /** 平台氣泡已提供的文字內距；不重複把外框也推開。 */
+  bubblePadding?: DockClearance
 }
 
 export type DockClearance = { left: number; right: number }
@@ -100,7 +103,7 @@ export function sideDockClearance(input: DockInput): DockClearance {
     if (!side) continue
     const intrusion = intrusionOf(side, box, lane)
     if (!(intrusion > 0)) continue
-    out[side] = Math.max(out[side], Math.round(intrusion + GAP))
+    out[side] = Math.max(out[side], Math.max(0, Math.round(intrusion + GAP - (input.bubblePadding?.[side] || 0))))
   }
 
   const remaining = laneWidth - out.left - out.right
@@ -240,7 +243,19 @@ export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
         return { box: paintedBox(subtreeRects(el, win), viewport), declared: declarationOf(el, win) || (slot ? slot.side : '') }
       })
     } catch { list = [] }
-    const out = sideDockClearance({ lane: { left: l.left, right: l.right, top: s.top, bottom: s.bottom }, candidates: list })
+    // 取目前訊息裡最小的實際 padding，任何一種氣泡都不能被側欄蓋到字。
+    // 量不到（尚未掛訊息）就不扣，作者清成 0 也會回到全額避讓。
+    let bubblePadding: DockClearance | undefined
+    for (const bubble of Array.from(lane.querySelectorAll('[data-lt="bubble"]'))) {
+      const rect = bubble.getBoundingClientRect()
+      if (!(rect.width > 0 && rect.height > 0)) continue
+      let style: CSSStyleDeclaration
+      try { style = win.getComputedStyle(bubble) } catch { continue }
+      const pad = { left: Math.max(0, parseFloat(style.paddingLeft) || 0), right: Math.max(0, parseFloat(style.paddingRight) || 0) }
+      if (!bubblePadding) bubblePadding = pad
+      else { bubblePadding.left = Math.min(bubblePadding.left, pad.left); bubblePadding.right = Math.min(bubblePadding.right, pad.right) }
+    }
+    const out = sideDockClearance({ bubblePadding, lane: { left: l.left, right: l.right, top: s.top, bottom: s.bottom }, candidates: list })
     // 差不到 2px 不重寫：側欄動畫、次像素抖動不該讓整條對話欄跟著重排。
     if (Math.abs(out.left - last.left) >= 2 || (out.left === 0) !== (last.left === 0)) write(SIDE_DOCK_LEFT_VAR, out.left)
     if (Math.abs(out.right - last.right) >= 2 || (out.right === 0) !== (last.right === 0)) write(SIDE_DOCK_RIGHT_VAR, out.right)

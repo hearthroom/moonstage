@@ -301,15 +301,25 @@ export function createShell(options: CreateShellOptions): Shell {
   // 舞台與訊息列容器也已經在上面掛好了，作者腳本啟動時看得到跟舊頁一樣的骨架。
   // 前端區塊協議：圍欄裝的整份 HTML 文件，定稿後各自掛成 iframe（跟酒館助手的渲染器同一套慣例）。
   const mountFrontend = (root: HTMLElement) => { mountFrontendBlocks(root, { charAvatar: config.role.avatarUrl, userAvatar: config.user.avatarUrl, doc }) }
+  const setStatusbarHtml = (html: string) => {
+    if (!refs.statusbar) return
+    refs.statusbar.innerHTML = html
+    // 匯入檔案的獨立 BOM 是不可見格式字元，但會讓 block 掛載槽產生一行高度。
+    // 只移除頂層純格式文字；功能欄正文、元素內文字與行內間距照舊。
+    for (const node of Array.from(refs.statusbar.childNodes)) {
+      if (node.nodeType === 3 && node.textContent?.includes('\uFEFF') && !node.textContent.trim()) node.remove()
+    }
+  }
+
   // 狀態欄的規則結果還沒回來：先畫暫時的，結果到了重畫一次（下面 onSettled）。
   let statusbarPending = false
   if (refs.statusbar) {
     if (config.card.statusbarHtml != null && config.card.statusbarHtml !== '') {
-      refs.statusbar.innerHTML = config.card.statusbarHtml
+      setStatusbarHtml(config.card.statusbarHtml)
     } else {
       const out = render(config.card.statusbar)
       statusbarPending = typeof out !== 'string'
-      refs.statusbar.innerHTML = htmlOf(out)
+      setStatusbarHtml(htmlOf(out))
     }
     mountFrontend(refs.statusbar)
   }
@@ -380,7 +390,7 @@ export function createShell(options: CreateShellOptions): Shell {
     if (statusbarPending && refs.statusbar) {
       const out = render(config.card.statusbar)
       statusbarPending = typeof out !== 'string'
-      if (!statusbarPending) { refs.statusbar.innerHTML = htmlOf(out); mountFrontend(refs.statusbar) }
+      if (!statusbarPending) { setStatusbarHtml(htmlOf(out)); mountFrontend(refs.statusbar) }
     }
     list.refresh()
   })
@@ -397,7 +407,7 @@ export function createShell(options: CreateShellOptions): Shell {
         if (refs.statusbar && !(config.card.statusbarHtml != null && config.card.statusbarHtml !== '')) {
           const out = render(config.card.statusbar)
           statusbarPending = typeof out !== 'string'
-          refs.statusbar.innerHTML = htmlOf(out)
+          setStatusbarHtml(htmlOf(out))
           mountFrontend(refs.statusbar)
         }
         list.rerenderAll()

@@ -736,10 +736,9 @@
      寬度上限放在這一層、氣泡在裡面 100%——不然「百分比上限對著一個縮到內容寬的父層」
      會互相參照，氣泡被多縮一次。
 
-     下限是內容的最小寬度：作者用 vw／px 寫死寬度的面板（#100076 的 80vw 角色面板）比 94%
-     還寬時，外框跟著內容撐開，不讓面板伸出氣泡。一般文字有 overflow-wrap:anywhere，最小寬度
-     只有一個字，不會因此變寬。撐開沒有上限，所以撐到對話欄邊界就由 canvas-bubble-fit.ts 釘住
-     ——這個頁面沒有橫向捲動，任何內容都不准超出畫面。
+     外框守住 94% 上限，不讓 Shadow DOM／表單等內容的 intrinsic 最小寬度把外框撐大。
+     作者明寫固定寬度的內容可以伸出外框；最外層仍由 viewport 安全邊界處理。
+
   */
   .mes_turn {
     display: flex;
@@ -747,7 +746,7 @@
     align-items: flex-start;
     align-self: flex-start;
     gap: 4px;
-    min-width: min-content;
+    min-width: 0;
     max-width: 94%;
   }
 
@@ -760,6 +759,9 @@
   }
 
   .mes_text {
+    /* 沙盒沒有宿主的 border-box 重置：padding 必須算在 94% 這一組的寬度內。
+       只定平台氣泡，MMD 作者內容的 content-box 規則與覆蓋權保持原樣。 */
+    box-sizing: border-box;
     max-width: var(--lt-canvas-bubble-max-width);
     padding: var(--lt-canvas-bubble-padding);
     border-radius: var(--lt-canvas-bubble-radius);
@@ -767,6 +769,11 @@
     color: var(--lt-canvas-bubble-fg);
     line-height: var(--lt-canvas-bubble-line-height, 1.75);
     overflow-wrap: anywhere;
+  }
+
+  /* 作者固定寬面板只超出外框時保持原樣；超過視窗時讓內容自己橫捲，不裁掉也不改作者寬度。 */
+  .lt-bubble-body[data-lt-overflow-scroll] {
+    overflow-x: auto;
   }
 
   .mes_text.right {

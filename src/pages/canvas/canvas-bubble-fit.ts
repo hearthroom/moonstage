@@ -1,19 +1,14 @@
 /*
-  氣泡不准超出對話欄——卡片內容寫死多寬都一樣。
+  平台氣泡的外框守住每列 94% 上限，作者的固定寬內容可以伸出外框。
+  只有伸出視窗的內容才在正文容器內橫捲，保留作者寬度並讓全部內容可達。
+  作者明確覆寫氣泡本身的寬度、使它超出視窗時，沿用既有的 viewport 保底。
 
-  氣泡那一列（.mes_turn）在 canvas.css 裡撐到內容的最小寬度：作者用 vw 寫死寬度的面板
-  （#100076：`.character-panel-wrap{width:80vw}`，手機上 344px）不再伸出氣泡外框，外框跟著
-  內容走。但 min-content 沒有上限——作者寫 width:700px，氣泡就被撐到 700px，捲動區雖然
-  overflow-x:hidden，內容已經在畫面外，程式捲動（捲到某個元素）還是能把整頁往旁邊推。
-  這個頁面沒有設計任何橫向捲動，所以這裡保底：氣泡碰到對話欄邊界（兩側各留 EDGE）就釘住
-  寬度，裡面伸出去的最外層元素收進 max-width:100%。
-
-  只在真的超出時動手，沒超出的氣泡一個屬性都不碰。動過的都標上屬性，視窗尺寸一變先全部
-  拿掉再量——上限是跟著畫面寬度算的，轉向之後舊的數字就不對了。
+  量測只處理變動的氣泡；重算時保留捲動位置，避免作者動畫讓長訊息反覆跳動。
 */
 
 export const FIT_ATTR = 'data-lt-fit'
 const FIT_CHILD_ATTR = 'data-lt-fit-child'
+const OVERFLOW_ATTR = 'data-lt-overflow-scroll'
 /** 氣泡離對話欄邊界至少留多少 */
 const EDGE = 8
 const MAX_NODES = 2000
@@ -29,6 +24,19 @@ export function bubbleCap(bubble: Span, limit: Span): number | null {
   return Math.floor(overRight ? limit.right - bubble.left : bubble.right - limit.left)
 }
 
+/** 作者內容可以伸出氣泡，但伸出視窗時要能捲到，而不是被外層裁掉。 */
+function fitContentOverflow(bubble: HTMLElement, limit: Span): boolean {
+  const body = bubble.querySelector('.lt-bubble-body') as HTMLElement | null
+  if (!body) return false
+  const left = body.scrollLeft
+  body.removeAttribute(OVERFLOW_ATTR)
+  const rect = body.getBoundingClientRect()
+  if (!(body.scrollWidth > limit.right - rect.left + 0.5)) return false
+  body.setAttribute(OVERFLOW_ATTR, '')
+  body.scrollLeft = left
+  return true
+}
+
 /**
  * 量一個氣泡，超出就鎖回來。回傳有沒有動。
  * 伸出的判斷用「鎖完之後的內容區」：氣泡釘寬之後內容區的左右界是算得出來的，不用再量一次版面。
@@ -36,8 +44,8 @@ export function bubbleCap(bubble: Span, limit: Span): number | null {
 export function clampWideBubble(bubble: HTMLElement, limit: Span, win: Window): boolean {
   const r = bubble.getBoundingClientRect()
   const cap = bubbleCap(r, limit)
-  if (cap == null || !(cap > 0)) return false
-  // cap 是外框（含內距與邊框）的寬；content-box 的氣泡（沙箱殼）要扣掉再寫，外框才正好停在上限。
+  if (cap == null || !(cap > 0)) return fitContentOverflow(bubble, limit)
+  // cap 是外框（含內距與邊框）的寬；作者設成 content-box 的氣泡要扣掉再寫，外框才正好停在上限。
   const style = win.getComputedStyle(bubble)
   const px = (v: string) => parseFloat(v) || 0
   const insetLeft = px(style.paddingLeft) + px(style.borderLeftWidth)
@@ -71,11 +79,13 @@ export function clampWideBubble(bubble: HTMLElement, limit: Span, win: Window): 
     }
     for (let i = el.children.length - 1; i >= 0; i--) stack.push(el.children[i])
   }
+  fitContentOverflow(bubble, limit)
   return true
 }
 
 /** 拿掉這裡加的寬度（只拿自己加的屬性，作者原本的 inline 樣式留著）。 */
 export function resetBubbleFit(root: ParentNode): void {
+  root.querySelectorAll('[' + OVERFLOW_ATTR + ']').forEach(el => el.removeAttribute(OVERFLOW_ATTR))
   root.querySelectorAll('[' + FIT_ATTR + ']').forEach((el) => {
     const h = el as HTMLElement
     h.style.removeProperty('width')

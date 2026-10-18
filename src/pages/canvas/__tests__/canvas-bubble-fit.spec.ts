@@ -76,7 +76,7 @@ describe('把超出的氣泡鎖回畫面內', () => {
     expect(n.deco.style.maxWidth).toBe('')
   })
 
-  it('沙箱殼的氣泡是 content-box：寬度扣掉內距再寫，外框才會正好停在上限', () => {
+  it('作者氣泡覆寫成 content-box：寬度扣掉內距再寫，外框才會正好停在上限', () => {
     const n = build()
     n.b.style.boxSizing = 'content-box'
     rect(n.b, { left: 34, right: 762 })
@@ -110,8 +110,9 @@ describe('接線', () => {
   const vue = readFileSync(resolve(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
   const shell = readFileSync(resolve(process.cwd(), 'src/sandbox/shell.ts'), 'utf8')
 
-  it('氣泡那一列撐到內容的最小寬度（寫死寬度的面板不再伸出氣泡）', () => {
-    expect(css).toMatch(/\.mes_turn \{[^}]*min-width: min-content;/)
+  it('氣泡外框守住94%上限，不讓內容的intrinsic最小寬撐大外框', () => {
+    expect(css).toMatch(/\.mes_turn \{[^}]*min-width: 0;/)
+    expect(css).toMatch(/\.mes_turn \{[^}]*max-width: 94%;/)
   })
 
   // 程式碼框裡的長行在框內左右滑，不把氣泡撐寬（否則每則帶程式碼的回覆都要靠上面的保底釘寬）。
@@ -219,5 +220,27 @@ describe('重量氣泡不能動到讀者的捲動位置', () => {
     await tick()
     expect(added.hasAttribute(FIT_ATTR)).toBe(true)
     stop()
+  })
+})
+
+describe('作者固定寬內容保留，超過視窗時在內容內可橫捲', () => {
+  it('外框在94%內，作者寬面板不改寬度，超過視窗的部分仍能在內容區捲到', () => {
+    document.body.innerHTML='<div class="mes_text" id="bubble"><div class="lt-bubble-body"><div style="width:700px">Panel</div></div></div>'
+    const bubble=document.getElementById('bubble')!, body=bubble.firstElementChild as HTMLElement
+    rect(bubble,{left:10,right:330});rect(body,{left:24,right:316})
+    Object.defineProperty(body,'scrollWidth',{configurable:true,value:700})
+    expect(clampWideBubble(bubble,{left:8,right:352},window)).toBe(true)
+    expect(body.hasAttribute('data-lt-overflow-scroll')).toBe(true)
+    expect((body.firstElementChild as HTMLElement).style.width).toBe('700px')
+    resetBubbleFit(document.body)
+    expect(body.hasAttribute('data-lt-overflow-scroll')).toBe(false)
+  })
+  it('內容只伸出外框但仍在視窗內，就保持原樣', () => {
+    document.body.innerHTML='<div class="mes_text" id="bubble"><div class="lt-bubble-body"></div></div>'
+    const bubble=document.getElementById('bubble')!,body=bubble.firstElementChild as HTMLElement
+    rect(bubble,{left:10,right:330});rect(body,{left:24,right:316})
+    Object.defineProperty(body,'scrollWidth',{configurable:true,value:320})
+    expect(clampWideBubble(bubble,{left:8,right:352},window)).toBe(false)
+    expect(body.hasAttribute('data-lt-overflow-scroll')).toBe(false)
   })
 })

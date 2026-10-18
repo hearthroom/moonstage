@@ -271,3 +271,61 @@ describe('接線', () => {
     expect(shell).toMatch(/bus\.on\('message:done'/)
   })
 })
+
+// Side docks protect text rather than the bubble's decorative outer edge.
+// Author padding is measured at runtime; the pure decision receives that inset.
+describe('側欄只避開文字，不重複計入氣泡 padding', () => {
+  it('16px 側欄與 14px 氣泡內距：只需 8px 欄距，CSS 仍保留原本 10px', () => {
+    expect(sideDockClearance({
+      lane: phoneLane, candidates: [rail({left:0,right:16,top:100,bottom:600})],
+      bubblePadding: {left:14,right:14},
+    })).toEqual({left:8,right:0})
+  })
+  it('作者 padding 歸零：讓足側欄與原本 6px 文字間隙', () => {
+    expect(sideDockClearance({
+      lane:phoneLane,candidates:[rail(leftRail),rail(galleryTab)],bubblePadding:{left:0,right:0},
+    })).toEqual({left:34,right:35})
+  })
+  it('左右 padding 不同，分開扣除；padding 比側欄還寬時不再加欄距', () => {
+    expect(sideDockClearance({
+      lane:phoneLane,candidates:[rail(leftRail),rail(galleryTab)],bubblePadding:{left:40,right:8},
+    })).toEqual({left:0,right:27})
+  })
+})
+
+
+describe('DOM：用實際氣泡 padding 抵扣側欄避讓', () => {
+  it('含 padding 的氣泡扣重複留白；作者清零後外部刷新回到全額', () => {
+    document.body.innerHTML = '<div id="lane"><div data-lt="bubble" style="padding:10px 14px">Text</div></div><div id="rail"></div>'
+    const lane=document.getElementById('lane')!, rail=document.getElementById('rail')!
+    const bubble=lane.firstElementChild as HTMLElement
+    lane.getBoundingClientRect=()=>({left:0,right:390,top:53,bottom:844,width:390,height:791}) as DOMRect
+    rail.getBoundingClientRect=()=>({left:0,right:16,top:160,bottom:260,width:16,height:100}) as DOMRect
+    bubble.getBoundingClientRect=()=>({left:10,right:350,top:120,bottom:300,width:340,height:180}) as DOMRect
+    const raf=window.requestAnimationFrame
+    window.requestAnimationFrame=fn=>{fn(0);return 1}
+    let refresh=()=>{}
+    try {
+      const dispose=bindAuthorSideDock({doc:document,win:window,lane,scroll:lane,candidates:()=>[rail],observe:[],target:document.documentElement,subscribe:fn=>{refresh=fn}})
+      expect(document.documentElement.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('8px')
+      bubble.style.padding='0px'
+      refresh()
+      expect(document.documentElement.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('22px')
+      dispose()
+    } finally { window.requestAnimationFrame=raf }
+  })
+  it('同時有不同 padding 的 AI/玩家泡泡時採較小值，不能擋到任一邊的文字', () => {
+    document.body.innerHTML = '<div id="lane"><div data-lt="bubble" style="padding:14px"></div><div data-lt="bubble" style="padding:4px"></div></div><div id="rail"></div>'
+    const lane=document.getElementById('lane')!, rail=document.getElementById('rail')!
+    lane.getBoundingClientRect=()=>({left:0,right:390,top:53,bottom:844,width:390,height:791}) as DOMRect
+    rail.getBoundingClientRect=()=>({left:0,right:16,top:160,bottom:260,width:16,height:100}) as DOMRect
+    for(const b of Array.from(lane.children))b.getBoundingClientRect=()=>({left:10,right:350,top:120,bottom:300,width:340,height:180}) as DOMRect
+    const raf=window.requestAnimationFrame
+    window.requestAnimationFrame=fn=>{fn(0);return 1}
+    try {
+      const dispose=bindAuthorSideDock({doc:document,win:window,lane,scroll:lane,candidates:()=>[rail],observe:[],target:document.documentElement})
+      expect(document.documentElement.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('18px')
+      dispose()
+    } finally { window.requestAnimationFrame=raf }
+  })
+})
