@@ -772,8 +772,13 @@
   }
 
   /* 作者固定寬面板只超出外框時保持原樣；超過視窗時讓內容自己橫捲，不裁掉也不改作者寬度。 */
-  .lt-bubble-body[data-lt-overflow-scroll] {
+  .mes_text[data-lt-overflow-scroll] {
     overflow-x: auto;
+  }
+  .mes_text[data-lt-overflow-scroll] > .lt-bubble-body {
+    box-sizing: border-box;
+    width: var(--lt-overflow-body-width);
+    margin-left: var(--lt-overflow-offset);
   }
 
   .mes_text.right {
