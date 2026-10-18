@@ -61,6 +61,7 @@ describe('context usage on the newly completed reply', () => {
     expect(app.row.value).toMatchObject({ chatFinish: true, chatLoading: false,
       hasContextUsage: true, inputTokens: 200, chatId: 'reply-1', model: 'test-model' })
     expect(app.clearStreamState).toHaveBeenCalledOnce()
+    expect(app.clearStreamState).toHaveBeenCalledWith({ preservePersistedOperation: true })
     expect(app.getHistoryMsg).toHaveBeenCalledOnce()
   })
 

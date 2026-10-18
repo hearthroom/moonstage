@@ -516,9 +516,11 @@ import {
   type DirectiveState,
 } from './canvas-directives'
 import {
-  createPanelState, toggleMore, closeMore, openSheet, closeSheet, onEscape,
+  createPanelState, toggleMore, closeMore, openSheet, closeSheet,
   type CanvasPanelState, type CanvasSheet,
 } from './canvas-panel-state'
+import { createCanvasBackClose } from './canvas-back-close'
+import { incompleteTerminalHistoryOperation } from './chat-history-snapshot'
 import { findVariant, resolveVariant, scoreParts, priceMeaning } from './canvas-model-catalog'
 import { resolveStoredModel, composeModelDisplayName } from './canvas-model-lanes'
 import {
@@ -1002,6 +1004,7 @@ let operationTimedOutNoticeKey = '';
 let backwardOperationRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let backwardOperationRequestKey = '';
 const operationStatusPollScheduler = createOperationStatusPollScheduler();
+const historySnapshotPollScheduler = createOperationStatusPollScheduler();
 let globalSocketHandlers: null | {
   open?: (...args: any[]) => void;
   message?: (...args: any[]) => void;
@@ -1294,6 +1297,7 @@ function clearStreamState(options: { preservePersistedOperation?: boolean } = {}
   }
 }
 function bumpConversationGeneration() {
+  historySnapshotPollScheduler.cancel();
   conversationGeneration.value += 1;
   return conversationGeneration.value;
 }
@@ -1495,13 +1499,11 @@ onMounted(() => {
   // #ifdef H5
   keyboardHandler = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
-    if (panel.value.sheet === 'response-settings') return;
     // 蓋在畫面上的東西先關：功能面板、彈層。ESC 在有東西蓋著的時候按下去，
     // 玩家要的是把它關掉，不是停掉正在生成的回覆。
-    const next = onEscape(panel.value);
-    if (next !== panel.value) {
+    if (hasCanvasOverlay()) {
       e.preventDefault();
-      panel.value = next;
+      void closeTopCanvasOverlay();
       return;
     }
     // Escape：生成中就停止（ChatGPT / Claude.ai 慣例）。
@@ -6561,6 +6563,32 @@ function recoverEmptyHistory(reason: HistoryRecoveryReason, request: {
   return true;
 }
 
+// A terminal outcome is durable before its final message snapshot reaches us.
+// Retry reads only: never resend the player's turn or discard its recovery key.
+function scheduleHistorySnapshotRefresh(request: {
+  conversationId: string
+  generation: number
+  attempt: number
+  page: number
+}, incomplete?: any): boolean {
+  const stored = readLsEntry();
+  if (request.page !== 1 || (!incomplete && !isChatOperationTerminal({ operationId: stored?.operationId, state: stored?.operationState }))) return false;
+  if (incomplete && (!stored?.operationId || stored.operationId === incomplete.operationId)) {
+    writeLsEntry(mergeOperationStatusIntoStreamEntry(stored, incomplete));
+  }
+  const refresh = () => {
+    if (!isConversationGenerationCurrent(request.generation)
+      || String(unref(conversationId)) !== request.conversationId
+      || historyRequestSequence !== request.attempt) return;
+    ajax.value.page = 1;
+    ajax.value.flag = true;
+    getHistoryMsg();
+  };
+  if (historySnapshotPollScheduler.schedule(refresh)) return true;
+  if (historySnapshotPollScheduler.isExhausted()) return historySnapshotPollScheduler.scheduleSlow(refresh);
+  return historySnapshotPollScheduler.hasPending();
+}
+
 //获取历史对话
 // preloadedFirstPage：conversation/start 順便帶回的第一頁（跟 messages 同一份回應）。
 // 只在要的正是這個對話的第一頁時拿來用，省掉開場再問一次 messages；其餘情況照常發請求。
@@ -6613,11 +6641,19 @@ function getHistoryMsg(preloadedFirstPage?: any) {
       return;
     }
     if (res.statusCode == 200) {
+      const incomplete = pageAtHistoryRequest === 1 ? incompleteTerminalHistoryOperation(res.data) : null;
+      if (incomplete) {
+        if (!completeHistoryRequest({ conversationId: conversationIdAtHistoryRequest, requestKey: historyRequestKey })) return;
+        scheduleHistorySnapshotRefresh({ conversationId: conversationIdAtHistoryRequest,
+          generation: generationAtHistoryRequest, attempt: historyRequestAttempt, page: pageAtHistoryRequest }, incomplete);
+        return;
+      }
       if (!completeHistoryRequest({
         conversationId: conversationIdAtHistoryRequest,
         requestKey: historyRequestKey,
       })) return;
       if (pageAtHistoryRequest == 1) {
+        historySnapshotPollScheduler.cancel();
         historyRecoveryAttemptedKey = '';
         historyRecoveryKey = '';
       }
@@ -6681,6 +6717,13 @@ function getHistoryMsg(preloadedFirstPage?: any) {
         userStopRequested.value = false;
         clearStreamState();
         closeWebSocket();
+      }
+      // Cold entry can recover from an incomplete snapshot without a live socket.
+      // Its stored terminal is retired only after this consistent page is applied.
+      if (pageAtHistoryRequest === 1 && pendingChatTurn === pendingAtHistoryRequest && !pendingChatTurn) {
+        const stored = readLsEntry();
+        const settled = res.data.operations?.some((op: any) => op.operationId === stored?.operationId && isChatOperationTerminal(op));
+        if (stored?.operationId && settled) clearStreamState();
       }
       responseSettingsVersion.value = res.data.responseSettingsVersion === 1 ? 1 : 0;
       const operationProjectionUnavailable = (
@@ -6783,6 +6826,13 @@ function getHistoryMsg(preloadedFirstPage?: any) {
         hideLoadTips(true);
       });
     } else {
+      if (shouldCompleteHistoryRequest({ requestConversationId: conversationIdAtHistoryRequest,
+        requestKey: historyRequestKey, currentConversationId: unref(conversationId), activeRequestKey: activeHistoryRequestKey })
+        && scheduleHistorySnapshotRefresh({ conversationId: conversationIdAtHistoryRequest,
+          generation: generationAtHistoryRequest, attempt: historyRequestAttempt, page: pageAtHistoryRequest })) {
+        completeHistoryRequest({ conversationId: conversationIdAtHistoryRequest, requestKey: historyRequestKey });
+        return;
+      }
       const recoveryScheduled = recoverEmptyHistory('transport_error', {
         conversationId: conversationIdAtHistoryRequest,
         generation: generationAtHistoryRequest,
@@ -6810,6 +6860,13 @@ function getHistoryMsg(preloadedFirstPage?: any) {
           requestKey: historyRequestKey,
         });
       }
+      return;
+    }
+    if (shouldCompleteHistoryRequest({ requestConversationId: conversationIdAtHistoryRequest,
+      requestKey: historyRequestKey, currentConversationId: unref(conversationId), activeRequestKey: activeHistoryRequestKey })
+      && scheduleHistorySnapshotRefresh({ conversationId: conversationIdAtHistoryRequest,
+        generation: generationAtHistoryRequest, attempt: historyRequestAttempt, page: pageAtHistoryRequest })) {
+      completeHistoryRequest({ conversationId: conversationIdAtHistoryRequest, requestKey: historyRequestKey });
       return;
     }
     const recoveryScheduled = recoverEmptyHistory('transport_error', {
@@ -7252,11 +7309,10 @@ function refreshHistoryAfterAuthoritativeOperation(status: any) {
   if (currentChatId.value) {
     try { clearStreamCache(String(currentChatId.value) + ':0'); } catch (_) {}
   }
-  pendingChatTurn = null;
   pendingResendPayload.value = null;
   isResumeInitial.value = false;
   userStopRequested.value = false;
-  clearStreamState();
+  clearStreamState({ preservePersistedOperation: true });
   removeOrphanPlaceholder();
   closeWebSocket();
   // A pre-terminal page-one request may still be in flight for this same
@@ -9068,11 +9124,9 @@ onUnload(() => {
 });
 
 onBackPress(() => {
-  //监听页面卸载
-  teardownStreamForConversationSwitch({
-    preservePersistedOperation: hasPersistedPendingOperationIdentity(),
-    invalidateHistory: true,
-  });
+  if (!hasCanvasOverlay()) return;
+  void closeTopCanvasOverlay();
+  return true;
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -9712,6 +9766,20 @@ const shortcutItems = computed(() => previewOnly.value ? [] : [
 // 自訂指令、用戶人設、設定補充、劇情總結、遊玩教程都不在 v1 裡，
 // 放一顆按下去沒反應的鍵比沒有那顆鍵更糟。
 const panel = ref<CanvasPanelState>(createPanelState())
+let canvasBackClose: ReturnType<typeof createCanvasBackClose> | null = null
+function hasCanvasOverlay() { return menuOpen.value || Boolean(panel.value.sheet) || panel.value.more }
+async function closeTopCanvasOverlay() {
+  if (menuOpen.value) closeMessageMenu()
+  else if (panel.value.sheet) await closeCanvasSheet()
+  else panel.value = closeMore(panel.value)
+}
+watch(hasCanvasOverlay, open => canvasBackClose?.sync(open), { flush: 'sync' })
+onMounted(() => {
+  if (typeof window === 'undefined') return
+  canvasBackClose = createCanvasBackClose({ window, close: closeTopCanvasOverlay })
+  canvasBackClose.sync(hasCanvasOverlay())
+})
+onUnload(() => { canvasBackClose?.dispose(); canvasBackClose = null })
 const responseSettingsVersion = ref(0)
 const responseSettingsSupported = computed(() => responseSettingsVersion.value === 1 && Boolean(conversationId.value) && !previewOnly.value)
 // 有替代開場白的卡在第一次送出前還沒開對話；回覆偏好掛在對話上，所以這時也列出來，
