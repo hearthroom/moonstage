@@ -5,6 +5,7 @@
 	"canvas.favorite.add": "즐겨찾기에 추가",
 	"canvas.favorite.remove": "즐겨찾기에서 삭제",
 	"canvas.favorite.failed": "즐겨찾기를 변경하지 못했어요. 다시 시도해 주세요.",
+	"canvas.roleLoadFailed": "이 카드를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.",
 	"canvas.comments.open": "댓글 보기",
 
 	"error.contextCapacityTitle": "모델의 컨텍스트 용량을 초과했습니다",
