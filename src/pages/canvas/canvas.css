@@ -1000,7 +1000,9 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    padding-top: 2px;
+    box-sizing: border-box;
+    max-width: var(--lt-dock-control-width, none);
+    padding: 2px 0 0 var(--lt-dock-control-left, 0px);
     opacity: var(--lt-canvas-actions-opacity);
     transition: opacity 150ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }

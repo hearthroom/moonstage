@@ -19,7 +19,7 @@ const phoneLane: Box = { left: 0, right: 430, top: 53, bottom: 824 }
 const leftRail: Box = { left: 0, right: 28, top: 233, bottom: 649 }
 const galleryTab: Box = { left: 401, right: 430, top: 155, bottom: 217 }
 const scriptTab: Box = { left: 401, right: 430, top: 317, bottom: 429 }
-const rail = (box: Box | null, declared: DockCandidate['declared'] = ''): DockCandidate => ({ box, declared })
+const rail = (box: Box | null, declared: DockCandidate['declared'] = '', canOverlapBubble = false): DockCandidate => ({ box, declared, canOverlapBubble })
 
 describe('貼邊的窄側欄：對話欄讓出空間', () => {
   it('#100076 手機：左右各讓到側欄外緣再多 6px', () => {
@@ -277,18 +277,18 @@ describe('接線', () => {
 describe('側欄只避開文字，不重複計入氣泡 padding', () => {
   it('16px 側欄與 14px 氣泡內距：只需 8px 欄距，CSS 仍保留原本 10px', () => {
     expect(sideDockClearance({
-      lane: phoneLane, candidates: [rail({left:0,right:16,top:100,bottom:600})],
+      lane: phoneLane, candidates: [rail({left:0,right:16,top:100,bottom:600}, '', true)],
       bubblePadding: {left:14,right:14},
     })).toEqual({left:8,right:0})
   })
   it('作者 padding 歸零：讓足側欄與原本 6px 文字間隙', () => {
     expect(sideDockClearance({
-      lane:phoneLane,candidates:[rail(leftRail),rail(galleryTab)],bubblePadding:{left:0,right:0},
+      lane:phoneLane,candidates:[rail(leftRail, '', true),rail(galleryTab, '', true)],bubblePadding:{left:0,right:0},
     })).toEqual({left:34,right:35})
   })
   it('左右 padding 不同，分開扣除；padding 比側欄還寬時不再加欄距', () => {
     expect(sideDockClearance({
-      lane:phoneLane,candidates:[rail(leftRail),rail(galleryTab)],bubblePadding:{left:40,right:8},
+      lane:phoneLane,candidates:[rail(leftRail, '', true),rail(galleryTab, '', true)],bubblePadding:{left:40,right:8},
     })).toEqual({left:0,right:27})
   })
 })
@@ -296,7 +296,7 @@ describe('側欄只避開文字，不重複計入氣泡 padding', () => {
 
 describe('DOM：用實際氣泡 padding 抵扣側欄避讓', () => {
   it('氣泡 padding 動態清零後自動回到全額，不靠外部刷新或 resize', async () => {
-    document.body.innerHTML = '<div id="lane"><div data-lt="bubble" style="padding:10px 14px">Text</div></div><div id="rail"></div>'
+    document.body.innerHTML = '<div id="lane"><div data-lt="bubble" style="padding:10px 14px">Text</div></div><div id="rail" style="position:fixed;z-index:10"></div>'
     const lane=document.getElementById('lane')!, rail=document.getElementById('rail')!
     const bubble=lane.firstElementChild as HTMLElement
     lane.getBoundingClientRect=()=>({left:0,right:390,top:53,bottom:844,width:390,height:791}) as DOMRect
@@ -314,7 +314,7 @@ describe('DOM：用實際氣泡 padding 抵扣側欄避讓', () => {
     } finally { window.requestAnimationFrame=raf }
   })
   it('同時有不同 padding 的 AI/玩家泡泡時採較小值，不能擋到任一邊的文字', () => {
-    document.body.innerHTML = '<div id="lane"><div data-lt="bubble" style="padding:14px"></div><div data-lt="bubble" style="padding:4px"></div></div><div id="rail"></div>'
+    document.body.innerHTML = '<div id="lane"><div data-lt="bubble" style="padding:14px"></div><div data-lt="bubble" style="padding:4px"></div></div><div id="rail" style="position:fixed;z-index:10"></div>'
     const lane=document.getElementById('lane')!, rail=document.getElementById('rail')!
     lane.getBoundingClientRect=()=>({left:0,right:390,top:53,bottom:844,width:390,height:791}) as DOMRect
     rail.getBoundingClientRect=()=>({left:0,right:16,top:160,bottom:260,width:16,height:100}) as DOMRect
@@ -328,3 +328,65 @@ describe('DOM：用實際氣泡 padding 抵扣側欄避讓', () => {
     } finally { window.requestAnimationFrame=raf }
   })
 })
+
+// Art return: decorative overlap requires proven author paint priority;
+// action hitboxes always need the full dock clearance, not bubble padding credit.
+describe('側欄層級與操作列完整避讓', () => {
+  it('沒證明側欄在上層，就不能用氣泡 padding 折抵', () => {
+    expect(sideDockClearance({lane:phoneLane,candidates:[rail({left:0,right:16,top:100,bottom:600})],bubblePadding:{left:14,right:14}}))
+      .toEqual({left:22,right:0})
+  })
+
+  it('明確在上層的側欄仍折抵裝飾，但操作列整個點擊框保留6px', async () => {
+    document.body.innerHTML='<div id="lane"><div data-lt="bubble" style="padding:14px"><div id="rail" style="position:fixed;z-index:10"></div></div><div data-lt="message-actions"><button>Menu</button></div></div>'
+    const lane=document.getElementById('lane')!, rail=document.getElementById('rail')!
+    const bubble=lane.firstElementChild as HTMLElement, actions=lane.lastElementChild as HTMLElement
+    lane.getBoundingClientRect=()=>({left:0,right:390,top:53,bottom:844,width:390,height:791}) as DOMRect
+    rail.getBoundingClientRect=()=>({left:0,right:16,top:160,bottom:260,width:16,height:100}) as DOMRect
+    bubble.getBoundingClientRect=()=>({left:10,right:350,top:120,bottom:300,width:340,height:180}) as DOMRect
+    actions.getBoundingClientRect=()=>({left:10,right:54,top:300,bottom:344,width:44,height:44}) as DOMRect
+    const raf=window.requestAnimationFrame
+    window.requestAnimationFrame=fn=>{fn(0);return 1}
+    const dispose=bindAuthorSideDock({doc:document,win:window,lane,scroll:lane,candidates:()=>[rail],observe:[],target:document.documentElement})
+    try {
+      expect(document.documentElement.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('8px')
+      expect(actions.style.getPropertyValue('--lt-dock-control-left')).toBe('12px')
+      await new Promise(resolve=>setTimeout(resolve,0))
+      rail.style.zIndex='auto'
+      await new Promise(resolve=>setTimeout(resolve,0))
+      expect(document.documentElement.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('22px')
+    } finally { dispose();window.requestAnimationFrame=raf }
+    expect(actions.style.getPropertyValue('--lt-dock-control-left')).toBe('')
+  })
+
+  it('側欄陷在較低的祖先堆疊時，即使自己z-index高也不折抵', () => {
+    document.body.innerHTML='<div id="lane"><div data-lt="bubble" style="padding:14px"></div></div><div style="position:relative;z-index:-1"><div id="rail" style="position:fixed;z-index:9999"></div></div>'
+    const lane=document.getElementById('lane')!, rail=document.getElementById('rail')!, bubble=lane.firstElementChild as HTMLElement
+    lane.getBoundingClientRect=()=>({left:0,right:390,top:53,bottom:844,width:390,height:791}) as DOMRect
+    rail.getBoundingClientRect=()=>({left:0,right:16,top:160,bottom:260,width:16,height:100}) as DOMRect
+    bubble.getBoundingClientRect=()=>({left:10,right:350,top:120,bottom:300,width:340,height:180}) as DOMRect
+    const raf=window.requestAnimationFrame;window.requestAnimationFrame=fn=>{fn(0);return 1}
+    try {
+      const dispose=bindAuthorSideDock({doc:document,win:window,lane,scroll:lane,candidates:()=>[rail],observe:[],target:document.documentElement})
+      expect(document.documentElement.style.getPropertyValue(SIDE_DOCK_LEFT_VAR)).toBe('22px')
+      dispose()
+    } finally {window.requestAnimationFrame=raf}
+  })
+})
+
+  it('右側欄限制操作列可用寬，讓多顆按鈕在安全邊界內換行', () => {
+    document.body.innerHTML='<div id="lane"><div data-lt="bubble" style="padding:14px"></div><div data-lt="message-actions"><button>A</button><button>B</button></div></div><div id="rail" style="position:fixed;z-index:10"></div>'
+    const lane=document.getElementById('lane')!, rail=document.getElementById('rail')!, bubble=lane.firstElementChild as HTMLElement,actions=lane.lastElementChild as HTMLElement
+    lane.getBoundingClientRect=()=>({left:0,right:390,top:53,bottom:844,width:390,height:791}) as DOMRect
+    rail.getBoundingClientRect=()=>({left:374,right:390,top:160,bottom:260,width:16,height:100}) as DOMRect
+    bubble.getBoundingClientRect=()=>({left:10,right:380,top:120,bottom:300,width:370,height:180}) as DOMRect
+    actions.getBoundingClientRect=()=>({left:10,right:390,top:300,bottom:344,width:380,height:44}) as DOMRect
+    const raf=window.requestAnimationFrame;window.requestAnimationFrame=fn=>{fn(0);return 1}
+    try {
+      const dispose=bindAuthorSideDock({doc:document,win:window,lane,scroll:lane,candidates:()=>[rail],observe:[],target:document.documentElement})
+      expect(document.documentElement.style.getPropertyValue(SIDE_DOCK_RIGHT_VAR)).toBe('8px')
+      expect(actions.style.getPropertyValue('--lt-dock-control-width')).toBe('358px')
+      dispose()
+      expect(actions.style.getPropertyValue('--lt-dock-control-width')).toBe('')
+    } finally {window.requestAnimationFrame=raf}
+  })
