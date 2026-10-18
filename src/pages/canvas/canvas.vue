@@ -58,7 +58,7 @@
       ></iframe>
     </div>
 
-    <CanvasStage v-if="!sandboxCard" :background-url="playerBackgroundUrl" :background-landscape-url="playerBackgroundLandscapeUrl" @scroll="onStageScroll">
+    <CanvasStage v-if="!sandboxCard" :background="stageBackground" @scroll="onStageScroll">
       <CanvasIntro :text="introText" :open="introOpen" @toggle="introOpen = !introOpen" />
 
       <CanvasMessage
@@ -193,10 +193,13 @@
 
     <CanvasPopup :open="panel.sheet === 'background'" v-if="!sandboxCard" :title="t('canvas.panel.background')"
                  :close-label="t('main.cancel')" @close="closeCanvasSheet">
-      <CanvasModify
-        :title="t('canvas.panel.background')"
-        :items="backgroundOptions"
+      <CanvasBackgroundPicker
+        v-bind="backgroundPickerProps"
         @pick="onPickBackground"
+        @color="onPickBackgroundColor"
+        @file="onBackgroundFile"
+        @retry="onBackgroundRetry"
+        @delete="onBackgroundDelete"
       />
     </CanvasPopup>
 
@@ -459,12 +462,14 @@ import { createOutcomeUnconfirmedHold } from './outcome-unconfirmed-hold'
 // ── Open Canvas ─────────────────────────────────────────────────
 import '@/common/canvas-theme-vars.css'
 import './canvas.css'
+import './canvas-player-background.css'
 // 殼的 margin／padding 在 layer 外的副本（由 scripts/gen-canvas-chrome-box.mjs 產生），要排在 canvas.css 之後
 import './canvas-chrome-box.css'
 import { createAssistSession } from './canvas-assist-state'
 import CanvasAssist from './components/canvas-assist.vue'
 import CanvasHeader from './components/canvas-header.vue'
 import CanvasStage from './components/canvas-stage.vue'
+import CanvasBackgroundPicker from './components/canvas-background-picker.vue'
 import CanvasIntro from './components/canvas-intro.vue'
 import CanvasMessage from './components/canvas-message.vue'
 import CanvasComposer from './components/canvas-composer.vue'
@@ -477,7 +482,9 @@ import { withFencesProtected } from '@/common/markdown-fences'
 import { tagFrontendBlocks, mountFrontendBlocks } from '@/common/frontend-block'
 import { stylePolicyFor } from '@/common/author-style-policy'
 import { detectAuthorOwnedRegions } from './canvas-author-regions'
-import { resolveStageBackground, resolveStageLandscapeBackground } from './canvas-background'
+import { BACKGROUND_COLORS, backgroundChoiceFrom, backgroundPrefsPatch, readLocalChoice, resolvePlayerBackground, writeLocalChoice, CUSTOM_BACKGROUND_LIMIT, type BackgroundChoice, type BackgroundMode } from './canvas-player-background'
+import { resolveStageBackground } from './canvas-background'
+import { prepareBackgroundUpload } from './canvas-background-upload'
 import { stripUnknownTags, wrapDialogue } from './canvas-platform-defaults'
 import { drawNativeBlocks } from '@/common/native-blocks'
 import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
@@ -1437,6 +1444,7 @@ const {
   formData,
   defaultJailbreak,
   getUserDefine,
+  preferenceSettled,
   currentRole,
   setCurrentRoleId,
   getRole
@@ -1589,9 +1597,58 @@ const stageBackgroundInput = computed(() => ({
   roleAvatar: (roleView.value as any).roleAvatar,
   roleBackgroundLandscape: (roleView.value as any).roleBackgroundLandscape,
 }));
-const playerBackgroundUrl = computed(() => resolveStageBackground(stageBackgroundInput.value));
-// 橫向螢幕用的那張（卡片選填）；空的話舞台 CSS 退回直圖。
-const playerBackgroundLandscapeUrl = computed(() => resolveStageLandscapeBackground(stageBackgroundInput.value));
+// 玩家自選背景（卡片原圖／模糊／純色／自訂，canvas-player-background.ts）。
+// null＝這張卡的偏好還沒回來、本機也沒紀錄：先不畫圖，免得設過純色的卡第一幀露出原圖。
+const backgroundChoice = ref<BackgroundChoice | null>(null);
+let backgroundChoiceRole = '';
+// 玩家在偏好回來之前就自己選了：偏好回來時不能拿舊值蓋回去。
+let backgroundPickedBeforePreference = false;
+// 這張卡正在等伺服器的偏好（登入玩家開機時）。遊客與純預覽不等：他們選的只存在這台裝置，
+// 之後原地登入讀到的偏好照常生效，不被遊客時的選擇蓋掉。
+let backgroundAwaitingPreference = false;
+// 偏好讀不回來時最多等這麼久，之後照本機紀錄或卡片原圖畫。
+const BACKGROUND_PREFERENCE_WAIT_MS = 4000;
+let backgroundWaitTimer: ReturnType<typeof setTimeout> | null = null;
+function startBackgroundChoice(targetRoleId: string, fetchesPreference: boolean) {
+  const target = String(targetRoleId || '');
+  // 同一張卡再開機（分頁切回來時 onShow 會重跑）：已經決定好的背景留著。偏好只在掛載時讀一次，
+  // 這時清掉就只能等逾時，卡片原圖的玩家會看到背景消失幾秒。
+  if (target && target === backgroundChoiceRole && backgroundChoice.value) return;
+  backgroundChoiceRole = target;
+  backgroundPickedBeforePreference = false;
+  backgroundAwaitingPreference = fetchesPreference;
+  if (fetchesPreference && preferenceSettled.ok && preferenceSettled.roleId === target) {
+    backgroundChoice.value = backgroundChoiceFrom(formData);
+    return;
+  }
+  const local = readLocalChoice(stageHost.storage, backgroundChoiceRole);
+  backgroundChoice.value = local || (fetchesPreference ? null : backgroundChoiceFrom({}));
+  if (backgroundWaitTimer) clearTimeout(backgroundWaitTimer);
+  if (fetchesPreference && !local) {
+    backgroundWaitTimer = setTimeout(() => {
+      if (!backgroundChoice.value) backgroundChoice.value = backgroundChoiceFrom({});
+    }, BACKGROUND_PREFERENCE_WAIT_MS);
+  }
+}
+watch(() => [preferenceSettled.roleId, preferenceSettled.ok], () => {
+  if (!backgroundChoiceRole || preferenceSettled.roleId !== backgroundChoiceRole) return;
+  if (backgroundWaitTimer) { clearTimeout(backgroundWaitTimer); backgroundWaitTimer = null; }
+  if (!preferenceSettled.ok) {
+    // 讀失敗：本機記過的照本機（已經在畫了），沒記過的照卡片原圖。
+    if (!backgroundChoice.value) backgroundChoice.value = backgroundChoiceFrom({});
+    return;
+  }
+  const pickedEarly = backgroundPickedBeforePreference;
+  backgroundAwaitingPreference = false;
+  backgroundPickedBeforePreference = false;
+  if (pickedEarly && backgroundChoice.value) return;
+  const choice = backgroundChoiceFrom(formData);
+  backgroundChoice.value = choice;
+  writeLocalChoice(stageHost.storage, backgroundChoiceRole, choice);
+});
+const stageBackground = computed(() => resolvePlayerBackground(stageBackgroundInput.value, backgroundChoice.value));
+const playerBackgroundUrl = computed(() => stageBackground.value.portrait);
+const playerBackgroundLandscapeUrl = computed(() => stageBackground.value.landscape);
 
 onLoad((options) => {
   //监听页面加载
@@ -1627,6 +1684,7 @@ async function bootFromDraft(draftId: string, targetRoleId: any) {
     return;
   }
   previewOnly.value = true;
+  startBackgroundChoice('', false);
   // 沒有卡：把角色識別清成空字串，免得下游把預設的 0 當成一張卡。
   roleId.value = '' as any;
   // onLoad 在掛載之前；作者容器要掛在 body 上、量對話欄，等 DOM 在了再套。
@@ -1661,6 +1719,8 @@ function bootRole(targetRoleId: any, draft: AuthorDraft | null) {
   }
   uni.$on('multiPassPreferenceUpdated', onMultiPassPreferenceUpdated);
   formData.roleId = options.roleId;
+  // 背景等這張卡的偏好；遊客與不給存偏好的宿主讀不到，直接照本機紀錄或卡片原圖。
+  startBackgroundChoice(String(options.roleId || ''), !!unref(hasLogin) && stageHost.capabilities?.preferences !== false);
 
   setCurrentRoleId(options.roleId);
   getRole(async (error, data) => {
@@ -2763,7 +2823,7 @@ function buildPanelsState() {
       break;
     case 'background':
       title = t('canvas.panel.background');
-      props = { title, items: backgroundOptions.value };
+      props = { ...backgroundPickerProps.value };
       break;
     case 'font':
       title = t('canvas.panel.font');
@@ -2841,7 +2901,13 @@ function onSandboxPanelUi(panelName: string, event: string, args: unknown[]) {
       else if (event === 'delete') onDeleteArchive(str());
       else if (event === 'new') onNewFromArchives();
       return;
-    case 'background': if (event === 'pick') onPickBackground(str()); return;
+    case 'background':
+      if (event === 'pick') onPickBackground(str() as BackgroundMode);
+      else if (event === 'color') onPickBackgroundColor(str());
+      else if (event === 'file' && a0 instanceof Blob) onBackgroundFile(a0 as File);
+      else if (event === 'retry') onBackgroundRetry();
+      else if (event === 'delete') onBackgroundDelete();
+      return;
     case 'font': if (event === 'pick') onPickFont(str()); return;
     case 'persona': if (event === 'save') onSavePersona(a0); return;
     case 'directives':
@@ -2908,6 +2974,12 @@ function translateSandboxAnchor(anchor: any): any {
   if (anchor.kind === 'anchor' && anchor.rect) return { kind: 'anchor', rect: { ...anchor.rect, left: anchor.rect.left + r.left, top: anchor.rect.top + r.top } };
   return anchor;
 }
+
+// 背景變了（玩家換選項、作者換場景、偏好剛回來）就推給殼：hello 只帶開機那一刻的值。
+watch(stageBackground, (bg) => {
+  const host = sandboxHostRef.value;
+  if (host) host.postBackground({ ...bg });
+});
 
 // 玩家切深淺（站台改 html 上的屬性）時，殼要跟著換：盯著 html 的屬性，變了就推一次 theme。
 function observeSandboxTheme(host: SandboxHost) {
@@ -2980,6 +3052,7 @@ function mountSandbox(asset: any) {
           themeVars: collectCanvasVars(),
           backgroundUrl: String(playerBackgroundUrl.value || '') || undefined,
           backgroundLandscapeUrl: String(playerBackgroundLandscapeUrl.value || '') || undefined,
+          background: { ...stageBackground.value },
           // 殼的網址是固定的，作者要開除錯面板得從宿主頁的網址帶進去：?sdkDebug=1
           debug: /[?&]sdkDebug=1\b/.test(String(window.location.search || '')),
         };
@@ -3139,10 +3212,11 @@ function buildAuthorAssetHost() {
     setBackground: (url) => {
       // 先動本地再寫穿伺服器。只寫伺服器的話畫面要重載才變，作者呼叫完會覺得
       // 「什麼都沒發生」——背景是 formData.backgroundUrl 算出來的，不同步就看不到。
+      // 不碰玩家的背景選項：玩家選了模糊、純色或自訂時，場景照常記下，但畫面照玩家的選擇
+      // （模糊時換成糊的新場景）。以前這裡會順手把「不要背景」打開，現在那是玩家的純色選項。
       formData.backgroundUrl = url;
-      formData.backgroundOff = false;
       // 寫穿伺服器：換裝置再進來這張卡，桌布還在。純預覽沒有卡也沒有登入，只改本地。
-      if (!previewOnly.value) savePlayerPreference({ roleId: unref(roleId), prefs: { backgroundUrl: url, backgroundOff: false } });
+      if (!previewOnly.value) savePlayerPreference({ roleId: unref(roleId), prefs: { backgroundUrl: url } });
       return true;
     },
     scrollToTop: () => { scrollTopValue.value = 0; return true; },
@@ -11621,33 +11695,173 @@ const sandboxArchive: SandboxArchiveHost = {
 
 // ── 更換背景 ───────────────────────────────────────────────────────────
 //
-// 這一頁不上傳圖片（開放契約沒有那條路）。做得到的是換回卡片自己的背景，
-// 或把玩家自己設過的那張拿掉——作者的卡也可以用它自己的方式改背景。
-const backgroundOptions = computed(() => {
-  const items: Array<{ key: string; label: string; current?: boolean }> = [
-    // 「不要背景」是獨立的偏好鍵：空字串＝沒設過、要照卡片走（見 canvas-background.ts）
-    { key: 'reset', label: t('canvas.panel.backgroundReset'), current: formData.backgroundOff === true },
-  ]
-  const roleBackground = (roleView.value as any).roleBackground
-  if (roleBackground) {
-    items.push({
-      key: 'role',
-      label: t('canvas.panel.backgroundRole'),
-      current: formData.backgroundUrl === roleBackground,
-    })
-  }
-  return items
-})
+// 四個選項：卡片原圖、模糊原圖、純色、自訂圖片（canvas-player-background.ts）。
+// 點了就套用、立刻存，面板不關（美術方向 2026-10-18）。只作用於這張卡。
+const backgroundUploading = ref(false);
+const backgroundCustomError = ref('');
+// 上一次沒存到帳號的選擇：畫面與本機已經換了，「再試一次」重送這一份。
+const backgroundSaveFailed = ref<BackgroundChoice | null>(null);
 
-function onPickBackground(key: string) {
-  const roleBackground = (roleView.value as any).roleBackground
-  const wantsRole = key === 'role' && !!roleBackground
-  const next = wantsRole ? roleBackground : ''
-  // 兩個鍵一起寫：關掉背景是玩家的明示選擇，跟「沒設過」必須分得開。
-  formData.backgroundUrl = next
-  formData.backgroundOff = !wantsRole
-  savePlayerPreference({ roleId: unref(roleId), prefs: { backgroundUrl: next, backgroundOff: !wantsRole } })
-  closeCanvasSheet()
+// 跟著畫面實際用的語言（i18n 的 locale），不是宿主回報的：兩者可能不同（例如網址帶了 ?lang=）。
+const BACKGROUND_FORMATS_TEXT = computed(() => (['en', 'ko'].includes(String(locale.value || '').slice(0, 2)) ? 'JPG, PNG, WebP' : 'JPG、PNG、WebP'));
+const BACKGROUND_MAX_TEXT = Math.round(CUSTOM_BACKGROUND_LIMIT.maxBytes / 1024 / 1024) + ' MB';
+
+const BACKGROUND_COLOR_LABEL_KEYS: Record<string, string> = {
+  ink: 'canvas.panel.backgroundColorInk', navy: 'canvas.panel.backgroundColorNavy', green: 'canvas.panel.backgroundColorGreen',
+  wine: 'canvas.panel.backgroundColorWine', beige: 'canvas.panel.backgroundColorBeige', light: 'canvas.panel.backgroundColorLight',
+};
+
+const backgroundCanUpload = computed(() => !previewOnly.value && !!unref(hasLogin) && stageHost.capabilities?.preferences !== false);
+
+const backgroundPickerProps = computed(() => {
+  const choice = backgroundChoice.value || backgroundChoiceFrom({});
+  const params = { formats: BACKGROUND_FORMATS_TEXT.value, maxSize: BACKGROUND_MAX_TEXT };
+  return {
+    labels: {
+      title: t('canvas.panel.background'),
+      hint: t('canvas.panel.backgroundHint'),
+      optionOriginal: t('canvas.panel.backgroundOptionOriginal'),
+      optionBlur: t('canvas.panel.backgroundOptionBlur'),
+      optionSolid: t('canvas.panel.backgroundOptionSolid'),
+      optionCustom: t('canvas.panel.backgroundOptionCustom'),
+      replace: t('canvas.panel.backgroundReplace'),
+      remove: t('canvas.panel.backgroundDelete'),
+      uploading: t('canvas.panel.backgroundUploading'),
+      customHint: t('canvas.panel.backgroundCustomHint'),
+      uploadLimit: t('canvas.panel.backgroundUploadLimit', params),
+      signIn: t('canvas.panel.backgroundUploadSignIn'),
+      saveError: t('canvas.panel.backgroundErrorSave'),
+      retry: t('canvas.panel.backgroundRetry'),
+    },
+    mode: choice.mode,
+    color: choice.color,
+    customUrl: choice.customUrl,
+    // 模糊那一列的小方塊：卡片現在畫的那張，在方塊裡糊掉。
+    blurPreviewUrl: resolveStageBackground({ ...stageBackgroundInput.value, backgroundOff: false }),
+    colors: BACKGROUND_COLORS.map((c) => ({ value: c.value, label: t(BACKGROUND_COLOR_LABEL_KEYS[c.key]) })),
+    uploading: backgroundUploading.value,
+    canUpload: backgroundCanUpload.value,
+    customError: backgroundCustomError.value,
+    saveError: !!backgroundSaveFailed.value,
+    saveErrorMode: backgroundSaveFailed.value ? backgroundSaveFailed.value.mode : '',
+    accept: CUSTOM_BACKGROUND_LIMIT.types.join(','),
+    lang: String(locale.value || ''),
+  };
+});
+
+async function postBackgroundPreference(prefs: Record<string, unknown>): Promise<boolean> {
+  try {
+    const res: any = await _this.http.post(_this.requestUrl.playerPreferenceSave, { data: { roleId: unref(roleId), prefs }, showLoading: false, quietTransport: true, quietErrors: true });
+    return res?.statusCode === 200;
+  } catch (e) {
+    return false;
+  }
+}
+
+// 刪掉這張卡的自訂圖片（PM 2026-10-18 修訂：圖留到玩家換新圖或自己刪，切到別的選項不刪）。
+// 正在用它時改成墨色，不退回卡片原圖：玩家在公開場合按刪除，不能直接露出原圖。
+async function onBackgroundDelete() {
+  if (backgroundUploading.value) return;
+  const current = backgroundChoice.value || backgroundChoiceFrom({});
+  if (!current.customUrl) return;
+  backgroundCustomError.value = '';
+  let ok = true;
+  if (backgroundCanUpload.value) {
+    const res: any = await _this.http.post(_this.requestUrl.playerBackgroundDelete, { data: { roleId: unref(roleId) }, showLoading: false, quietTransport: true })
+      .catch((failed: any) => failed);
+    ok = res?.statusCode === 200;
+  }
+  if (!ok) { backgroundCustomError.value = t('canvas.panel.backgroundErrorDelete'); return; }
+  const next: BackgroundChoice = current.mode === 'custom'
+    ? { mode: 'color', color: BACKGROUND_COLORS[0].value, customUrl: '' }
+    : { ...current, customUrl: '' };
+  await applyBackgroundChoice(next);
+}
+
+// 每次選擇遞增：存檔回來時比對序號，只有最後一次選擇的失敗才顯示。
+// （不能比對物件：放進 ref 後讀回來的是代理，永遠不等於原本那個物件。）
+let backgroundChoiceSeq = 0;
+async function applyBackgroundChoice(next: BackgroundChoice) {
+  const seq = ++backgroundChoiceSeq;
+  if (backgroundAwaitingPreference) backgroundPickedBeforePreference = true;
+  backgroundChoice.value = next;
+  backgroundCustomError.value = '';
+  backgroundSaveFailed.value = null;
+  formData.backgroundMode = next.mode;
+  formData.backgroundColor = next.color;
+  formData.backgroundCustomUrl = next.customUrl;
+  formData.backgroundOff = false;
+  writeLocalChoice(stageHost.storage, backgroundChoiceRole, next);
+  // 純預覽與遊客只存在這台裝置。
+  if (!backgroundCanUpload.value) return;
+  const ok = await postBackgroundPreference(backgroundPrefsPatch(next));
+  if (!ok && seq === backgroundChoiceSeq) backgroundSaveFailed.value = next;
+}
+
+// 上傳中不接受其他選擇：上傳完成會把這張卡切到自訂圖片，中間選的會被蓋掉，伺服器也會留下孤兒檔。
+function onPickBackground(mode: BackgroundMode) {
+  if (backgroundUploading.value) return;
+  const current = backgroundChoice.value || backgroundChoiceFrom({});
+  if (mode === 'custom' && !current.customUrl) return;
+  applyBackgroundChoice({ ...current, mode });
+}
+
+function onPickBackgroundColor(value: string) {
+  if (backgroundUploading.value) return;
+  const current = backgroundChoice.value || backgroundChoiceFrom({});
+  applyBackgroundChoice({ ...current, mode: 'color', color: value });
+}
+
+function onBackgroundRetry() {
+  if (backgroundUploading.value) return;
+  const failed = backgroundSaveFailed.value;
+  if (failed) applyBackgroundChoice(failed);
+}
+
+// 自訂圖片：本機先檢查格式與大小、縮到長邊上限並重新編碼（順便去掉 EXIF），
+// 傳上去成功才換背景（美術方向）；伺服器同時把網址寫進這張卡的偏好，並刪掉舊的那張。
+async function onBackgroundFile(file: File) {
+  if (!backgroundCanUpload.value || backgroundUploading.value) return;
+  const params = { formats: BACKGROUND_FORMATS_TEXT.value, maxSize: BACKGROUND_MAX_TEXT };
+  backgroundCustomError.value = '';
+  // 縮圖重編碼也算上傳中：這段期間點別的選項或再選一張，結果會互相蓋掉。
+  backgroundUploading.value = true;
+  try {
+    const prepared = await prepareBackgroundUpload(file, CUSTOM_BACKGROUND_LIMIT);
+    if (!prepared.ok) {
+      backgroundCustomError.value = prepared.reason === 'size'
+        ? t('canvas.panel.backgroundErrorTooLarge', params)
+        : prepared.reason === 'format' ? t('canvas.panel.backgroundErrorFormat', params) : t('canvas.panel.backgroundErrorUpload');
+      return;
+    }
+    // 4xx 會以回應本身 reject：太大、格式不對要照伺服器說的原因提示，所以兩條路都收回應。
+    const res: any = await _this.http.post(_this.requestUrl.playerBackgroundUpload, {
+      data: { roleId: unref(roleId), contentType: prepared.contentType, image: prepared.base64 },
+      showLoading: false,
+      quietTransport: true,
+      timeout: 60000,
+    }).catch((failed: any) => failed);
+    const url = res?.statusCode === 200 ? String(res.data?.url || '') : '';
+    if (!url) {
+      const code = String(res?.data?.error || '');
+      backgroundCustomError.value = code === 'file_too_large' ? t('canvas.panel.backgroundErrorTooLarge', params)
+        : code === 'unsupported_media_type' ? t('canvas.panel.backgroundErrorFormat', params)
+        : code === 'quota_exceeded' ? t('canvas.panel.backgroundErrorQuota') : t('canvas.panel.backgroundErrorUpload');
+      return;
+    }
+    const current = backgroundChoice.value || backgroundChoiceFrom({});
+    const next: BackgroundChoice = { ...current, mode: 'custom', customUrl: url };
+    if (backgroundAwaitingPreference) backgroundPickedBeforePreference = true;
+    backgroundChoice.value = next;
+    formData.backgroundMode = 'custom';
+    formData.backgroundCustomUrl = url;
+    formData.backgroundOff = false;
+    writeLocalChoice(stageHost.storage, backgroundChoiceRole, next);
+  } catch (e) {
+    backgroundCustomError.value = t('canvas.panel.backgroundErrorUpload');
+  } finally {
+    backgroundUploading.value = false;
+  }
 }
 
 // ── 字體 ───────────────────────────────────────────────────────────────

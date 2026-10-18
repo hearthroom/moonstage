@@ -41,6 +41,7 @@ export function setupHttp(http, deps) {
 		'/role/detail',               // 對話頁與入口頁各自講「這張卡讀不到」，不彈伺服器的錯誤碼
 		'/trial-cards',               // 試玩卡：入口頁自己開視窗講清楚是哪一段、哪一條超限，不要再疊一個 toast
 		'/conversation/prompt-diagnostics', // 上下文用量：面板自己顯示讀取失敗與重試，輸入框旁的小圓環讀不到就不畫
+		'/player/background',          // 自訂背景圖：背景面板在那一列下面講原因（太大、格式、沒傳上去），不再疊 toast
 	];
 
 	const isSilentErrorRequest = (url) => {
@@ -82,7 +83,9 @@ export function setupHttp(http, deps) {
 
 		// 处理不同状态码
 		const statusCode = response.statusCode;
-		const shouldSilenceError = isSilentErrorRequest(response._requestUrl);
+		// 整支端點的錯誤都由呼叫端呈現（silentErrorApis），或這一筆請求自己宣告（quietErrors）：
+		// 同一支端點有的呼叫端自己講、有的靠 toast（偏好存檔：背景面板自己講，字體偏好靠 toast）。
+		const shouldSilenceError = isSilentErrorRequest(response._requestUrl) || !!response._quietErrors;
 
 		// 超时或取消的请求
 		//

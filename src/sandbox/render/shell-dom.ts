@@ -38,7 +38,6 @@ export interface BuildShellOptions {
   /** 功能欄原文非空才建 `[data-slot="statusbar"]`；空就整塊不存在。 */
   hasStatusbar: boolean
   composerVisible: boolean
-  backgroundUrl?: string
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, attrs: Record<string, string> = {}, text?: string): HTMLElementTagNameMap[K] {
@@ -53,7 +52,6 @@ export function buildShell(doc: Document, mount: HTMLElement, options: BuildShel
   doc.head.appendChild(authorCss)
 
   const root = el(doc, 'div', { 'data-chat': 'root', 'data-theme': options.theme, 'data-composer': options.composerVisible ? 'visible' : 'hidden' })
-  if (options.backgroundUrl) root.style.backgroundImage = `url("${options.backgroundUrl.replace(/"/g, '%22')}")`
 
   const header = el(doc, 'header', { 'data-chat': 'header' })
   const headerBack = el(doc, 'button', { 'data-chat': 'header-back', type: 'button', title: options.strings.back }, '‹')

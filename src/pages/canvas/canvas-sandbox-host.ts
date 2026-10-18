@@ -21,7 +21,7 @@ import {
 import type { SandboxSavesStore } from '@/host/sandbox-host'
 import { observeViewport, visibleViewport } from './canvas-viewport'
 import { cardStorageScope, getAuthorRuleStorageScope, onStorageScopeChange } from '@/common/author-rules/storage-scope'
-import type { ChromeState, ChromeUiEvent, MessageMenuAnchor, MessageView, PanelsState, StageState } from '@/sandbox/protocol'
+import type { ChromeState, ChromeUiEvent, MessageMenuAnchor, MessageView, PanelsState, SandboxBackground, StageState } from '@/sandbox/protocol'
 
 /** 宿主做一個存檔操作的結果：成功帶值，失敗帶 sdk 的錯誤碼（LIMIT_REACHED 附 { count, limit }）。 */
 export type SandboxArchiveResult = { ok: true; value?: unknown } | { ok: false; code: string; message?: string; data?: Record<string, unknown> }
@@ -101,6 +101,8 @@ export interface SandboxHost {
   conversationSwitched(conversationId?: string): void
   postTheme(theme: 'dark' | 'light', vars?: Record<string, string>): void
   postViewport(height: number): void
+  /** 背景變了（玩家換選項、作者換場景）。hello 之前不送：hello 會帶當下的值。 */
+  postBackground(background: SandboxBackground): void
   /** 宿主的返回鍵：殼處理了（關舞台）回 true；否則回 false 由宿主導頁。 */
   requestBack(): Promise<boolean>
   ready(): boolean
@@ -644,6 +646,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     },
     postTheme: (theme, vars) => post({ type: 'theme', theme, vars }),
     postViewport: (height) => post({ type: 'viewport', height }),
+    postBackground: (background) => { if (helloSent) post({ type: 'background', background }) },
     requestBack() {
       if (!helloSent || destroyed) return Promise.resolve(false)
       return new Promise<boolean>((resolve) => {

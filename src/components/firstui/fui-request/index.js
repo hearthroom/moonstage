@@ -59,6 +59,8 @@ class FIRSTUI_INNER {
 						// HarperHarbor patch: 讓回應攔截器能在 401 換完 token 後原樣重送這一筆。
 						res._requestConfig = config
 						res._quietTransport = !!params.quietTransport
+						// 呼叫端自己在畫面上講業務錯誤（例如背景面板的「再試一次」）：攔截器不再彈 toast。
+						res._quietErrors = !!params.quietErrors
 						resolve(params.brief ? res.data : res)
 					},
 					fail: (err) => {

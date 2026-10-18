@@ -103,3 +103,29 @@ describe('嵌入模式的錯誤提示跟著宿主語言', () => {
     expect(say.mock.calls.map((c) => c[0])).toEqual(['请求超时，请重试', '網路錯誤，請重試', 'Request timed out. Please try again.'])
   })
 })
+
+describe('呼叫端自己呈現的業務錯誤', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
+
+  it('呼叫端宣告自己呈現錯誤（quietErrors）：伺服器的 4xx／5xx 不彈 toast，仍 reject 給呼叫端', async () => {
+    const { http, toast, pending } = await load()
+    const p = http.post('/v1/player/preference/save', { showLoading: false, quietErrors: true, data: {} }).catch((e: any) => e)
+    await vi.advanceTimersByTimeAsync(0)
+    const req = pending.at(-1)!
+    req.success({ statusCode: 500, data: { error: 'boom' } }); req.complete({})
+    expect((await p).statusCode).toBe(500)
+    expect(toast.serverError).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  it('同一個端點沒宣告時，照舊提示（字體偏好等其他呼叫端不受影響）', async () => {
+    const { http, toast, pending } = await load()
+    const p = http.post('/v1/player/preference/save', { showLoading: false, data: {} }).catch((e: any) => e)
+    await vi.advanceTimersByTimeAsync(0)
+    const req = pending.at(-1)!
+    req.success({ statusCode: 500, data: { error: 'boom' } }); req.complete({})
+    await p
+    expect(toast.serverError).toHaveBeenCalledTimes(1)
+  })
+})

@@ -11,6 +11,7 @@ import CanvasPopup from '@/pages/canvas/components/canvas-popup.vue'
 import CanvasMessageMenu from '@/pages/canvas/components/canvas-message-menu.vue'
 import CanvasConversationList from '@/pages/canvas/components/canvas-conversation-list.vue'
 import CanvasModify from '@/pages/canvas/components/canvas-modify.vue'
+import CanvasBackgroundPicker from '@/pages/canvas/components/canvas-background-picker.vue'
 import CanvasPersona from '@/pages/canvas/components/canvas-persona.vue'
 import CanvasDirectives from '@/pages/canvas/components/canvas-directives.vue'
 import CanvasNotepad from '@/pages/canvas/components/canvas-notepad.vue'
@@ -23,7 +24,7 @@ import type { PanelsState } from '../protocol'
 
 const COMPONENTS: Record<string, Component> = {
   conversations: CanvasConversationList,
-  background: CanvasModify,
+  background: CanvasBackgroundPicker,
   font: CanvasModify,
   persona: CanvasPersona,
   directives: CanvasDirectives,
@@ -38,7 +39,8 @@ const COMPONENTS: Record<string, Component> = {
 /** 各面板會發的事件（跟元件的 defineEmits 一致），全部轉給宿主。 */
 const EVENTS: Record<string, string[]> = {
   conversations: ['pick', 'rename', 'delete', 'new', 'close'],
-  background: ['pick'],
+  // file 帶的是玩家選的檔案（File 可以跨 iframe 結構化複製）：選檔在殼裡，上傳在宿主。
+  background: ['pick', 'color', 'file', 'retry', 'delete'],
   font: ['pick'],
   persona: ['save', 'close'],
   directives: ['add', 'edit', 'save-edit', 'cancel-edit', 'ask-delete', 'confirm-delete', 'cancel-delete', 'retry', 'close', 'update:draft', 'update:editing-text'],
