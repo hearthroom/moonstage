@@ -25,7 +25,7 @@ const messages: SandboxMessage[] = [
   {id:'ai', role:'ai', content:longText, serverId:null},
   {id:'user', role:'user', content:longText, serverId:null},
 ]
-messages.forEach((m, i) => {m.view={mesid:i,role:m.role,name:m.role==='user'?'Player':'Example',html:m.content,finished:true}})
+messages.forEach((m, i) => {m.view={mesid:i,role:m.role,name:m.role==='user'?'Player':'Example',html:m.content,finished:true,latestAI:params.has('actions')&&i===1}})
 const style = document.createElement('style')
 style.textContent = `
   .content { width:100%; }
@@ -33,6 +33,7 @@ style.textContent = `
   ${params.get('pad') === '0' ? '.mes_text { padding:0; }' : ''}
   ${params.has('wide') ? '.opening-panel { min-width:100vw; }' : ''}
   .legacy-dock { position:fixed; top:160px; width:16px; height:100px; background:#8cb1c9; color:#111; writing-mode:vertical-rl; }
+  ${params.get('dock-z') === '10' ? '.legacy-dock { z-index:10; }' : ''}
   .legacy-dock.left { left:0; } .legacy-dock.right { right:0; }
 
 `

@@ -16,7 +16,8 @@
     data-*，作者 CSS 則原樣生效，兩種頁面才能用同一種寫法。
   - 讓完之後欄寬不到原本四分之三（或 240px）就整個不讓，小螢幕不擠成一條。
 
-  避開的是文字：側欄侵入量加原本 6px 間隙，再扣掉實際氣泡 padding（作者清成 0 就全額讓）。
+  文字與操作鈕都要避讓。只有證明側欄在氣泡上層時，裝飾外框才扣實測 padding；
+  層級不明就全額讓。操作列永遠保留整個點擊框，作者清成 0 也全額讓。
   寫出去的是「欄內距至少要多少」，CSS 用 max(原內距, 變數)：量出來比原內距小（桌機欄置中，側欄
   碰不到氣泡）就等於沒變。量的是 #chat 的外框，不受這份內距影響，不會自己觸發自己。
 */
@@ -30,6 +31,8 @@ export type DockCandidate = {
   /** 畫出來的範圍（paintedBox）；null = 看不到 */
   box: Box | null
   declared: DockDeclaration
+  /** Only proven paint priority permits the decorative edge under this dock. */
+  canOverlapBubble?: boolean
 }
 
 export type DockInput = {
@@ -103,7 +106,7 @@ export function sideDockClearance(input: DockInput): DockClearance {
     if (!side) continue
     const intrusion = intrusionOf(side, box, lane)
     if (!(intrusion > 0)) continue
-    out[side] = Math.max(out[side], Math.max(0, Math.round(intrusion + GAP - (input.bubblePadding?.[side] || 0))))
+    out[side] = Math.max(out[side], Math.max(0, Math.round(intrusion + GAP - (c.canOverlapBubble ? input.bubblePadding?.[side] || 0 : 0))))
   }
 
   const remaining = laneWidth - out.left - out.right
@@ -187,6 +190,39 @@ function declarationOf(el: Element, win: Window): DockDeclaration {
   return v === 'left' || v === 'right' || v === 'none' ? v : ''
 }
 
+/** Conservative proof only: a positive fixed dock in the same plain stacking
+ * context paints above normal-flow bubbles. Any intervening context is unknown
+ * here, so keep the full clearance instead of changing the author's z-index. */
+function hasStackingContext(el: Element, win: Window): boolean {
+  const style = win.getComputedStyle(el)
+  if (style.position === 'fixed' || style.position === 'sticky' || (style.zIndex && style.zIndex !== 'auto')) return true
+  if (parseFloat(style.opacity) < 1 || style.isolation === 'isolate') return true
+  for (const prop of ['transform', 'translate', 'rotate', 'scale', 'perspective', 'filter', 'backdrop-filter', 'clip-path', 'mask-image']) {
+    const value = style.getPropertyValue(prop)
+    if (value && value !== 'none') return true
+  }
+  const blend = style.getPropertyValue('mix-blend-mode')
+  const container = style.getPropertyValue('container-type')
+  const change = style.getPropertyValue('will-change')
+  return !!((blend && blend !== 'normal') || (container && container !== 'normal') ||
+    (change && change !== 'auto') || /paint|layout|strict|content/.test(style.contain) ||
+    style.getPropertyValue('content-visibility') === 'auto')
+}
+
+function dockPaintsAbove(dock: Element, bubbles: Element[], win: Window): boolean {
+  const style = win.getComputedStyle(dock)
+  if (style.position !== 'fixed' || !(Number(style.zIndex) > 0) || !bubbles.length) return false
+  return bubbles.every((bubble) => {
+    if (hasStackingContext(bubble, win)) return false
+    let common: Element | null = dock.parentElement
+    while (common && !common.contains(bubble)) common = common.parentElement
+    if (!common) return false
+    for (let el = dock.parentElement; el && el !== common; el = el.parentElement) if (hasStackingContext(el, win)) return false
+    for (let el = bubble.parentElement; el && el !== common; el = el.parentElement) if (hasStackingContext(el, win)) return false
+    return true
+  })
+}
+
 export const SIDE_DOCK_LEFT_VAR = '--lt-canvas-dock-left'
 export const SIDE_DOCK_RIGHT_VAR = '--lt-canvas-dock-right'
 
@@ -227,6 +263,8 @@ export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
   let raf = 0
   let disposed = false
   let last = { left: -1, right: -1 }
+  const actionRows = new Set<HTMLElement>()
+  const dockPaths = new Set<Node>()
   const write = (name: string, px: number) => {
     if (px > 0) target.style.setProperty(name, px + 'px')
     else target.style.removeProperty(name)
@@ -235,18 +273,21 @@ export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
     const l = lane.getBoundingClientRect()
     const s = scroll.getBoundingClientRect()
     const viewport = { width: win.innerWidth, height: win.innerHeight }
+    const bubbles = Array.from(lane.querySelectorAll('[data-lt="bubble"]')).filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 })
     let list: DockCandidate[] = []
+    dockPaths.clear()
     try {
       list = candidates().map((c) => {
         const slot = 'side' in c ? c : null
         const el = slot ? slot.el : (c as Element)
-        return { box: paintedBox(subtreeRects(el, win), viewport), declared: declarationOf(el, win) || (slot ? slot.side : '') }
+        for (let node: Element | null = el; node; node = node.parentElement) dockPaths.add(node)
+        return { box: paintedBox(subtreeRects(el, win), viewport), declared: declarationOf(el, win) || (slot ? slot.side : ''), canOverlapBubble: dockPaintsAbove(el, bubbles, win) }
       })
     } catch { list = [] }
     // 取目前訊息裡最小的實際 padding，任何一種氣泡都不能被側欄蓋到字。
     // 量不到（尚未掛訊息）就不扣，作者清成 0 也會回到全額避讓。
     let bubblePadding: DockClearance | undefined
-    for (const bubble of Array.from(lane.querySelectorAll('[data-lt="bubble"]'))) {
+    for (const bubble of bubbles) {
       const rect = bubble.getBoundingClientRect()
       if (!(rect.width > 0 && rect.height > 0)) continue
       let style: CSSStyleDeclaration
@@ -255,7 +296,28 @@ export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
       if (!bubblePadding) bubblePadding = pad
       else { bubblePadding.left = Math.min(bubblePadding.left, pad.left); bubblePadding.right = Math.min(bubblePadding.right, pad.right) }
     }
-    const out = sideDockClearance({ bubblePadding, lane: { left: l.left, right: l.right, top: s.top, bottom: s.bottom }, candidates: list })
+    const laneBox = { left: l.left, right: l.right, top: s.top, bottom: s.bottom }
+    const out = sideDockClearance({ bubblePadding, lane: laneBox, candidates: list })
+    const full = sideDockClearance({ lane: laneBox, candidates: list })
+    // Controls never borrow bubble padding. Inset the first hitbox and cap the
+    // row at the right safe edge so extra buttons wrap before reaching a dock.
+    for (const row of actionRows) if (!lane.contains(row)) {
+      row.style.removeProperty('--lt-dock-control-left')
+      row.style.removeProperty('--lt-dock-control-width')
+      actionRows.delete(row)
+    }
+    for (const row of Array.from(lane.querySelectorAll<HTMLElement>('[data-lt="message-actions"]'))) {
+      const rect = row.getBoundingClientRect()
+      const values = {
+        '--lt-dock-control-left': full.left > 0 ? Math.ceil(Math.max(0, l.left + full.left - rect.left)) + 'px' : '',
+        '--lt-dock-control-width': full.right > 0 ? Math.floor(Math.max(0, l.right - full.right - rect.left)) + 'px' : '',
+      }
+      for (const [name, value] of Object.entries(values)) if (row.style.getPropertyValue(name) !== value) {
+        if (value) row.style.setProperty(name, value)
+        else row.style.removeProperty(name)
+      }
+      actionRows.add(row)
+    }
     // 差不到 2px 不重寫：側欄動畫、次像素抖動不該讓整條對話欄跟著重排。
     if (Math.abs(out.left - last.left) >= 2 || (out.left === 0) !== (last.left === 0)) write(SIDE_DOCK_LEFT_VAR, out.left)
     if (Math.abs(out.right - last.right) >= 2 || (out.right === 0) !== (last.right === 0)) write(SIDE_DOCK_RIGHT_VAR, out.right)
@@ -282,11 +344,11 @@ export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
     // Padding is now an input, so author style/class changes and newly mounted
     // bubbles must refresh it too. Ignore streaming/decorative descendants.
     const hasBubble = (node: Node) => node.nodeType === 1 && (
-      (node as Element).matches('[data-lt="bubble"]') || !!(node as Element).querySelector('[data-lt="bubble"]')
+      (node as Element).matches('[data-lt="bubble"], [data-lt="message-actions"]') || !!(node as Element).querySelector('[data-lt="bubble"], [data-lt="message-actions"]')
     )
     bubbleObserver = new MO((records) => {
       if (records.some((record) => record.type === 'attributes'
-        ? hasBubble(record.target)
+        ? dockPaths.has(record.target) || hasBubble(record.target)
         : Array.from(record.addedNodes).concat(Array.from(record.removedNodes)).some(hasBubble))) schedule()
     })
     bubbleObserver.observe(lane, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] })
@@ -299,6 +361,9 @@ export function bindAuthorSideDock(opts: BindSideDockOptions): () => void {
     if (observer) { try { observer.disconnect() } catch { /* 收尾不得拋錯 */ } observer = null }
     if (bubbleObserver) { try { bubbleObserver.disconnect() } catch { /* 收尾不得拋錯 */ } bubbleObserver = null }
     win.removeEventListener('resize', schedule)
+    for (const row of actionRows) { row.style.removeProperty('--lt-dock-control-left'); row.style.removeProperty('--lt-dock-control-width') }
+    actionRows.clear()
+    dockPaths.clear()
     try { target.style.removeProperty(SIDE_DOCK_LEFT_VAR); target.style.removeProperty(SIDE_DOCK_RIGHT_VAR) } catch { /* 同上 */ }
   }
 }

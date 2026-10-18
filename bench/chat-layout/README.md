@@ -21,6 +21,10 @@ Options can be combined:
 - `bom=1&broken=1`: positive control reinserting that BOM after platform mounting;
   the slot must gain a persistent line height while messages scroll.
 - `docks=1`: 16px fixed author sidebars; text must clear them by at least 4px.
+- `docks=1&dock-z=10`: explicit upper-layer author docks may overlap only the
+  decorative edge; platform action hitboxes still clear the full dock. Auto
+  or ambiguous stacking falls back to full clearance.
+- `actions=1`: also show the real regenerate action next to the menu.
 - `docks=1&pad=0`: author clears bubble padding; full dock clearance must return.
 - `frontend=1`: opening uses the platform frontend-block iframe.
 - `wide=1`: author opening panel deliberately sets min-width:100vw; this is an
