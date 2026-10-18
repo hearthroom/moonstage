@@ -88,6 +88,10 @@
     淺色的圖上光靠陰影不夠（美術總監完整交件審查）：名字、⋯、翻頁跟「重新生成」一樣墊半透明深底，
     字改不透明的淺色，白底的圖上也找得到。
   */
+  [data-lt-player-bg=color]:not([data-lt-player-tone=light]) .lt-msg-regen,
+  [data-lt-player-bg=color]:not([data-lt-player-tone=light]) .name_text,
+  [data-lt-player-bg=color]:not([data-lt-player-tone=light]) .extraMesButtonsHint,
+  [data-lt-player-bg=color]:not([data-lt-player-tone=light]) .swipes-counter,
   :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .lt-msg-regen,
   :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .ch_name .name_text,
   :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .extraMesButtonsHint,

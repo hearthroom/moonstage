@@ -51,3 +51,12 @@ describe('canvas-background-picker', () => {
     expect(w.find('.bg-picker-scope').attributes('lang')).toBe('ko')
   })
 })
+
+
+it('選中列有獨立勾記，亮色卡不靠 accent 邊框才能辨識', async () => {
+  const w = mount(CanvasBackgroundPicker, { props: { labels, mode: 'blur' } })
+  expect(w.findAll('.bg-picker-check')).toHaveLength(1)
+  expect(w.find('.bg-picker-item.is-current .bg-picker-check').exists()).toBe(true)
+  await w.setProps({ mode: 'color' })
+  expect(w.findAll('.bg-picker-check')).toHaveLength(1)
+})

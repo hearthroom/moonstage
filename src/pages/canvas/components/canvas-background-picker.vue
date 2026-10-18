@@ -25,6 +25,7 @@
           <span v-else-if="row.mode === 'custom' && uploading" class="bg-picker-spinner"></span>
         </span>
         <span class="bg-picker-label">{{ row.label }}</span>
+        <svg v-if="mode === row.mode" class="bg-picker-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
       </div>
 
       <div v-if="row.mode === 'color' && mode === 'color'" class="bg-picker-colors">
