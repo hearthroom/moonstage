@@ -115,6 +115,18 @@ describe('official SukiSuki links', () => {
 });
 
 describe('indented author images', () => {
+  test.each(['1.', '-'])('preserves an image nested in a %s list and its parent-dependent handler', (marker) => {
+    const handler = "this.closest('li').setAttribute('title', 'ready')"
+    const content = `${marker} First\n\n    <img src="data:," onerror="${handler}">\n\n${marker === '1.' ? '2.' : '-'} Second`
+    const holder = document.createElement('div')
+    holder.innerHTML = renderRichText(content)
+    expect(holder.querySelectorAll(marker === '1.' ? 'ol' : 'ul')).toHaveLength(1)
+    const img = holder.querySelector('li img')!
+    expect(img).not.toBeNull()
+    new Function(img.getAttribute('onerror')!).call(img)
+    expect(img.closest('li')?.getAttribute('title')).toBe('ready')
+  })
+
   test('renders an indented image while retaining an explicit source-code fence', () => {
     const image = '<img src="data:," style="display:none" onerror="boot(this)">'
     const holder = document.createElement('div')

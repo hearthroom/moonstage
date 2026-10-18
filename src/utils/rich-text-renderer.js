@@ -36,14 +36,14 @@ const HEAVY_HTML_TAGS = /<\s*(div|section|article|header|footer|nav|main|aside|h
 // 這類元件靠作者 HTML 組合邏輯，絕對不能被 MD 誤處理
 const CUSTOM_HC_TAGS = /<\s*hc-[a-z]/i;
 
-// 行首縮排 + block-level HTML／圖片 tag — 用於 dedentHtmlBlockLines pre-pass
-// 圖片點火器常獨立縮排在面板後；不能被 CommonMark 當成程式碼而印出原始標籤。
+// 行首縮排 + block-level HTML 開/閉 tag — 用於 dedentHtmlBlockLines pre-pass
 // AI 輸出常 pretty-print HTML（tag 前留 4+ 空格），CommonMark 卻把 ≥4 空格的行當 indented code block，
 // 造成第二段 <p> 之後被 escape 成 <pre><code>&lt;p&gt;...</code></pre>
 // HTML 註解（<!-- … -->）也算：它跟區塊 tag 一樣是 CommonMark 的 HTML 區塊起始條件（type 2），
 // 排版過的作者 HTML 在空行之後常接一行縮排的註解，不砍縮排就會印成一行 `<!-- … -->` 文字
 // （2026-09-16 MMD 匯入卡的開場面板回報）。
-const HTML_BLOCK_LEADING_WS = /^[ \t]+(<!--|<\/?\s*(div|section|article|header|footer|nav|main|aside|h[1-6]|p|ul|ol|li|dl|dt|dd|table|thead|tbody|tr|td|th|form|fieldset|figure|hr|body|html|pre|blockquote|details|summary|audio|video|canvas|iframe|img|hc-[a-z][\w-]*)\b)/i;
+const HTML_BLOCK_LEADING_WS = /^[ \t]+(<!--|<\/?\s*(div|section|article|header|footer|nav|main|aside|h[1-6]|p|ul|ol|li|dl|dt|dd|table|thead|tbody|tr|td|th|form|fieldset|figure|hr|body|html|pre|blockquote|details|summary|audio|video|canvas|iframe|hc-[a-z][\w-]*)\b)/i;
+const INDENTED_IMAGE = /^[ \t]+(?=<img(?:\s|\/?>))/i;
 
 /**
  * 把「行首是 block-level HTML tag」這種行的縮排砍掉，再交給 markdown-it。
@@ -72,6 +72,16 @@ function dedentHtmlBlockLines(content) {
     if (trimmed.startsWith('~~~')) { inFence = '~~~'; continue; }
     const m = HTML_BLOCK_LEADING_WS.exec(line);
     if (m) lines[i] = m[1] + line.substring(m[0].length);
+  }
+  const dedented = lines.join('\n');
+  // 圖片可能是清單續行，不能像 block tag 一律拉到 column 0。只救回 Markdown
+  // 實際判成頂層 indented code 的圖片；清單／引言的容器與明確圍欄保持原樣。
+  if (!lines.some((line) => INDENTED_IMAGE.test(line))) return dedented;
+  for (const token of getMarkdownIt().parse(dedented, {})) {
+    if (token.type !== 'code_block' || token.level !== 0 || !token.map) continue;
+    for (let i = token.map[0]; i < token.map[1]; i++) {
+      lines[i] = lines[i].replace(INDENTED_IMAGE, '');
+    }
   }
   return lines.join('\n');
 }
