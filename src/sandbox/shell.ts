@@ -6,7 +6,7 @@
  *   createShell(config) → 建骨架、裝訊息作用域、建 sdk（掛到 window.sdk）、裝卡（樣式進
  *   author-css、腳本跑一次）→ 等宿主的 `messages` → 冷啟動每則 new→mount→done → `ready`。
  */
-import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, RequestOp, SandboxHelloConfig, SandboxMessage, ShellToHost, StageState } from './protocol'
+import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, RequestOp, SandboxBackground, SandboxHelloConfig, SandboxMessage, ShellToHost, StageState } from './protocol'
 import { createEventBus } from './sdk/events'
 import { createSdk, type Sdk, type SdkHost } from './sdk/create-sdk'
 import { SdkError, sdkErrorFromHost } from './sdk/errors'
@@ -29,8 +29,10 @@ import { bindBubbleFit } from '@/pages/canvas/canvas-bubble-fit'
 import { createFollowBottom, growToBottom } from './render/follow-bottom'
 import { mountGeometryDebug, rectText } from '@/common/geometry-debug'
 import { reactive, ref } from 'vue'
+import { cssUrl } from '@/pages/canvas/canvas-player-background'
 // 標準播放器的樣式表整份帶進殼：訊息區的每一條規則跟一般卡同一份。頁首與輸入區的規則在殼裡沒有對應節點，不礙事。
 import '@/pages/canvas/canvas.css'
+import '@/pages/canvas/canvas-player-background.css'
 // 殼的內距在 layer 外的副本，跟一般卡同一份、同一個先後：卡片的 `* { margin: 0; padding: 0 }` 不分層，
 // 少了這份，殼裡的頁首、快捷列、輸入區內距在沙箱卡上會被整批清掉，一般卡卻不會。
 import '@/pages/canvas/canvas-chrome-box.css'
@@ -81,8 +83,18 @@ export function createShell(options: CreateShellOptions): Shell {
     roleAvatar: config.role.avatarUrl,
     hasStatusbar: !!String(config.card.statusbar || '').trim(),
     composerVisible: config.composer !== false,
-    backgroundUrl: config.backgroundUrl,
   })
+  // 背景：宿主送 background（玩家自選，見 canvas-player-background.ts）；舊宿主只送兩個網址，照卡片原圖畫。
+  // 之後玩家換選項、作者換場景，宿主送 background 訊息，這裡立刻重畫。
+  const stageBackground = ref<SandboxBackground>(config.background || { mode: 'card', portrait: config.backgroundUrl || '', landscape: config.backgroundLandscapeUrl || '', color: '' })
+  // 殼的根也畫一份（卡片原圖時跟以前一樣）；玩家換掉原圖時根不畫圖，並標記起來讓 canvas.css 關掉作者畫在根上的背景圖。
+  const applyRootBackground = (bg: SandboxBackground) => {
+    if (bg.mode === 'card' && bg.portrait) refs.root.style.backgroundImage = cssUrl(bg.portrait)
+    else refs.root.style.removeProperty('background-image')
+    if (bg.mode === 'card' && !bg.pending) refs.root.removeAttribute('data-lt-player-bg')
+    else refs.root.setAttribute('data-lt-player-bg', bg.pending ? 'pending' : bg.mode)
+  }
+  applyRootBackground(stageBackground.value)
   // 殼的根不准被內部捲動：iOS Safari 為了露出聚焦的輸入框會捲 overflow:hidden 的祖先且不捲回
   // （見 shell.css 的說明）。overflow:clip 擋掉大多數情況；認不得 clip 的舊 Safari 靠這裡歸零。
   // ?sdkDebug=1（宿主頁的網址帶進 hello.config.debug）：殼這邊也疊一塊幾何數值面板。
@@ -113,7 +125,7 @@ export function createShell(options: CreateShellOptions): Shell {
   }
   applyThemeVars(config.themeVars)
   // 訊息區的容器用標準的舞台元件（#scrollview／#chat／#msglistview 這些作者打得到的名字都在）。
-  const stageApp = createApp({ render: () => h(CanvasStage, { backgroundUrl: config.backgroundUrl || undefined, backgroundLandscapeUrl: config.backgroundLandscapeUrl || undefined }) })
+  const stageApp = createApp({ render: () => h(CanvasStage, { background: stageBackground.value }) })
   stageApp.config.warnHandler = () => {}
   stageApp.mount(refs.messages)
   const scrollView = (refs.messages.querySelector('#scrollview') as HTMLElement) || refs.messages
@@ -713,6 +725,11 @@ export function createShell(options: CreateShellOptions): Shell {
         return
       case 'viewport':
         setViewportHeight(refs, message.height)
+        return
+      case 'background':
+        if (!message.background) return
+        stageBackground.value = message.background
+        applyRootBackground(message.background)
         return
       case 'conversation.switch':
         if (stageState !== 'closed') { sdkHost.stage.close(); bus.emit('stage:close') }

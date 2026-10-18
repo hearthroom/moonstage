@@ -3809,6 +3809,171 @@
     border-color: var(--lt-canvas-accent);
   }
 
+  /* 更換背景（canvas-background-picker.vue）：沿用上面的列，左邊多一個預覽方塊。 */
+  .bg-picker-hint,
+  .bg-picker-note {
+    font-size: 12px;
+    color: var(--lt-canvas-muted);
+  }
+
+  /* 殼沒有宿主那條全域 border-box，min-height 44 加上 1px 邊框會變 46；兩邊都算進邊框才一樣高。 */
+  .bg-picker-item {
+    gap: 12px;
+    box-sizing: border-box;
+  }
+
+  .bg-picker-swatch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 8px;
+    border: 1px solid var(--lt-canvas-sheet-line);
+    background-size: cover;
+    background-position: center;
+    color: var(--lt-canvas-muted);
+  }
+
+  /* 原圖那一列只用圖示：縮圖本身就會露出原圖。模糊那一列的縮圖糊在方塊裡面，不糊到方塊邊。 */
+  /* 純色方塊跟色票一樣有一圈細線：深色色票時方塊跟列底同色，沒有線就看不出是色塊。 */
+  .bg-picker-swatch.is-color {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 28%, transparent);
+  }
+
+  .bg-picker-swatch.is-blur {
+    background-color: #16191E;
+  }
+
+  .bg-picker-swatch.is-blur::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--bg-picker-blur, none);
+    background-size: cover;
+    background-position: center;
+    /* 跟整頁同一個比例糊：方塊 28px 約是手機寬的 1/14，整頁 42px 縮下來約 3px。 */
+    filter: blur(3px);
+    transform: scale(1.2);
+  }
+
+  .bg-picker-label {
+    min-width: 0;
+  }
+
+  /* 左緣對齊上面那一列的預覽方塊（列的內距 12 + 邊框 1）。 */
+  .bg-picker-colors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 4px 13px 8px;
+  }
+
+  .bg-picker-color {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    cursor: pointer;
+    /* 每個色票都有一圈細線（取面板字色）：深色色票在深色面板、淺色色票在淺色面板上才看得見。 */
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 28%, transparent);
+  }
+
+  .bg-picker-color.is-current {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 28%, transparent), 0 0 0 2px var(--lt-canvas-panel-bg, transparent), 0 0 0 4px var(--lt-canvas-accent);
+  }
+
+  /* 展開區與錯誤字的左緣都對齊上面那一列的預覽方塊（列的內距 12 + 邊框 1）。 */
+  .bg-picker-custom {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px 13px 8px;
+  }
+
+  .bg-picker-custom .bg-picker-error {
+    padding: 0;
+  }
+
+  .bg-picker-custom-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+
+  .bg-picker-thumb {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 auto;
+    border-radius: 8px;
+    border: 1px solid var(--lt-canvas-sheet-line);
+    background-size: cover;
+    background-position: center;
+  }
+
+  .bg-picker-replace,
+  .bg-picker-retry {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 9999px;
+    border: 1px solid var(--lt-canvas-sheet-line);
+    background: var(--lt-canvas-panel-item-bg);
+    color: inherit;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .bg-picker-remove {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 4px;
+    font-size: 13px;
+    color: var(--lt-canvas-muted);
+    cursor: pointer;
+  }
+
+  /* 韓文照詞斷行，不在一個詞中間斷（文案走查）。看選單自己的 lang：沙盒殼的 <html lang> 是固定的。 */
+  .bg-picker-scope:lang(ko) {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+
+  .bg-picker-replace.is-busy {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .bg-picker-error {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 0 13px;
+    font-size: 12px;
+    color: var(--lt-canvas-danger);
+  }
+
+  .bg-picker-spinner {
+    width: 14px;
+    height: 14px;
+    border-radius: 9999px;
+    border: 2px solid var(--lt-canvas-sheet-line);
+    border-top-color: var(--lt-canvas-accent);
+    animation: bg-picker-spin 0.8s linear infinite;
+  }
+
+  @keyframes bg-picker-spin {
+    to { transform: rotate(360deg); }
+  }
+
   /* ── 歷史對話 ─────────────────────────────────────────────────── */
 
   .conversation-list-scope {

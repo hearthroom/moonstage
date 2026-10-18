@@ -101,6 +101,9 @@ export const useUserDefine = () => {
 		showAll: false,
 		backgroundUrl: '', //用户设定角色聊天背景
 		backgroundOff: false, //玩家明示「不要背景」，跟「沒設過」分開
+		backgroundMode: '', // 玩家自選背景：card / blur / color / custom（空＝沒選過，見 pages/canvas/canvas-player-background.ts）
+		backgroundColor: '', // 純色背景的色票值
+		backgroundCustomUrl: '', // 自訂背景圖（上傳端點寫入）
 		fontFamily: '', // 畫布字體偏好（card / wenkai / system；空＝依卡片來源）
 		context: 1,
 		systemPrompt:"",//系统预设
@@ -221,9 +224,17 @@ export const useUserDefine = () => {
 		// 玩家明示「不要背景」。獨立一個鍵，因為空字串要保留給「沒設過」
 		// （畫布據此照卡片回退，見 pages/canvas/canvas-background.ts）。
 		backgroundOff: false,
+		// 玩家自選背景（模糊／純色／自訂），見 pages/canvas/canvas-player-background.ts
+		backgroundMode: '',
+		backgroundColor: '',
+		backgroundCustomUrl: '',
 		// 畫布字體：'' 跟卡片來源的預設走（MMD 卡＝文楷，其餘跟隨卡片）、wenkai、system、card
 		fontFamily: '',
 	};
+
+	// 哪一張卡的偏好讀完了（成功或失敗）。畫布等它才決定背景：設過模糊或純色的卡，
+	// 第一幀不能先畫出原圖。
+	const preferenceSettled = reactive({ roleId: '', ok: false })
 
 	const getUserDefine = () => {
         if (useStageHost().capabilities?.preferences === false) return Promise.resolve();
@@ -251,8 +262,13 @@ export const useUserDefine = () => {
 			// `player/role-settings` 說了算，畫布讀到什麼就用什麼。
 			// 邊界 7：adaptive 模型「顯示思考過程」是純顯示層偏好，不經 server。
 			formData.showThinkingProcess = getShowThinkingProcess(formData.roleId);
+			const ok = !!(res && res.statusCode == 200);
+			preferenceSettled.ok = ok;
+			preferenceSettled.roleId = String(formData.roleId || '');
 		}).catch(e => {
 			console.log('角色設定錯誤', e)
+			preferenceSettled.ok = false;
+			preferenceSettled.roleId = String(formData.roleId || '');
 		});
 	}
 
@@ -531,6 +547,7 @@ export const useUserDefine = () => {
 		formData,
 		setUserDefine,
 		getUserDefine,
+		preferenceSettled,
 		itemList,
 		templateStyleList,
 		replyLengthList,

@@ -561,14 +561,51 @@ describe('殼：舞台背景', () => {
   it('直、橫兩張都交給舞台的兩個變數', () => {
     boot(config({ backgroundUrl: 'https://cdn/p.jpg', backgroundLandscapeUrl: 'https://cdn/l.jpg' }))
     const stage = document.querySelector('.chat-scope-box') as HTMLElement
-    expect(stage.style.getPropertyValue('--lt-bg-portrait')).toBe('url(https://cdn/p.jpg)')
-    expect(stage.style.getPropertyValue('--lt-bg-landscape')).toBe('url(https://cdn/l.jpg)')
+    expect(stage.style.getPropertyValue('--lt-bg-portrait')).toBe('url("https://cdn/p.jpg")')
+    expect(stage.style.getPropertyValue('--lt-bg-landscape')).toBe('url("https://cdn/l.jpg")')
   })
 
   it('沒有橫圖：不寫橫圖變數，橫屏退回直圖', () => {
     boot(config({ backgroundUrl: 'https://cdn/p.jpg' }))
     const stage = document.querySelector('.chat-scope-box') as HTMLElement
     expect(stage.style.getPropertyValue('--lt-bg-landscape')).toBe('')
+  })
+
+  it('玩家換成純色：立刻生效，根與舞台都不再畫原圖，不必重開', async () => {
+    const s = boot(config({ backgroundUrl: 'https://cdn/p.jpg', background: { mode: 'card', portrait: 'https://cdn/p.jpg', landscape: '', color: '' } }))
+    expect(s.refs.root.style.backgroundImage).toContain('https://cdn/p.jpg')
+    s.handle({ type: 'background', background: { mode: 'color', portrait: '', landscape: '', color: '#18202E' } } as any)
+    await nextTick()
+    expect(s.refs.root.style.backgroundImage).toBe('')
+    expect(s.refs.root.getAttribute('data-lt-player-bg')).toBe('color')
+    const stage = document.querySelector('.chat-scope-box') as HTMLElement
+    expect(stage.getAttribute('data-lt-player-bg')).toBe('color')
+    expect(stage.style.getPropertyValue('--lt-bg-portrait')).toBe('')
+    expect((document.querySelector('.lt-stage-bg') as HTMLElement).style.getPropertyValue('--lt-player-bg-color')).toBe('#18202E')
+  })
+
+  it('開機就帶模糊：第一幀就是糊的那一層', () => {
+    boot(config({ backgroundUrl: 'https://cdn/p.jpg', background: { mode: 'blur', portrait: 'https://cdn/p.jpg', landscape: '', color: '#16191E' } }))
+    expect(document.querySelector('.lt-stage-bg.is-blur')).not.toBeNull()
+    expect((document.querySelector('[data-chat=root]') as HTMLElement).style.backgroundImage).toBe('')
+  })
+
+  it('偏好還沒回來：根標成 pending、不畫圖；回來是原圖就拿掉標記', async () => {
+    const s = boot(config({ background: { mode: 'card', pending: true, portrait: '', landscape: '', color: '' } }))
+    expect(s.refs.root.getAttribute('data-lt-player-bg')).toBe('pending')
+    expect(s.refs.root.style.backgroundImage).toBe('')
+    s.handle({ type: 'background', background: { mode: 'card', portrait: 'https://cdn/p.jpg', landscape: '', color: '' } } as any)
+    await nextTick()
+    expect(s.refs.root.hasAttribute('data-lt-player-bg')).toBe(false)
+    expect(s.refs.root.style.backgroundImage).toContain('https://cdn/p.jpg')
+  })
+
+  it('換回卡片原圖：標記拿掉，原圖回來', async () => {
+    const s = boot(config({ background: { mode: 'color', portrait: '', landscape: '', color: '#16191E' } }))
+    s.handle({ type: 'background', background: { mode: 'card', portrait: 'https://cdn/p.jpg', landscape: '', color: '' } } as any)
+    await nextTick()
+    expect(s.refs.root.hasAttribute('data-lt-player-bg')).toBe(false)
+    expect(document.querySelector('.lt-stage-bg')).toBeNull()
   })
 })
 

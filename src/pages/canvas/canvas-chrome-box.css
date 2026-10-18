@@ -290,6 +290,28 @@
 .modify-scope .modify-item {
     padding: 0 12px
 }
+.bg-picker-colors {
+    padding: 4px 13px 8px
+}
+.bg-picker-custom {
+    padding: 4px 13px 8px
+}
+.bg-picker-custom .bg-picker-error {
+    padding: 0
+}
+.bg-picker-custom-row {
+    margin-bottom: 4px
+}
+.bg-picker-replace,
+  .bg-picker-retry {
+    padding: 0 12px
+}
+.bg-picker-remove {
+    padding: 0 4px
+}
+.bg-picker-error {
+    padding: 0 13px
+}
 .cl-full {
     padding: 8px 12px
 }

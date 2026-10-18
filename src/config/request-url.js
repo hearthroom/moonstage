@@ -41,6 +41,8 @@ export const requestUrl = {
 	// 外觀偏好（桌布、字體）。送出那一輪不讀它——讀的是下面那一份。
 	playerPreference: `${V1}/player/preference`,
 	playerPreferenceSave: `${V1}/player/preference/save`,
+	playerBackgroundUpload: `${V1}/player/background`,
+	playerBackgroundDelete: `${V1}/player/background/delete`,
 	// 這張卡的遊玩設定：稱呼、自我介紹、模型／線路、上下文檔位、思考深度。
 	// **送出那一輪讀的是這一份**，寫進外觀偏好不會生效。
 	playerRoleSettings: `${V1}/player/role-settings`,

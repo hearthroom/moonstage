@@ -1,0 +1,117 @@
+/*
+ * 玩家自選背景（模糊／純色／自訂，canvas-player-background.ts）的覆蓋規則。
+ *
+ * 為什麼不放在 canvas.css：那一份刻意不寫 !important（畫布契約：卡片不寫 layer 就天然蓋得過我們，
+ * 這是「讓位」唯一的機制）。這裡是唯一反過來的地方——玩家選了模糊、純色或自訂，就是要贏過卡片：
+ * 需求是「在公開場合不露出原圖」，被卡片 CSS 蓋回去就等於沒做（PM 2026-10-18 裁定）。
+ *
+ * 重要宣告的層序是反過來的：layer 裡的 !important 贏過作者沒分層的 !important，不必跟作者比特異性。
+ * 規則全部掛在 [data-lt-player-bg] 底下，卡片原圖時一條都不生效，作者的 CSS 照舊蓋得到。
+ */
+@layer lt-player-bg {
+  /*
+    玩家選了這幾種，作者畫在舞台各層的背景圖一律關掉。只關「圖」不關「色」：作者的底色不會露出任何東西。
+
+    圖改由 .lt-stage-bg 這一層畫，模糊加在這層容器上，不加在某一張圖上：作者換場景、
+    頭像退路換上來時，新圖第一幀就是糊的。scale 蓋掉模糊後邊緣透出的空白，#bg1 裁掉溢出。
+  */
+  .chat-scope-box[data-lt-player-bg],
+  [data-chat=root][data-lt-player-bg],
+  [data-chat=root][data-lt-player-bg]::before,
+  [data-chat=root][data-lt-player-bg]::after,
+  [data-lt-player-bg] [data-chat=messages],
+  [data-lt-player-bg] #scrollview,
+  [data-lt-player-bg] #chat,
+  [data-lt-player-bg] #msglistview,
+  [data-lt-player-bg] .lt-canvas-root,
+  .chat-scope-box[data-lt-player-bg]::before,
+  .chat-scope-box[data-lt-player-bg]::after,
+  [data-lt-player-bg] #scrollview::before,
+  [data-lt-player-bg] #scrollview::after,
+  [data-lt-player-bg] #chat::before,
+  [data-lt-player-bg] #chat::after,
+  [data-lt-player-bg] #msglistview::before,
+  [data-lt-player-bg] #msglistview::after {
+    background-image: none !important;
+  }
+
+  .chat-scope-box[data-lt-player-bg] {
+    overflow: hidden;
+  }
+
+  .lt-stage-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-color: var(--lt-player-bg-color, transparent) !important;
+    background-image: var(--lt-player-bg-portrait, none) !important;
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+  }
+
+  @media (orientation: landscape) {
+    .lt-stage-bg {
+      background-image: var(--lt-player-bg-landscape, var(--lt-player-bg-portrait, none)) !important;
+    }
+  }
+
+  /*
+    強度固定（美術總監 2026-10-18 樣品審查）：以長邊算。vmin 在橫式螢幕取的是高度，桌機糊得不夠，
+    全身人物的輪廓認得出來。手機約 42px、桌機約 72px。
+    模糊會讓邊緣往內透明，往外撐出兩倍半徑再由 #bg1 裁掉，邊緣才不透白（比 scale 固定倍數可靠：
+    半徑跟著螢幕長邊變，撐出去的量也跟著變）。
+  */
+  .lt-stage-bg.is-blur {
+    --lt-player-blur: max(40px, 5vmax);
+    inset: calc(var(--lt-player-blur) * -2);
+    filter: blur(var(--lt-player-blur)) !important;
+  }
+
+  /*
+    模糊與自訂圖片：底的亮暗跟著圖走，事先不知道。氣泡外的平台控制項加一層淡陰影，「重新生成」的膠囊
+    再墊一層半透明深色，白底的圖上也讀得到（美術總監 2026-10-18 第二輪）。作者的字不動。
+  */
+  :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .ch_name,
+  :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .lt-msg-regen,
+  :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .extraMesButtonsHint,
+  :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .swipeRightBlock {
+    text-shadow: 0 1px 2px rgba(15, 18, 23, 0.55) !important;
+  }
+
+  :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .extraMesButtonsHint > svg {
+    filter: drop-shadow(0 1px 2px rgba(15, 18, 23, 0.55));
+  }
+
+  /*
+    淺色的圖上光靠陰影不夠（美術總監完整交件審查）：名字、⋯、翻頁跟「重新生成」一樣墊半透明深底，
+    字改不透明的淺色，白底的圖上也找得到。
+  */
+  :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .lt-msg-regen,
+  :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .ch_name .name_text,
+  :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .extraMesButtonsHint,
+  :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .swipes-counter {
+    color: #F2F3F5 !important;
+    background-color: rgba(15, 18, 23, 0.45) !important;
+    border-radius: 9999px;
+  }
+
+  :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .ch_name .name_text,
+  :is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .swipes-counter {
+    padding: 2px 8px;
+  }
+
+  /*
+    淺色色票：氣泡外由平台畫的控制項（名字、重新生成、⋯、翻頁）改深色字，否則淺字在淺底上看不見。
+    氣泡裡作者的字不動（PM 裁定 (a)）。⋯ 展開的選單有自己的底色，不在這裡改。
+  */
+  [data-lt-player-tone=light] .ch_name,
+  [data-lt-player-tone=light] .ch_name .name_text,
+  [data-lt-player-tone=light] .lt-msg-regen,
+  [data-lt-player-tone=light] .extraMesButtonsHint,
+  [data-lt-player-tone=light] .swipeRightBlock,
+  [data-lt-player-tone=light] .swipes-counter {
+    color: #16191E !important;
+  }
+}

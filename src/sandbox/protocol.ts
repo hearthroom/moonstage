@@ -110,6 +110,8 @@ export interface SandboxHelloConfig {
   backgroundUrl?: string
   /** 橫向螢幕用的背景圖（可省略，沒有就退回直圖）。 */
   backgroundLandscapeUrl?: string
+  /** 玩家自選背景（卡片原圖／模糊／純色／自訂）。有它就以它為準，上面兩個只給舊殼看；之後由 background 訊息更新。 */
+  background?: SandboxBackground
   /** 視窗高度（--chat-viewport-height），之後由 viewport 訊息更新。 */
   viewportHeight?: number
   /**
@@ -267,6 +269,16 @@ export interface SandboxError {
   data?: Record<string, unknown>
 }
 
+/** 舞台背景：畫什麼、怎麼畫。與 pages/canvas/canvas-player-background.ts 的 StageBackground 同形。 */
+export interface SandboxBackground {
+  mode: 'card' | 'blur' | 'color' | 'custom'
+  /** 偏好還沒回來：先不畫任何圖（連作者 CSS 的） */
+  pending?: boolean
+  portrait: string
+  landscape: string
+  color: string
+}
+
 /** 宿主 → 殼 */
 export type HostToShell =
   | { type: 'hello'; config: SandboxHelloConfig }
@@ -287,6 +299,8 @@ export type HostToShell =
   /** 訊息的呈現資料變了（可重生成、上下文用量…），正文沒變。 */
   | { type: 'message.view'; id: string; view: MessageView }
   | { type: 'viewport'; height: number }
+  /** 玩家換了背景，或作者換了場景：殼立刻重畫，不必重開。 */
+  | { type: 'background'; background: SandboxBackground }
   /** 更早的歷史：還有沒有（more）、正在載（loading）。殼捲到頂附近且 more 才會要（history）。 */
   | { type: 'history'; more: boolean; loading: boolean }
   // 開場選項（MMD「你可以选择开场」）：空清單＝拿掉。玩家點一條回 ui prologue，key 是第幾條。

@@ -48,39 +48,119 @@ describe('.chat-scope-box 背景裁切', () => {
   })
 })
 
+// 網址加引號並轉義（2026-10-18 起）：網址裡的引號或括號不會截斷 url()。
+const card = (portrait: string, landscape = '') => ({ mode: 'card' as const, portrait, landscape, color: '' })
+
 describe('CanvasStage 只寫變數', () => {
   it('兩張都給：兩個變數都寫，且不 inline 寫 background-image', () => {
-    const w = mount(CanvasStage, { props: { backgroundUrl: 'https://cdn/p.jpg', backgroundLandscapeUrl: 'https://cdn/l.jpg' } })
+    const w = mount(CanvasStage, { props: { background: card('https://cdn/p.jpg', 'https://cdn/l.jpg') } })
     const style = (w.find('.chat-scope-box').element as HTMLElement).style
-    expect(style.getPropertyValue('--lt-bg-portrait')).toBe('url(https://cdn/p.jpg)')
-    expect(style.getPropertyValue('--lt-bg-landscape')).toBe('url(https://cdn/l.jpg)')
+    expect(style.getPropertyValue('--lt-bg-portrait')).toBe('url("https://cdn/p.jpg")')
+    expect(style.getPropertyValue('--lt-bg-landscape')).toBe('url("https://cdn/l.jpg")')
     expect(style.backgroundImage).toBe('')
   })
 
   it('只有直圖：不寫橫圖變數，讓 CSS 退回直圖', () => {
-    const w = mount(CanvasStage, { props: { backgroundUrl: 'https://cdn/p.jpg' } })
+    const w = mount(CanvasStage, { props: { background: card('https://cdn/p.jpg') } })
     const style = (w.find('.chat-scope-box').element as HTMLElement).style
-    expect(style.getPropertyValue('--lt-bg-portrait')).toBe('url(https://cdn/p.jpg)')
+    expect(style.getPropertyValue('--lt-bg-portrait')).toBe('url("https://cdn/p.jpg")')
     expect(style.getPropertyValue('--lt-bg-landscape')).toBe('')
   })
 
   it('沒有背景：什麼都不寫，作者 CSS 的預設值才有效', () => {
-    const w = mount(CanvasStage, { props: { backgroundUrl: '' } })
+    const w = mount(CanvasStage, { props: { background: card('') } })
     expect((w.find('.chat-scope-box').element as HTMLElement).getAttribute('style')).toBeFalsy()
+  })
+
+  it('卡片原圖：沒有玩家背景層，也沒有覆蓋標記', () => {
+    const w = mount(CanvasStage, { props: { background: card('https://cdn/p.jpg') } })
+    expect(w.find('.lt-stage-bg').exists()).toBe(false)
+    expect(w.find('.chat-scope-box').attributes('data-lt-player-bg')).toBeUndefined()
+  })
+})
+
+describe('CanvasStage 玩家自選背景', () => {
+  it('模糊：圖畫在獨立的一層，不畫在 #bg1（不然訊息會一起糊）', () => {
+    const w = mount(CanvasStage, { props: { background: { mode: 'blur', portrait: 'https://cdn/p.jpg', landscape: '', color: '#16191E' } } })
+    const root = w.find('.chat-scope-box')
+    expect(root.attributes('data-lt-player-bg')).toBe('blur')
+    expect((root.element as HTMLElement).getAttribute('style')).toBeFalsy()
+    const layer = w.find('.lt-stage-bg')
+    expect(layer.classes()).toContain('is-blur')
+    expect((layer.element as HTMLElement).style.getPropertyValue('--lt-player-bg-portrait')).toBe('url("https://cdn/p.jpg")')
+    // 訊息不在背景層裡
+    expect(layer.find('#scrollview').exists()).toBe(false)
+  })
+
+  it('淺色色票才標淺色底；深色色票、模糊、自訂不標', () => {
+    const tone = (bg: any) => mount(CanvasStage, { props: { background: bg } }).find('.chat-scope-box').attributes('data-lt-player-tone')
+    expect(tone({ mode: 'color', portrait: '', landscape: '', color: '#F2F3F5' })).toBe('light')
+    expect(tone({ mode: 'color', portrait: '', landscape: '', color: '#E8E2D9' })).toBe('light')
+    expect(tone({ mode: 'color', portrait: '', landscape: '', color: '#16191E' })).toBeUndefined()
+    expect(tone({ mode: 'blur', portrait: 'https://cdn/p.jpg', landscape: '', color: '#16191E' })).toBeUndefined()
+  })
+
+  it('偏好還沒回來：標成 pending，作者 CSS 的背景圖也先不畫，第一幀不露原圖', () => {
+    const w = mount(CanvasStage, { props: { background: { mode: 'card', pending: true, portrait: '', landscape: '', color: '' } } })
+    expect(w.find('.chat-scope-box').attributes('data-lt-player-bg')).toBe('pending')
+  })
+
+  it('純色：只有底色，沒有圖', () => {
+    const w = mount(CanvasStage, { props: { background: { mode: 'color', portrait: '', landscape: '', color: '#2A1A1F' } } })
+    const style = (w.find('.lt-stage-bg').element as HTMLElement).style
+    expect(style.getPropertyValue('--lt-player-bg-color')).toBe('#2A1A1F')
+    expect(style.getPropertyValue('--lt-player-bg-portrait')).toBe('')
+  })
+})
+
+describe('玩家背景的覆蓋規則（canvas-player-background.css）', () => {
+  const player = readFileSync(resolve(__dirname, '../canvas-player-background.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+
+  it('整份在自己的 layer 裡：layer 內的 !important 才贏得過作者沒分層的 !important', () => {
+    expect(player.trim().startsWith('@layer lt-player-bg')).toBe(true)
+  })
+
+  it('每一條關掉背景圖的規則都掛在玩家標記底下：卡片原圖時一條都不生效', () => {
+    const selectors = player.slice(player.indexOf('{') + 1).split('{')[0]
+    for (const sel of selectors.split(',')) expect(sel).toMatch(/data-lt-player-bg/)
+  })
+
+  it('模糊加在背景層容器上，以長邊算（橫式螢幕也夠糊）', () => {
+    const rule = player.slice(player.indexOf('.lt-stage-bg.is-blur'))
+    expect(rule).toMatch(/--lt-player-blur:\s*max\(40px,\s*5vmax\)/)
+    expect(rule.slice(0, rule.indexOf('}'))).toMatch(/filter:\s*blur\(var\(--lt-player-blur\)\)/)
+  })
+
+  it('模糊與自訂：平台控制項加淡陰影、重新生成墊深底；純色不加', () => {
+    // 重新生成、名字、⋯ 同一條規則：不透明淺字墊半透明深底
+    const backed = player.slice(player.lastIndexOf(':is([data-lt-player-bg=blur], [data-lt-player-bg=custom]) .lt-msg-regen,'))
+    expect(backed.slice(0, backed.indexOf('}'))).toMatch(/\.ch_name \.name_text[\s\S]*\.extraMesButtonsHint[\s\S]*background-color:\s*rgba\(15, 18, 23/)
+    expect(player).toMatch(/text-shadow:\s*0 1px 2px rgba\(15, 18, 23, 0\.55\)/)
+    expect(player).not.toMatch(/\[data-lt-player-bg=color\][^{]*\{[^}]*text-shadow/)
+  })
+
+  it('淺色色票：氣泡外的平台控制項改深色字', () => {
+    expect(player).toMatch(/\[data-lt-player-tone=light\] \.lt-msg-regen/)
+  })
+
+  it('canvas.vue 與殼都載入這一份', () => {
+    expect(readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')).toContain("import './canvas-player-background.css'")
+    expect(readFileSync(resolve(__dirname, '../../../sandbox/shell.ts'), 'utf8')).toContain("import '@/pages/canvas/canvas-player-background.css'")
   })
 })
 
 // 橫圖曾經算好了卻沒交給舞台（2026-09-15 起，作者上傳的橫式背景在橫屏上從沒出現過）。
 // canvas.vue 太大不好掛載，這裡看兩處交接點：一般卡的舞台、沙箱卡交給殼的設定。
-describe('canvas.vue 把橫圖交出去', () => {
+describe('canvas.vue 把背景交出去', () => {
   const vue = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
 
-  it('一般卡：舞台拿到橫圖', () => {
+  it('一般卡：舞台拿到解析好的背景（含橫圖）', () => {
     const tag = vue.slice(vue.indexOf('<CanvasStage'), vue.indexOf('>', vue.indexOf('<CanvasStage')))
-    expect(tag).toMatch(/:background-landscape-url="playerBackgroundLandscapeUrl"/)
+    expect(tag).toMatch(/:background="stageBackground"/)
   })
 
-  it('沙箱卡：交給殼的設定帶橫圖', () => {
-    expect(vue).toMatch(/backgroundLandscapeUrl:\s*String\(playerBackgroundLandscapeUrl\.value \|\| ''\) \|\| undefined/)
+  it('沙箱卡：交給殼的設定帶背景，之後變了再推', () => {
+    expect(vue).toMatch(/background:\s*\{ \.\.\.stageBackground\.value \}/)
+    expect(vue).toMatch(/host\.postBackground\(/)
   })
 })
