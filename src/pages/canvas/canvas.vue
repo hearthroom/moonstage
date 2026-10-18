@@ -485,7 +485,7 @@ import { archiveRequestQuery, buildArchiveRows, isArchiveFull, nextArchiveAfterD
 import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
 import type { ArchiveRow } from './canvas-archives'
 import { convertVisibleHtml, convertPlainText, createDisplayScriptConverter, directionFor } from './canvas-display-script'
-import { whenRoleDetail } from './canvas-role-ready'
+import { roleLoadFailureIsOurs, whenRoleDetail } from './canvas-role-ready'
 import { guestDraftStorage, saveGuestDraft, takeGuestDraft } from './canvas-guest'
 import CanvasPrologue from './components/canvas-prologue.vue'
 import { captureBodySnapshot, restoreBodySnapshot, sweepForeignNodes } from './canvas-body-snapshot'
@@ -1664,7 +1664,11 @@ function bootRole(targetRoleId: any, draft: AuthorDraft | null) {
 
   setCurrentRoleId(options.roleId);
   getRole(async (error, data) => {
-    if (error) { contentReady.mark(); return; }
+    if (error) {
+      if (roleLoadFailureIsOurs(error)) message.error(t('canvas.roleLoadFailed'));
+      contentReady.mark();
+      return;
+    }
     greeting.list = buildGreetingList(data);
     prologue.value = buildPrologueList(data);
     if (data) pic.value = cardPortrait(data);

@@ -8,6 +8,15 @@ import { watch, type WatchSource } from 'vue'
  * 卡片語言（簡繁方向退回只看介面語言）。store 裡的角色可能還是上一張卡，所以要比對卡片 ID。
  * 角色細節讀不到時不能讓殼永遠掛不上，逾時就照現有資料走。
  */
+/**
+ * 角色細節讀不到時，這一頁要不要自己講。伺服器回了錯誤（含攔截器不擋的 400）才講；
+ * 逾時、斷線、要重新登入，請求層已經提示過了。
+ */
+export function roleLoadFailureIsOurs(error: any): boolean {
+  const status = Number(error?.statusCode)
+  return status >= 400 && status !== 401
+}
+
 export function whenRoleDetail(
   current: WatchSource<any>,
   read: () => any,

@@ -317,11 +317,9 @@ export const useUserDefine = () => {
 				if (callback) {
 					callback(null, role);
 				}
-			} else {
-				message.error(res.data.error);
-				if (callback) {
-					callback(res.data.error, null);
-				}
+			} else if (callback) {
+				// 讀不到怎麼講由呼叫端決定（對話頁講「這張卡讀不到」），不彈伺服器的錯誤碼
+				callback(res, null);
 			}
 		}).catch(e => {
 			console.log(e)

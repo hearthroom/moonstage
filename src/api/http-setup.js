@@ -38,6 +38,7 @@ export function setupHttp(http, deps) {
 		'/conversation/operations',   // 背景恢復查詢；拿不到就靜默回退，不打擾使用者
 		'/conversation/rewrite-by-id', // 重寫的錯誤由聊天頁的系統訊息卡呈現，避免重複 toast
 		'/role/author-asset/serve',   // 玩家路徑：沒有資產就是「這張卡沒裝修」，不是使用者要處理的錯誤
+		'/role/detail',               // 對話頁與入口頁各自講「這張卡讀不到」，不彈伺服器的錯誤碼
 		'/trial-cards',               // 試玩卡：入口頁自己開視窗講清楚是哪一段、哪一條超限，不要再疊一個 toast
 		'/conversation/prompt-diagnostics', // 上下文用量：面板自己顯示讀取失敗與重試，輸入框旁的小圓環讀不到就不畫
 	];

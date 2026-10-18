@@ -5,6 +5,7 @@
 	"canvas.favorite.add": "お気に入りに追加",
 	"canvas.favorite.remove": "お気に入りから外す",
 	"canvas.favorite.failed": "お気に入りを更新できませんでした。もう一度お試しください。",
+	"canvas.roleLoadFailed": "このカードを読み込めませんでした。再読み込みしてもう一度お試しください。",
 	"canvas.comments.open": "コメントを見る",
 
 	"error.contextCapacityTitle": "モデルのコンテキスト容量を超えています",
