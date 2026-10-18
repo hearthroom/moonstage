@@ -47,6 +47,16 @@ const completePayloadInput = (overrides: Record<string, unknown> = {}) => ({
 })
 
 describe('desktop chat transport ownership state machine', () => {
+  it.each(['content_filter', 'refusal', 'length'])(
+    'preserves canonical %s on live, replay and restored partial rows', (finishReason) => {
+      for (const state of ['interrupted', 'failed_retryable']) {
+        expect(projectionFinishReason({ kind: 'send', state, reasonCode: 'temporary_failure', finishReason })).toBe(finishReason)
+      }
+      expect(projectionFinishReason({ state: 'stopped', finishReason })).toBe('user_stop')
+      expect(projectionFinishReason({ state: 'interrupted', finishReason: 'stop' })).toBe('interrupted')
+    },
+  )
+
   it('surfaces a durable empty response as a model-specific retryable outcome', () => {
     expect(projectionFinishReason({
       kind: 'send',

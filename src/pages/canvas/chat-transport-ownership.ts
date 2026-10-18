@@ -734,6 +734,13 @@ export function projectionFinishReason(
   if (status.reasonCode === 'empty_response') {
     return 'empty_response'
   }
+  // Stop is the player's action; a late upstream terminal cannot replace it.
+  if (status.state === 'stopped') return 'user_stop'
+  // Preserve the server's bounded reason across live frames and history restore.
+  // An interrupted/failed operation must never become a successful stop.
+  if (['content_filter', 'refusal', 'length'].includes(String(status.finishReason))) {
+    return String(status.finishReason)
+  }
   if (status.state === 'interrupted') {
     return 'interrupted'
   }
