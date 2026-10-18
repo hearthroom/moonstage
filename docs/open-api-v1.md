@@ -417,3 +417,15 @@ Cache hit rates are percentages (0–100). `billing.componentsAvailable: false`
 means show the settled total without inventing a component cost split.
 If no token capacity is published, show a context-details action without a
 capacity percentage. A byte limit is not a token capacity.
+
+## Conversation termination category
+
+`operationStatus.finishReason` is optional and bounded: empty while running,
+`stop`, `length`, `content_filter`, `refusal`, `interrupted`, or `user_stop`.
+Live frames, reconnect replay and HTTP operation history use the same category;
+the final answer chunk also carries it. Only `stop` means a completed answer.
+A partial/failed operation preserves `length`, `content_filter` or `refusal` for
+the existing system-message card; an upstream `stop` cannot turn an interrupted
+operation into success. User Stop takes precedence. Continue/retry availability
+still comes only from `allowedActions`; the category never triggers a model call.
+Raw upstream terminal strings remain provider diagnostics.
