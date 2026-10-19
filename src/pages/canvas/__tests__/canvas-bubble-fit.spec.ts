@@ -115,6 +115,18 @@ describe('接線', () => {
     expect(css).toMatch(/\.mes_turn \{[^}]*max-width: 94%;/)
   })
 
+  // 手機（窄螢幕）上對面那一側的保留寬度收到 8px；說話人那一側的 10px 欄距不動。
+  // 桌機與寬螢幕仍是 94%，所以規則必須只放在窄螢幕的 media 裡，且排在基本規則之後才贏得過。
+  it('窄螢幕把氣泡對面那一側的保留寬度收到 8px，桌機的 94% 不動', () => {
+    const base = css.indexOf('max-width: 94%;')
+    const block = css.match(/@media \(max-width: 480px\) \{\s*\.mes_turn \{([^}]*)\}/)
+    expect(block).not.toBeNull()
+    expect(block![1]).toMatch(/max-width: calc\(100% - 8px\);/)
+    expect(block![1]).not.toMatch(/!important/)
+    expect(css.indexOf(block![0])).toBeGreaterThan(base)
+    expect(css.match(/max-width: 94%;/g)).toHaveLength(1)
+  })
+
   // 程式碼框裡的長行在框內左右滑，不把氣泡撐寬（否則每則帶程式碼的回覆都要靠上面的保底釘寬）。
   // grid + minmax(0,1fr)：短程式碼照原寬、長的封頂在氣泡上限；width:0 那種寫法會把短訊息的框擠窄。
   it('一般畫布與沙箱殼的程式碼框都在框內左右滑', () => {

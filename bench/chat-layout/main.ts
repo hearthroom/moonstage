@@ -38,6 +38,13 @@ style.textContent = `
 
 `
 document.head.append(style)
+// theme=light: the traditional route has no web host to map site tokens, so these stand in for the
+// light values stage.css supplies (layout evidence only; the sandbox route uses the shell's own light theme).
+if (params.get('theme') === 'light') {
+  const light = document.createElement('style')
+  light.textContent = ':root{--lt-canvas-bg:#f5f3ee;--lt-canvas-fg:#1f2328;--lt-canvas-muted:rgba(31,35,40,.6);--lt-canvas-header-bg:rgba(255,255,255,.82);--lt-canvas-bubble-ai-bg:rgba(255,255,255,.78);--lt-canvas-bubble-user-bg:rgba(226,221,210,.92)}body{background:#f5f3ee}'
+  if (params.get('mode') === 'traditional') document.head.append(light)
+}
 if (params.get('mode') === 'traditional') {
   // The community host supplies this reset outside lt-base. MMD author
   // descendants are subsequently restored by canvas.css, as in real /play.
@@ -57,7 +64,7 @@ if (params.get('mode') === 'traditional') {
   const shell = createShell({
     doc:document, win:window, mount:document.querySelector('#app')!,
     config: {
-      theme:'dark', locale:'en', role:{ name:'Example', avatarUrl:'' }, user:{ nickname:'Player', avatarUrl:'' },
+      theme:params.get('theme') === 'light' ? 'light' : 'dark', locale:'en', role:{ name:'Example', avatarUrl:'' }, user:{ nickname:'Player', avatarUrl:'' },
       card:{ rules:[], statusbar:params.has('bom') ? 'mount' : '', statusbarHtml:params.has('bom') ? '\n\ufeff<div style="position:fixed;left:0;top:160px"></div>' : undefined }, capabilities:{ saves:false, edit:false, send:false }, composer:false,
       chromeState: {
         header,
