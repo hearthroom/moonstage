@@ -10704,7 +10704,7 @@ const contextBreakdownGate = createPromptDiagnosticsRequestGate()
 
 const contextBreakdownLabels = computed(() => ({
   title: t('promptBreakdown.title'),
-  // 「變更 MOD 後⋯⋯」那句只給真的有 MOD 用量的報告（LunaTalk）；沒有 MOD 的供應商（HarperHarbor）不提 MOD。
+  // 「變更 MOD 後⋯⋯」那句只給真的有 MOD 用量的報告；沒有 MOD 的供應商（HarperHarbor）不提 MOD。
   subtitle: t(contextBreakdown.value.report?.chatId
     ? 'canvas.context.selectedReply'
     : (promptBreakdownHasModData(contextBreakdown.value.report) ? 'promptBreakdown.subtitleMod' : 'promptBreakdown.subtitle')),
