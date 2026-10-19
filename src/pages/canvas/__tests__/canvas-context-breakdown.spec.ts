@@ -183,7 +183,7 @@ describe('組成：伺服器回覆正規化', () => {
     expect(view.condensing).toBe(false)
   })
 
-  it('沒有容量時（LunaTalk、舊回合）退回占提示詞幾成，不算剩餘空間也不畫線', () => {
+  it('沒有容量時（舊回合）退回占提示詞幾成，不算剩餘空間也不畫線', () => {
     const view = promptUsageView(normalizeServerReport(serverReport()))!
     expect(view.hasWindow).toBe(false)
     expect(view.compactAt).toBeNull()
@@ -388,7 +388,7 @@ it('does not turn missing historical cache usage into a measured zero',()=>{
 
 // ── 沒有 MOD 的供應商（HarperHarbor）──────────────────────────────────
 //
-// 同一份舞台同時接 LunaTalk（有 MOD）與 HarperHarbor（沒有 MOD）。舞台不知道
+// 同一份舞台處理有 MOD 與沒有 MOD 的用量報告。舞台不知道
 // 自己接的是哪一家，能看的只有報告本身：MOD 那桶沒有 token、也沒有明細，就代表
 // 這一家沒有 MOD 可講，那一列與 MOD 相關的字都不該出現。
 function harborReport() {

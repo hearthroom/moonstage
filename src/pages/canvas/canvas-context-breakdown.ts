@@ -92,7 +92,7 @@ export interface PromptBreakdownCache {
 /**
  * 這段對話的上下文用到哪裡了，跟伺服器的記憶整理同一把尺：用量、玩家選的容量、
  * 從哪裡開始把較早的劇情濃縮成摘要，以及照最近幾輪的速度大約還剩幾輪。
- * 沒有容量可比的供應商（LunaTalk、按位元組計的模型、舊回合）available 是 false。
+ * 沒有容量可比的供應商（按位元組計的模型、舊回合）available 是 false。
  */
 export interface PromptContextWindow {
   available: boolean
@@ -494,7 +494,7 @@ export function normalizeServerReport(report: any): PromptBreakdownReport | null
 
 // ── 沒有 MOD 的供應商 ─────────────────────────────────────────────────
 //
-// 同一份舞台同時接 LunaTalk（有 MOD）與 HarperHarbor（沒有 MOD），而宿主沒有告訴
+// 同一份舞台處理有 MOD 與沒有 MOD 的用量報告，而宿主沒有告訴
 // 舞台接的是哪一家——能判斷的只有報告本身。HarperHarbor 的第 2 版報告仍然帶著 mod
 // 這一桶，但永遠是 0 字、不可用、沒有明細；照畫的話玩家會看到一列「MOD／暫無資料」
 // 和「變更 MOD 後⋯⋯」的副標，講的是這一家根本沒有的東西。
