@@ -21,6 +21,8 @@ Options can be combined:
 - `bom=1&broken=1`: positive control reinserting that BOM after platform mounting;
   the slot must gain a persistent line height while messages scroll.
 - `theme=light`: light theme (sandbox: the shell's light theme; traditional: stand-in light tokens, layout evidence only).
+- `avatar=1`: synthetic avatars on both speakers. `same=1`: author CSS paints both bubbles the
+  same color and frame (worst case for telling speakers apart).
 - `docks=1`: 16px fixed author sidebars; text must clear them by at least 4px.
 - `docks=1&dock-z=10`: explicit upper-layer author docks may overlap only the
   decorative edge; platform action hitboxes still clear the full dock. Auto
