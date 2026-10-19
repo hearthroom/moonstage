@@ -30,6 +30,17 @@ export interface StageHost {
      * 每次進對話頁只叫一次。不實作就不叫。
      */
     contentReady?(): void
+    /**
+     * 積分不夠聊這一輪時，宿主給的說法與去處（綺夢社：「今日任務還能拿 N 積分」「儲值」）。
+     * shortfall 是伺服器錯誤信封帶的這一輪要多少、現在能用多少；沒帶是 null。
+     * 回 null 或不實作：卡片維持原樣、沒有任何連結（畫布本身不賣點數，不給按了會落空的鍵）。
+     * href 要是絕對網址：沙箱卡的殼在別的網域，相對路徑會落在殼那邊。
+     */
+    creditsActions?(shortfall: { needed: number; available: number } | null): {
+      title?: string
+      body?: string
+      links: Array<{ id: string; label: string; href: string }>
+    } | null
   }
   storage: {
     get(key: string): string | null

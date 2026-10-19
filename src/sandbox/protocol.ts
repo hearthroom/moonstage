@@ -32,6 +32,8 @@ export interface GenerationOutcome {
   label: string
   sub: string
   actions: Array<{ action: string; label: string }>
+  /** 宿主注入的去處（積分不夠：今日任務、儲值），新分頁開；沒有就不畫。 */
+  links?: Array<{ id: string; label: string; href: string }>
 }
 export type SandboxTheme = 'dark' | 'light'
 export type StageState = 'closed' | 'content' | 'full'

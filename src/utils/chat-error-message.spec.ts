@@ -182,3 +182,17 @@ describe('resolveContextCapacityAdvice', () => {
     expect(resolveContextCapacityAdvice(null)).toBe(null)
   })
 })
+
+describe('resolveCreditsShortfall', () => {
+  it('reads credits_needed and credits_available from the insufficient_credits envelope', async () => {
+    const { resolveCreditsShortfall } = await import('./chat-error-message')
+    expect(resolveCreditsShortfall({ error_type: 'insufficient_credits', credits_needed: 300, credits_available: 120 })).toEqual({ needed: 300, available: 120 })
+    expect(resolveCreditsShortfall({ data: { code: 'insufficient_credits', credits_needed: 300, credits_available: 0 } })).toEqual({ needed: 300, available: 0 })
+  })
+  it('returns null for other errors or missing numbers', async () => {
+    const { resolveCreditsShortfall } = await import('./chat-error-message')
+    expect(resolveCreditsShortfall({ error_type: 'rate_limit', credits_needed: 1 })).toBeNull()
+    expect(resolveCreditsShortfall({ error_type: 'insufficient_credits' })).toBeNull()
+    expect(resolveCreditsShortfall(null)).toBeNull()
+  })
+})
