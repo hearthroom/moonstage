@@ -20,6 +20,7 @@ Options can be combined:
 - `bom=1`: mount HTML containing a standalone BOM; the slot must have zero height.
 - `bom=1&broken=1`: positive control reinserting that BOM after platform mounting;
   the slot must gain a persistent line height while messages scroll.
+- `theme=light`: light theme (sandbox: the shell's light theme; traditional: stand-in light tokens, layout evidence only).
 - `docks=1`: 16px fixed author sidebars; text must clear them by at least 4px.
 - `docks=1&dock-z=10`: explicit upper-layer author docks may overlap only the
   decorative edge; platform action hitboxes still clear the full dock. Auto
