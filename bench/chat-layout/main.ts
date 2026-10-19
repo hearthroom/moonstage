@@ -20,18 +20,22 @@ const ordinaryPanel = '<div class="opening-panel"><h3>Journey panel</h3><p>Choos
 const panel = params.has('frontend') ? '<pre class="lt-frontend"><code>&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;body&gt;&lt;h3&gt;Journey panel&lt;/h3&gt;&lt;p&gt;Choose the first scene.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</code></pre>' : ordinaryPanel
 const dockMarkup = params.has('docks') ? '<div class="legacy-dock left">Map</div><div class="legacy-dock right">Info</div>' : ''
 const longText = '<p>' + 'The road ahead winds through the forest. '.repeat(params.has('long') ? 40 : 4) + '</p>'
+// avatar=1: synthetic avatars (inline SVG, no player art). same=1: author CSS paints both bubbles the same
+// color and frame, the worst case for telling speakers apart.
+const avatarOf = (c:string) => params.has('avatar') ? 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><circle cx="32" cy="32" r="32" fill="${c}"/></svg>`) : ''
 const messages: SandboxMessage[] = [
   {id:'greeting', role:'ai', content:panel+dockMarkup, serverId:null},
   {id:'ai', role:'ai', content:longText, serverId:null},
   {id:'user', role:'user', content:longText, serverId:null},
 ]
-messages.forEach((m, i) => {m.view={mesid:i,role:m.role,name:m.role==='user'?'Player':'Example',html:m.content,finished:true,latestAI:params.has('actions')&&i===1}})
+messages.forEach((m, i) => {m.view={mesid:i,role:m.role,name:m.role==='user'?'Player':'Example',avatar:avatarOf(m.role==='user'?'#d98a5a':'#6a8fd8'),html:m.content,finished:true,latestAI:params.has('actions')&&i===1}})
 const style = document.createElement('style')
 style.textContent = `
   .content { width:100%; }
   .opening-panel { box-sizing:border-box; width:100%; padding:8px; border:1px solid #8cb1c9; }
   ${params.get('pad') === '0' ? '.mes_text { padding:0; }' : ''}
   ${params.has('wide') ? '.opening-panel { min-width:100vw; }' : ''}
+  ${params.has('same') ? '.mes_text, .mes_text.right { background:#2b2f3a; border:1px solid #6b7280; }' : ''}
   .legacy-dock { position:fixed; top:160px; width:16px; height:100px; background:#8cb1c9; color:#111; writing-mode:vertical-rl; }
   ${params.get('dock-z') === '10' ? '.legacy-dock { z-index:10; }' : ''}
   .legacy-dock.left { left:0; } .legacy-dock.right { right:0; }
@@ -64,7 +68,7 @@ if (params.get('mode') === 'traditional') {
   const shell = createShell({
     doc:document, win:window, mount:document.querySelector('#app')!,
     config: {
-      theme:params.get('theme') === 'light' ? 'light' : 'dark', locale:'en', role:{ name:'Example', avatarUrl:'' }, user:{ nickname:'Player', avatarUrl:'' },
+      theme:params.get('theme') === 'light' ? 'light' : 'dark', locale:'en', role:{ name:'Example', avatarUrl:avatarOf('#6a8fd8') }, user:{ nickname:'Player', avatarUrl:avatarOf('#d98a5a') },
       card:{ rules:[], statusbar:params.has('bom') ? 'mount' : '', statusbarHtml:params.has('bom') ? '\n\ufeff<div style="position:fixed;left:0;top:160px"></div>' : undefined }, capabilities:{ saves:false, edit:false, send:false }, composer:false,
       chromeState: {
         header,
