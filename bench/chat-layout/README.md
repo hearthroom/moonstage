@@ -33,6 +33,7 @@ Options can be combined:
 
 Read `window.legacyStageSnapshot()` after scrolling `#scrollview` to the start,
 middle and end. Without docks, AI near-side margin is 10px on phones and its
-far-side margin is at least 30.4px (360) / 32.2px (390); player margins mirror it.
+far-side margin is 18px up to 480px wide (10px gutter + 8px reserve); above 480px
+the 94% cap applies (37.7px at 481). Player margins mirror it.
 A normal opening must obey the same cap. Ordinary cards and both modes must
 have no horizontal overflow. Author CSS stays unlayered and overridable.

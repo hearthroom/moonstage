@@ -124,6 +124,17 @@ describe('接線', () => {
     expect(block![1]).toMatch(/max-width: calc\(100% - 8px\);/)
     expect(block![1]).not.toMatch(/!important/)
     expect(css.indexOf(block![0])).toBeGreaterThan(base)
+    // 必須在 lt-base 裡：移到 layer 外就贏過作者的 CSS（ui-stage §2）。
+    const start = css.indexOf('@layer lt-base {')
+    let depth = 0
+    let end = -1
+    for (let i = css.indexOf('{', start); i < css.length; i++) {
+      if (css[i] === '{') depth++
+      else if (css[i] === '}' && --depth === 0) { end = i; break }
+    }
+    expect(start).toBeGreaterThan(-1)
+    expect(css.indexOf(block![0])).toBeGreaterThan(start)
+    expect(css.indexOf(block![0])).toBeLessThan(end)
     expect(css.match(/max-width: 94%;/g)).toHaveLength(1)
   })
 
