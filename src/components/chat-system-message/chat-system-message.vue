@@ -55,6 +55,11 @@
         </view>
       </view>
     </view>
+    <!-- 宿主注入的去處（積分不夠時：今日任務、儲值）。畫布本身不賣點數也沒有每日報到，
+         宿主沒給就什麼都不畫；新分頁開，不離開正在玩的對話（輸入框裡的字也不會丟）。 -->
+    <view v-if="validLinks.length" class="sys-links">
+      <a v-for="link in validLinks" :key="link.id" class="sys-link" :href="link.href" target="_blank" rel="noopener noreferrer">{{ link.label }}</a>
+    </view>
   </view>
 </template>
 
@@ -105,6 +110,8 @@ export default {
     // callers omit this prop and keep the frozen kind-derived fallback.
     ctaAction: { type: String, default: '' },
     ctas: { type: Array, default: () => [] },
+    // 宿主給的連結：[{ id, label, href }]
+    links: { type: Array, default: () => [] },
   },
   emits: ['cta'],
   computed: {
@@ -123,6 +130,11 @@ export default {
       if (capable.length) return capable;
       if (!this.cta) return [];
       return [{ label: this.cta, action: this.resolvedCtaAction }];
+    },
+    validLinks() {
+      return (Array.isArray(this.links) ? this.links : [])
+        .filter(link => link && link.label && typeof link.href === 'string' && /^(https:\/\/|\/)/.test(link.href))
+        .map(link => ({ id: String(link.id || link.href), label: String(link.label), href: link.href }));
     },
     isFailure() { return this.tone === 'failure'; },
     isTerminal() { return this.tone === 'failure' || this.tone === 'notice'; },
@@ -341,6 +353,36 @@ export default {
   color: inherit;
   font-size: 11px;
   font-weight: 700;
+}
+
+/* ---- 宿主注入的去處：觸控 44 高、放不下就直排；顏色只用卡片的 --lt-canvas-*（不擴大公開契約） ---- */
+.sys-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  max-width: 100%;
+}
+.sys-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--lt-canvas-pill-radius, 9999px);
+  background: var(--lt-canvas-pill-bg, color-mix(in srgb, currentColor 7%, transparent));
+  border: var(--lt-canvas-pill-border, 1px solid color-mix(in srgb, currentColor 32%, transparent));
+  color: var(--lt-canvas-pill-fg, inherit);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.sys-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }
 }
 </style>

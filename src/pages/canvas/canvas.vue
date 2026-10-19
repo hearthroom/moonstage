@@ -81,8 +81,9 @@
         <chat-system-message
           v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason)"
           :kind="getSystemMsgKind(item.finishReason)"
-          :label="operationFailureTitle(item.failureCause, t) || getSystemMsgLabel(item.finishReason)"
-          :sub="operationFailureSub(item.failureCause, t) || getSystemMsgSub(item.finishReason)"
+          :label="creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause, t) || getSystemMsgLabel(item.finishReason)"
+          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause, t) || getSystemMsgSub(item.finishReason)"
+          :links="creditsOverrideFor(item)?.links ?? []"
           :cta="getSystemMsgCta(item.finishReason, item, index)"
           :cta-action="getSystemMsgCtaAction(item.finishReason, item, index)"
           :ctas="getSystemMsgCtas(item, index)"
@@ -670,6 +671,7 @@ import {
   resolveChatErrorMessage,
   resolveChatErrorPresentation,
   resolveContextCapacityAdvice,
+  resolveCreditsShortfall,
 } from '@/utils/chat-error-message.js';
 import { isSignedIn as canUseChatOperationOutcome } from '@/common/open-oauth';
 // 卡片附加內容的名字有多語欄位；沒有對應語言就退回原名。
@@ -3286,6 +3288,12 @@ const HUD_DESTRUCTIVE_MORE = new Set(['new-chat', 'reset-chat', 'fork-archive'])
   按鍵照元件的規則合成：伺服器列給了 ctas 就用那幾顆，否則用那一顆 cta／cta-action；
   只有最新那一列有鍵（getSystemMsgCtas／getSystemMsgCta 本來就這樣判）。
 */
+/** 積分不夠時宿主給的說法與去處；不是這種失敗、或宿主沒實作，回 null（卡片維持原樣）。 */
+function creditsOverrideFor(item: any) {
+  if (item?.finishReason !== 'insufficient_credits' || typeof stageHost.ui.creditsActions !== 'function') return null;
+  try { return stageHost.ui.creditsActions(item.creditsShortfall ?? null) || null; } catch { return null; }
+}
+
 function systemNoticeFor(item: any, index: number) {
   if (!item || !(item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason))) return null;
   const ctas = getSystemMsgCtas(item, index);
@@ -3294,9 +3302,11 @@ function systemNoticeFor(item: any, index: number) {
   const actions: Array<{ action: string; label: string }> = ctas.length ? ctas : (cta && ctaAction ? [{ action: ctaAction, label: cta }] : []);
   return {
     kind: getSystemMsgKind(item.finishReason),
-    label: operationFailureTitle(item.failureCause, t) || getSystemMsgLabel(item.finishReason),
-    sub: operationFailureSub(item.failureCause, t) || getSystemMsgSub(item.finishReason),
+    label: creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause, t) || getSystemMsgLabel(item.finishReason),
+    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause, t) || getSystemMsgSub(item.finishReason),
     actions: actions.map((entry) => ({ action: String(entry.action), label: String(entry.label) })),
+    // 宿主給的去處（積分不夠）：有才帶，殼照畫；沒有的卡跟以前一模一樣
+    ...((creditsOverrideFor(item)?.links ?? []).length ? { links: creditsOverrideFor(item)?.links ?? [] } : {}),
   };
 }
 
@@ -5416,6 +5426,7 @@ function chatStart(greetingIndex?: number) {
 }
 
 
+let pendingCreditsShortfall: { needed: number; available: number } | null = null;
 function appendChatErrorBubble(errorType, errorMessage = '', metadata: Record<string, any> = {}) {
   removeOrphanPlaceholder();
   const presentation = resolveChatErrorPresentation(errorType, t);
@@ -5436,10 +5447,12 @@ function appendChatErrorBubble(errorType, errorMessage = '', metadata: Record<st
     ...metadata,
     finishReason: capacity ? 'context_capacity_choice' : presentation.finishReason,
     ...(capacity ? { capacityAdvice: capacity.advice, capacityDraft: capacity.draft } : {}),
+    ...(errorType === 'insufficient_credits' ? { creditsShortfall: pendingCreditsShortfall } : {}),
     errorAction: presentation.action,
     isApplicationError: true,
     systemOnly: true,
   });
+  if (errorType === 'insufficient_credits') pendingCreditsShortfall = null;
   scrollToBottom();
   if (capacity) askCapacityChoice(capacity.advice, capacity.draft, String(bubbleId));
 }
@@ -6342,6 +6355,8 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
           errorType === 'context_capacity_exceeded' ? resolveContextCapacityAdvice(event.data) : null,
           String(pendingChatTurn?.draft || tempContent.value || ''),
         );
+        // 積分不夠：記下這一輪要多少、現在有多少，宿主講得出具體的數字（同上，回合清掉前先記）
+        if (errorType === 'insufficient_credits') pendingCreditsShortfall = resolveCreditsShortfall(event.data);
         if (markExplicitPreAdmissionError(
           pendingChatTurn,
           errorType,

@@ -162,4 +162,22 @@ describe('ChatSystemMessage (desktop port)', () => {
       ['switch_model'],
     ])
   })
+
+  // 積分不夠時由宿主注入的去處（綺夢社：今日任務、儲值）。畫布不賣點數，宿主沒給就什麼都不畫。
+  it('renders host-provided credit links as new-tab anchors under the quota card, and nothing when absent', () => {
+    const links = [
+      { id: 'tasks', label: '今日任務還能拿 120 積分', href: '/checkin#tasks' },
+      { id: 'topup', label: '儲值', href: 'https://console.example/billing' },
+    ]
+    const wrapper = mountCard({ kind: 'quota', label: '積分不夠聊這一輪', sub: '這一輪大約要 300 積分，目前有 120。', links })
+    const anchors = wrapper.findAll('a.sys-link')
+    expect(anchors.map((a) => a.text())).toEqual(['今日任務還能拿 120 積分', '儲值'])
+    for (const a of anchors) {
+      expect(a.attributes('target')).toBe('_blank')
+      expect(a.attributes('rel')).toContain('noopener')
+    }
+    expect(anchors[0].attributes('href')).toBe('/checkin#tasks')
+    expect(mountCard({ kind: 'quota', label: 'x', sub: '' }).findAll('a.sys-link')).toHaveLength(0)
+  })
 })
+

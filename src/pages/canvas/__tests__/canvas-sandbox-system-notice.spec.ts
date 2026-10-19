@@ -45,16 +45,16 @@ function canvasFunctions(names: string[], env: Record<string, unknown>): Record<
   return new Function(...keys, `${js}\nreturn { ${names.join(', ')} };`)(...keys.map((k) => env[k]))
 }
 
-function resolver(timeline: any[], over: { capabilities?: unknown; operations?: unknown[] } = {}) {
+function resolver(timeline: any[], over: { capabilities?: unknown; operations?: unknown[]; ui?: Record<string, unknown> } = {}) {
   const fns = canvasFunctions([
     'getSystemMsgKind', 'getSystemMsgLabel', 'getSystemMsgSub', 'getSystemMsgCtaLabel', 'getSystemMsgCta',
-    'getSystemMsgCtas', 'getSystemMsgCtaAction', 'systemNoticeFor',
+    'getSystemMsgCtas', 'getSystemMsgCtaAction', 'creditsOverrideFor', 'systemNoticeFor',
   ], {
     t,
     unref: (v: any) => (v && typeof v === 'object' && 'value' in v ? v.value : v),
     talkList: { value: timeline },
     knownOperations: { value: over.operations || [] },
-    stageHost: { capabilities: over.capabilities },
+    stageHost: { capabilities: over.capabilities, ui: over.ui || {} },
     allowsStageAction,
     isTerminalActionAllowed,
     terminalUIActionFromAllowedActions,
@@ -106,6 +106,17 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
     expect(notice).toEqual({ kind: 'quota', label: t('chat.point_no_tips'), sub: t('chat.manageCredits'), actions: [] })
   })
 
+  it('點數不足、宿主給了說法與去處（綺夢社：今日任務、儲值）：照宿主的字畫，帶上連結', () => {
+    const seen: unknown[] = []
+    const ui = { creditsActions: (shortfall: unknown) => { seen.push(shortfall); return { title: '積分不夠聊這一輪', body: '這一輪大約要 300 積分，目前有 120。', links: [{ id: 'topup', label: '儲值', href: 'https://console.example/billing' }] } } }
+    const row = failed({ finishReason: 'insufficient_credits', failureCause: 'insufficient_credits', operationState: 'failed_terminal', allowedActions: [], creditsShortfall: { needed: 300, available: 120 } })
+    const notice = resolver([user('u1'), row], { ui })(1)
+    expect(notice).toEqual({ kind: 'quota', label: '積分不夠聊這一輪', sub: '這一輪大約要 300 積分，目前有 120。', actions: [], links: [{ id: 'topup', label: '儲值', href: 'https://console.example/billing' }] })
+    expect(seen[0]).toEqual({ needed: 300, available: 120 })
+    // 別種失敗不問宿主
+    expect(resolver([user('u1'), failed()], { ui })(1)?.links).toBeUndefined()
+  })
+
   it('只有最新那一列有按鍵：舊的失敗留著字，鍵收掉', () => {
     const timeline = [user('u1'), failed(), user('u2', '再來'), { id: 'a2', chatId: 'a2', type: 0, content: '好', chatFinish: true, finishReason: 'stop' }]
     const notice = resolver(timeline)(1)
@@ -145,7 +156,7 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
     }
     const fnStart = CANVAS.indexOf('\nfunction systemNoticeFor(')
     const fn = CANVAS.slice(fnStart, CANVAS.indexOf('\nfunction ', fnStart + 1))
-    for (const name of ['v-if', ':kind', ':label', ':sub', ':cta', ':cta-action', ':ctas']) {
+    for (const name of ['v-if', ':kind', ':label', ':sub', ':cta', ':cta-action', ':ctas', ':links']) {
       expect(fn, `systemNoticeFor 跟模板的 ${name} 不一樣`).toContain(attr(name))
     }
   })

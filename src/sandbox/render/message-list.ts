@@ -243,6 +243,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
             label: notice.label,
             sub: notice.sub,
             ctas: notice.actions,
+            links: notice.links ?? [],
             onCta: (action: string) => { if (deps.onUi) deps.onUi(id, { kind: 'action', key: `sys:${action}` }) },
           } as Record<string, unknown>)
         },

@@ -106,3 +106,18 @@ export function resolveChatErrorPresentation(errorType, translate) {
     action: isCreditFailure ? 'openVip' : '',
   }
 }
+
+// 積分不夠：伺服器在錯誤信封（WebSocket error 事件、HTTP 402）裡附上這一輪要多少、現在能用多少，
+// 宿主用它講「這一輪大約要多少、目前有多少」。沒帶（舊伺服器、別的錯誤）回 null，畫面維持原本的說法。
+export function resolveCreditsShortfall(source) {
+  const data = source && typeof source === 'object' && source.data && typeof source.data === 'object'
+    ? source.data
+    : source
+  if (!data || typeof data !== 'object') return null
+  const type = String(data.error_type || data.errorCode || data.code || data.error || '').trim()
+  if (type !== 'insufficient_credits') return null
+  const needed = Number(data.credits_needed)
+  const available = Number(data.credits_available)
+  if (!Number.isFinite(needed) || !Number.isFinite(available)) return null
+  return { needed, available }
+}
