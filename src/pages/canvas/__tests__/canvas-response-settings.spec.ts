@@ -7,13 +7,39 @@ const initial = () => ({conversationId:'c1',scope:'conversation',schemaVersion:1
 const echo = () => vi.fn().mockImplementation(async (_id, rev, patch)=>({...initial(),revision:rev+1,overrides:Object.fromEntries(Object.entries(patch).filter(([,v])=>v!==null))}))
 const pill = (wrapper:any, axis:string, value:string) => wrapper.get(`.mode-item[data-axis="${axis}"][data-value="${value}"]`)
 
+it('defaults old responses to streaming and saves the complete-response preference',async()=>{
+ const save=echo()
+ const wrapper=mount(Panel,{props:{conversationId:'c1',model:'fixture',load:async()=>initial(),save,t:(k:string)=>k}})
+ await flushPromises()
+ expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-checked')).toBe('true')
+ await wrapper.get('[data-lt="streaming-toggle"]').trigger('click')
+ expect(wrapper.get('[data-hint="streaming"]').text()).toBe('responseSettings.streamingOffHint')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({streaming:'off'}))
+ wrapper.unmount()
+ const settings={...initial(),overrides:{streaming:'off'},effective:{...initial().effective,streaming:'off'}}
+ expect(readResponseSettings(settings,'c1').overrides.streaming).toBe('off')
+})
+
+it('disables only a streaming-only route without changing its saved choice',async()=>{
+ const wrapper=mount(Panel,{props:{conversationId:'c1',model:'only-stream',load:async()=>({...initial(),streamingOnlyModels:['only-stream'],overrides:{streaming:'off'},effective:{...initial().effective,streaming:'off'}}),save:vi.fn(),t:(k:string)=>k}})
+ await flushPromises()
+ expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-disabled')).toBe('true')
+ expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-checked')).toBe('true')
+ expect(wrapper.get('[data-hint="streaming"]').text()).toBe('responseSettings.streamingOnlyHint')
+ expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeDefined()
+ await wrapper.setProps({model:'another-route'})
+ expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-disabled')).toBe('false')
+ expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-checked')).toBe('false')
+})
+
 // 跟「用戶人設」同一套版面：每一項一張卡、一排藥丸，作者替人設頁寫的美化在這裡同樣生效。
 it('uses the persona panel layout with one card and one selected pill per setting', async () => {
  const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:vi.fn(),t:(k:string)=>k}})
  await flushPromises()
  expect(wrapper.element.matches('.role-setting.response-settings[data-lt="response-settings"]')).toBe(true)
  expect(wrapper.get('.header-scope .page-title').text()).toBe('responseSettings.title')
- expect(wrapper.findAll('.card.mode-box')).toHaveLength(5)
+ expect(wrapper.findAll('.card.mode-box.response-axis')).toHaveLength(5)
  expect(wrapper.findAll('.mode-item.selected')).toHaveLength(5)
  await pill(wrapper,'agency','protect').trigger('click')
  expect(wrapper.get('.mode-item[data-axis="agency"].selected').attributes('data-value')).toBe('protect')

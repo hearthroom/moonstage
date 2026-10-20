@@ -23,6 +23,14 @@
    <button type="button" class="advanced-reset" data-action="reload" :disabled="loading || saving" @click="reload">{{ t('responseSettings.reload') }}</button>
   </div>
   <template v-if="saved">
+   <div class="card mode-box response-streaming">
+    <div class="response-streaming-head">
+     <div class="label" id="response-streaming-label">{{ t('responseSettings.streamingTitle') }}</div>
+     <MsSwitch data-lt="streaming-toggle" aria-labelledby="response-streaming-label" :aria-describedby="streamingOnly || !streaming ? 'response-streaming-hint' : undefined"
+      :checked="streamingOnly || streaming" :disabled="loading || saving || streamingOnly" @change="setStreaming" />
+    </div>
+    <div v-if="streamingOnly || !streaming" id="response-streaming-hint" class="mode-hint" data-hint="streaming">{{ t(streamingOnly ? 'responseSettings.streamingOnlyHint' : 'responseSettings.streamingOffHint') }}</div>
+   </div>
    <div v-for="(options, axis) in responseAxes" :key="axis" class="card mode-box response-axis" :data-axis="axis">
     <div class="label">{{ t(`responseSettings.axes.${axis}`) }}</div>
     <div class="radio-group" role="radiogroup" :aria-label="t(`responseSettings.axes.${axis}`)">
@@ -118,9 +126,12 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import MsSwitch from '../../../components/model-select/ms-switch.vue'
 import { lengthMode, lengthTargetLadder, lengthTargetOf, lengthZone, maxResponseNoteLength, readResponseSettings, responseAxes, responseBase, responseNoteKeys, responsePatch, type LengthZone, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
 const props=defineProps<{
  conversationId:string
+ model?:string
+ thinkingDepth?:string
  load:(id:string)=>Promise<unknown>
  save:(id:string,revision:number,patch:Record<string,string|null>)=>Promise<unknown>
  t:(key:string, values?:Record<string,unknown>)=>string
@@ -138,6 +149,14 @@ function answerDiscard(ok:boolean){discardAsked.value=false;const resolve=discar
 onBeforeUnmount(()=>{alive=false;answerDiscard(false)})
 // 玩家沒改的軸顯示的是 base：平台預設，卡片有作者預設時是作者的；「恢復預設」也回到這裡。
 const base=computed(()=>responseBase(saved.value))
+const streamingOnly=computed(()=>!!props.model && !!saved.value?.streamingOnlyModels?.includes(props.thinkingDepth ? `${props.model}@${props.thinkingDepth}` : props.model))
+const streaming=computed(()=>(draft.value.streaming ?? base.value.streaming ?? 'on')!=='off')
+function setStreaming(value:boolean){
+ if(streamingOnly.value)return
+ const picked=value?'on':'off'
+ if(picked===(base.value.streaming ?? 'on')) delete draft.value.streaming
+ else draft.value.streaming=picked
+}
 const dirty=computed(()=>JSON.stringify(responsePatch(draft.value,base.value))!==JSON.stringify(responsePatch(saved.value?.overrides || {},base.value)))
 const jailbreakOpen=ref(!!props.frame?.jailbreak)
 const frameDraft=reactive({sandboxLevel:props.frame?.sandboxLevel || '',jailbreak:props.frame?.jailbreak || ''})
@@ -226,6 +245,13 @@ defineExpose({mayClose})
 </script>
 
 <style scoped>
+@layer lt-base {
+ .response-streaming-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+ .response-streaming-head .label{margin:0}
+ /* Preserve the existing track while giving touch/keyboard users a 44px target. */
+ .response-streaming :deep(.ms-switch){width:64px;height:44px;border:10px solid transparent;background-clip:padding-box;margin:-10px}
+ .response-streaming :deep(.ms-switch:focus-visible){outline:2px solid var(--lt-canvas-accent);outline-offset:4px}
+}
 .response-length{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .response-length-value{font-size:14px;font-weight:600}
 .response-length-slider{width:100%;margin:0;accent-color:var(--luna-gold, #F5C542)}
