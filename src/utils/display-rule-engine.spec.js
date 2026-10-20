@@ -273,6 +273,11 @@ describe('neutralizeRelativeMediaSources', () => {
     )
   })
 
+  it.each(["it's", 'a"b', 'a=b"c'])('未加引號屬性值中的引號不吞掉後續標籤：%s', (value) => {
+    const code = '<div data-x=' + value + '></div><textarea><img src="dynamic"></textarea><script>const html=\'<img src="script-image">\';</script>'
+    expect(neutralizeRelativeMediaSources(code + '<img src="outside">')).toBe(code + '<img src="data:,">')
+  })
+
   it('applyDisplayRules 的輸出已經處理過：規則產出的點火圖片不會再打站台', () => {
     const out = applyDisplayRules('<st>hi</st>', [{ id: 'r', find: '/<st>([\\s\\S]*?)<\\/st>/g', replace: '<div><img src="x-sao-v153-turn" onerror="fire()">$1</div>', enabled: true }])
     expect(out.html).toBe('<div><img src="data:," onerror="fire()">hi</div>')
