@@ -32,8 +32,11 @@ function geometry(width: number, height: number) {
   writeFileSync(file, `<!doctype html><iframe style="border:0;width:${width}px;height:${height}px" srcdoc="${markup.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" onload="
     const d=this.contentDocument, q=s=>d.querySelector(s), box=s=>q(s).getBoundingClientRect().toJSON();
     const m=q('[data-chat=messages]'), dock=q('#dock'), r=dock.getBoundingClientRect();
+    const overlay=d.createElement('author-overlay');overlay.style.cssText='position:fixed;inset:0;z-index:2';
+    overlay.attachShadow({mode:'open'}).innerHTML='<style>:host{pointer-events:none}</style>';
+    q('[data-slot=statusbar]').append(overlay);
     m.scrollTop=1000;
-    const result={width:this.contentWindow.innerWidth,messages:box('[data-chat=messages]'),composer:box('[data-chat=composer]'),statusbar:box('[data-slot=statusbar]'),scrollTop:m.scrollTop,dockHit:d.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===dock};
+    const result={width:this.contentWindow.innerWidth,messages:box('[data-chat=messages]'),composer:box('[data-chat=composer]'),statusbar:box('[data-slot=statusbar]'),scrollTop:m.scrollTop,dockHit:d.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===dock,shadowPointer:this.contentWindow.getComputedStyle(overlay).pointerEvents};
     document.querySelector('pre').textContent=JSON.stringify(result);
   "></iframe><pre id="result"></pre>`)
   const run = spawnSync(chrome!, ['--headless=new', '--no-first-run', '--no-default-browser-check', `--user-data-dir=${join(dir, 'profile')}`, '--dump-dom', '--virtual-time-budget=1000', `file://${file}`], { encoding: 'utf8', timeout: 20000, maxBuffer: 2 * 1024 * 1024 })
@@ -51,6 +54,7 @@ describe('mount content leaves the message viewport available', () => {
     expect(result.messages.height).toBeGreaterThan(height / 2)
     expect(result.composer.bottom).toBeLessThanOrEqual(height)
     expect(result.scrollTop).toBeGreaterThan(0)
+    expect(result.shadowPointer).toBe('none')
     expect(result.dockHit).toBe(true)
   }, 30000)
 })
