@@ -4180,6 +4180,8 @@ const highlightText = (content, type, cacheKey, streaming) => {
       const tagStart = i;
       out += '<'; i++;
       let quote = null;
+      let valueStart = false;
+      let unquotedValue = false;
       while (i < n) {
         const cc = html.charAt(i);
         if (quote) {
@@ -4188,12 +4190,21 @@ const highlightText = (content, type, cacheKey, streaming) => {
           else out += cc;
           if (cc === quote) quote = null;
           i++;
-        } else if (cc === '"' || cc === "'") {
-          quote = cc; out += cc; i++;
-        } else if (cc === '>') {
-          out += '>'; i++; break;
-        } else {
-          out += cc; i++;
+          continue;
+        }
+        out += cc; i++;
+        if (cc === '>') break;
+        if (unquotedValue) {
+          if (/[\t\n\f\r ]/.test(cc)) unquotedValue = false;
+        } else if (valueStart) {
+          if (/[\t\n\f\r ]/.test(cc)) continue;
+          valueStart = false;
+          if (cc === '"' || cc === "'") quote = cc;
+          else unquotedValue = true;
+        } else if (cc === '=') {
+          // 只在 = 後的值開頭進入引號；未加引號值裡的 it's / a"b 都是內容。
+          // 否則後續標籤會被 shield，接著的字形 DOM 解析會把它們吞進屬性。
+          valueStart = true;
         }
       }
       // 若這個 tag 是 raw-text element（style/script/code/pre），整段 inner 內容

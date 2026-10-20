@@ -24,6 +24,7 @@ import {
 import { stripUnknownTags, wrapDialogue } from '../canvas-platform-defaults'
 // highlightText 也畫原生 [status]／[choices] 區塊（common/native-blocks）；跟頁面裡一樣是真實函式。
 import { drawNativeBlocks } from '../../../common/native-blocks'
+import { convertVisibleHtml } from '../canvas-display-script'
 
 /*
   重 HTML（訊息以區塊 tag 開頭）也要過 Markdown。
@@ -60,7 +61,7 @@ function buildHighlightText(): (content: string, type?: number, cacheKey?: strin
     findStableBoundary, getStreamCacheEntry, setStreamCacheEntry, unwrapSingleHtmlFence,
     stripUnknownTags, wrapDialogue, drawNativeBlocks,
     cardFormat: { value: 'tavern' },
-    convertVisibleHtml: (html: string) => html,
+    convertVisibleHtml,
     displayScript: (text: string) => text,
     applyDisplayRules: (text: string) => ({ html: text, rollbacks: [] }),
     activeAuthorAsset: { value: { rules: [], version: 0, crossLine: false } },
@@ -148,4 +149,39 @@ describe('indented display-rule image triggers', () => {
     expect(el.querySelector('img')).toBeNull()
     expect(el.querySelector('pre code')?.textContent).toContain('<img')
   })
+})
+
+
+// Exercise the real DOM-based script conversion, even when no characters change:
+// parsing shielded HTML before restoration is part of the production path.
+describe('attribute quotes through the complete classic renderer', () => {
+  it.each(["it's", 'a"b', 'a=b"c'])(
+    'preserves tags and author handlers after an unquoted %s value', (value) => {
+      const raw = '<img class="portrait" src="https://example.com/portrait.png">'
+      const handler = "this.closest('.panel').setAttribute('title', 'ready')"
+      const content = `<div data-x=${value}></div><div class="panel">狀態` +
+        `<textarea hidden>${raw}</textarea><img src="data:," onerror="${handler}"></div>` +
+        '<style>.panel { color: red; }</style><script>window.authorReady = true</script>'
+      const el = document.createElement('div')
+      el.innerHTML = buildHighlightText()(content, 0, null)
+      expect(el.querySelector('[data-x]')?.getAttribute('data-x')).toBe(value)
+      expect(el.querySelector('textarea')?.textContent).toBe(raw)
+      expect(el.querySelector('img')?.getAttribute('onerror')).toBe(handler)
+      expect(el.querySelector('style')?.textContent).toBe('.panel { color: red; }')
+      expect(el.querySelector('script')?.textContent).toBe('window.authorReady = true')
+      const img = el.querySelector('img')!
+      new Function(img.getAttribute('onerror')!).call(img)
+      expect(el.querySelector('.panel')?.getAttribute('title')).toBe('ready')
+    },
+  )
+
+  it.each(['"', "'"])(
+    'shields angle brackets in a genuinely quoted %s attribute value', (quote) => {
+      const content = `<div title = \t${quote}a > b < c${quote}>狀態</div><img src="https://example.com/a.png">`
+      const el = document.createElement('div')
+      el.innerHTML = buildHighlightText()(content, 0, null)
+      expect(el.querySelector('div')?.getAttribute('title')).toBe('a > b < c')
+      expect(el.querySelector('img')?.getAttribute('src')).toBe('https://example.com/a.png')
+    },
+  )
 })
