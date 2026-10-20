@@ -351,14 +351,24 @@ function neutralizeRelativeMediaSources(html) {
 // 引號內的 > 只是屬性內容，不能提前結束標籤。
 function findHtmlTagEnd(html, from) {
   let quote = ''
+  let valueStart = false
+  let unquotedValue = false
   for (let i = from; i < html.length; i++) {
     const c = html.charAt(i)
     if (quote) {
       if (c === quote) quote = ''
-    } else if (c === '"' || c === "'") {
-      quote = c
     } else if (c === '>') {
       return i
+    } else if (unquotedValue) {
+      if (/[\t\n\f\r ]/.test(c)) unquotedValue = false
+    } else if (valueStart) {
+      if (/[\t\n\f\r ]/.test(c)) continue
+      valueStart = false
+      if (c === '"' || c === "'") quote = c
+      else unquotedValue = true
+    } else if (c === '=') {
+      // 只有屬性值的第一個字元能開啟引號；未加引號值中的引號只是內容。
+      valueStart = true
     }
   }
   return -1
