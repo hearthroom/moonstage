@@ -251,7 +251,7 @@ defineExpose({mayClose})
  .response-streaming-head .label{margin:0}
  /* Preserve the existing track while giving touch/keyboard users a 44px target. */
  .response-streaming :deep(.ms-switch){width:64px;height:44px;border:10px solid transparent;background-clip:padding-box;margin:-10px}
- .response-streaming :deep(.ms-switch:focus-visible){outline:2px solid var(--lt-canvas-accent);outline-offset:4px}
+ .response-streaming :deep(.ms-switch:focus-visible){outline:2px solid var(--lt-canvas-accent);outline-offset:-8px}
 }
 .response-length{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .response-length-value{font-size:14px;font-weight:600}
