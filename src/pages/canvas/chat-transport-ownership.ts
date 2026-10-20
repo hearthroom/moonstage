@@ -1,5 +1,6 @@
 import { prepTrailFromServerSteps } from '@/utils/prep-step-text'
 export interface PendingChatTurn {
+  nonStreaming?: boolean
   userBubbleId?: string | number
   aiBubbleId?: string | number
   draft?: string
@@ -235,11 +236,12 @@ export function isChatOperationVisibleOutcomeExpired(input: {
   now: number
   deadlineMs?: number
   agentTurn?: boolean
+  nonStreaming?: boolean
 }): boolean {
   // agent 輪次不套這條上界：一輪要打三到五次模型，跑六分鐘、十分鐘都是正常的。
   // 套上去的話使用者看到的是「還在跑的那一輪突然消失」，而後端好好的。它什麼
   // 時候停由伺服器決定（使用者按停止，或內部重試耗盡），不由前端的碼表決定。
-  if (input?.agentTurn === true) return false
+  if (input?.agentTurn === true || input?.nonStreaming === true) return false
   const now = Number(input?.now)
   if (!Number.isFinite(now)) return false
   const deadlineMs = Math.max(
@@ -374,6 +376,7 @@ export interface ChatOperationStatus {
   // 留 undefined 讓呼叫端退回本地判斷——當成 false 會讓 agent 輪次在冷啟動後
   // 又被套上五分鐘上界。
   agentTurn?: boolean
+  nonStreaming?: boolean
   acceptedAt?: string
   terminalAt?: string
   lastUpdateTime?: string
@@ -416,6 +419,7 @@ export function normalizeChatOperationStatus(input: any): ChatOperationStatus | 
   if (version !== undefined) normalized.version = version
   // 只認伺服器明確給的布林；沒帶就留 undefined（見 ChatOperationStatus.agentTurn）。
   if (typeof source.agentTurn === 'boolean') normalized.agentTurn = source.agentTurn
+  if (typeof source.nonStreaming === 'boolean') normalized.nonStreaming = source.nonStreaming
   // Preserve provider usage through stream, polling and wrapped status responses.
   // Missing measurements stay absent, including replies recorded before usage persistence.
   if (typeof source.hasContextUsage === 'boolean') normalized.hasContextUsage = source.hasContextUsage
@@ -773,6 +777,7 @@ function operationProjectionMetadata(status: ChatOperationStatus) {
     clientOperationId: status.clientOperationId || '',
     operationConversationId: status.conversationId || '',
     operationVersion: status.version,
+    ...(typeof status.nonStreaming === 'boolean' ? {nonStreaming:status.nonStreaming} : {}),
     operationState: status.state,
     operationKind: normalizedOperationKind(status.kind),
     serverOperationKind: status.kind,
@@ -1176,6 +1181,7 @@ export function mergeOperationStatusIntoStreamEntry(
       || current.clientOperationId
       || current.pendingPayload?.clientOperationId
       || '',
+    ...(typeof status.nonStreaming === 'boolean' ? {nonStreaming:status.nonStreaming} : {}),
     operationState: status.state,
     operationVersion: status.version ?? current.operationVersion,
     serverOperationKind: status.kind || current.serverOperationKind || '',
@@ -1419,6 +1425,7 @@ export function markStreamEntryAccepted(entry: any, { streamId, lastEventId = 0,
     // 依據判斷這是不是 agent 輪次——而 accepted 在送出後一秒內就發生，
     // 等於這個欄位實際上從來不曾存活過（瀏覽器實測抓到）。
     ...(current.agentTurn === true ? { agentTurn: true } : {}),
+    ...(current.nonStreaming === true ? {nonStreaming:true} : {}),
     ...operationIdentity,
     clientOperationId,
     ...(keepPendingIntent
@@ -1456,6 +1463,7 @@ export function decideStreamResume(entry: any, now = Date.now(), options: any = 
             localStartedAt: localBaselineMs ?? null,
             now,
             agentTurn: entry?.agentTurn === true,
+            nonStreaming: entry?.nonStreaming === true,
           }),
         }
       }
@@ -1478,6 +1486,7 @@ export function decideStreamResume(entry: any, now = Date.now(), options: any = 
         localStartedAt: localBaselineMs ?? null,
         now,
         agentTurn: entry?.agentTurn === true,
+            nonStreaming: entry?.nonStreaming === true,
       }),
     }
   }
@@ -1516,6 +1525,7 @@ export function decideStreamResume(entry: any, now = Date.now(), options: any = 
         localStartedAt: pendingSince || null,
         now,
         agentTurn: entry?.agentTurn === true,
+            nonStreaming: entry?.nonStreaming === true,
       }),
     }
   }

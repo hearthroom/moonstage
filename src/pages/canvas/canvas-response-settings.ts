@@ -27,9 +27,9 @@ export function lengthZone(target:number):LengthZone {
 }
 export function isLengthTarget(value:unknown):value is number {return (lengthTargetLadder as readonly number[]).includes(value as number)}
 export function lengthMode(value:string|undefined):'auto'|'recommended'|'target' {return !value || value==='auto' ? 'auto' : value==='recommended' ? 'recommended' : 'target'}
-export type ResponseDraft = Partial<Record<ResponseAxis | 'customStyle' | 'lengthTarget' | ResponseNoteKey, string>>
+export type ResponseDraft = Partial<Record<ResponseAxis | 'streaming' | 'customStyle' | 'lengthTarget' | ResponseNoteKey, string>>
 // 玩家什麼都沒改時的偏好：平台預設，卡片有作者預設時再疊上去（伺服器的 defaults）。
-export type ResponseBase = Record<ResponseAxis, string> & {lengthTarget?: number, customStyle?: string} & Partial<Record<ResponseNoteKey, string>>
+export type ResponseBase = Record<ResponseAxis, string> & {streaming?: string, lengthTarget?: number, customStyle?: string} & Partial<Record<ResponseNoteKey, string>>
 export function lengthTargetOf(draft:ResponseDraft, base?:ResponseBase):number {
  const baseTarget=base?.length==='target' && isLengthTarget(base.lengthTarget) ? base.lengthTarget : defaultLengthTarget
  if(draft.length==='target') {const n=Number(draft.lengthTarget);return isLengthTarget(n) ? n : baseTarget}
@@ -44,6 +44,7 @@ const legacyStyles:readonly string[] = ['plain','dialogue','descriptive']
 // 搶話 2026-10-16 收成兩檔：舊存檔的「只補細節」當防搶話、「只代寫台詞」當允許搶話，跟伺服器同一張表。
 const legacyAgency: Readonly<Record<string,string>> = {assist:'protect', lines:'coauthor'}
 export interface ResponseSettings {
+ streamingOnlyModels?: string[]
  conversationId: string
  scope: 'conversation'
  schemaVersion: 1
@@ -51,11 +52,12 @@ export interface ResponseSettings {
  overrides: ResponseDraft
  // 舊伺服器沒有這一欄；沒有就用平台預設。
  defaults?: ResponseBase
- effective: Record<ResponseAxis, string> & {lengthTarget?: number}
+ effective: Record<ResponseAxis, string> & {streaming?: string,lengthTarget?: number}
 }
 export function responseBase(settings:ResponseSettings|null|undefined):ResponseBase {return settings?.defaults ?? responseDefaults}
 function lengthOption(value:unknown){return typeof value==='string' && lengthValues.includes(value)}
 function checkResolved(value:Record<string,unknown>){
+ if(value.streaming!==undefined && value.streaming!=='on' && value.streaming!=='off') throw new Error('Unsupported transport')
  for(const [key,options] of Object.entries(responseAxes)) {
   const v=value[key]
   if(key==='length' ? !lengthOption(v) : !(options as readonly string[]).includes(v as string)) throw new Error('Unsupported preference')
@@ -67,9 +69,11 @@ export function readResponseSettings(raw: unknown, conversationId: string): Resp
  if(!r || r.conversationId!==conversationId || r.scope!=='conversation' || r.schemaVersion!==1 || !Number.isSafeInteger(r.revision) || r.revision<0 || !r.overrides || !r.effective) throw new Error('Invalid settings response')
  checkResolved(r.effective)
  if(r.defaults!==undefined) checkResolved(r.defaults)
+ if(r.streamingOnlyModels!==undefined && (!Array.isArray(r.streamingOnlyModels) || r.streamingOnlyModels.some(v=>typeof v!=='string'))) throw new Error('Invalid transport capabilities')
  if(legacyStyles.includes(r.overrides.style ?? '')) return readResponseSettings({...r,overrides:{...r.overrides,style:'default'}},conversationId)
  if(legacyAgency[r.overrides.agency ?? '']) return readResponseSettings({...r,overrides:{...r.overrides,agency:legacyAgency[r.overrides.agency!]}},conversationId)
  for(const [key,value] of Object.entries(r.overrides)) {
+  if(key==='streaming') {if(value!=='on' && value!=='off') throw new Error('Unsupported transport');continue}
   if(key==='customStyle') {if(typeof value!=='string' || [...value].length>1000) throw new Error('Invalid style');continue}
   if(noteKeys.includes(key)) {if(typeof value!=='string' || !value.trim() || [...value].length>maxResponseNoteLength) throw new Error('Invalid note');continue}
   if(key==='length') {if(!lengthOption(value)) throw new Error('Unsupported override');continue}
@@ -83,6 +87,7 @@ export function readResponseSettings(raw: unknown, conversationId: string): Resp
 // 玩家只改文字、不必先重選「自訂」。
 export function responsePatch(draft: ResponseDraft, base: ResponseBase = responseDefaults): Record<string,string|null> {
  const patch:Record<string,string|null>={}
+ patch.streaming=draft.streaming ?? null
  for(const key of Object.keys(responseAxes)) patch[key]=draft[key as keyof ResponseDraft] ?? null
  // 清空的文字等於沒寫：作者預設「自訂」時，伺服器會退回作者的文字，而不是收到空字串拒絕存檔。
  patch.customStyle=draft.customStyle?.trim() ? draft.customStyle : null

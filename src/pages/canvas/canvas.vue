@@ -242,6 +242,8 @@
     <CanvasPopup v-if="responseSettingsSupported && panel.sheet === 'response-settings'" :open="true"
       :title="t('responseSettings.title')" :close-label="t('main.cancel')" @close="closeCanvasSheet">
       <CanvasResponseSettings :key="String(conversationId)" ref="responseSettingsPanel" :conversation-id="String(conversationId)" @close="closeCanvasSheet"
+        :model="String(selectedVariantValue || '')"
+        :thinking-depth="String(formData.thinkingDepth || '')"
         :load="loadResponseSettings" :save="saveResponseSettings" :t="t" :frame="responseFrame" :save-frame="saveResponseFrame" />
     </CanvasPopup>
 
@@ -811,6 +813,11 @@ function resolveAgentTurnForOwnership(status?: { agentTurn?: boolean } | null): 
   })
 }
 
+// The transport belongs to the admitted operation, not the panel's next-turn draft.
+function resolveNonStreamingForOwnership(status?:{nonStreaming?:boolean}|null):boolean {
+ return status?.nonStreaming===true || pendingChatTurn?.nonStreaming===true || readLsEntry()?.nonStreaming===true
+}
+
 function enterSlowWait(capturedPending: PendingChatTurn, storedDraft: string) {
   slowWaitActive.value = true
   thinkingPhrase.value = composeThinkingPhrase()
@@ -827,7 +834,7 @@ function enterSlowWait(capturedPending: PendingChatTurn, storedDraft: string) {
   if (slowWaitGiveUpTimer) clearTimeout(slowWaitGiveUpTimer)
   // 安撫文案可以一直輪替，但普通 one-shot 不能無限等下去（I-1）。agent 沒有這個
   // 上界：跑六分鐘、十分鐘都是正常的，到期把它收掉等於把一輪還在跑的準備抹掉。
-  if (!resolveAgentTurnForOwnership()) {
+  if (!resolveAgentTurnForOwnership() && !resolveNonStreamingForOwnership()) {
     slowWaitGiveUpTimer = setTimeout(() => {
       slowWaitGiveUpTimer = null
       if (pendingChatTurn !== capturedPending) return
@@ -1232,6 +1239,7 @@ function persistAcceptedStreamState() {
       kind: pendingChatTurn.serverOperationKind || '',
       state: pendingChatTurn.operationState || 'generating',
       version: pendingChatTurn.operationVersion,
+      nonStreaming:pendingChatTurn.nonStreaming,
       assistantChatId: pendingChatTurn.assistantChatId || '',
       userChatId: pendingChatTurn.userChatId || '',
       targetChatId: pendingChatTurn.targetChatId || '',
@@ -7274,6 +7282,7 @@ function recordAuthoritativeOperationStatus(input: any) {
     if (status.reasonCode) pendingChatTurn.reasonCode = status.reasonCode;
     if (status.failureCause) pendingChatTurn.failureCause = status.failureCause;
     if (status.messageKey) pendingChatTurn.messageKey = status.messageKey;
+    if (typeof status.nonStreaming==='boolean') pendingChatTurn.nonStreaming=status.nonStreaming;
   }
 
   const operationBubble = pendingChatTurn?.aiBubbleId == null
@@ -7551,6 +7560,7 @@ function schedulePendingOperationIdentityReconciliation(
     localStartedAt: pending.startedAt,
     now: Date.now(),
     agentTurn: resolveAgentTurnForOwnership(),
+    nonStreaming: resolveNonStreamingForOwnership(),
   })) {
     releaseExpiredChatOperationOwnership(null, reason);
     return false;
@@ -7696,6 +7706,7 @@ function requestAuthoritativeOperationReconciliation(
         localStartedAt: pendingChatTurn?.startedAt,
         now: Date.now(),
         agentTurn: resolveAgentTurnForOwnership(),
+    nonStreaming: resolveNonStreamingForOwnership(),
       })) {
         releaseExpiredChatOperationOwnership(null, reason);
         return;
@@ -7708,6 +7719,7 @@ function requestAuthoritativeOperationReconciliation(
         localStartedAt: pendingChatTurn?.startedAt,
         now: Date.now(),
         agentTurn: resolveAgentTurnForOwnership(),
+    nonStreaming: resolveNonStreamingForOwnership(),
       })) {
         releaseExpiredChatOperationOwnership(null, reason);
         return;
@@ -7721,6 +7733,7 @@ function requestAuthoritativeOperationReconciliation(
         localStartedAt: pendingChatTurn?.startedAt,
         now: Date.now(),
         agentTurn: resolveAgentTurnForOwnership(),
+    nonStreaming: resolveNonStreamingForOwnership(),
       })) {
         releaseExpiredChatOperationOwnership(null, reason);
         return;
@@ -7741,6 +7754,7 @@ function requestAuthoritativeOperationReconciliation(
       localStartedAt: pendingChatTurn?.startedAt,
       now: Date.now(),
       agentTurn: resolveAgentTurnForOwnership(recorded),
+      nonStreaming: resolveNonStreamingForOwnership(recorded),
     })) {
       releaseExpiredChatOperationOwnership(recorded, reason);
       return;
@@ -7761,6 +7775,7 @@ function requestAuthoritativeOperationReconciliation(
       localStartedAt: pendingChatTurn?.startedAt,
       now: Date.now(),
       agentTurn: resolveAgentTurnForOwnership(),
+    nonStreaming: resolveNonStreamingForOwnership(),
     })) {
       releaseExpiredChatOperationOwnership(null, reason);
       return;
