@@ -153,6 +153,10 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 `div:author-stage[data-stage]`、`footer:composer`（`shortcut`、`instruction-bar`、`assistant`、
 `textarea:input`、`model-chip`、`send`）。殼裡的模型鍵是輸入區的 `.mind-type`（點它開宿主的模型清單）；模型名與點數請用 `sdk.model.get()`，別讀 DOM。插槽：`header-extra`、`statusbar`、`left`、`right`、`toolbar`。
 
+`statusbar` 是功能欄的作者資產掛載點，不佔用訊息區的 flex 高度。預設與一般畫布的作者容器一致：
+零尺寸、裁切流內內容，但不建立 fixed 後代的 containing block；作者自行定位的 fixed 面板仍可顯示與操作。
+開場訊息裡的表單仍由訊息 scroller 捲動；作者可用不分層的 CSS 覆寫掛載點，平台不加 `!important`。
+
 變數：29 個 `--chat-*` 定義在 `[data-theme="dark"]`／`[data-theme="light"]`；`--rpx: calc(100vw / 750)`；
 `--chat-viewport-height` 由宿主 `viewport` 訊息維護。
 作者側欄貼邊壓到訊息時，殼把讓出的寬度寫進 `<html>` 的 `--lt-canvas-dock-left`／`-right`，`#chat` 左右內距取
