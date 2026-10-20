@@ -252,6 +252,27 @@ describe('neutralizeRelativeMediaSources', () => {
     }
   })
 
+  it.each([
+    `<textarea data-note="> </textarea>"><img src="dynamic"></textarea>`,
+    `<textarea data-note='> </textarea>'><img src="dynamic"></textarea>`,
+    `<textarea><img src="dynamic"></textarea/>`,
+    `<textarea><img src="dynamic"></textarea data-end>`,
+    `<textarea><img src="dynamic"></textarea-code><img src="still-text"></textarea>`,
+  ])('textarea 依 HTML 的引號與結尾邊界保護內容：%s', (code) => {
+    expect(neutralizeRelativeMediaSources(code + '<img src="outside">')).toBe(code + '<img src="data:,">')
+  })
+
+  it.each([
+    '<textarea-code><img src="inside"></textarea-code>',
+    '<textarea:code><img src="inside"></textarea:code>',
+    '<div data-note="<textarea>"><img src="inside"></div>',
+    '<!-- <textarea> --><img src="inside">',
+  ])('非 textarea 標籤不吞掉後續真正的圖片：%s', (html) => {
+    expect(neutralizeRelativeMediaSources(html + '<img src="outside">')).toBe(
+      html.replace('<img src="inside">', '<img src="data:,">') + '<img src="data:,">',
+    )
+  })
+
   it('applyDisplayRules 的輸出已經處理過：規則產出的點火圖片不會再打站台', () => {
     const out = applyDisplayRules('<st>hi</st>', [{ id: 'r', find: '/<st>([\\s\\S]*?)<\\/st>/g', replace: '<div><img src="x-sao-v153-turn" onerror="fire()">$1</div>', enabled: true }])
     expect(out.html).toBe('<div><img src="data:," onerror="fire()">hi</div>')
