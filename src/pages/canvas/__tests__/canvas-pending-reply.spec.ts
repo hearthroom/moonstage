@@ -3,6 +3,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createI18n } from 'vue-i18n'
+import zhHant from '@/locale/zh-Hant.json'
+import zhHans from '@/locale/zh-Hans.json'
+import en from '@/locale/en.json'
+import ja from '@/locale/ja.json'
+import ko from '@/locale/ko.json'
 import CanvasMessage from '../components/canvas-message.vue'
 import {
   clearPendingReplyPhase,
@@ -124,6 +130,22 @@ describe('畫布接線（canvas.vue 的 inline WebSocket switch 無法獨立掛�
 
 describe('訊息元件：等回覆時的提示', () => {
   const BASE = { id: 'm1', mesid: 1, role: 'ai' as const, name: '角色', avatar: '', html: '', finished: false, loading: true, latest: true, swipes: null, prepSteps: null }
+
+  it.each(Object.entries({ 'zh-Hant': zhHant, 'zh-Hans': zhHans, en, ja, ko }))('真實 %s 翻譯經畫布 labels 接線後，秒與分秒仍有數字', (locale, messages) => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
+    const expression = source.match(/const messageLabels = computed\(\(\) => \(([\s\S]*?)\)\)/)?.[1]
+    expect(expression).toBeTruthy()
+    const i18n = createI18n({ legacy: false, locale, messages: { [locale]: messages }, missingWarn: false, fallbackWarn: false })
+    const labels = new Function('t', `return (${expression})`)(i18n.global.t)
+    for (const seconds of [1, 65]) {
+      const wrapper = mount(CanvasMessage, { props: { labels, message: { ...BASE, waitStartedAt: Date.now() - seconds * 1000 } } })
+      const value = wrapper.get('.typing-elapsed').text()
+      expect(value).toContain('1')
+      if (seconds === 65) expect(value).toContain('05')
+      expect(value).not.toMatch(/[{}]/)
+      wrapper.unmount()
+    }
+  })
 
   it('伺服器說模型回應慢：指示器下方立即顯示那句話', () => {
     const el = mount(CanvasMessage, { props: { message: { ...BASE, loadingLabel: '正在回覆', waitingHint: '模型回應較慢，請耐心等待...' } } }).element as HTMLElement

@@ -9442,8 +9442,8 @@ const messageLabels = computed(() => ({
   continueAction: t('multiPass.continueAction'),
   failedAgainSub: t('multiPass.failedAgainSub'),
   switchModel: t('chat.switchModel'),
-  waitSeconds: t('chat.waitSeconds'),
-  waitMinutes: t('chat.waitMinutes'),
+  waitSeconds: t('chat.waitSeconds', { s: '{s}' }),
+  waitMinutes: t('chat.waitMinutes', { m: '{m}', s: '{s}' }),
 }))
 
 

@@ -23,14 +23,6 @@
    <button type="button" class="advanced-reset" data-action="reload" :disabled="loading || saving" @click="reload">{{ t('responseSettings.reload') }}</button>
   </div>
   <template v-if="saved">
-   <div class="card mode-box response-streaming">
-    <div class="response-streaming-head">
-     <div class="label" id="response-streaming-label">{{ t('responseSettings.streamingTitle') }}</div>
-     <MsSwitch data-lt="streaming-toggle" aria-labelledby="response-streaming-label" :aria-describedby="streamingOnly || !streaming ? 'response-streaming-hint' : undefined"
-      :checked="streamingOnly || streaming" :disabled="loading || saving || streamingOnly" @change="setStreaming" />
-    </div>
-    <div v-if="streamingOnly || !streaming" id="response-streaming-hint" class="mode-hint" data-hint="streaming">{{ t(streamingOnly ? 'responseSettings.streamingOnlyHint' : 'responseSettings.streamingOffHint') }}</div>
-   </div>
    <div v-for="(options, axis) in responseAxes" :key="axis" class="card mode-box response-axis" :data-axis="axis">
     <div class="label">{{ t(`responseSettings.axes.${axis}`) }}</div>
     <div class="radio-group" role="radiogroup" :aria-label="t(`responseSettings.axes.${axis}`)">
@@ -55,6 +47,15 @@
       :placeholder="customPlaceholder" :aria-invalid="customTooLong" />
      <div class="char-count" :class="{ 'response-error': customTooLong }">{{ t('responseSettings.customCount', { count: [...(draft.customStyle || '')].length }) }}</div>
     </div>
+   </div>
+
+   <div class="card mode-box response-streaming">
+    <div class="response-streaming-head">
+     <div class="label" id="response-streaming-label">{{ t('responseSettings.streamingTitle') }}</div>
+     <MsSwitch data-lt="streaming-toggle" aria-labelledby="response-streaming-label" :aria-describedby="streamingOnly || !streaming ? 'response-streaming-hint' : undefined"
+      :checked="streamingOnly || streaming" :disabled="loading || saving || streamingOnly" @change="setStreaming" />
+    </div>
+    <div v-if="streamingOnly || !streaming" id="response-streaming-hint" class="mode-hint" data-hint="streaming">{{ t(streamingOnly ? 'responseSettings.streamingOnlyHint' : 'responseSettings.streamingOffHint') }}</div>
    </div>
 
    <div class="advanced-scope">
