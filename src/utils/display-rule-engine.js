@@ -316,14 +316,53 @@ const RELATIVE_MEDIA_SRC = /(<(?:img|source|video|audio|iframe|embed)\b[^>]*?\s(
  */
 function neutralizeRelativeMediaSources(html) {
   if (typeof html !== 'string' || html.indexOf('<') === -1) return html
-  // split 只帶一個捕獲組：奇數位是 script／textarea 塊，原樣留著
-  return html.split(RAW_TEXT_BLOCK).map(function (part, i) {
-    return i % 2 ? part : neutralizeMarkup(part)
-  }).join('')
+  const parts = []
+  // 先越過完整標籤與註解，避免把屬性／註解裡的 <textarea> 當成開啟標籤。
+  const tags = /<!--|<(\/?)([a-z][^\t\n\f\r />]*)/gi
+  let cursor = 0
+  let tag
+  while ((tag = tags.exec(html))) {
+    if (!tag[2]) {
+      const commentEnd = html.indexOf('-->', tags.lastIndex)
+      if (commentEnd === -1) break
+      tags.lastIndex = commentEnd + 3
+      continue
+    }
+    const tagEnd = findHtmlTagEnd(html, tags.lastIndex)
+    if (tagEnd === -1) break
+    tags.lastIndex = tagEnd + 1
+    const name = tag[2].toLowerCase()
+    if (tag[1] || (name !== 'script' && name !== 'textarea')) continue
+
+    // HTML 結尾標籤也接受 / 與屬性；名稱後只認 ASCII 空白、/ 或 >。
+    const closing = new RegExp('</' + name + '(?=[\\t\\n\\f\\r />])', 'gi')
+    closing.lastIndex = tagEnd + 1
+    const close = closing.exec(html)
+    const closeEnd = close ? findHtmlTagEnd(html, closing.lastIndex) : -1
+    const end = closeEnd === -1 ? html.length : closeEnd + 1
+    parts.push(neutralizeMarkup(html.slice(cursor, tag.index)), html.slice(tag.index, end))
+    cursor = end
+    tags.lastIndex = end
+  }
+  parts.push(neutralizeMarkup(html.slice(cursor)))
+  return parts.join('')
 }
 
-// 各自只認自己的結尾標籤；未收尾時一路保留到結尾，跟瀏覽器一樣
-const RAW_TEXT_BLOCK = /(<script\b[^>]*>[\s\S]*?(?:<\/script\s*>|$)|<textarea\b[^>]*>[\s\S]*?(?:<\/textarea\s*>|$))/i
+// 引號內的 > 只是屬性內容，不能提前結束標籤。
+function findHtmlTagEnd(html, from) {
+  let quote = ''
+  for (let i = from; i < html.length; i++) {
+    const c = html.charAt(i)
+    if (quote) {
+      if (c === quote) quote = ''
+    } else if (c === '"' || c === "'") {
+      quote = c
+    } else if (c === '>') {
+      return i
+    }
+  }
+  return -1
+}
 
 function neutralizeMarkup(html) {
   return html.replace(RELATIVE_MEDIA_SRC, function (whole, head, dq, sq, bare) {
