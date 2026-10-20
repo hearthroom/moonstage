@@ -232,6 +232,26 @@ describe('neutralizeRelativeMediaSources', () => {
     expect(neutralizeRelativeMediaSources(open)).toBe(open)
   })
 
+  it('textarea 裡的圖片程式模板原樣保留，外面的點火圖片仍會處理', () => {
+    const code = `<textarea hidden>card.innerHTML='<img src="'+getAvatar(name)+'">';</textarea>`
+    const ignition = '<img src="x-boot" onerror="boot(this)">'
+    const out = applyDisplayRules('[status]', [{ find: '[status]', replace: code + ignition }])
+    expect(out.html).toBe(code + '<img src="data:," onerror="boot(this)">')
+    expect(out.rollbacks).toEqual([])
+  })
+
+  it('textarea 依自己的結尾標籤關閉；大小寫、未收尾與多個文字區塊都保留', () => {
+    const samples = [
+      '<TEXTAREA class="code"><img src="${url}"></TEXTAREA >',
+      '<textarea>const sample="<script></script><img src=dynamic>";</textarea>',
+      '<textarea>first<img src=a></textarea><script>second<img src=b></script><textarea>third<img src=c></textarea>',
+      '<textarea hidden>card.innerHTML=`<img src="${url}">`',
+    ]
+    for (const code of samples) {
+      expect(neutralizeRelativeMediaSources(code)).toBe(code)
+    }
+  })
+
   it('applyDisplayRules 的輸出已經處理過：規則產出的點火圖片不會再打站台', () => {
     const out = applyDisplayRules('<st>hi</st>', [{ id: 'r', find: '/<st>([\\s\\S]*?)<\\/st>/g', replace: '<div><img src="x-sao-v153-turn" onerror="fire()">$1</div>', enabled: true }])
     expect(out.html).toBe('<div><img src="data:," onerror="fire()">hi</div>')
