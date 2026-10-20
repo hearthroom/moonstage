@@ -2,7 +2,7 @@
  * 殼的 DOM 骨架：固定的 `data-chat` 節點與 `data-slot` 插槽。作者的樣式與腳本只認這些名字，
  * 所以這裡的結構是契約（docs/sandbox-chat-page.md §4），改了要一起改文件與測試。
  *
- * 平台節點一律 z-index auto、position static（它們只是 root 這個 flex 容器的普通項目）；
+ * 平台節點一律 z-index auto；功能欄是脫離流的作者掛載點，其餘是 root 的 flex 項目；
  * 舞台 content 2000／full 3000；殼自己的彈層 9000 起。
  */
 import type { SandboxTheme, StageState } from '../protocol'
