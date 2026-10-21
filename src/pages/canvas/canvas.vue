@@ -4831,7 +4831,7 @@ function getSystemMsgSub(finishReason, item = null, index = -1) {
     // 這個客戶端不賣點數也沒有每日報到，所以副標只說清楚該去哪處理，不給一顆
     // 按了會落空的鍵（開放契約沒有付費端點，見 docs/open-api-v1.md）。
     'insufficient_credits': t('chat.creditsNotEnoughSub'),
-    'quota_exhausted':  t('chat.creditsNotEnoughSub'),
+    'quota_exhausted':  t('chat.freeQuotaExhaustedSub'),
     'context_capacity_exceeded': t('error.contextCapacityExceeded'),
     // 伺服器說了哪種玩法裝得下（第一輪）：問題在這張卡的大小，不在訊息長短或模型，
     // 所以不再叫玩家縮短訊息或換模型；鍵打開選擇（見 askCapacityChoice）。

@@ -98,3 +98,11 @@ it('measures error panels in both the stage and sandbox document scopes', () => 
   syncChromeTone(document)
   expect(document.querySelector('.sys-msg-card')!.getAttribute('data-lt-tone')).toBe('light')
 })
+
+it('measures an opaque second gradient behind a translucent tone tint', () => {
+  document.body.innerHTML = '<div class="sys-msg-card" style="background-color:rgb(15,18,23);background-image:linear-gradient(rgba(248,113,113,.08),rgba(248,113,113,.08)),linear-gradient(rgb(255,255,255),rgb(255,255,255))"></div>'
+  const panel = document.querySelector('.sys-msg-card')!
+  expect(effectiveBackground(panel)).toEqual({r:254,g:244,b:244,a:1})
+  syncChromeTone(document)
+  expect(panel.getAttribute('data-lt-tone')).toBe('light')
+})
