@@ -7,6 +7,18 @@ const initial = () => ({conversationId:'c1',scope:'conversation',schemaVersion:1
 const echo = () => vi.fn().mockImplementation(async (_id, rev, patch)=>({...initial(),revision:rev+1,overrides:Object.fromEntries(Object.entries(patch).filter(([,v])=>v!==null))}))
 const pill = (wrapper:any, axis:string, value:string) => wrapper.get(`.mode-item[data-axis="${axis}"][data-value="${value}"]`)
 
+it('hides streaming controls in world mode while retaining other response preferences',async()=>{
+ const save=echo()
+ const wrapper=mount(Panel,{props:{conversationId:'c1',worldMode:true,load:async()=>({...initial(),overrides:{streaming:'off'},effective:{...initial().effective,streaming:'off'}}),save,t:(k:string)=>k}})
+ await flushPromises()
+ expect(wrapper.find('[data-lt="streaming-toggle"]').exists()).toBe(false)
+ expect(wrapper.find('[data-hint="streaming"]').exists()).toBe(false)
+ await pill(wrapper,'agency','protect').trigger('click')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({agency:'protect'}))
+ wrapper.unmount()
+})
+
 it('defaults old responses to streaming and saves the complete-response preference',async()=>{
  const save=echo()
  const wrapper=mount(Panel,{props:{conversationId:'c1',model:'fixture',load:async()=>initial(),save,t:(k:string)=>k}})
