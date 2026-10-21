@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 一個請求逾時曾經彈兩個提示：請求層取消請求後走進 fail 先彈「網路錯誤」，攔截器再彈「逾時」
 // （小米使用者 2026-09-25 截圖：三組「网络错误，请重试」＋「Request timed out」）。
@@ -90,8 +90,10 @@ describe('請求層的傳輸失敗提示', () => {
 })
 
 describe('嵌入模式的錯誤提示跟著宿主語言', () => {
-  it('沒設定文字時讀舞台語言包，不在中文介面冒英文', async () => {
-    const { hostToast } = await import('@/stage/index')
+  let hostToast: typeof import('@/stage/index').hostToast
+  // 公開入口會載入整個畫布；模組載入屬準備工作，文案斷言本身是同步行為。
+  beforeAll(async () => { ({ hostToast } = await import('@/stage/index')) })
+  it('沒設定文字時讀舞台語言包，不在中文介面冒英文', () => {
     const say = vi.fn()
     let locale = 'zh-Hans'
     const t = hostToast({ ui: { toast: say }, locale: { get: () => locale, set: () => {} } } as any)
