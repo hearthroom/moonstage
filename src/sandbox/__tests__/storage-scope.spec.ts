@@ -29,6 +29,10 @@ const boot = (cfg: SandboxHelloConfig) => {
 afterEach(() => { shell?.dispose(); shell = null; vi.mocked(setAuthorRuleStorageScope).mockClear(); vi.mocked(clearAuthorRuleStorage).mockClear() })
 
 describe('殼：作者規則持久層的帳號範圍', () => {
+  it('gives shared components the configured language for Korean word boundaries', () => {
+    boot(config({locale:'ko'}))
+    expect(document.querySelector('[data-chat="root"]')?.getAttribute('lang')).toBe('ko')
+  })
   it('握手帶了範圍：交給持久層（範圍不同時持久層會先清掉舊的）', () => {
     boot(config({ storageScope: 'c'.repeat(64) }))
     expect(setAuthorRuleStorageScope).toHaveBeenCalledWith('c'.repeat(64))

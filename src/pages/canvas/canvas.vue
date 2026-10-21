@@ -4793,6 +4793,10 @@ function getSystemMsgSub(finishReason, item = null, index = -1) {
     const actions = getSystemMsgCtas(item, index).map(entry => entry.action);
     const legacyAction = getSystemMsgCtaAction(finishReason, item, index);
     if (legacyAction) actions.push(legacyAction);
+    const cause = item.failureCause || finishReason;
+    if (['no_final_answer', 'empty_response', 'no_answer'].includes(cause)) {
+      return operationFailureSub(cause, t, { actions, hasReasoning: !!item.thinkingContent });
+    }
     if (['length', 'context_overflow'].includes(finishReason) && !actions.includes('continue')) return '';
     if (['error', 'server_error', 'network_error', 'empty_response', 'rate_limit', 'compact_retryable'].includes(finishReason)
       && !actions.some(action => action.startsWith('retry'))) return '';
