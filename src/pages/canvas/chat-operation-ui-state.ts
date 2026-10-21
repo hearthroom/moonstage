@@ -9,6 +9,7 @@ export type ChatOperationUIAction =
 
 export type ChatComposerOperationState = {
   isStreamActive?: boolean
+  sendBlocked?: boolean
   isConnecting?: boolean
   isCompacting?: boolean
   userStopRequested?: boolean
@@ -60,6 +61,7 @@ export function resolveChatActionButtonState(
   if (state.isStreamActive === true) return 'stop'
   // 真正只在整理記憶、沒有進行中串流時才顯示整理記憶。
   if (state.isCompacting === true) return 'compacting'
+  if (state.sendBlocked || state.isConnecting || state.pendingChatTurn || state.pendingResendPayload) return 'send-disabled'
   // agent 沒收尾時底下不該是「發送」。
   //
   // 上一輪已經花了錢、進度也留著,這時送新訊息在 agent 模式下沒有意義——

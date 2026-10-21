@@ -127,6 +127,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   let shellReady = false
   let destroyed = false
   let liveSeq = 0
+  let lastSendBlocked = false
   let lastBusy: boolean | null = null
   let lastPhase: string | null = null
   let lastOutcomeKey: string | null = null
@@ -290,15 +291,16 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   }
 
   const syncGeneration = (snapshot: HudHostState = hud.read()) => {
+    const sendBlocked = snapshot.sendBlocked === true
     const busy = snapshot.generation !== 'idle'
     const phase = busy ? (snapshot.generationPhase && snapshot.generationPhase !== 'idle' ? snapshot.generationPhase : 'preparing') : 'idle'
     // 結局只送作者看得到的部分：那顆鍵交回宿主的鍵、那一列的 id 留在宿主這邊。
     const o = !busy && snapshot.generationOutcome ? snapshot.generationOutcome : null
     const outcome = o ? { kind: o.kind, label: o.label, sub: o.sub, actions: o.actions.map((a) => ({ action: a.action, label: a.label })) } : null
     const outcomeKey = JSON.stringify(outcome)
-    if (busy === lastBusy && phase === lastPhase && outcomeKey === lastOutcomeKey) return
-    lastBusy = busy; lastPhase = phase; lastOutcomeKey = outcomeKey
-    post({ type: 'generation', busy, phase, outcome })
+    if (sendBlocked === lastSendBlocked && busy === lastBusy && phase === lastPhase && outcomeKey === lastOutcomeKey) return
+    lastSendBlocked = sendBlocked; lastBusy = busy; lastPhase = phase; lastOutcomeKey = outcomeKey
+    post({ type: 'generation', busy, sendBlocked, phase, outcome })
   }
 
   const syncHistory = (snapshot: HudHostState) => {

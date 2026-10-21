@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="toneRoot"
     class="mes item"
     :class="[roleClass, { last_mes: message.latest, 'is-loading': message.loading }]"
     :mesid="String(message.mesid)"
@@ -212,7 +213,8 @@
     AI／使用者同時用 class（MMD 語彙）與屬性（酒館語彙）分辨：兩邊的卡各認一種。
 
 */
-import { computed, ref } from 'vue'
+import { computed, ref, watch, nextTick, onUnmounted } from 'vue'
+import { syncChromeTone } from '../canvas-chrome-tone'
 import { createLongPress, type LongPressPoint } from '../canvas-longpress'
 import ChatTypingIndicator from '@/components/chat-typing-indicator/chat-typing-indicator.vue'
 
@@ -281,6 +283,23 @@ const emit = defineEmits<{
 const roleClass = computed(() => (props.message.role === 'user' ? 'User self' : 'Ai'))
 const bubbleClass = computed(() => (props.message.role === 'user' ? 'right' : 'left'))
 const blockClass = computed(() => (props.message.role === 'user' ? 'touch-scope-right' : ''))
+
+const toneRoot = ref<HTMLElement | null>(null)
+let toneObserver: MutationObserver | null = null
+watch(() => props.message.agentInterrupted, async (interrupted) => {
+  toneObserver?.disconnect()
+  if (!interrupted) return
+  await nextTick()
+  const root = toneRoot.value
+  if (!root) return
+  const measure = () => syncChromeTone(root)
+  measure()
+  toneObserver = new MutationObserver(measure)
+  for (let node: HTMLElement | null = root; node; node = node.parentElement) {
+    toneObserver.observe(node, {attributes:true, attributeFilter:['style','class','data-theme','data-mode']})
+  }
+}, { immediate: true })
+onUnmounted(() => toneObserver?.disconnect())
 
 const hintEl = ref<HTMLElement | null>(null)
 

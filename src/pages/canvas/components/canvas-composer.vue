@@ -332,6 +332,8 @@
         </div>
       </div>
 
+      <div v-if="balanceHint" class="chat-balance-hint" role="status">{{ balanceHint }}</div>
+
       <!--
         「＋」呼出的功能面板。位置照 MMD：住在 `.chat-bottom` 裡、輸入區底下，
         兩端同一份（沒有 PC 側欄——這一頁只有畫布）。
@@ -401,6 +403,7 @@ const props = withDefaults(defineProps<{
   /** 上下文用量的小圓環；供應商沒給容量時是 null，不畫。label 是給讀屏與懸停看的那句話。 */
   contextRing?: { percent: number; level: string; label: string } | null
   /** 數字的意思（例如「下一輪約 12–18 點」）；懸停與讀屏用 */
+  balanceHint?: string
   scoreHint?: string
   /** 第一次出現膠囊時的說明；null 不畫 */
   meterHint?: { ring: string; score: string; ok: string } | null
@@ -419,6 +422,7 @@ const props = withDefaults(defineProps<{
   modelScore: '',
   contextRing: null,
   scoreHint: '',
+  balanceHint: '',
   meterHint: null,
   assistEnabled: true,
   assistBusy: false,
@@ -623,3 +627,9 @@ function onAssist() {
 
 defineExpose({ textareaEl, expand })
 </script>
+
+<style scoped>
+@layer lt-base {
+.chat-balance-hint { padding: 4px 12px; font-size: 12px; line-height: 1.5; color: var(--lt-canvas-panel-fg); background: linear-gradient(var(--lt-canvas-panel-bg), var(--lt-canvas-panel-bg)) var(--lt-canvas-bg); border-left: 3px solid #b58b24; border-radius: var(--lt-canvas-block-radius, 14px); overflow-wrap: anywhere; }
+}
+</style>

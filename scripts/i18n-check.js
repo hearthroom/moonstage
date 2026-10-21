@@ -50,11 +50,15 @@ const NON_ENGLISH = ['zh-Hans', 'zh-Hant', 'ja', 'ko'];
 /**
  * 允許為空的 key 白名單：{ localeKey: Set<flatKey> }。
  * 這些 key 在對應語言「刻意留空」，不計為 empty 失敗。
- * desktop 目前沒有刻意留空的 key；保留機制以便日後需要時加入，
+ * systemMsg.stoppedSub 刻意留空：停止本身不證明保存或免收；
  * 並與 mobile 端的校驗能力對齊。
  */
 const EMPTY_ALLOWLIST = {
-  // 例：en: new Set(['some.prefixUnit']),
+  en: new Set(['systemMsg.stoppedSub']),
+  'zh-Hant': new Set(['systemMsg.stoppedSub']),
+  'zh-Hans': new Set(['systemMsg.stoppedSub']),
+  ja: new Set(['systemMsg.stoppedSub']),
+  ko: new Set(['systemMsg.stoppedSub']),
 };
 
 function isEmptyAllowed(localeKey, key) {

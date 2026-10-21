@@ -81,8 +81,8 @@
         <chat-system-message
           v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason)"
           :kind="getSystemMsgKind(item.finishReason)"
-          :label="creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause, t) || getSystemMsgLabel(item.finishReason)"
-          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause, t) || getSystemMsgSub(item.finishReason)"
+          :label="creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || getSystemMsgLabel(item.finishReason)"
+          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent }) || getSystemMsgSub(item.finishReason, item, index)"
           :links="creditsOverrideFor(item)?.links ?? []"
           :cta="getSystemMsgCta(item.finishReason, item, index)"
           :cta-action="getSystemMsgCtaAction(item.finishReason, item, index)"
@@ -110,6 +110,7 @@
       :model-score="modelScoreText"
       :context-ring="contextRing"
       :score-hint="modelScoreLabel"
+      :balance-hint="modelBalanceHint"
       :meter-hint="meterHint"
       :labels="composerLabels"
       @update:value="content = $event"
@@ -530,7 +531,7 @@ import {
 } from './canvas-panel-state'
 import { createCanvasBackClose } from './canvas-back-close'
 import { incompleteTerminalHistoryOperation } from './chat-history-snapshot'
-import { findVariant, resolveVariant, scoreParts, priceMeaning } from './canvas-model-catalog'
+import { findVariant, resolveVariant, scoreParts, priceMeaning, balanceWarning } from './canvas-model-catalog'
 import { resolveStoredModel, composeModelDisplayName } from './canvas-model-lanes'
 import {
   BREAKDOWN_META,
@@ -1047,6 +1048,7 @@ type OperationResumeFields = {
   allowedActions?: string[];
   reasonCode?: string;
   failureCause?: string;
+  filterReason?: string;
   messageKey?: string;
 };
 type PendingEntry = OperationResumeFields & {
@@ -1079,7 +1081,9 @@ type ResumeDecision =
 function lsKeyForConv(currentConversationId: string = String(unref(conversationId) || '')): string {
   return STREAM_LS_PREFIX + currentConversationId;
 }
+const ownershipRevision = ref(0);
 function writeLsEntry(entry: PendingEntry) {
+  ownershipRevision.value++;
   try { localStorage.setItem(lsKeyForConv(), JSON.stringify(entry)); } catch (e) { /* quota / disabled */ }
 }
 function readLsEntry(
@@ -1159,7 +1163,7 @@ function clearPendingStopSettlement(expected: PendingStopSettlement | null) {
 }
 function clearPersistedStoppedStream(expected: PendingStopSettlement | null) {
   if (!expected || !pendingStopSettlementMatches(readLsEntry(expected.conversationId), expected)) return;
-  try { localStorage.removeItem(lsKeyForConv(expected.conversationId)); } catch (_) {}
+  try { localStorage.removeItem(lsKeyForConv(expected.conversationId)); ownershipRevision.value++; } catch (_) {}
 }
 function resumePendingStopSettlement(): boolean {
   const pendingStop = readPendingStopSettlement();
@@ -1227,7 +1231,7 @@ function persistAcceptedStreamState() {
       }
       return;
     }
-    try { localStorage.removeItem(lsKeyForConv()); } catch (e) {}
+    try { localStorage.removeItem(lsKeyForConv()); ownershipRevision.value++; } catch (e) {}
     return;
   }
   const current = pendingChatTurn?.operationId
@@ -1251,6 +1255,7 @@ function persistAcceptedStreamState() {
       finishReason: pendingChatTurn.finishReason || '',
       allowedActions: pendingChatTurn.allowedActions || [],
       reasonCode: pendingChatTurn.reasonCode || '',
+      filterReason: pendingChatTurn.filterReason,
       failureCause: pendingChatTurn.failureCause || '',
       messageKey: pendingChatTurn.messageKey || '',
     })
@@ -1291,7 +1296,7 @@ function hasPersistedPendingOperationIdentity(): boolean {
 
 function clearStreamState(options: { preservePersistedOperation?: boolean } = {}) {
   if (unref(conversationId) && options.preservePersistedOperation !== true) {
-    try { localStorage.removeItem(lsKeyForConv()); } catch (e) {}
+    try { localStorage.removeItem(lsKeyForConv()); ownershipRevision.value++; } catch (e) {}
   }
   streamId.value = '';
   lastEventId.value = 0;
@@ -1339,7 +1344,7 @@ function teardownStreamForConversationSwitch(
   }
   sseParser.reset();
   messageQueue.value = [];
-  pendingChatTurn = null;
+  ownershipRevision.value++; pendingChatTurn = null;
   pendingRewriteSnapshot = null;
   isResumeInitial.value = false;
   currentChatId.value = '';
@@ -1356,7 +1361,7 @@ function readPendingStreamState(): ResumeDecision {
     pendingTtlMs: STREAM_PENDING_TTL_MS,
   });
   if (!decision || decision.kind === 'expired') {
-    try { localStorage.removeItem(lsKeyForConv()); } catch (e) {}
+    try { localStorage.removeItem(lsKeyForConv()); ownershipRevision.value++; } catch (e) {}
     return null;
   }
   return decision as ResumeDecision;
@@ -1859,6 +1864,7 @@ function tryResumeOnMount() {
         finishReason: pending.finishReason,
         allowedActions: pending.allowedActions,
         reasonCode: pending.reasonCode,
+      filterReason: pending.filterReason,
       failureCause: pending.failureCause,
         messageKey: pending.messageKey,
       });
@@ -1881,6 +1887,7 @@ function tryResumeOnMount() {
         finishReason: pending.finishReason,
         allowedActions: pending.allowedActions,
         reasonCode: pending.reasonCode,
+      filterReason: pending.filterReason,
       failureCause: pending.failureCause,
         messageKey: pending.messageKey,
         operationKind: operationKindFromServer(pending.serverOperationKind),
@@ -1989,6 +1996,7 @@ function tryResumeOnMount() {
       finishReason: pending.finishReason,
       allowedActions: pending.allowedActions,
       reasonCode: pending.reasonCode,
+      filterReason: pending.filterReason,
       failureCause: pending.failureCause,
       messageKey: pending.messageKey,
       operationKind: operationKindFromServer(pending.serverOperationKind),
@@ -2107,6 +2115,8 @@ const retryTimes = ref(0);
 const userStopRequested = ref(false);
 const actionBtnState = computed<'send-disabled' | 'send' | 'stop' | 'compacting' | 'continue'>(() => {
   return resolveChatActionButtonState({
+    sendBlocked: isTimelineMutationBlocked(),
+    isConnecting: unref(isConnecting),
     isCompacting: unref(isCompacting),
     userStopRequested: unref(userStopRequested),
     isStreamActive: unref(isStreamActive),
@@ -2149,6 +2159,7 @@ const actionBtnTooltip = computed(() => {
   回傳 false 代表沒有可以續的那一輪。
 */
 function resumeAgentOperation(): boolean {
+  if (isTimelineMutationBlocked()) return false;
   const resumable = findResumableAgentOperation(unref(knownOperations));
   const target = resolveAgentResumeTarget(resumable, unref(talkList));
   if (!target) return false;
@@ -2354,7 +2365,7 @@ function releaseStoppedComposerOwnership() {
   isConnecting.value = released.isConnecting === true;
   userStopRequested.value = released.userStopRequested === true;
   pendingResendPayload.value = released.pendingResendPayload;
-  pendingChatTurn = null;
+  ownershipRevision.value++; pendingChatTurn = null;
   // compact/stream flags 都屬於被停止的 request；若任一殘留，輸入後仍會顯示灰鍵。
   clearCompactState();
 }
@@ -2386,6 +2397,7 @@ const sseParser = createSSEParser();
 const rollbackPending = ref(false);
 
 function timelineMutationState() {
+  void ownershipRevision.value;
   const storedOperation = readLsEntry();
   const hasPersistedOperationIdentity = !!String(
     storedOperation?.operationId
@@ -2747,6 +2759,7 @@ function buildChromeState() {
       modelScore: modelScoreText.value,
       contextRing: contextRing.value,
       scoreHint: modelScoreLabel.value,
+      balanceHint: modelBalanceHint.value,
       meterHint: meterHint.value,
       modelName: String(formData.selectModelName || ''),
       assistBusy: assistBusy.value,
@@ -3297,9 +3310,25 @@ const HUD_DESTRUCTIVE_MORE = new Set(['new-chat', 'reset-chat', 'fork-archive'])
   只有最新那一列有鍵（getSystemMsgCtas／getSystemMsgCta 本來就這樣判）。
 */
 /** 積分不夠時宿主給的說法與去處；不是這種失敗、或宿主沒實作，回 null（卡片維持原樣）。 */
+function canSwitchModelFor(item: any, index: number) {
+  return item?.agentInterrupted === true
+    ? terminalUIActionsFromAllowedActions(item).includes('switch_model') && !isTimelineMutationBlocked()
+    : getSystemMsgCtas(item, index).some(entry => entry.action === 'switch_model');
+}
 function creditsOverrideFor(item: any) {
-  if (item?.finishReason !== 'insufficient_credits' || typeof stageHost.ui.creditsActions !== 'function') return null;
-  try { return stageHost.ui.creditsActions(item.creditsShortfall ?? null) || null; } catch { return null; }
+  if (item?.finishReason !== 'insufficient_credits') return null;
+  const short = item.creditsShortfall;
+  let override = null;
+  try { override = stageHost.ui.creditsActions?.(short ?? null) || null; } catch {}
+  if (override?.title && override?.body) return override;
+  if (typeof short?.minimum !== 'number' || !Number.isFinite(short.minimum) || short.minimum < 0 || short.minimum > short.needed) return override;
+  return { ...override, title: t('credits.recovery.title'), body: [
+    t('credits.recovery.estimate', {min:short.minimum,max:short.needed}),
+    t('credits.recovery.required', {max:short.needed}),
+    t('credits.recovery.available', {have:short.available}),
+    t('credits.recovery.explanation'),
+  ].join('\n') };
+
 }
 
 function systemNoticeFor(item: any, index: number) {
@@ -3310,8 +3339,8 @@ function systemNoticeFor(item: any, index: number) {
   const actions: Array<{ action: string; label: string }> = ctas.length ? ctas : (cta && ctaAction ? [{ action: ctaAction, label: cta }] : []);
   return {
     kind: getSystemMsgKind(item.finishReason),
-    label: creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause, t) || getSystemMsgLabel(item.finishReason),
-    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause, t) || getSystemMsgSub(item.finishReason),
+    label: creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || getSystemMsgLabel(item.finishReason),
+    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent }) || getSystemMsgSub(item.finishReason, item, index),
     actions: actions.map((entry) => ({ action: String(entry.action), label: String(entry.label) })),
     // 宿主給的去處（積分不夠）：有才帶，殼照畫；沒有的卡跟以前一模一樣
     ...((creditsOverrideFor(item)?.links ?? []).length ? { links: creditsOverrideFor(item)?.links ?? [] } : {}),
@@ -3331,8 +3360,8 @@ function generationOutcomeFor(list: any[]) {
     const failedAgain = agentResumeFailedAgain(unref(knownOperations), item.operationId);
     const failedAgainSub = t('multiPass.failedAgainSub');
     return outcomeFromInterruption(id, {
-      label: operationFailureTitle(item.failureCause, t) || t('multiPass.interruptedNotice'),
-      sub: failedAgain && failedAgainSub ? failedAgainSub : (operationFailureSub(item.failureCause, t, { agent: true }) || t('multiPass.interruptedNoticeSub')),
+      label: operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || t('multiPass.interruptedNotice'),
+      sub: !item.filterReason && canSwitchModelFor(item, index) && failedAgain && failedAgainSub ? failedAgainSub : (operationFailureSub(item.failureCause || item.finishReason, t, { agent: true, filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent }) || t('multiPass.interruptedNoticeSub')),
       continueLabel: t('multiPass.continueAction'),
       switchModelLabel: t('chat.switchModel'),
       failedAgain,
@@ -3404,6 +3433,7 @@ function buildHudHost(): HudHost {
           : lastAI && !lastAI.chatFinish && String(lastAI.thinkingContent || '') ? 'thinking' as const
           : 'preparing' as const,
         // 沙箱殼用：上一輪沒正常結束時，最新那一列底下那張卡（作者用 sdk.generation 拿去畫自己的 UI）。
+        sendBlocked: isTimelineMutationBlocked(),
         generationOutcome: sandboxCard.value && !generating ? generationOutcomeFor(list) : undefined,
         streamingMessageId: streamingId,
         inputText: String(unref(content) || ''),
@@ -3456,7 +3486,7 @@ function buildHudHost(): HudHost {
       };
     },
     // 遊客：送出會請宿主登入，這一句沒送出去——回 false（HOST_DENIED），作者的腳本才知道別等回覆。草稿已存，登入回來還在。
-    sendMessage: (text) => { const signedIn = !!unref(hasLogin); content.value = text; onCanvasSend(); return signedIn; },
+    sendMessage: (text) => { if (isTimelineMutationBlocked()) return false; const signedIn = !!unref(hasLogin); content.value = text; onCanvasSend(); return signedIn; },
     setInputText: (text) => { content.value = text; return true; },
     // 沙箱殼捲到頂附近：跟一般卡的捲動處理同一條路（翻頁 + getHistoryMsg），守同樣的開關與節流。
     loadMoreHistory: () => {
@@ -3470,11 +3500,12 @@ function buildHudHost(): HudHost {
     copyMessage: (id) => { const found = itemOf(id); if (!found) return false; copyText(null, found.item.content, t('canvas.copied')); return true; },
     stopGeneration: () => { onCanvasStop(); return true; },
     continueGeneration: (id) => {
+      if (isTimelineMutationBlocked()) return false;
       if (unref(actionBtnState) === 'continue') { onCanvasSend(); return true; }
       const found = itemOf(id); if (!found) return false;
       doContinue(found.item, found.index); return true;
     },
-    regenerateMessage: (id) => { const found = itemOf(id); if (!found) return false; doReiteration(found.index); return true; },
+    regenerateMessage: (id) => { if (isTimelineMutationBlocked()) return false; const found = itemOf(id); if (!found) return false; doReiteration(found.index); return true; },
     rollbackMessage: (id) => { const found = itemOf(id); if (!found) return false; loadConversation(found.item.id); return true; },
     deleteMessage: (id) => { const found = itemOf(id); if (!found) return false; chatDelete(found.item.id); return true; },
     // 編輯走訊息選單既有的草稿狀態，但不開選單本身（HUD 蓋著，開了也看不到）。
@@ -4718,6 +4749,7 @@ function getSystemMsgKind(finishReason) {
   return (finishReason && finishReason !== 'stop') ? (map[finishReason] || 'model-error') : '';
 }
 function getSystemMsgLabel(finishReason) {
+  if (['content_filter', 'content_filter_input', 'refusal'].includes(finishReason)) return operationFailureTitle(finishReason, t);
   const map = {
     'content_filter':   t('systemMsg.filtered')     || 'AI 已終止本次回覆',
     'content_filter_input': t('systemMsg.filtered') || 'AI 已終止本次回覆',
@@ -4742,7 +4774,7 @@ function getSystemMsgLabel(finishReason) {
     'service_unavailable': t('error.serviceUnavailable'),
     'server_error':     t('systemMsg.serverError')  || '伺服器暫時不穩定',
     'network_error':    t('systemMsg.networkError') || '網路連線中斷',
-    'history_load_error': t('systemMsg.networkError') || '網路連線中斷',
+    'history_load_error': t('systemMsg.historyLoadError') || '網路連線中斷',
     'insufficient_credits': t('chat.point_no_tips') || '點數已用完',
     'quota_exhausted':  t('chat.freeQuotaExhaustedTitle') || '免費額度已用完',
     'context_capacity_exceeded': t('error.contextCapacityTitle'),
@@ -4756,7 +4788,16 @@ function getSystemMsgLabel(finishReason) {
   };
   return map[finishReason] || (t('systemMsg.modelError') || '模型未能完成這次回覆');
 }
-function getSystemMsgSub(finishReason) {
+function getSystemMsgSub(finishReason, item = null, index = -1) {
+  if (item) {
+    const actions = getSystemMsgCtas(item, index).map(entry => entry.action);
+    const legacyAction = getSystemMsgCtaAction(finishReason, item, index);
+    if (legacyAction) actions.push(legacyAction);
+    if (['length', 'context_overflow'].includes(finishReason) && !actions.includes('continue')) return '';
+    if (['error', 'server_error', 'network_error', 'empty_response', 'rate_limit', 'compact_retryable'].includes(finishReason)
+      && !actions.some(action => action.startsWith('retry'))) return '';
+  }
+  if (['content_filter', 'content_filter_input', 'refusal'].includes(finishReason)) return operationFailureSub(finishReason, t);
   const map = {
     'content_filter':   t('systemMsg.filteredSub')     || '內容觸發了安全規則',
     // content_filter_input：輸入端內容審查拒絕(阿里/Kimi/Grok 等審查簽名分揀，
@@ -4774,8 +4815,8 @@ function getSystemMsgSub(finishReason) {
     'empty_response':   t('chat.turnRetryable')         || '本次沒有可用回覆，可再試一次',
     'rewrite_below_threshold': t('chat.turnRetryable')  || '原回覆仍保留，可再試一次',
     'error':            t('systemMsg.modelErrorSub')   || '可以重試，或換一個模型再試',
-    'pause_turn':       t('systemMsg.stoppedSub')      || '你中斷了這次生成',
-    'user_stop':        t('systemMsg.stoppedSub')      || '你中斷了這次生成',
+    'pause_turn':       t('systemMsg.stoppedSub'),
+    'user_stop':        t('systemMsg.stoppedSub'),
     'outcome_unconfirmed': t('chat.operationStatusUnavailableSub') || '好了會自動顯示在這裡，不用重送。',
     // agent 準備沒跑完時,主標只說「進度已經留著」——使用者不知道除了按繼續之外
     // 還能換模型。實測模型整條掛掉時(上游 100% 失敗),他會一直按繼續,而那個模型
@@ -4786,11 +4827,11 @@ function getSystemMsgSub(finishReason) {
     'rate_limit':       t('systemMsg.rateLimitSub')    || '請稍等一會再試',
     'server_error':     t('systemMsg.serverErrorSub')  || '可能過載中，稍候再試',
     'network_error':    t('systemMsg.networkErrorSub') || '請檢查網路後重試',
-    'history_load_error': t('systemMsg.networkErrorSub') || '請檢查網路後重試',
+    'history_load_error': t('systemMsg.historyLoadErrorSub') || '請檢查網路後重試',
     // 這個客戶端不賣點數也沒有每日報到，所以副標只說清楚該去哪處理，不給一顆
     // 按了會落空的鍵（開放契約沒有付費端點，見 docs/open-api-v1.md）。
-    'insufficient_credits': t('chat.manageCredits'),
-    'quota_exhausted':  t('chat.manageCredits'),
+    'insufficient_credits': t('chat.creditsNotEnoughSub'),
+    'quota_exhausted':  t('chat.creditsNotEnoughSub'),
     'context_capacity_exceeded': t('error.contextCapacityExceeded'),
     // 伺服器說了哪種玩法裝得下（第一輪）：問題在這張卡的大小，不在訊息長短或模型，
     // 所以不再叫玩家縮短訊息或換模型；鍵打開選擇（見 askCapacityChoice）。
@@ -4844,7 +4885,7 @@ function getSystemMsgCtas(item, index) {
     .filter(entry => !!entry.label);
 }
 function getSystemMsgCtaAction(finishReason, item, index) {
-  if (finishReason === 'history_load_error') return 'refresh_history';
+  if (finishReason === 'history_load_error' || finishReason === 'conversation_stale') return 'refresh_history';
   if (finishReason === 'context_capacity_choice') return 'capacity_choice';
   if (finishReason === 'context_capacity_exceeded') return 'open_model_settings';
   // 結果還在確認：背景對帳一直在跑，有結果這一列會自己換掉。給鍵只會叫人去做系統本來就在做的事
@@ -4891,6 +4932,7 @@ function firstExactTimelineRowIndex(chatIds, expectedType?: number) {
 }
 
 function startRetryGenerationFromAuthoritativeTerminal(item): boolean {
+  if (isTimelineMutationBlocked()) return false;
   const target = resolveRetryGenerationAction(talkList.value, item);
   if (!target) return false;
   const { userIndex, terminalIndex } = target;
@@ -5290,7 +5332,7 @@ function loadConversation(chatId) {
     now: Date.now(),
   });
   if (!writePendingBackwardOperation(entry)) {
-    uni.showToast({ title: t('chat.rollbackFailed'), icon: 'none' });
+    uni.showToast({ title: t('chat.rollbackFailed'), icon: 'error' });
     return;
   }
   rollbackPending.value = true;
@@ -5342,7 +5384,7 @@ function saveAndStartNew() {
       if (Number(res.data.limit) > 0) archiveLimit.value = Number(res.data.limit);
       askArchivesFull();
     } else {
-      message.error(res.data.error);
+      message.error(resolveChatErrorMessage(resolveChatErrorTypeFromFailure(res), t));
     }
   }).catch(e => {
     console.error(e);
@@ -5437,7 +5479,7 @@ function chatStart(greetingIndex?: number) {
         nextTick(() => scrollToBottom(true));
       }
     } else {
-      message.error(res.data.error);
+      message.error(resolveChatErrorMessage(resolveChatErrorTypeFromFailure(res), t));
     }
   }).catch(e => {
     console.error(e);
@@ -5445,7 +5487,7 @@ function chatStart(greetingIndex?: number) {
 }
 
 
-let pendingCreditsShortfall: { needed: number; available: number } | null = null;
+let pendingCreditsShortfall: { needed: number; available: number; minimum?: number } | null = null;
 function appendChatErrorBubble(errorType, errorMessage = '', metadata: Record<string, any> = {}) {
   removeOrphanPlaceholder();
   const presentation = resolveChatErrorPresentation(errorType, t);
@@ -5513,7 +5555,7 @@ const sendError = (retryLimit, errMsg, finishReasonOverride = '', errorType = ''
     };
     if (pendingMessageMeta.value?.isV3 === true) partial.isV3 = true;
     upsertPendingAIBubble(partial);
-    pendingChatTurn = null;
+    ownershipRevision.value++; pendingChatTurn = null;
     rewrite.value = false;
     contine.value = false;
     lastFinishReason.value = '';
@@ -5526,7 +5568,7 @@ const sendError = (retryLimit, errMsg, finishReasonOverride = '', errorType = ''
 
   const shouldRestoreUserBubble = !!failedPendingTurn?.userBubbleId;
   talkList.value = removeOwnedTurnBubbles(talkList.value, failedPendingTurn);
-  pendingChatTurn = null;
+  ownershipRevision.value++; pendingChatTurn = null;
   rewrite.value = false;
   contine.value = false;
   if (retryTimes.value < retryLimit) {
@@ -6349,19 +6391,9 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
         {
           const attempt = event.data?.attempt || '?';
           const max = event.data?.max || '?';
-          const retryErrorType = event.data?.error_type || 'connection_error';
-          const retryMessages = {
-            'service_unavailable': t('error.serviceUnavailable'),
-            'rate_limit': t('error.rateLimit'),
-            'server_error': t('error.serverError'),
-            'timeout': t('error.timeout'),
-            'connection_error': t('error.connectionError'),
-            'content_filter': t('error.contentFilter'),
-          };
-          const retryMsg = retryMessages[retryErrorType] || t('error.connectionError');
           let lastItem = talkList.value[talkList.value.length - 1];
           if (lastItem) {
-            lastItem.waitingHint = retryMsg + ' (' + attempt + '/' + max + ')';
+            lastItem.waitingHint = t('chat.replyRetrying', { attempt, max });
           }
         }
         break;
@@ -6439,7 +6471,7 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
           appendChatErrorBubble(errorType, errorMsg);
           break;
         }
-        pendingChatTurn = null;
+        ownershipRevision.value++; pendingChatTurn = null;
 
         if (hasRenderableAssistantOutput(replyContent.value, thinkingContent.value)) {
           // 正文或思考已有可顯示輸出 → 保留內容，標記為 error 截斷
@@ -6825,7 +6857,7 @@ function getHistoryMsg(preloadedFirstPage?: any) {
         authoritativePendingDisposition === 'terminal'
         || authoritativePendingDisposition === 'absent'
       ) {
-        pendingChatTurn = null;
+        ownershipRevision.value++; pendingChatTurn = null;
         pendingResendPayload.value = null;
         isResumeInitial.value = false;
         userStopRequested.value = false;
@@ -7280,6 +7312,7 @@ function recordAuthoritativeOperationStatus(input: any) {
     if (status.finishReason) pendingChatTurn.finishReason = status.finishReason;
     if (status.allowedActions) pendingChatTurn.allowedActions = status.allowedActions;
     if (status.reasonCode) pendingChatTurn.reasonCode = status.reasonCode;
+    if (status.filterReason) pendingChatTurn.filterReason = status.filterReason;
     if (status.failureCause) pendingChatTurn.failureCause = status.failureCause;
     if (status.messageKey) pendingChatTurn.messageKey = status.messageKey;
     if (typeof status.nonStreaming==='boolean') pendingChatTurn.nonStreaming=status.nonStreaming;
@@ -7313,6 +7346,10 @@ function recordAuthoritativeOperationStatus(input: any) {
     if (status.outputDisposition) operationBubble.outputDisposition = status.outputDisposition;
     operationBubble.allowedActions = status.allowedActions ? [...status.allowedActions] : [];
     if (status.reasonCode) operationBubble.reasonCode = status.reasonCode;
+    operationBubble.creditsShortfall = status.creditsShortfall || operationBubble.creditsShortfall;
+    operationBubble.settled = status.settled;
+    operationBubble.chargeCredits = status.chargeCredits;
+    if (status.filterReason) operationBubble.filterReason = status.filterReason;
     if (status.failureCause) operationBubble.failureCause = status.failureCause;
     if (status.messageKey) operationBubble.messageKey = status.messageKey;
   }
@@ -7338,7 +7375,7 @@ function refreshHistoryAfterAuthoritativeOperation(status: any) {
 
   notifyBufferedTerminal(status, operationBubble?.content || replyContent.value, bufferedTerminalNotices, () => {
     const reason = projectionFinishReason(status);
-    uni.showToast({ title: operationFailureTitle(status.failureCause, t) || getSystemMsgLabel(reason), icon: 'none' });
+    uni.showToast({ title: operationFailureTitle(status.failureCause || status.finishReason, t, status.filterReason) || getSystemMsgLabel(reason), icon: 'error' });
   });
 
   if (operationBubble) {
@@ -7362,6 +7399,10 @@ function refreshHistoryAfterAuthoritativeOperation(status: any) {
     if (status.outputDisposition) operationBubble.outputDisposition = status.outputDisposition;
     operationBubble.allowedActions = status.allowedActions ? [...status.allowedActions] : [];
     if (status.reasonCode) operationBubble.reasonCode = status.reasonCode;
+    operationBubble.creditsShortfall = status.creditsShortfall || operationBubble.creditsShortfall;
+    operationBubble.settled = status.settled;
+    operationBubble.chargeCredits = status.chargeCredits;
+    if (status.filterReason) operationBubble.filterReason = status.filterReason;
     if (status.failureCause) operationBubble.failureCause = status.failureCause;
     if (status.messageKey) operationBubble.messageKey = status.messageKey;
     operationBubble.finishReason = projectionFinishReason(
@@ -7528,7 +7569,7 @@ function releaseExpiredChatOperationOwnership(recorded: any, reason: string): vo
   if (shouldNotify) operationTimedOutNoticeKey = operationId || reason;
   operationStatusPollScheduler.cancel();
   discardPendingChatOperationCandidate(pending);
-  pendingChatTurn = null;
+  ownershipRevision.value++; pendingChatTurn = null;
   pendingResendPayload.value = null;
   clearStreamState();
   removeOrphanPlaceholder();
@@ -7841,7 +7882,7 @@ function beginPendingChatTurn(input: PendingChatTurn) {
       || pendingRewriteSnapshot
       || createRewriteSnapshotForTarget(talkList.value, input.payload?.chatId)
     : null;
-  pendingChatTurn = {
+  ownershipRevision.value++; pendingChatTurn = {
     ...input,
     operationKind,
     rewriteSnapshot,
@@ -7870,7 +7911,7 @@ function discardPendingChatOperationCandidate(pending = pendingChatTurn): boolea
     talkList.value = removeOperationCandidate(talkList.value, pending.aiBubbleId);
   }
   removeOrphanPlaceholder();
-  if (pending === pendingChatTurn) pendingChatTurn = null;
+  if (pending === pendingChatTurn) { ownershipRevision.value++; pendingChatTurn = null; }
   pendingRewriteSnapshot = null;
   rewrite.value = false;
   contine.value = false;
@@ -7945,7 +7986,7 @@ function recoverPendingChatTurnBeforeAccepted(showNotice = true, errorMetadata: 
   if (pending.socketToken) {
     messageQueue.value = messageQueue.value.filter(entry => entry && entry.socketToken !== pending.socketToken);
   }
-  pendingChatTurn = null;
+  ownershipRevision.value++; pendingChatTurn = null;
   tempContent.value = '';
   replyContent.value = '';
   thinkingContent.value = '';
@@ -8027,7 +8068,7 @@ function finalizePendingChatTurnAfterVisibleDone() {
       userBubble.serverAccepted = true;
     }
   }
-  pendingChatTurn = null;
+  ownershipRevision.value++; pendingChatTurn = null;
 }
 
 function shouldRewriteUserTurn(userBubble: any): boolean {
@@ -8036,7 +8077,7 @@ function shouldRewriteUserTurn(userBubble: any): boolean {
 
 function recoverStoredStreamDraft(decision: any) {
   if (decision?.draft && !content.value) content.value = decision.draft;
-  pendingChatTurn = null;
+  ownershipRevision.value++; pendingChatTurn = null;
   clearStreamState();
   removeOrphanPlaceholder();
   message.warning(t('chat.messageNotSentDraftSaved'));
@@ -8103,7 +8144,7 @@ function settleConfirmedPreAdmissionFailure(
   // 不能把原文恢復成「未送出」草稿；只移除未持久化 AI 候選並保留 USER。
   if (capturedPending.accepted === true) {
     discardPendingChatOperationCandidate(capturedPending);
-    if (pendingChatTurn === capturedPending) pendingChatTurn = null;
+    if (pendingChatTurn === capturedPending) { ownershipRevision.value++; pendingChatTurn = null; }
     pendingResendPayload.value = null;
     clearStreamState();
     removeOrphanPlaceholder();
@@ -8129,7 +8170,7 @@ function settleConfirmedPreAdmissionFailure(
   const recovered = recoverPendingChatTurnBeforeAccepted(false, operationProjection);
   if (!recovered) {
     if (storedDraft && !content.value) content.value = storedDraft;
-    pendingChatTurn = null;
+    ownershipRevision.value++; pendingChatTurn = null;
     clearStreamState();
     removeOrphanPlaceholder();
     appendChatErrorBubble(errorType, errorMessage, operationProjection);
@@ -8169,7 +8210,7 @@ function settleFrozenLegacyStreamError(
     return true;
   }
 
-  pendingChatTurn = null;
+  ownershipRevision.value++; pendingChatTurn = null;
   if (hasRenderableAssistantOutput(replyContent.value, thinkingContent.value)) {
     const last = talkList.value[talkList.value.length - 1];
     const bubbleId = unref(currentChatId)
@@ -8439,7 +8480,7 @@ function handleModExpiryAckRequired(eventData: any) {
   if (pending?.socketToken) {
     messageQueue.value = messageQueue.value.filter(entry => entry && entry.socketToken !== pending.socketToken);
   }
-  pendingChatTurn = null;
+  ownershipRevision.value++; pendingChatTurn = null;
   tempContent.value = '';
   replyContent.value = '';
   thinkingContent.value = '';
@@ -9496,10 +9537,10 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     // 「有沒有在幹活」的依據，不該隨氣泡出現而消失。
     prepTrail: Array.isArray(item.prepTrail) ? item.prepTrail : null,
     agentInterrupted: item.agentInterrupted === true,
-    interruptedNotice: operationFailureTitle(item.failureCause, t),
-    interruptedNoticeSub: operationFailureSub(item.failureCause, t, { agent: true }),
+    interruptedNotice: operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent),
+    interruptedNoticeSub: operationFailureSub(item.failureCause || item.finishReason, t, { agent: true, filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent }),
     // 續跑的那次又停在跟上一次同一個原因上：卡片改建議換模型（看伺服器給的操作清單，重新載入也一樣）。
-    agentFailedAgain: item.agentInterrupted === true && agentResumeFailedAgain(unref(knownOperations), item.operationId),
+    agentFailedAgain: item.agentInterrupted === true && !item.filterReason && canSwitchModelFor(item, index) && agentResumeFailedAgain(unref(knownOperations), item.operationId),
     reasoning: (!isUser && item.thinkingContent && formData.showThinkingProcess !== false)
       ? item.thinkingContent : '',
     finished: !!item.chatFinish,
@@ -9510,7 +9551,7 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     // 串流進行中一律關掉：重新生成時新氣泡要等跑完才換上去，這段時間舊的那則仍是
     // 「最新一則 AI」，鍵還亮著就會再送一次（owner 2026-09-05：跑到 182 個 token 時還能按）。
     // 開場白是作者寫的，不是模型生成的：沒有「重新生成」。
-    latestAI: allowsStageAction(stageHost.capabilities, 'rewrite') && !previewOnly.value && !isUser && !isSystemOnly && !!item.chatFinish && !isStreamActive.value && isLatestCanonicalAIIndex(index) && !isOpeningIndex(talkList.value, index),
+    latestAI: allowsStageAction(stageHost.capabilities, 'rewrite') && !previewOnly.value && !isUser && !isSystemOnly && !!item.chatFinish && !isTimelineMutationBlocked() && isLatestCanonicalAIIndex(index) && !isOpeningIndex(talkList.value, index),
     swipes: (index === 0 && showGreetingSwipes.value)
       ? { index: greeting.index, total: greeting.list.length }
       : null,
@@ -9841,7 +9882,7 @@ function resendPlayerRowWithoutReply(index: number, text: string) {
     data: { conversationId: unref(conversationId), chatId },
   }).then((res: any) => {
     if (res.statusCode !== 200) {
-      message.error((res.data && res.data.error) || t('main.save_failed'))
+      message.error(resolveChatErrorMessage(resolveChatErrorTypeFromFailure(res), t))
       return
     }
     const at = talkList.value.findIndex((item: any) => item && String(item.chatId || item.id || '') === chatId)
@@ -10210,6 +10251,12 @@ watch(selectedVariant, (variant) => {
 // 固定計價的線路選了 128K，面板寫 900、左下角還是 180）。
 const modelScoreOpts = computed(() => ({ context: Number(formData.context) || 1, thinkingDepth: String(formData.thinkingDepth || '') }))
 const modelScoreText = computed(() => scoreParts(selectedVariant.value, modelScoreOpts.value).text)
+const modelBalanceHint = computed(() => {
+  if (multiPassEffective.value || (roleView.value as any)?.world) return '';
+  let available: number | null = null;
+  try { available = stageHost.ui.availableCredits?.() ?? null; } catch { return ''; }
+  return balanceWarning(selectedVariant.value, modelScoreOpts.value, available, t);
+})
 const modelScoreDynamic = computed(() => scoreParts(selectedVariant.value, modelScoreOpts.value).dynamic)
 // 動態計價的價格要說清楚是什麼：這段對話的下一輪，還是還沒聊過的卡依全站估的第一輪。
 // 跟模型選單用同一組字（priceMeaning），頂欄與選單才不會各說各話。
@@ -10359,13 +10406,13 @@ async function persistRoleSettings() {
       // 稱呼與自我介紹會過內容審核，被擋下時伺服器講的是原因——照講給玩家聽，
       // 不要換成一句「儲存失敗」。
       const reason = (res.data && (res.data.error || res.data.message)) || ''
-      uni.showToast({ title: String(reason || t('main.save_failed')), icon: 'none' })
+      uni.showToast({ title: t('main.save_failed'), icon: 'error' })
       return false
     }
     roleSettingsSnapshot = { ...roleSettingsSnapshot, ...currentRoleSettings() }
     return true
   } catch (e) {
-    uni.showToast({ title: t('main.save_failed'), icon: 'none' })
+    uni.showToast({ title: t('main.save_failed'), icon: 'error' })
     return false
   }
 }
@@ -11998,7 +12045,7 @@ function deleteConversationAndRestart(id: string) {
     data: { conversationId: id },
   }).then((res: any) => {
     if (res.statusCode !== 200) {
-      message.error((res.data && res.data.error) || t('main.save_failed'))
+      message.error(resolveChatErrorMessage(resolveChatErrorTypeFromFailure(res), t))
       return
     }
     restartConversationFromScratch()
@@ -12093,7 +12140,7 @@ async function startPendingGreeting(): Promise<boolean> {
     pendingGreetingStart.value = true
     content.value = draft
     renderGreetingPreview()
-    uni.showToast({ title: t('main.network_error'), icon: 'none' })
+    uni.showToast({ title: t('main.network_error'), icon: 'error' })
     return false
   }
   return true

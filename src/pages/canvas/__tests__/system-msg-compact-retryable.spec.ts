@@ -75,7 +75,7 @@ describe('desktop chat.vue · SystemMessage card port (C2)', () => {
 
   it('getSystemMsgLabel/getSystemMsgSub reuse existing locale keys ported verbatim from mobile (no invented copy)', () => {
     const chat = readChat()
-    const labelFn = sliceBetween(chat, 'function getSystemMsgLabel(finishReason)', 'function getSystemMsgSub(finishReason)')
+    const labelFn = sliceBetween(chat, 'function getSystemMsgLabel(finishReason)', 'function getSystemMsgSub(')
     expect(labelFn).toContain("t('systemMsg.filtered')")
     expect(labelFn).toContain("t('systemMsg.lengthCap')")
     expect(labelFn).toContain("t('systemMsg.modelError')")
@@ -87,7 +87,7 @@ describe('desktop chat.vue · SystemMessage card port (C2)', () => {
     expect(labelFn).toContain("t('error.emptyResponse')")
     expect(labelFn).toContain("t('chat.rewriteBelowThreshold')")
 
-    const subFn = sliceBetween(chat, 'function getSystemMsgSub(finishReason)', 'function getSystemMsgCta(finishReason, item, index)')
+    const subFn = sliceBetween(chat, 'function getSystemMsgSub(', 'function getSystemMsgCta(finishReason, item, index)')
     expect(subFn).toContain("t('systemMsg.filteredSub')")
     expect(subFn).toContain("t('systemMsg.lengthCapSub')")
     expect(subFn).toContain("t('systemMsg.modelErrorSub')")

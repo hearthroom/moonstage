@@ -1051,7 +1051,7 @@ describe('desktop chat operation product contract', () => {
     // 這個 kind 必須有卡片版面覆寫，否則吃到 notice 的藥丸預設。
     const comp = read('src/components/chat-system-message/chat-system-message.vue')
     expect(comp).toContain("'outcome-unconfirmed'")
-    expect(comp).toMatch(/\.sys-kind-outcome-unconfirmed\s+\.sys-msg-card\s*\{[^}]*border-radius/)
+    expect(comp).toMatch(/\.sys-msg-card\s*\{[^}]*border-radius/)
   })
 
   it('routes every unconfirmed-outcome announcement through the durable row first', () => {

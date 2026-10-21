@@ -249,3 +249,11 @@ export function priceMeaning(variant?: ModelVariantLike | null): PriceMeaning {
 export function formatScore(variant?: ModelVariantLike | null, opts: ScoreContext = {}): string {
   return scoreParts(variant, opts).text
 }
+
+/** The hint compares the current display quote, never an invented lower admission threshold. */
+export function balanceWarning(variant: ModelVariantLike | null | undefined, opts: ScoreContext, available: number | null | undefined, t: (key: string, params: Record<string, unknown>) => string): string {
+ if (!variant || typeof available !== 'number' || !Number.isFinite(available) || available < 0) return ''
+ const price = variantPrice(variant, opts)
+ if (!price.isDynamic || !Number.isFinite(price.min) || !Number.isFinite(price.max) || !price.max || price.max <= 0 || (price.min ?? -1) < 0 || price.min! > price.max) return ''
+ return available < price.max ? t('chat.balanceBelowEstimate', {have: available}) : ''
+}

@@ -5,34 +5,33 @@
           aria-atomic="true">
       <view class="sys-icon-box">
         <!-- model-error: alert triangle -->
-        <view v-if="kind === 'model-error'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;${meta.color}&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z&quot;/><line x1=&quot;12&quot; y1=&quot;9&quot; x2=&quot;12&quot; y2=&quot;13&quot;/><line x1=&quot;12&quot; y1=&quot;17&quot; x2=&quot;12.01&quot; y2=&quot;17&quot;/></svg>`"></view>
+        <view v-if="kind === 'model-error'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z&quot;/><line x1=&quot;12&quot; y1=&quot;9&quot; x2=&quot;12&quot; y2=&quot;13&quot;/><line x1=&quot;12&quot; y1=&quot;17&quot; x2=&quot;12.01&quot; y2=&quot;17&quot;/></svg>`"></view>
         <!-- network-error: wifi-off -->
-        <view v-else-if="kind === 'network-error'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;${meta.color}&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><line x1=&quot;1&quot; y1=&quot;1&quot; x2=&quot;23&quot; y2=&quot;23&quot;/><path d=&quot;M16.72 11.06A10.94 10.94 0 0 1 19 12.55&quot;/><path d=&quot;M5 12.55a10.94 10.94 0 0 1 5.17-2.39&quot;/><path d=&quot;M10.71 5.05A16 16 0 0 1 22.58 9&quot;/><path d=&quot;M1.42 9a15.91 15.91 0 0 1 4.7-2.88&quot;/><path d=&quot;M8.53 16.11a6 6 0 0 1 6.95 0&quot;/><line x1=&quot;12&quot; y1=&quot;20&quot; x2=&quot;12.01&quot; y2=&quot;20&quot;/></svg>`"></view>
+        <view v-else-if="kind === 'network-error'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><line x1=&quot;1&quot; y1=&quot;1&quot; x2=&quot;23&quot; y2=&quot;23&quot;/><path d=&quot;M16.72 11.06A10.94 10.94 0 0 1 19 12.55&quot;/><path d=&quot;M5 12.55a10.94 10.94 0 0 1 5.17-2.39&quot;/><path d=&quot;M10.71 5.05A16 16 0 0 1 22.58 9&quot;/><path d=&quot;M1.42 9a15.91 15.91 0 0 1 4.7-2.88&quot;/><path d=&quot;M8.53 16.11a6 6 0 0 1 6.95 0&quot;/><line x1=&quot;12&quot; y1=&quot;20&quot; x2=&quot;12.01&quot; y2=&quot;20&quot;/></svg>`"></view>
         <!-- server-error: server rack（設計稿 icons.jsx 精確版） -->
-        <view v-else-if="kind === 'server-error'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;${meta.color}&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><rect x=&quot;2&quot; y=&quot;3&quot; width=&quot;20&quot; height=&quot;7&quot; rx=&quot;1.5&quot;/><rect x=&quot;2&quot; y=&quot;14&quot; width=&quot;20&quot; height=&quot;7&quot; rx=&quot;1.5&quot;/><path d=&quot;M6 6.5h.01M6 17.5h.01&quot;/></svg>`"></view>
+        <view v-else-if="kind === 'server-error'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><rect x=&quot;2&quot; y=&quot;3&quot; width=&quot;20&quot; height=&quot;7&quot; rx=&quot;1.5&quot;/><rect x=&quot;2&quot; y=&quot;14&quot; width=&quot;20&quot; height=&quot;7&quot; rx=&quot;1.5&quot;/><path d=&quot;M6 6.5h.01M6 17.5h.01&quot;/></svg>`"></view>
         <!-- rate-limit: hourglass（設計稿 zigzag 單路徑） -->
-        <view v-else-if="kind === 'rate-limit'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;${meta.color}&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M6 2h12v4l-4 4 4 4v4H6v-4l4-4-4-4V2z&quot;/></svg>`"></view>
+        <view v-else-if="kind === 'rate-limit'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M6 2h12v4l-4 4 4 4v4H6v-4l4-4-4-4V2z&quot;/></svg>`"></view>
         <!-- quota: credit card -->
-        <view v-else-if="kind === 'quota'" class="sys-svg sys-quota-icon" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;${meta.color}&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><rect x=&quot;2&quot; y=&quot;5&quot; width=&quot;20&quot; height=&quot;14&quot; rx=&quot;2&quot;/><path d=&quot;M2 10h20&quot;/><path d=&quot;M6 15h4&quot;/></svg>`"></view>
+        <view v-else-if="kind === 'quota'" class="sys-svg sys-quota-icon" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><rect x=&quot;2&quot; y=&quot;5&quot; width=&quot;20&quot; height=&quot;14&quot; rx=&quot;2&quot;/><path d=&quot;M2 10h20&quot;/><path d=&quot;M6 15h4&quot;/></svg>`"></view>
         <!-- filtered: shield -->
-        <view v-else-if="kind === 'filtered'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;${meta.color}&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z&quot;/></svg>`"></view>
+        <view v-else-if="kind === 'filtered'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z&quot;/></svg>`"></view>
         <!-- stopped: filled square（設計稿 rx=2, filled） -->
-        <view v-else-if="kind === 'stopped'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;${meta.color}&quot; stroke=&quot;none&quot; style=&quot;width:100%;height:100%;display:block;&quot;><rect x=&quot;6&quot; y=&quot;6&quot; width=&quot;12&quot; height=&quot;12&quot; rx=&quot;2&quot;/></svg>`"></view>
+        <view v-else-if="kind === 'stopped'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;currentColor&quot; stroke=&quot;none&quot; style=&quot;width:100%;height:100%;display:block;&quot;><rect x=&quot;6&quot; y=&quot;6&quot; width=&quot;12&quot; height=&quot;12&quot; rx=&quot;2&quot;/></svg>`"></view>
         <!-- length-cap: zap（設計稿單路徑） -->
-        <view v-else-if="kind === 'length-cap'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;${meta.color}&quot; stroke=&quot;${meta.color}&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M13 2L3 14h7l-1 8 10-12h-7l1-8z&quot;/></svg>`"></view>
+        <view v-else-if="kind === 'length-cap'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;currentColor&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M13 2L3 14h7l-1 8 10-12h-7l1-8z&quot;/></svg>`"></view>
         <!-- compact-retryable: 沿用 mobile 版同一顆 4 L-shapes compress 圖示（語意對應
              「記憶壓縮/整理」失敗），但走 failure 紅色（meta.color） -->
-        <view v-else-if="kind === 'compact-retryable'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;${meta.color}&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M4 9h6V3M20 9h-6V3M4 15h6v6M20 15h-6v6&quot;/></svg>`"></view>
+        <view v-else-if="kind === 'compact-retryable'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M4 9h6V3M20 9h-6V3M4 15h6v6M20 15h-6v6&quot;/></svg>`"></view>
         <!-- outcome-unconfirmed: clock（「還在確認」而非「已失敗」） -->
-        <view v-else-if="kind === 'outcome-unconfirmed'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;${meta.color}&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;9&quot;/><polyline points=&quot;12 7 12 12 15.5 14&quot;/></svg>`"></view>
+        <view v-else-if="kind === 'outcome-unconfirmed'" class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;9&quot;/><polyline points=&quot;12 7 12 12 15.5 14&quot;/></svg>`"></view>
         <!-- fallback（理論上不會命中：所有目前傳入的 kind 都有上面明確分支） -->
-        <view v-else class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;${meta.color}&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M4 9h6V3M20 9h-6V3M4 15h6v6M20 15h-6v6&quot;/></svg>`"></view>
+        <view v-else class="sys-svg" v-html="`<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M4 9h6V3M20 9h-6V3M4 15h6v6M20 15h-6v6&quot;/></svg>`"></view>
       </view>
 
       <view class="sys-body">
-        <text class="sys-label" :style="meta.neutral ? null : { color: meta.color }">{{ label }}</text>
+        <text class="sys-label" >{{ label }}</text>
         <text v-if="sub" class="sys-sub">
-          <text v-if="tone === 'notice'" class="sys-dot" :style="{ color: meta.color + '55' }">·</text>
           <text class="sys-sub-text">{{ sub }}</text>
         </text>
       </view>
@@ -40,12 +39,11 @@
       <view v-if="resolvedCtas.length" class="sys-ctas">
         <!-- data-lt="retry" 是作者樣式契約裡的穩定選擇器（見 author-theme-vars.css）：
              重試鍵在這一端就是系統訊息卡上的那顆 CTA，作者要改它得抓得到。 -->
-        <view v-for="entry in resolvedCtas" :key="entry.action"
+        <view v-for="(entry, index) in resolvedCtas" :key="entry.action"
               class="sys-cta"
               :data-lt="isRetryAction(entry.action) ? 'retry' : null"
               role="button" tabindex="0" :aria-label="entry.label"
-              :class="['sys-cta-' + tone, { 'sys-cta-neutral': meta.neutral }]"
-              :style="isFailure ? { background: meta.color, color: '#0F1419' } : (meta.neutral ? null : { background: meta.color + '22', border: '1px solid ' + meta.color + '55', color: meta.color })"
+              :class="{ 'sys-cta-primary': index === resolvedCtas.length - 1 }"
               @click.stop="onCta(entry.action)"
               @keydown="onCtaKeydown($event, entry.action)">
           <view v-if="showsRetryIcon(entry.action)" class="sys-cta-svg" v-html="'<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.5&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><polyline points=&quot;23 4 23 10 17 10&quot;/><polyline points=&quot;1 20 1 14 7 14&quot;/><path d=&quot;M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15&quot;/></svg>'"></view>
@@ -64,6 +62,8 @@
 </template>
 
 <script>
+import { syncChromeTone } from '../../pages/canvas/canvas-chrome-tone'
+
 /**
  * 系統訊息卡片（desktop port，from mobile
  * src/components/chat-system-message/chat-system-message.vue）
@@ -114,6 +114,18 @@ export default {
     links: { type: Array, default: () => [] },
   },
   emits: ['cta'],
+  mounted() {
+    this.$nextTick(this.measurePanel);
+    const Observer = this.$el?.ownerDocument?.defaultView?.MutationObserver;
+    if (Observer) {
+      this.panelThemeObserver = new Observer(this.measurePanel);
+      for (let node = this.$el; node; node = node.parentElement) {
+        this.panelThemeObserver.observe(node, { attributes: true, attributeFilter: ['style', 'class', 'data-theme', 'data-mode'] });
+      }
+    }
+  },
+  updated() { this.measurePanel(); },
+  beforeUnmount() { this.panelThemeObserver?.disconnect(); },
   computed: {
     meta() { return KIND_META[this.kind] || KIND_META['stopped']; },
     tone() { return this.meta.tone; },
@@ -142,6 +154,7 @@ export default {
     liveRegionPoliteness() { return this.isTerminal ? 'assertive' : 'polite'; },
   },
   methods: {
+    measurePanel() { syncChromeTone(this.$el); },
     showsRetryIcon(action) {
       return action === 'rewrite' || String(action || '').startsWith('retry');
     },
@@ -173,197 +186,92 @@ export default {
 </script>
 
 <style scoped lang="scss">
-/*
-  全部進 @layer lt-base：作者的卡不在 layer 裡，永遠贏過這裡。
-  底色與邊框都從 currentColor 調出來——這條狀態列住在對話流裡，文字色是作者的卡在設的
-  （亮色主題設深色字）；先前寫死 rgba(22,27,34,.72) 的深色疊層，在亮色卡上就是一塊黑框
-  （owner 2026-09-05 截圖）。語氣色（紅／橙／琥珀）只留給「出事了」那幾種；中性語氣
-  （停止、進度留著、結果未確認）整條跟著卡片走。不寫 margin（uni 的 *{margin:0} 不在
-  layer 裡會吃掉），間距用 padding。
-*/
+/* Platform panels own their background/foreground pair; author rules still win over lt-base. */
 @layer lt-base {
-/* 寬度是 100%／max-width 100% 再加內距：要 border-box 才不會超出那一列。uni 的基底本來就把 `*`
-   設成 border-box，沙箱卡的殼沒有那份基底，卡片右緣會被切掉一截，所以這裡自己講清楚。 */
-.sys-msg-wrap,
-.sys-msg-wrap * {
-  box-sizing: border-box;
-}
+.sys-msg-wrap, .sys-msg-wrap * { box-sizing: border-box; }
 .sys-msg-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
   padding: 10px 16px;
-  color: inherit;
 }
-
 .sys-msg-card {
+  --sys-tone: currentColor;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
   gap: 8px;
-  max-width: 100%;
-  color: inherit;
+  width: 100%;
+  max-width: 560px;
+  padding: 12px;
+  border-radius: var(--lt-canvas-block-radius, 14px);
+  border: 1px solid color-mix(in srgb, var(--sys-tone) 40%, transparent);
+  /* The opaque base also backs translucent author panel tokens. */
+  background: linear-gradient(color-mix(in srgb, var(--sys-tone) 8%, transparent), color-mix(in srgb, var(--sys-tone) 8%, transparent)),
+    linear-gradient(var(--lt-canvas-panel-bg, rgba(24,27,33,.98)), var(--lt-canvas-panel-bg, rgba(24,27,33,.98)))
+    var(--lt-canvas-bg, #0f1217);
+  color: var(--lt-canvas-panel-fg, #e8eaed);
+  box-shadow: 0 1px 3px rgba(0,0,0,.22);
 }
-
-.sys-tone-failure .sys-msg-card {
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: color-mix(in srgb, #F87171 16%, transparent);
-  border: 1px solid color-mix(in srgb, #F87171 40%, transparent);
-}
-.sys-kind-rate-limit .sys-msg-card,
-.sys-kind-filtered .sys-msg-card {
-  background: color-mix(in srgb, #FB923C 16%, transparent);
-  border-color: color-mix(in srgb, #FB923C 40%, transparent);
-}
-
-.sys-tone-notice .sys-msg-card {
-  padding: 7px 12px;
-  border-radius: var(--lt-canvas-pill-radius, 9999px);
-  background: var(--lt-canvas-block-bg, color-mix(in srgb, currentColor 7%, transparent));
-  border: var(--lt-canvas-block-border, 1px solid color-mix(in srgb, currentColor 22%, transparent));
-}
-.sys-kind-length-cap .sys-msg-card,
-.sys-kind-quota .sys-msg-card {
-  background: color-mix(in srgb, #FBBF24 16%, transparent);
-  border-color: color-mix(in srgb, #FBBF24 40%, transparent);
-}
-/* 中性語氣但走卡片版面：notice 預設的藥丸（9999px）只能容納單行短標籤，
-   本 kind 有說明文字與 CTA，多行會被圓角包成一顆球並壓到按鈕。
-   圓角取 14px（與 failure 卡同級，DESIGN.md 4-tier 的 medium）。 */
-.sys-kind-outcome-unconfirmed .sys-msg-card {
-  padding: 10px 12px;
-  border-radius: 14px;
-  align-items: flex-start;
-}
-.sys-kind-outcome-unconfirmed .sys-body {
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 2px;
-}
-.sys-kind-outcome-unconfirmed .sys-label { font-size: 13px; }
-
-/* ---- icon box ---- */
 .sys-icon-box {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  background: color-mix(in srgb, currentColor 14%, transparent);
-}
-.sys-tone-failure .sys-icon-box {
+  flex: 0 0 24px;
   width: 24px;
   height: 24px;
-  background: color-mix(in srgb, #F87171 22%, transparent);
+  border-radius: 50%;
+  color: var(--sys-tone);
+  background: color-mix(in srgb, var(--sys-tone) 14%, transparent);
 }
-.sys-kind-rate-limit .sys-icon-box,
-.sys-kind-filtered .sys-icon-box {
-  background: color-mix(in srgb, #FB923C 22%, transparent);
-}
-.sys-kind-length-cap .sys-icon-box,
-.sys-kind-quota .sys-icon-box {
-  background: color-mix(in srgb, #FBBF24 22%, transparent);
-}
-.sys-svg {
-  width: 11px;
-  height: 11px;
-}
-.sys-tone-failure .sys-svg {
-  width: 13px;
-  height: 13px;
-}
-
-/* ---- body ---- */
+.sys-svg { width: 14px; height: 14px; }
 .sys-body {
+  flex: 1 1 180px;
   min-width: 0;
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0 6px;
-  flex: 1;
-}
-.sys-label {
-  font-weight: 700;
-  line-height: 1.3;
-  color: inherit;
-}
-.sys-tone-failure .sys-label { font-size: 13px; }
-.sys-tone-notice .sys-label { font-size: 12px; }
-
-.sys-sub {
-  font-size: 11px;
-  color: inherit;
-  opacity: 0.7;
-  display: inline-flex;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 4px;
+  overflow-wrap: anywhere;
 }
-.sys-dot {
-  opacity: 0.5;
-}
-.sys-sub-text {
-  font-size: 11px;
-  color: inherit;
-}
-
-/* ---- CTA ---- */
+.sys-label { color: inherit; font-size: 14px; font-weight: 600; line-height: 1.4; }
+.sys-sub { white-space: pre-line; color: inherit; opacity: .78; font-size: 12px; line-height: 1.5; }
+.sys-sub-text { color: inherit; font-size: inherit; }
 .sys-ctas {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex: 0 0 auto;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
+  gap: 8px;
+  max-width: 100%;
+  margin-left: auto;
 }
 .sys-cta {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-weight: 700;
-  font-size: 11px;
-  flex-shrink: 0;
-  cursor: pointer;
-  transition: transform 0.12s, opacity 0.15s;
-}
-.sys-cta-neutral {
-  background: var(--lt-canvas-pill-bg, color-mix(in srgb, currentColor 7%, transparent));
-  border: var(--lt-canvas-pill-border, 1px solid color-mix(in srgb, currentColor 32%, transparent));
-  color: var(--lt-canvas-pill-fg, inherit);
-  border-radius: var(--lt-canvas-pill-radius, 9999px);
-}
-/* 版面釘死：一列、標籤吃剩餘寬度、CTA 靠右不換行（owner 2026-09-05 截圖裡 CTA 被疊成直排）。 */
-.sys-msg-card { flex-wrap: nowrap; }
-.sys-body { flex: 1 1 auto; }
-.sys-ctas { flex: 0 0 auto; }
-.sys-cta { width: auto; }
-.sys-cta:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
-}
-.sys-cta:active { transform: scale(0.94); opacity: 0.85; }
-.sys-cta-svg {
-  width: 11px;
-  height: 11px;
-}
-.sys-cta-text {
-  color: inherit;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-/* ---- 宿主注入的去處：觸控 44 高、放不下就直排；顏色只用卡片的 --lt-canvas-*（不擴大公開契約） ---- */
-.sys-links {
-  display: flex;
-  flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 12px;
   max-width: 100%;
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+  border-radius: var(--lt-canvas-pill-radius, 9999px);
+  background: transparent;
+  color: inherit;
+  font-weight: 600;
+  font-size: 12px;
+  flex: 0 0 auto;
+  cursor: pointer;
+  transition: transform .12s, opacity .15s;
 }
+.sys-cta-primary { background: var(--lt-canvas-accent); color: var(--lt-canvas-accent-fg); border-color: transparent; }
+.sys-cta:focus-visible, .sys-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.sys-cta:active { transform: scale(.94); opacity: .85; }
+.sys-cta-svg { width: 12px; height: 12px; flex-shrink: 0; }
+.sys-cta-text { color: inherit; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.sys-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding-top: 8px; width: 100%; max-width: 560px; }
 .sys-link {
   display: inline-flex;
   align-items: center;
@@ -371,18 +279,24 @@ export default {
   min-height: 44px;
   padding: 0 16px;
   border-radius: var(--lt-canvas-pill-radius, 9999px);
-  background: var(--lt-canvas-pill-bg, color-mix(in srgb, currentColor 7%, transparent));
-  border: var(--lt-canvas-pill-border, 1px solid color-mix(in srgb, currentColor 32%, transparent));
-  color: var(--lt-canvas-pill-fg, inherit);
+  background: linear-gradient(var(--lt-canvas-panel-bg), var(--lt-canvas-panel-bg)) var(--lt-canvas-bg);
+  color: var(--lt-canvas-panel-fg);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
   max-width: 100%;
   overflow-wrap: anywhere;
 }
-.sys-link:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
+@media (pointer: coarse) { .sys-cta { min-height: 44px; } }
 }
-}
+</style>
+<style>
+/* Zero specificity outside the layer matches the stage chrome's existing author override contract.
+   Kept with the shared component so sandbox documents receive the same measured pairing. */
+:where(.sys-msg-card[data-lt-tone="light"]) { color: #17171c; --sys-tone: #4b4b50; }
+:where(.sys-msg-card[data-lt-tone="dark"]) { color: #e8eaed; --sys-tone: #a3a3ad; }
+:where(.sys-msg-card[data-lt-tone="light"].sys-kind-model-error, .sys-msg-card[data-lt-tone="light"].sys-kind-network-error, .sys-msg-card[data-lt-tone="light"].sys-kind-server-error, .sys-msg-card[data-lt-tone="light"].sys-kind-compact-retryable) { --sys-tone: #b91c1c; }
+:where(.sys-msg-card[data-lt-tone="dark"].sys-kind-model-error, .sys-msg-card[data-lt-tone="dark"].sys-kind-network-error, .sys-msg-card[data-lt-tone="dark"].sys-kind-server-error, .sys-msg-card[data-lt-tone="dark"].sys-kind-compact-retryable) { --sys-tone: #f87171; }
+:where(.sys-msg-card[data-lt-tone="light"].sys-kind-rate-limit, .sys-msg-card[data-lt-tone="light"].sys-kind-filtered, .sys-msg-card[data-lt-tone="light"].sys-kind-quota, .sys-msg-card[data-lt-tone="light"].sys-kind-length-cap) { --sys-tone: #8a5a00; }
+:where(.sys-msg-card[data-lt-tone="dark"].sys-kind-rate-limit, .sys-msg-card[data-lt-tone="dark"].sys-kind-filtered, .sys-msg-card[data-lt-tone="dark"].sys-kind-quota, .sys-msg-card[data-lt-tone="dark"].sys-kind-length-cap) { --sys-tone: #fbbf24; }
 </style>

@@ -24,12 +24,12 @@ describe('capacity rejection card', () => {
       cta: t('contextFootprint.action'),
       ctaAction: 'open_model_settings',
     } })
-    expect(card.text()).toContain('上下文容量')
-    expect(card.text()).toContain('調大容量')
-    expect(card.text()).toContain('對話都還保留著')
+    expect(card.text()).toContain(zh['error.contextCapacityTitle'])
+    expect(card.text()).toContain(zh['error.contextCapacityExceeded'])
+    expect(card.text()).not.toContain('對話都還保留著')
     expect(card.text()).not.toContain('連線失敗')
     expect(card.text()).not.toContain('伺服器暫時不穩定')
-    expect(card.find('.sys-cta').text()).toBe('調整上下文容量')
+    expect(card.find('.sys-cta').text()).toBe(zh['contextFootprint.action'])
   })
 })
 
@@ -44,7 +44,7 @@ describe('capacity rejection card with advice', () => {
       cta: t('canvas.capacity.choose'),
       ctaAction: 'capacity_choice',
     } })
-    expect(card.text()).toContain('這張卡')
+    expect(card.text()).toContain(zh['error.contextCapacitySettings'])
     expect(card.text()).not.toContain('縮短')
     expect(card.text()).not.toContain('切換')
     expect(card.text()).not.toContain('連線失敗')

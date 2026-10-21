@@ -9,7 +9,7 @@
 //   - kind → tone（failure/notice/info）分類一致，包含新加的 compact-retryable
 //   - label/sub/cta 三個 prop 原樣顯示，不吃掉
 //   - CTA 點擊 emit ('cta', action)，action 依 kind 對應 retry/continue
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ChatSystemMessage from './chat-system-message.vue'
 
@@ -181,3 +181,19 @@ describe('ChatSystemMessage (desktop port)', () => {
   })
 })
 
+
+
+describe('error panel legibility', () => {
+  it('measures the panel when a failure arrives after the page theme was synchronized', async () => {
+    const style = vi.spyOn(window, 'getComputedStyle').mockImplementation(() => ({
+      backgroundColor: 'rgb(255, 255, 255)', backgroundImage: 'none', content: 'none',
+    } as CSSStyleDeclaration))
+    const wrapper = mountCard({ kind: 'model-error', label: 'Failure', sub: 'Try again' })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.sys-msg-card').attributes('data-lt-tone')).toBe('light')
+    expect(wrapper.find('.sys-label').attributes('style')).toBeUndefined()
+    expect(wrapper.find('svg').attributes('stroke')).toBe('currentColor')
+    wrapper.unmount()
+    style.mockRestore()
+  })
+})

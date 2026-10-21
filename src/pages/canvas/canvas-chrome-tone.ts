@@ -18,7 +18,7 @@ export type ChromeTone = 'light' | 'dark'
 export interface RGBA { r: number; g: number; b: number; a: number }
 
 /** 有這些節點就量：頂欄、彈層。輸入區作者通常不漆，等真的碰到再加。 */
-export const CHROME_TONE_SELECTORS = ['.topTabbar', '.u-popup__content'] as const
+export const CHROME_TONE_SELECTORS = ['.topTabbar', '.u-popup__content', '.sys-msg-card', '.agent-resume-card'] as const
 
 /** 頁面預設底：量不到任何底色時當作深色（舞台的預設主題）。 */
 const DEFAULT_PAGE_BG: RGBA = { r: 15, g: 18, b: 23, a: 1 }

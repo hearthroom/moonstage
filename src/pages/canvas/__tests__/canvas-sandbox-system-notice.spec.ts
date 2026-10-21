@@ -48,13 +48,14 @@ function canvasFunctions(names: string[], env: Record<string, unknown>): Record<
 function resolver(timeline: any[], over: { capabilities?: unknown; operations?: unknown[]; ui?: Record<string, unknown> } = {}) {
   const fns = canvasFunctions([
     'getSystemMsgKind', 'getSystemMsgLabel', 'getSystemMsgSub', 'getSystemMsgCtaLabel', 'getSystemMsgCta',
-    'getSystemMsgCtas', 'getSystemMsgCtaAction', 'creditsOverrideFor', 'systemNoticeFor',
+    'getSystemMsgCtas', 'getSystemMsgCtaAction', 'canSwitchModelFor', 'creditsOverrideFor', 'systemNoticeFor',
   ], {
     t,
     unref: (v: any) => (v && typeof v === 'object' && 'value' in v ? v.value : v),
     talkList: { value: timeline },
     knownOperations: { value: over.operations || [] },
     stageHost: { capabilities: over.capabilities, ui: over.ui || {} },
+    isTimelineMutationBlocked: () => false,
     allowsStageAction,
     isTerminalActionAllowed,
     terminalUIActionFromAllowedActions,
@@ -95,7 +96,7 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
   })
 
   it('我們這邊出錯：說是我們的問題、道歉、沒扣點，按鍵照伺服器給的', () => {
-    const notice = resolver([user('u1'), failed({ failureCause: 'internal_error' })])(1)
+    const notice = resolver([user('u1'), failed({ failureCause: 'internal_error', settled: true, chargeCredits: 0 })])(1)
     expect(notice?.label).toBe(t('systemMsg.ourError'))
     expect(notice?.sub).toBe(t('systemMsg.ourErrorSub'))
     expect(notice?.actions.map((a: any) => a.action)).toEqual(['retry', 'switch_model'])
@@ -103,7 +104,7 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
 
   it('點數不足：點數的卡，沒有按了會落空的鍵', () => {
     const notice = resolver([user('u1'), failed({ finishReason: 'insufficient_credits', failureCause: 'insufficient_credits', operationState: 'failed_terminal', allowedActions: [] })])(1)
-    expect(notice).toEqual({ kind: 'quota', label: t('chat.point_no_tips'), sub: t('chat.manageCredits'), actions: [] })
+    expect(notice).toEqual({ kind: 'quota', label: t('chat.point_no_tips'), sub: t('chat.creditsNotEnoughSub'), actions: [] })
   })
 
   it('點數不足、宿主給了說法與去處（綺夢社：今日任務、儲值）：照宿主的字畫，帶上連結', () => {

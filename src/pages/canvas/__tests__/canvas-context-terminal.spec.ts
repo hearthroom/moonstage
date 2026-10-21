@@ -62,7 +62,7 @@ describe('context usage on the newly completed reply', () => {
     const status = { ...terminal, nonStreaming: true, state: 'failed_retryable', version: 3,
       finishReason: 'content_filter', failureCause: 'content_filter', outputDisposition: 'none' }
     app.handle(status)
-    expect(app.bindings.uni.showToast).toHaveBeenCalledWith({ title: 'systemMsg.filtered', icon: 'none' })
+    expect(app.bindings.uni.showToast).toHaveBeenCalledWith({ title: 'systemMsg.filterUnknown', icon: 'error' })
     app.handle(status)
     expect(app.bindings.uni.showToast).toHaveBeenCalledOnce()
   })

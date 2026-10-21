@@ -35,7 +35,7 @@ describe('desktop chat.vue · content_filter_input drives the filtered card with
 
   it('getSystemMsgLabel reuses the existing systemMsg.filtered headline (no invented copy)', () => {
     const chat = readChat()
-    const fn = sliceBetween(chat, 'function getSystemMsgLabel(finishReason)', 'function getSystemMsgSub(finishReason)')
+    const fn = sliceBetween(chat, 'function getSystemMsgLabel(finishReason)', 'function getSystemMsgSub(')
     const line = fn.split('\n').find((l) => l.includes("'content_filter_input':"))
     expect(line).toBeTruthy()
     expect(line).toContain("t('systemMsg.filtered')")
@@ -43,7 +43,7 @@ describe('desktop chat.vue · content_filter_input drives the filtered card with
 
   it('getSystemMsgSub uses the dedicated actionable copy key (error.contentFilter), distinct from the generic filteredSub', () => {
     const chat = readChat()
-    const fn = sliceBetween(chat, 'function getSystemMsgSub(finishReason)', 'function getSystemMsgCta(finishReason, item, index)')
+    const fn = sliceBetween(chat, 'function getSystemMsgSub(', 'function getSystemMsgCta(finishReason, item, index)')
     const line = fn.split('\n').find((l) => l.includes("'content_filter_input':"))
     expect(line).toBeTruthy()
     expect(line).toContain("t('error.contentFilter')")

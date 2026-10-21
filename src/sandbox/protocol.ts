@@ -222,6 +222,7 @@ export interface ChromeState {
     contextRing?: { percent: number; level: string; label: string } | null
     /** 數字的意思（canvas-composer.vue 的 scoreHint） */
     scoreHint?: string
+    balanceHint?: string
     /** 第一次出現膠囊時的說明；按「知道了」送 ui 'meter-hint-done' */
     meterHint?: { ring: string; score: string; ok: string } | null
     /** 目前模型的友善名（頂欄那個「模型名 · 線路名」）；空字串＝還不知道。殼不畫它，給 sdk.model.get() 用。 */
@@ -290,7 +291,7 @@ export type HostToShell =
   | { type: 'message.stream'; id: string; content: string; view?: MessageView }
   | { type: 'message.done'; id: string; content: string; serverId: string | null; view?: MessageView }
   | { type: 'message.remove'; id: string }
-  | { type: 'generation'; busy: boolean; phase?: GenerationPhase; outcome?: GenerationOutcome | null }
+  | { type: 'generation'; busy: boolean; sendBlocked?: boolean; phase?: GenerationPhase; outcome?: GenerationOutcome | null }
   | { type: 'input'; value: string }
   | { type: 'reply'; reqId: number; ok: boolean; value?: unknown; error?: SandboxError }
   | { type: 'theme'; theme: SandboxTheme; vars?: Record<string, string> }
