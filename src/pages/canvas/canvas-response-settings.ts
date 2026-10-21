@@ -44,7 +44,6 @@ const legacyStyles:readonly string[] = ['plain','dialogue','descriptive']
 // 搶話 2026-10-16 收成兩檔：舊存檔的「只補細節」當防搶話、「只代寫台詞」當允許搶話，跟伺服器同一張表。
 const legacyAgency: Readonly<Record<string,string>> = {assist:'protect', lines:'coauthor'}
 export interface ResponseSettings {
- streamingOnlyModels?: string[]
  conversationId: string
  scope: 'conversation'
  schemaVersion: 1
@@ -69,7 +68,6 @@ export function readResponseSettings(raw: unknown, conversationId: string): Resp
  if(!r || r.conversationId!==conversationId || r.scope!=='conversation' || r.schemaVersion!==1 || !Number.isSafeInteger(r.revision) || r.revision<0 || !r.overrides || !r.effective) throw new Error('Invalid settings response')
  checkResolved(r.effective)
  if(r.defaults!==undefined) checkResolved(r.defaults)
- if(r.streamingOnlyModels!==undefined && (!Array.isArray(r.streamingOnlyModels) || r.streamingOnlyModels.some(v=>typeof v!=='string'))) throw new Error('Invalid transport capabilities')
  if(legacyStyles.includes(r.overrides.style ?? '')) return readResponseSettings({...r,overrides:{...r.overrides,style:'default'}},conversationId)
  if(legacyAgency[r.overrides.agency ?? '']) return readResponseSettings({...r,overrides:{...r.overrides,agency:legacyAgency[r.overrides.agency!]}},conversationId)
  for(const [key,value] of Object.entries(r.overrides)) {

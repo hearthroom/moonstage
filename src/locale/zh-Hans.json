@@ -4157,7 +4157,6 @@
 	"canvas.assist.retry": "重试",
 	"responseSettings.streamingTitle": "流式输出",
 	"responseSettings.streamingOffHint": "关闭后整段生成完才显示，较长的回复要多等一会儿",
-	"responseSettings.streamingOnlyHint": "这条线路只支持流式输出",
 	"responseSettings.title": "回复偏好",
 	"responseSettings.scope": "只用于这个对话存档，下一次回复开始生效；同一张卡开新存档会沿用。",
 	"responseSettings.frameScope": "下面两项跟着这张卡：这张卡的每个对话存档都用。",

@@ -52,10 +52,10 @@
    <div class="card mode-box response-streaming">
     <div class="response-streaming-head">
      <div class="label" id="response-streaming-label">{{ t('responseSettings.streamingTitle') }}</div>
-     <MsSwitch data-lt="streaming-toggle" aria-labelledby="response-streaming-label" :aria-describedby="streamingOnly || !streaming ? 'response-streaming-hint' : undefined"
-      :checked="streamingOnly || streaming" :disabled="loading || saving || streamingOnly" @change="setStreaming" />
+     <MsSwitch data-lt="streaming-toggle" aria-labelledby="response-streaming-label" :aria-describedby="!streaming ? 'response-streaming-hint' : undefined"
+      :checked="streaming" :disabled="loading || saving" @change="setStreaming" />
     </div>
-    <div v-if="streamingOnly || !streaming" id="response-streaming-hint" class="mode-hint" data-hint="streaming">{{ t(streamingOnly ? 'responseSettings.streamingOnlyHint' : 'responseSettings.streamingOffHint') }}</div>
+    <div v-if="!streaming" id="response-streaming-hint" class="mode-hint" data-hint="streaming">{{ t('responseSettings.streamingOffHint') }}</div>
    </div>
 
    <div class="advanced-scope">
@@ -131,8 +131,6 @@ import MsSwitch from '../../../components/model-select/ms-switch.vue'
 import { lengthMode, lengthTargetLadder, lengthTargetOf, lengthZone, maxResponseNoteLength, readResponseSettings, responseAxes, responseBase, responseNoteKeys, responsePatch, type LengthZone, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
 const props=defineProps<{
  conversationId:string
- model?:string
- thinkingDepth?:string
  load:(id:string)=>Promise<unknown>
  save:(id:string,revision:number,patch:Record<string,string|null>)=>Promise<unknown>
  t:(key:string, values?:Record<string,unknown>)=>string
@@ -150,10 +148,8 @@ function answerDiscard(ok:boolean){discardAsked.value=false;const resolve=discar
 onBeforeUnmount(()=>{alive=false;answerDiscard(false)})
 // 玩家沒改的軸顯示的是 base：平台預設，卡片有作者預設時是作者的；「恢復預設」也回到這裡。
 const base=computed(()=>responseBase(saved.value))
-const streamingOnly=computed(()=>!!props.model && !!saved.value?.streamingOnlyModels?.includes(props.thinkingDepth ? `${props.model}@${props.thinkingDepth}` : props.model))
 const streaming=computed(()=>(draft.value.streaming ?? base.value.streaming ?? 'on')!=='off')
 function setStreaming(value:boolean){
- if(streamingOnly.value)return
  const picked=value?'on':'off'
  if(picked===(base.value.streaming ?? 'on')) delete draft.value.streaming
  else draft.value.streaming=picked
