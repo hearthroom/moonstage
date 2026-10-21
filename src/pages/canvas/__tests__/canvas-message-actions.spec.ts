@@ -209,7 +209,7 @@ describe('狀態列與確認框跟著卡片走', () => {
     expect(style).toContain('color: var(--lt-canvas-panel-fg')
     expect(style).not.toContain('var(--lt-canvas-block-bg')
     expect(style).not.toContain('!important')
-    expect(src).toContain(':where(.sys-msg-card[data-lt-tone="light"])')
+    expect(src).toContain(':where(.sys-msg-card[data-lt-tone="light"], .sys-link[data-lt-tone="light"])')
   })
 
   it('這一頁沒有任何 uni.showModal：二次確認一律走畫布自己的確認框', () => {
