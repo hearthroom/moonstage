@@ -10,13 +10,6 @@
    <div class="header-box"><div class="page-title">{{ t('responseSettings.title') }}</div></div>
   </div>
   <div class="mode-hint response-scope">{{ t('responseSettings.scope') }}</div>
-  <!-- 有沒存的修改時關掉：問一次，問在面板裡。面板開著時在瀏覽器 top layer，系統對話框
-       （uni.showModal）z-index 再大也畫在它底下，玩家看不到也按不到，只能按儲存才脫身。 -->
-  <div class="response-discard" role="alertdialog" :hidden="!discardAsked">
-   <span class="response-discard-text">{{ t('responseSettings.discard') }}</span>
-   <button type="button" class="response-discard-keep" data-action="keep-editing" @click="answerDiscard(false)">{{ t('responseSettings.keepEditing') }}</button>
-   <button type="button" class="response-discard-ok" data-action="discard" @click="answerDiscard(true)">{{ t('responseSettings.discardButton') }}</button>
-  </div>
   <p v-if="loading" class="mode-hint" role="status">{{ t('responseSettings.loading') }}</p>
   <div v-if="error" role="alert" class="role-setting-error response-error">
    <span>{{ t(`responseSettings.${error}`) }}</span>
@@ -105,8 +98,8 @@
     </div>
     <div class="card textarea-wrapper advanced-body" :hidden="!jailbreakOpen">
      <div class="advanced-desc">{{ t('chat.jailbreakTips') }}</div>
-     <textarea v-model="frameDraft.jailbreak" class="textarea-dark response-jailbreak-input" rows="4" :aria-label="t('chat.jailbreak')"
-      :maxlength="frame.maxLength" :placeholder="frame.defaultJailbreak || t('chat.jailbreakTips')" />
+     <CanvasTextField :value="frameDraft.jailbreak" el-class="textarea-dark response-jailbreak-input" rows="4" :aria-label="t('chat.jailbreak')"
+      :maxlength="frame.maxLength" :placeholder="frame.defaultJailbreak || t('chat.jailbreakTips')" @input="frameDraft.jailbreak = $event" />
      <div class="advanced-actions">
       <!-- 清空＝回到預設，不是刪除資料。 -->
       <button type="button" class="advanced-reset" data-action="reset-jailbreak" :hidden="!frameDraft.jailbreak" @click="frameDraft.jailbreak = ''">{{ t('chat.jailbreakResetDefault') }}</button>
@@ -117,17 +110,30 @@
   </template>
 
   <div class="role-setting__actions">
-   <button type="button" class="icon-back" data-action="cancel" :disabled="saving" @click="$emit('close')">{{ t('main.cancel') }}</button>
+   <button type="button" class="icon-back" data-action="cancel" :disabled="saving" @click="cancel">{{ t('main.cancel') }}</button>
    <button v-if="saved || frame" type="button" class="complete-btn" data-action="save" :disabled="!canSave" @click="submit">
     {{ t(saving ? 'responseSettings.saving' : 'responseSettings.save') }}
    </button>
   </div>
+ <!-- 另一個 top-layer 彈層：不跟偏好內容一起捲動，也不會落在父彈層底下。 -->
+ <CanvasPopup class="response-discard" :open="discardAsked" :title="t('responseSettings.discard')" :close-label="t('responseSettings.keepEditing')"
+  :style="discardViewport" @close="answerDiscard(false)">
+  <div class="response-discard-body">
+   <p class="response-discard-text">{{ t('responseSettings.discard') }}</p>
+   <div class="response-discard-actions">
+    <button ref="keepEditing" type="button" class="response-discard-keep" data-action="keep-editing" @click="answerDiscard(false)">{{ t('responseSettings.keepEditing') }}</button>
+    <button ref="discardButton" type="button" class="response-discard-ok" data-action="discard" @click="answerDiscard(true)"><span>{{ t('responseSettings.discardButton') }}</span></button>
+   </div>
+  </div>
+ </CanvasPopup>
  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import MsSwitch from '../../../components/model-select/ms-switch.vue'
+import CanvasPopup from './canvas-popup.vue'
+import { CanvasTextField } from './canvas-field'
 import { lengthMode, lengthTargetLadder, lengthTargetOf, lengthZone, maxResponseNoteLength, readResponseSettings, responseAxes, responseBase, responseNoteKeys, responsePatch, type LengthZone, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
 const props=defineProps<{
  conversationId:string
@@ -143,9 +149,46 @@ const emit=defineEmits<{ (e: 'close'): void }>()
 const saved=ref<ResponseSettings|null>(null),draft=ref<ResponseDraft>({}),loading=ref(false),saving=ref(false),error=ref('')
 let alive=true
 const discardAsked=ref(false)
+const keepEditing=ref<HTMLButtonElement|null>(null),discardButton=ref<HTMLButtonElement|null>(null)
+const discardViewport=ref<Record<string,string>>({})
 let discardAnswer:((ok:boolean)=>void)|null=null
-function askDiscard(){discardAnswer?.(false);discardAsked.value=true;return new Promise<boolean>(resolve=>{discardAnswer=resolve})}
-function answerDiscard(ok:boolean){discardAsked.value=false;const resolve=discardAnswer;discardAnswer=null;resolve?.(ok)}
+let discardPending:Promise<boolean>|null=null
+let previousFocus:HTMLElement|null=null
+function syncDiscardViewport(){
+ const viewport=window.visualViewport
+ discardViewport.value=viewport?{inset:'auto',top:`${viewport.offsetTop}px`,left:`${viewport.offsetLeft}px`,width:`${viewport.width}px`,height:`${viewport.height}px`}:{}
+}
+function discardKeydown(event:KeyboardEvent){
+ if(!discardAsked.value)return
+ if(event.key==='Escape' || event.key==='Esc'){event.preventDefault();event.stopImmediatePropagation();answerDiscard(false)}
+ else if(event.key==='Tab'){
+  event.preventDefault();event.stopImmediatePropagation()
+  const next=document.activeElement===keepEditing.value?discardButton.value:keepEditing.value
+  next?.focus()
+ }
+}
+function askDiscard(){
+ if(discardPending)return discardPending
+ previousFocus=document.activeElement as HTMLElement|null
+ previousFocus?.blur()
+ syncDiscardViewport()
+ window.visualViewport?.addEventListener('resize',syncDiscardViewport)
+ window.visualViewport?.addEventListener('scroll',syncDiscardViewport)
+ document.addEventListener('keydown',discardKeydown,true)
+ discardPending=new Promise<boolean>(resolve=>{discardAnswer=resolve})
+ discardAsked.value=true
+ nextTick(()=>{if(discardAsked.value)keepEditing.value?.focus()})
+ return discardPending
+}
+function answerDiscard(ok:boolean){
+ discardAsked.value=false
+ window.visualViewport?.removeEventListener('resize',syncDiscardViewport)
+ window.visualViewport?.removeEventListener('scroll',syncDiscardViewport)
+ document.removeEventListener('keydown',discardKeydown,true)
+ const resolve=discardAnswer;discardAnswer=null;discardPending=null;resolve?.(ok)
+ if(!ok && alive && previousFocus?.isConnected)previousFocus.focus({preventScroll:true})
+ previousFocus=null
+}
 onBeforeUnmount(()=>{alive=false;answerDiscard(false)})
 // 玩家沒改的軸顯示的是 base：平台預設，卡片有作者預設時是作者的；「恢復預設」也回到這裡。
 const base=computed(()=>responseBase(saved.value))
@@ -160,7 +203,8 @@ const frameDraft=reactive({sandboxLevel:props.frame?.sandboxLevel || '',jailbrea
 // 上一次存進去（或讀回來）的值：存好之後不必等頁面把新值傳回來，才不會把剛存的當成沒存。
 const frameSaved=reactive({...frameDraft})
 // 卡的設定可能在面板打開後才讀回來：讀回自己寫過的破限詞時把進階打開，玩家看得到它在生效。
-watch(()=>[props.frame?.sandboxLevel,props.frame?.jailbreak],()=>{frameDraft.sandboxLevel=props.frame?.sandboxLevel || '';frameDraft.jailbreak=props.frame?.jailbreak || '';Object.assign(frameSaved,frameDraft);if(frameDraft.jailbreak)jailbreakOpen.value=true})
+// 儲存期間父層會先發布候選值、失敗再還原；兩者都不是新的已儲存資料，不能蓋掉草稿。
+watch(()=>[props.frame?.sandboxLevel,props.frame?.jailbreak],()=>{if(saving.value)return;frameDraft.sandboxLevel=props.frame?.sandboxLevel || '';frameDraft.jailbreak=props.frame?.jailbreak || '';Object.assign(frameSaved,frameDraft);if(frameDraft.jailbreak)jailbreakOpen.value=true})
 // 沒設過就標在「標準」上：破甲永遠有一個正在生效的值，不標出來玩家會以為它沒開。
 const frameLevel=computed(()=>frameDraft.sandboxLevel || 'standard')
 const frameHint=computed(()=>props.frame?.options.find(o=>o.value===frameLevel.value)?.hint || props.t('chat.sandboxLevelDesc'))
@@ -210,7 +254,16 @@ function choose(axis:ResponseAxis,value:string){
 function resetAll(){draft.value={}}
 const responseDirty=computed(()=>!!saved.value && dirty.value)
 const canSave=computed(()=>!saving.value && !loading.value && (frameDirty.value || responseDirty.value) && !(responseDirty.value && (invalid.value || error.value==='conflict')))
-async function mayClose(){return !saving.value && (!(responseDirty.value || frameDirty.value) || await askDiscard())}
+async function mayClose(){
+ if(discardAsked.value){answerDiscard(false);return false}
+ return !saving.value && (!(responseDirty.value || frameDirty.value) || await askDiscard())
+}
+function cancel(){
+ if(saving.value)return
+ draft.value={...saved.value?.overrides}
+ Object.assign(frameDraft,frameSaved)
+ emit('close')
+}
 async function reload(){
  if(loading.value || saving.value || (responseDirty.value && !await askDiscard()))return
  loading.value=true;error.value=''
@@ -243,6 +296,14 @@ defineExpose({mayClose})
 
 <style scoped>
 @layer lt-base {
+ .response-discard :deep(.u-popup__content){width:min(440px,calc(100vw - 32px))}
+ .response-discard :deep(.u-popup__content__close){display:none}
+ .response-discard-body{display:flex;flex-direction:column;gap:16px}
+ .response-discard-text{margin:0;font-size:14px;line-height:1.5;text-align:center}
+ .response-discard-actions{display:flex;gap:8px}
+ .response-discard-keep,.response-discard-ok{flex:1;min-height:44px;padding:8px 12px;border:1px solid var(--lt-canvas-sheet-line);border-radius:var(--lt-canvas-radius);background:var(--lt-canvas-sheet-item-bg);color:var(--lt-canvas-sheet-fg);font:inherit;cursor:pointer}
+ .response-discard-ok span{color:var(--lt-canvas-danger);font-weight:600}
+ .response-discard-keep:focus-visible,.response-discard-ok:focus-visible{outline:2px solid var(--lt-canvas-accent);outline-offset:2px}
  .response-streaming-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
  .response-streaming-head .label{margin:0}
  /* Preserve the existing track while giving touch/keyboard users a 44px target. */

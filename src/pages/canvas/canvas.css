@@ -382,32 +382,6 @@
     justify-content: space-between;
     gap: 8px;
   }
-  .role-setting.response-settings .response-discard[hidden] {
-    display: none;
-  }
-  .role-setting.response-settings .response-discard {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: var(--lt-canvas-radius);
-    background: var(--lt-canvas-sheet-item-bg);
-  }
-  .role-setting.response-settings .response-discard-text {
-    flex: 1 1 12em;
-    min-width: 0;
-    font-size: 13px;
-  }
-  .role-setting.response-settings .response-discard-keep,
-  .role-setting.response-settings .response-discard-ok {
-    min-height: 44px;
-    padding: 0 8px;
-  }
-  .role-setting.response-settings .response-discard-ok {
-    color: var(--lt-canvas-danger);
-    font-weight: 600;
-  }
   /* ── 頁面骨架 ────────────────────────────────────────────────── */
 
   .canvas-root {

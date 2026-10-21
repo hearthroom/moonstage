@@ -24,6 +24,8 @@ describe('operation failure copy says whose problem it was', () => {
   })
 
   it('points the player at what they can fix', () => {
+    expect(operationFailureTitle('content_filter', key)).toBe('systemMsg.filtered')
+    expect(operationFailureSub('content_filter', key, { agent: true })).toBe('error.contentFilter')
     expect(operationFailureSub('insufficient_credits', key, { agent: true })).toBe('chat.manageCredits')
     expect(operationFailureSub('context_capacity_exceeded', key, { agent: true })).toBe('error.contextCapacityExceeded')
   })
