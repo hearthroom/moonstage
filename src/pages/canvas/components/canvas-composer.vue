@@ -1,5 +1,5 @@
 <template>
-  <div class="composer-scope">
+  <div ref="composerEl" class="composer-scope">
     <!--
       停止鍵刻意放在 .chat-bottom 外面。
       作者的卡片會寫 `.kg .chat-bottom{…}`，也有卡片整塊藏掉底部自己畫一套；
@@ -365,6 +365,7 @@
 <script setup lang="ts">
 import { panelIconMarkup } from '../canvas-panel-icons'
 import { attachDragScroll } from '../canvas-drag-scroll'
+import { syncChromeTone } from '../canvas-chrome-tone'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CanvasTextarea from './canvas-textarea'
 import CanvasSendIcon from './canvas-send-icon.vue'
@@ -447,6 +448,10 @@ const emit = defineEmits<{
 }>()
 
 const stopEl = ref<HTMLElement | null>(null)
+const composerEl = ref<HTMLElement | null>(null)
+watch(() => props.balanceHint, () => {
+  nextTick(() => syncChromeTone(composerEl.value))
+}, { immediate: true })
 watch(() => props.generating, (on) => {
   nextTick(() => { if (on) raiseToTopLayer(stopEl.value); else leaveTopLayer(stopEl.value) })
 }, { immediate: true })
@@ -632,4 +637,10 @@ defineExpose({ textareaEl, expand })
 @layer lt-base {
 .chat-balance-hint { padding: 4px 12px; font-size: 12px; line-height: 1.5; color: var(--lt-canvas-panel-fg); background-color: #0f1217; background-image: linear-gradient(var(--lt-canvas-panel-bg), var(--lt-canvas-panel-bg)); border-left: 3px solid #b58b24; border-radius: var(--lt-canvas-block-radius, 14px); overflow-wrap: anywhere; }
 }
+</style>
+<style>
+:where(.chat-balance-hint[data-lt-tone="light"]) { color: #17171c; }
+:where(.chat-balance-hint[data-lt-tone="dark"]) { color: #e8eaed; }
+:where(.chat-balance-hint[data-lt-contrast="high"][data-lt-tone="light"]) { color: #000; }
+:where(.chat-balance-hint[data-lt-contrast="high"][data-lt-tone="dark"]) { color: #fff; }
 </style>
