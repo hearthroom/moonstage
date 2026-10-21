@@ -3,10 +3,12 @@ import { resolve } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick, ref, unref } from 'vue'
+import { operationFailureTitle } from '@/utils/operation-failure-copy'
 import { findOperationCandidate } from '../chat-operation-ui-state'
 import {
   normalizeChatOperationStatus, shouldApplyOperationStatus,
   mergeOperationStatusIntoStreamEntry, isChatOperationTerminal, projectionFinishReason,
+  notifyBufferedTerminal, isBufferedTerminalFailure,
 } from '../chat-transport-ownership'
 
 // Execute the actual canvas completion handlers, not a reimplementation of their
@@ -26,6 +28,10 @@ function harness() {
     conversationId: ref('conv-1'), talkList: ref([row.value]), unref,
     normalizeChatOperationStatus, shouldApplyOperationStatus,
     mergeOperationStatusIntoStreamEntry, isChatOperationTerminal, projectionFinishReason,
+    notifyBufferedTerminal, isBufferedTerminalFailure,
+    uni: { showToast: vi.fn() }, t: (key: string) => key,
+    operationFailureTitle,
+    getSystemMsgLabel: new Function('t', canvas.slice(canvas.indexOf('function getSystemMsgLabel('), canvas.indexOf('function getSystemMsgSub(')) + '\nreturn getSystemMsgLabel;')((key: string) => key),
     findOperationCandidate, readLsEntry: () => null, writeLsEntry: vi.fn(),
     chatTransport: { noteServerStreamProgress: vi.fn() }, STREAM_ENTRY_VERSION: 1,
     hasRenderableAssistantOutput: (body: string) => !!body,
@@ -50,6 +56,16 @@ const terminal = { operationId: 'op-1', conversationId: 'conv-1', kind: 'send',
   contextUsage: { inputTokens: 200, outputTokens: 30, cachedTokens: 20, cacheWriteTokens: 0 } }
 
 describe('context usage on the newly completed reply', () => {
+  it('executes the buffered empty-reply toast through the actual authoritative terminal handler', () => {
+    const app = harness()
+    app.row.value.content = ''
+    const status = { ...terminal, nonStreaming: true, state: 'failed_retryable', version: 3,
+      finishReason: 'content_filter', failureCause: 'content_filter', outputDisposition: 'none' }
+    app.handle(status)
+    expect(app.bindings.uni.showToast).toHaveBeenCalledWith({ title: 'systemMsg.filtered', icon: 'none' })
+    app.handle(status)
+    expect(app.bindings.uni.showToast).toHaveBeenCalledOnce()
+  })
   // 選單裡「這一輪的用量」看的是列上的 hasContextUsage 與 chatId：剛收尾的那則不必重新整理就要有。
   it.each(['stream', 'polled', 'wrapped'] as const)('%s completion marks the reply as measured without history or page reload', async (path) => {
     const app = harness()

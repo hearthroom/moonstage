@@ -601,6 +601,8 @@ import {
   normalizeChatOperationStatus,
   prepareChatPayload,
   projectionFinishReason,
+  isBufferedTerminalFailure,
+  notifyBufferedTerminal,
   recordExactOperationProbeMiss,
   selectPendingOperationFromList,
   shouldApplyOperationStatus,
@@ -7327,11 +7329,17 @@ function recordAuthoritativeOperationStatus(input: any) {
   return status;
 }
 
+const bufferedTerminalNotices = new Set<string>();
 function refreshHistoryAfterAuthoritativeOperation(status: any) {
   const pending = pendingChatTurn;
   const operationBubble = pending?.aiBubbleId == null
     ? null
     : findOperationCandidate(talkList.value, pending.aiBubbleId);
+
+  notifyBufferedTerminal(status, operationBubble?.content || replyContent.value, bufferedTerminalNotices, () => {
+    const reason = projectionFinishReason(status);
+    uni.showToast({ title: operationFailureTitle(status.failureCause, t) || getSystemMsgLabel(reason), icon: 'none' });
+  });
 
   if (operationBubble) {
     operationBubble.operationProjectionCapable = true;
@@ -7366,7 +7374,7 @@ function refreshHistoryAfterAuthoritativeOperation(status: any) {
   if (
     pending
     && !status.assistantChatId
-    && (status.state === 'failed_retryable' || status.state === 'failed_terminal')
+    && (status.state === 'failed_retryable' || status.state === 'failed_terminal' || isBufferedTerminalFailure(status))
   ) {
     talkList.value = settleZeroOutputTerminalFailure(talkList.value, pending);
     talkList.value = mergeChatHistoryOperationProjections(

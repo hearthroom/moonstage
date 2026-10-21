@@ -705,11 +705,32 @@ function historyProjectionTargetChatId(status: ChatOperationStatus): string {
   return ''
 }
 
+export function isBufferedTerminalFailure(status: ChatOperationStatus): boolean {
+  return status.nonStreaming === true && status.agentTurn !== true
+    && ['interrupted', 'stopped', 'failed_retryable', 'failed_terminal'].includes(status.state)
+}
+
+export function notifyBufferedTerminal(
+  status: ChatOperationStatus,
+  body: unknown,
+  shown: Set<string>,
+  notify: () => void,
+): void {
+  if (!isBufferedTerminalFailure(status) || String(body ?? '').trim() || !status.operationId || shown.has(status.operationId)) return
+  shown.add(status.operationId)
+  if (shown.size > 128) shown.delete(shown.values().next().value!)
+  notify()
+}
+
 export function projectionFinishReason(
   status: ChatOperationStatus,
   current = '',
   thinkingContent = '',
 ): string {
+  if (isBufferedTerminalFailure(status)) {
+    if (status.state === 'stopped') return 'user_stop'
+    if (['content_filter', 'refusal', 'length', 'interrupted'].includes(String(status.finishReason))) return String(status.finishReason)
+  }
   // 逾時說明義務：這則 reasoning_only 是不是我方 idle watchdog 造成的，必須先
   // 判，因為下面的 outputDisposition === 'reasoning_only' 對逾時與非逾時的
   // reasoning_only 都成立——排在後面會讓這個分支變成永遠打不到的死碼。
@@ -969,6 +990,7 @@ export function mergeChatHistoryOperationProjections(
     if (
       status.state !== 'failed_retryable'
       && status.state !== 'failed_terminal'
+      && !isBufferedTerminalFailure(status)
     ) {
       continue
     }
