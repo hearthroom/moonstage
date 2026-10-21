@@ -49,7 +49,7 @@
     </div>
    </div>
 
-   <div class="card mode-box response-streaming">
+   <div v-if="!worldMode" class="card mode-box response-streaming">
     <div class="response-streaming-head">
      <div class="label" id="response-streaming-label">{{ t('responseSettings.streamingTitle') }}</div>
      <MsSwitch data-lt="streaming-toggle" aria-labelledby="response-streaming-label" :aria-describedby="!streaming ? 'response-streaming-hint' : undefined"
@@ -131,6 +131,7 @@ import MsSwitch from '../../../components/model-select/ms-switch.vue'
 import { lengthMode, lengthTargetLadder, lengthTargetOf, lengthZone, maxResponseNoteLength, readResponseSettings, responseAxes, responseBase, responseNoteKeys, responsePatch, type LengthZone, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
 const props=defineProps<{
  conversationId:string
+ worldMode?:boolean
  load:(id:string)=>Promise<unknown>
  save:(id:string,revision:number,patch:Record<string,string|null>)=>Promise<unknown>
  t:(key:string, values?:Record<string,unknown>)=>string
