@@ -208,9 +208,7 @@ export default {
   border-radius: var(--lt-canvas-block-radius, 14px);
   border: 1px solid color-mix(in srgb, var(--sys-tone) 40%, transparent);
   /* The opaque base also backs translucent author panel tokens. */
-  background: linear-gradient(color-mix(in srgb, var(--sys-tone) 8%, transparent), color-mix(in srgb, var(--sys-tone) 8%, transparent)),
-    linear-gradient(var(--lt-canvas-panel-bg, rgba(24,27,33,.98)), var(--lt-canvas-panel-bg, rgba(24,27,33,.98)))
-    var(--lt-canvas-bg, #0f1217);
+  background: linear-gradient(var(--lt-canvas-panel-bg, rgba(24,27,33,.98)), var(--lt-canvas-panel-bg, rgba(24,27,33,.98))) var(--lt-canvas-bg, #0f1217);
   color: var(--lt-canvas-panel-fg, #e8eaed);
   box-shadow: 0 1px 3px rgba(0,0,0,.22);
 }
@@ -236,7 +234,7 @@ export default {
   overflow-wrap: anywhere;
 }
 .sys-label { color: inherit; font-size: 14px; font-weight: 600; line-height: 1.4; }
-.sys-sub { white-space: pre-line; color: inherit; opacity: .78; font-size: 12px; line-height: 1.5; }
+.sys-sub { white-space: pre-line; color: inherit; opacity: var(--sys-sub-opacity, .78); font-size: 12px; line-height: 1.5; }
 .sys-sub-text { color: inherit; font-size: inherit; }
 .sys-ctas {
   display: flex;
@@ -293,10 +291,13 @@ export default {
 <style>
 /* Zero specificity outside the layer matches the stage chrome's existing author override contract.
    Kept with the shared component so sandbox documents receive the same measured pairing. */
-:where(.sys-msg-card[data-lt-tone="light"]) { color: #17171c; --sys-tone: #4b4b50; }
-:where(.sys-msg-card[data-lt-tone="dark"]) { color: #e8eaed; --sys-tone: #a3a3ad; }
+:where(.sys-msg-card[data-lt-tone="light"], .sys-link[data-lt-tone="light"]) { color: #17171c; --sys-tone: #4b4b50; }
+:where(.sys-msg-card[data-lt-tone="dark"], .sys-link[data-lt-tone="dark"]) { color: #e8eaed; --sys-tone: #a3a3ad; }
 :where(.sys-msg-card[data-lt-tone="light"].sys-kind-model-error, .sys-msg-card[data-lt-tone="light"].sys-kind-network-error, .sys-msg-card[data-lt-tone="light"].sys-kind-server-error, .sys-msg-card[data-lt-tone="light"].sys-kind-compact-retryable) { --sys-tone: #b91c1c; }
 :where(.sys-msg-card[data-lt-tone="dark"].sys-kind-model-error, .sys-msg-card[data-lt-tone="dark"].sys-kind-network-error, .sys-msg-card[data-lt-tone="dark"].sys-kind-server-error, .sys-msg-card[data-lt-tone="dark"].sys-kind-compact-retryable) { --sys-tone: #f87171; }
 :where(.sys-msg-card[data-lt-tone="light"].sys-kind-rate-limit, .sys-msg-card[data-lt-tone="light"].sys-kind-filtered, .sys-msg-card[data-lt-tone="light"].sys-kind-quota, .sys-msg-card[data-lt-tone="light"].sys-kind-length-cap) { --sys-tone: #8a5a00; }
 :where(.sys-msg-card[data-lt-tone="dark"].sys-kind-rate-limit, .sys-msg-card[data-lt-tone="dark"].sys-kind-filtered, .sys-msg-card[data-lt-tone="dark"].sys-kind-quota, .sys-msg-card[data-lt-tone="dark"].sys-kind-length-cap) { --sys-tone: #fbbf24; }
+:where(.sys-msg-card[data-lt-contrast="high"], .sys-link[data-lt-contrast="high"]) { --sys-sub-opacity: 1; }
+:where(.sys-msg-card[data-lt-contrast="high"][data-lt-tone="light"], .sys-link[data-lt-contrast="high"][data-lt-tone="light"]) { color: #000; }
+:where(.sys-msg-card[data-lt-contrast="high"][data-lt-tone="dark"], .sys-link[data-lt-contrast="high"][data-lt-tone="dark"]) { color: #fff; }
 </style>

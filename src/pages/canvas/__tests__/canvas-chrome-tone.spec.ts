@@ -106,3 +106,11 @@ it('measures an opaque second gradient behind a translucent tone tint', () => {
   syncChromeTone(document)
   expect(panel.getAttribute('data-lt-tone')).toBe('light')
 })
+
+it('uses a readable foreground for mid-tone author panels as well as white panels', () => {
+  document.body.innerHTML = '<div class="sys-msg-card" style="background:rgb(128,128,128)"></div>'
+  syncChromeTone(document)
+  const panel = document.querySelector('.sys-msg-card')!
+  expect(panel.getAttribute('data-lt-tone')).toBe('light')
+  expect(panel.getAttribute('data-lt-contrast')).toBe('high')
+})
