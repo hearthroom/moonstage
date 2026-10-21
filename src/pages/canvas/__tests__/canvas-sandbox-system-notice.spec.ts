@@ -91,6 +91,13 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
       }
     }
   })
+  it('omits R06 when host capabilities hide the otherwise allowed retry', () => {
+    const row = failed({finishReason:'error',failureCause:'no_final_answer',allowedActions:['retry']})
+    expect(resolver([user('u1'),row])(1).sub).toBe(t('chat.turnRetryable'))
+    const hidden = resolver([user('u1'),row],{capabilities:{actions:[]}})(1)
+    expect(hidden.actions).toEqual([])
+    expect(hidden.sub).toBe('')
+  })
   it('內部錯誤（最新一列）：伺服器不穩定的字，重試與切換模型兩顆鍵', () => {
     const notice = resolver([user('u1'), failed()])(1)
     expect(notice).toEqual({
