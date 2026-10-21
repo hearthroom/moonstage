@@ -16,6 +16,7 @@ const CHAT_ERROR_I18N_KEYS = Object.freeze({
   compact_retryable: 'error.compactRetryable',
   context_capacity_exceeded: 'error.contextCapacityExceeded',
   operation_in_progress: 'chat.operationPending',
+  chat_operation_conflict: 'chat.operationPending',
   mutation_in_progress: 'chat.rollbackInProgressNotice',
   conversation_history_mutation_pending: 'chat.rollbackInProgressNotice',
   rewrite_target_not_persisted: 'error.replyNotGenerated',
@@ -27,7 +28,7 @@ const CHAT_ERROR_I18N_KEYS = Object.freeze({
 })
 
 export function resolveChatErrorMessage(errorType, translate) {
-  return translate(CHAT_ERROR_I18N_KEYS[errorType] || CHAT_ERROR_I18N_KEYS.connection_error)
+  return translate(CHAT_ERROR_I18N_KEYS[errorType] || CHAT_ERROR_I18N_KEYS.server_error)
 }
 
 export function resolveChatErrorTypeFromFailure(failure) {
@@ -38,7 +39,8 @@ export function resolveChatErrorTypeFromFailure(failure) {
     : (typeof data?.code === 'string'
       ? data.code
       : (typeof failure?.errorCode === 'string' ? failure.errorCode : ''))
-  const normalizedCode = typedCode.trim()
+  const controlledError = typeof data.error === 'string' && Object.prototype.hasOwnProperty.call(CHAT_ERROR_I18N_KEYS, data.error) ? data.error : ''
+  const normalizedCode = (typedCode || controlledError).trim()
   if (normalizedCode) return normalizedCode
 
   const statusCode = Number(
@@ -82,6 +84,7 @@ const CHAT_ERROR_FINISH_REASONS = Object.freeze({
   compact_retryable: 'compact_retryable',
   context_capacity_exceeded: 'context_capacity_exceeded',
   operation_in_progress: 'operation_in_progress',
+  chat_operation_conflict: 'operation_in_progress',
   mutation_in_progress: 'mutation_in_progress',
   conversation_history_mutation_pending: 'mutation_in_progress',
   rewrite_target_not_persisted: 'conversation_stale',
@@ -119,5 +122,7 @@ export function resolveCreditsShortfall(source) {
   const needed = Number(data.credits_needed)
   const available = Number(data.credits_available)
   if (!Number.isFinite(needed) || !Number.isFinite(available)) return null
-  return { needed, available }
+  const rawMinimum = data.credits_min ?? data.creditsMin;
+  const minimum = typeof rawMinimum === 'number' && Number.isFinite(rawMinimum) && rawMinimum >= 0 && rawMinimum <= needed ? rawMinimum : undefined;
+  return { needed, available, ...(minimum !== undefined ? {minimum} : {}) }
 }

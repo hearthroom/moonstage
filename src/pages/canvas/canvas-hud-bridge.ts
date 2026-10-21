@@ -69,6 +69,7 @@ export interface HudHostState {
   /** 沙箱殼用：開場選項（標題＋要畫的條目；玩家說過第一句之後是空的）。 */
   prologue?: { title: string; items: string[] }
   messages: HudHostMessage[]
+  sendBlocked?: boolean
   generation: 'idle' | 'starting' | 'streaming'
   /** 沙箱殼用：這一輪在等什麼（見 sandbox/protocol GenerationPhase）。 */
   generationPhase?: 'idle' | 'preparing' | 'summarizing' | 'thinking' | 'writing'

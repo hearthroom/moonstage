@@ -31,6 +31,7 @@ function harness(responses: any[], pending = true) {
   })
   const clear = vi.fn((options: any = {}) => { ctx.isStreamActive.value = false; if (!options.preservePersistedOperation) stored = null })
   const ctx: any = {
+    ownershipRevision: {value:0},
     ...ownership, ...ui, ...first, ...recovery, incompleteTerminalHistoryOperation,
     ajax: ref({ flag: true, page: 1, rows: 20 }), conversationGeneration: ref(1), conversationId: ref('conv'),
     historyRequestSequence: 0, activeHistoryRequestKey: '', historyRecoveryAttemptedKey: '', historyRecoveryKey: '',

@@ -12,8 +12,8 @@ const key = (k: string) => k
 describe('operation failure copy says whose problem it was', () => {
   it('names our own failure and apologises', () => {
     expect(operationFailureTitle('internal_error', key)).toBe('systemMsg.ourError')
-    expect(operationFailureSub('internal_error', key)).toBe('systemMsg.ourErrorSub')
-    expect(operationFailureSub('internal_error', key, { agent: true })).toBe('systemMsg.ourErrorSub')
+    expect(operationFailureSub('internal_error', key, {settled:true,chargeCredits:0})).toBe('systemMsg.ourErrorSub')
+    expect(operationFailureSub('internal_error', key, { agent: true,settled:true,chargeCredits:0 })).toBe('systemMsg.ourErrorSub')
   })
 
   it('puts a broken model connection on the model, not the player', () => {
@@ -24,9 +24,9 @@ describe('operation failure copy says whose problem it was', () => {
   })
 
   it('points the player at what they can fix', () => {
-    expect(operationFailureTitle('content_filter', key)).toBe('systemMsg.filtered')
-    expect(operationFailureSub('content_filter', key, { agent: true })).toBe('error.contentFilter')
-    expect(operationFailureSub('insufficient_credits', key, { agent: true })).toBe('chat.manageCredits')
+    expect(operationFailureTitle('content_filter', key)).toBe('systemMsg.filterUnknown')
+    expect(operationFailureSub('content_filter', key, { agent: true })).toBe('systemMsg.filterUnknownSub')
+    expect(operationFailureSub('insufficient_credits', key, { agent: true })).toBe('chat.creditsNotEnoughSub')
     expect(operationFailureSub('context_capacity_exceeded', key, { agent: true })).toBe('error.contextCapacityExceeded')
   })
 

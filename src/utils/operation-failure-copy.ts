@@ -1,5 +1,21 @@
+const FILTER_COPY: Record<string, string> = {
+ input_policy: 'InputPolicy', safety: 'Safety', prohibited: 'Safety', blocklist: 'Safety',
+ privacy: 'Privacy', recitation: 'Recitation', refusal: 'Refusal', unknown: 'Unknown',
+}
+export function normalizeFilterReason(reason: unknown): string {
+ if (!reason) return ''
+ return typeof reason === 'string' && Object.prototype.hasOwnProperty.call(FILTER_COPY, reason) ? reason : 'unknown'
+}
+function filterKey(cause: unknown, reason: unknown): string {
+ if (!['content_filter', 'content_filter_input', 'refusal'].includes(String(cause)) && !reason) return ''
+ const value = normalizeFilterReason(reason) || (cause === 'refusal' ? 'refusal' : 'unknown')
+ return 'systemMsg.filter' + FILTER_COPY[value]
+}
 /** Public causes only: never render raw provider errors or guess a network failure. */
-export function operationFailureTitle(cause: unknown, t: (key: string) => string): string {
+export function operationFailureTitle(cause: unknown, t: (key: string) => string, filterReason?: unknown, hasReasoning = false): string {
+  if (hasReasoning && ['no_final_answer', 'empty_response', 'no_answer'].includes(String(cause))) return t('chat.noFinalAnswer')
+  const restricted = filterKey(cause, filterReason)
+  if (restricted) return t(restricted)
   const keys: Record<string, string> = {
     stopped: 'systemMsg.stopped',
     tool_rejections: 'multiPass.failureTools',
@@ -21,26 +37,23 @@ export function operationFailureTitle(cause: unknown, t: (key: string) => string
   return key ? t(key) : ''
 }
 
-/**
- * 說明那一行要讓玩家看得出這次是誰的問題（owner 2026-10-05）：模型那邊連線出狀況
- * 就說不是他的訊息；我們這邊出錯就道歉，並說沒有扣點（伺服器只在這一輪實際沒扣時
- * 才給 internal_error）；他能處理的事就指路。要做什麼交給底下的按鍵，這一行不重複
- * 「重試或換模型」——標題和按鍵已經說了，窄螢幕上三遍同一件事會擠成一長條。
- * 空回覆、拒答這類講不準原因的，回空字串沿用原本那一句，不替模型找理由。
- */
-export function operationFailureSub(cause: unknown, t: (key: string) => string, opts: { agent?: boolean } = {}): string {
+/** Select copy from confirmed reasons, available actions and settlement evidence. */
+export function operationFailureSub(cause: unknown, t: (key: string) => string, opts: { agent?: boolean; filterReason?: unknown; canSwitch?: boolean; actions?: string[]; settled?: boolean; chargeCredits?: number; hasReasoning?: boolean } = {}): string {
+  if (opts.hasReasoning && ['no_final_answer', 'empty_response', 'no_answer'].includes(String(cause))) return t('chat.noFinalAnswerSub')
+  const restricted = filterKey(cause, opts.filterReason)
+  if (restricted) return t(restricted + (opts.canSwitch === false && ['systemMsg.filterInputPolicy','systemMsg.filterSafety','systemMsg.filterRefusal'].includes(restricted) ? 'SubNoSwitch' : 'Sub'))
   if (typeof cause !== 'string') return ''
   switch (cause) {
     case 'content_filter':
       return opts.agent ? t('error.contentFilter') : ''
     case 'internal_error':
-      return t('systemMsg.ourErrorSub')
+      return opts.settled === true && opts.chargeCredits === 0 ? t('systemMsg.ourErrorSub') : ''
     case 'service_unavailable':
     case 'upstream_timeout':
     case 'stream_incomplete':
-      return t(opts.agent ? 'multiPass.upstreamSub' : 'systemMsg.upstreamSub')
+      return opts.actions && !opts.actions.some(action => action.startsWith('retry')) ? '' : t(opts.agent ? 'multiPass.upstreamSub' : 'systemMsg.upstreamSub')
     case 'insufficient_credits':
-      return t('chat.manageCredits')
+      return t('chat.creditsNotEnoughSub')
     case 'context_capacity_exceeded':
       return t('error.contextCapacityExceeded')
     default:

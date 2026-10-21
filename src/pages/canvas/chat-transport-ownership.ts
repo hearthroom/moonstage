@@ -1,3 +1,5 @@
+import { resolveCreditsShortfall } from '../../utils/chat-error-message'
+import { normalizeFilterReason } from '../../utils/operation-failure-copy'
 import { prepTrailFromServerSteps } from '@/utils/prep-step-text'
 export interface PendingChatTurn {
   nonStreaming?: boolean
@@ -35,6 +37,10 @@ export interface PendingChatTurn {
   finishReason?: string
   allowedActions?: string[]
   reasonCode?: string
+  creditsShortfall?: {needed:number;available:number;minimum?:number}
+  settled?: boolean
+  chargeCredits?: number
+  filterReason?: string
   failureCause?: string
   messageKey?: string
   preAdmissionErrorType?: string
@@ -360,6 +366,10 @@ export interface ChatOperationStatus {
   outputDisposition?: string
   finishReason?: string
   reasonCode?: string
+  creditsShortfall?: {needed:number;available:number;minimum?:number}
+  settled?: boolean
+  chargeCredits?: number
+  filterReason?: string
   failureCause?: string
   messageKey?: string
   allowedActions?: string[]
@@ -415,6 +425,11 @@ export function normalizeChatOperationStatus(input: any): ChatOperationStatus | 
     kind: String(source.kind || '').trim(),
     state,
   }
+  const shortfall = resolveCreditsShortfall({error_type:'insufficient_credits',credits_needed:source.creditsNeeded,credits_available:source.creditsAvailable,credits_min:source.creditsMin})
+  if (shortfall && shortfall.needed > 0) normalized.creditsShortfall = shortfall
+  if (typeof source.settled === 'boolean') normalized.settled = source.settled
+  if (typeof source.chargeCredits === 'number' && Number.isSafeInteger(source.chargeCredits) && source.chargeCredits >= 0) normalized.chargeCredits = source.chargeCredits
+  if (source.filterReason) normalized.filterReason = normalizeFilterReason(source.filterReason)
   const version = nonNegativeIntegerOrUndefined(source.version)
   if (version !== undefined) normalized.version = version
   // 只認伺服器明確給的布林；沒帶就留 undefined（見 ChatOperationStatus.agentTurn）。
@@ -730,7 +745,8 @@ export function projectionFinishReason(
   // A rejected input produced no reply. Reuse the input-filter card's five-language
   // guidance; repeating the unchanged input is not a recovery action.
   if (['failed_retryable', 'failed_terminal', 'interrupted'].includes(status.state)
-    && status.failureCause === 'content_filter' && status.outputDisposition === 'none') {
+    && status.failureCause === 'content_filter' && status.outputDisposition === 'none'
+    && (!status.filterReason || status.filterReason === 'input_policy')) {
     return 'content_filter_input'
   }
   if (isBufferedTerminalFailure(status)) {
@@ -797,7 +813,7 @@ export function projectionFinishReason(
   return String(status.finishReason || current || 'stop').trim() || 'stop'
 }
 
-function operationProjectionMetadata(status: ChatOperationStatus) {
+export function operationProjectionMetadata(status: ChatOperationStatus) {
   return {
     operationProjectionCapable: true,
     operationId: status.operationId,
@@ -819,12 +835,16 @@ function operationProjectionMetadata(status: ChatOperationStatus) {
     allowedActions: status.allowedActions ? [...status.allowedActions] : [],
     reasonCode: status.reasonCode || '',
     failureCause: status.failureCause || '',
+    creditsShortfall: status.creditsShortfall,
+    settled: status.settled,
+    chargeCredits: status.chargeCredits,
+    filterReason: normalizeFilterReason(status.filterReason),
     messageKey: status.messageKey || '',
     retryable: status.retryable === true,
   }
 }
 
-function operationStatusFromProjectionRow(row: any): ChatOperationStatus | null {
+export function operationStatusFromProjectionRow(row: any): ChatOperationStatus | null {
   if (!row?.operationId || !row?.operationState) return null
   const operationKind = String(row.operationKind || '').trim().toLowerCase()
   const kind = String(row.serverOperationKind || '').trim() || (
@@ -856,6 +876,12 @@ function operationStatusFromProjectionRow(row: any): ChatOperationStatus | null 
     finishReason: row.finishReason,
     reasonCode: row.reasonCode,
     failureCause: row.failureCause,
+    creditsNeeded: row.creditsShortfall?.needed,
+    creditsAvailable: row.creditsShortfall?.available,
+    creditsMin: row.creditsShortfall?.minimum,
+    settled: row.settled,
+    chargeCredits: row.chargeCredits,
+    filterReason: normalizeFilterReason(row.filterReason),
     messageKey: row.messageKey,
     allowedActions: row.allowedActions,
     retryable: row.retryable,
@@ -1227,12 +1253,14 @@ export function mergeOperationStatusIntoStreamEntry(
       : (Array.isArray(current.allowedActions) ? [...current.allowedActions] : undefined),
     reasonCode: status.reasonCode || current.reasonCode || '',
     failureCause: status.failureCause || current.failureCause || '',
+    creditsShortfall: status.creditsShortfall || current.creditsShortfall,
+    filterReason: normalizeFilterReason(status.filterReason || current.filterReason),
     messageKey: status.messageKey || current.messageKey || '',
     updatedAt: now,
   }
 }
 
-function operationResumeIdentity(entry: any) {
+export function operationResumeIdentity(entry: any) {
   const operationId = String(entry?.operationId || '').trim()
   if (!operationId) return {}
   return {
@@ -1257,6 +1285,8 @@ function operationResumeIdentity(entry: any) {
       : undefined,
     reasonCode: String(entry?.reasonCode || '').trim(),
     failureCause: String(entry?.failureCause || '').trim(),
+    creditsShortfall: entry?.creditsShortfall,
+    filterReason: normalizeFilterReason(entry?.filterReason),
     messageKey: String(entry?.messageKey || '').trim(),
   }
 }

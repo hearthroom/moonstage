@@ -201,15 +201,15 @@ describe('「⋯」浮層的圖示槽', () => {
   完全沒吃到美化。狀態列寫死了深色疊層；確認框走的是 uni.showModal，卡片對它寫不了規則。
 */
 describe('狀態列與確認框跟著卡片走', () => {
-  it('狀態列的樣式全在 @layer lt-base、沒有寫死的深色疊層、中性語氣從 currentColor 調色', () => {
+  it('platform error panels own an opaque surface pair while author styles keep priority', () => {
     const src = readFileSync(resolve(__dirname, '../../../components/chat-system-message/chat-system-message.vue'), 'utf8')
     const style = src.slice(src.indexOf('<style'), src.indexOf('</style>'))
     expect(style).toMatch(/@layer lt-base \{/)
-    expect(style).not.toMatch(/rgba\(22, 27, 34/)
-    expect(style).not.toMatch(/box-shadow/)
-    expect(style).toMatch(/\.sys-tone-notice \.sys-msg-card \{[^}]*var\(--lt-canvas-block-bg, color-mix\(in srgb, currentColor/)
-    expect(style).toMatch(/\.sys-cta-neutral \{[^}]*color: var\(--lt-canvas-pill-fg, inherit\)/)
-    expect(src).toMatch(/'stopped':[^\n]*neutral: true/)
+    expect(style).toContain('var(--lt-canvas-panel-bg')
+    expect(style).toContain('color: var(--lt-canvas-panel-fg')
+    expect(style).not.toContain('var(--lt-canvas-block-bg')
+    expect(style).not.toContain('!important')
+    expect(src).toContain(':where(.sys-msg-card[data-lt-tone="light"])')
   })
 
   it('這一頁沒有任何 uni.showModal：二次確認一律走畫布自己的確認框', () => {
@@ -221,7 +221,7 @@ describe('狀態列與確認框跟著卡片走', () => {
 
   it('串流進行中，舊的最新一則不再是「可重新生成」', () => {
     const src = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
-    expect(src).toMatch(/latestAI: [^\n]*!isStreamActive\.value[^\n]*isLatestCanonicalAIIndex\(index\)/)
+    expect(src).toMatch(/latestAI: [^\n]*!isTimelineMutationBlocked\(\)[^\n]*isLatestCanonicalAIIndex\(index\)/)
   })
 })
 

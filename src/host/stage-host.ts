@@ -36,7 +36,9 @@ export interface StageHost {
      * 回 null 或不實作：卡片維持原樣、沒有任何連結（畫布本身不賣點數，不給按了會落空的鍵）。
      * href 要是絕對網址：沙箱卡的殼在別的網域，相對路徑會落在殼那邊。
      */
-    creditsActions?(shortfall: { needed: number; available: number } | null): {
+    /** Current spendable credits; null when the host has no verified balance. */
+    availableCredits?(): number | null
+    creditsActions?(shortfall: { needed: number; available: number; minimum?: number } | null): {
       title?: string
       body?: string
       links: Array<{ id: string; label: string; href: string }>

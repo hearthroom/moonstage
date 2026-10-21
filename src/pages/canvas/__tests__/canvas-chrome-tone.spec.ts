@@ -91,3 +91,10 @@ describe('漸層頂欄', () => {
     expect(toneForBackground(effectiveBackground(document.querySelector('.topTabbar')!))).toBe('dark')
   })
 })
+
+
+it('measures error panels in both the stage and sandbox document scopes', () => {
+  document.body.innerHTML = '<div class="sys-msg-card" style="background: rgb(255,255,255)"></div>'
+  syncChromeTone(document)
+  expect(document.querySelector('.sys-msg-card')!.getAttribute('data-lt-tone')).toBe('light')
+})

@@ -11,7 +11,7 @@ describe('unaccepted rejection feedback',()=>{
   const talkList={value:[{id:1},{id:2}]}
   const content={value:''}
   const bubbles=vi.fn((_type,_msg,metadata)=>talkList.value.push({id:3,...metadata}))
-  const scope:any={pendingChatTurn:pending,talkList,content,chatTransport:{shouldRecoverTransientTurn:()=>true},
+  const scope:any={ownershipRevision:{value:0},pendingChatTurn:pending,talkList,content,chatTransport:{shouldRecoverTransientTurn:()=>true},
    messageQueue:{value:[]},tempContent:{value:''},replyContent:{value:''},thinkingContent:{value:''},
    rewrite:{value:false},contine:{value:false},clearStreamState:vi.fn(),appendChatErrorBubble:bubbles,
    resolveChatErrorMessage:()=> 'Insufficient credits',t:(s:string)=>s,message:{warning:vi.fn()},
@@ -41,7 +41,7 @@ describe('unaccepted rejection feedback',()=>{
   const bubbles=vi.fn()
   const discard=vi.fn(()=>{talkList.value=[{id:1,content:'Original line'},{id:2,content:'Old reply'}];return true})
   const recover=vi.fn()
-  const scope:any={pendingChatTurn:pending,talkList,content,chatTransport:{shouldRecoverTransientTurn:()=>true},
+  const scope:any={ownershipRevision:{value:0},pendingChatTurn:pending,talkList,content,chatTransport:{shouldRecoverTransientTurn:()=>true},
    messageQueue:{value:[]},tempContent:{value:''},replyContent:{value:''},thinkingContent:{value:''},
    rewrite:{value:true},contine:{value:false},clearStreamState:vi.fn(),appendChatErrorBubble:bubbles,
    resolveChatErrorMessage:()=> 'Insufficient credits',t:(s:string)=>s,message:{warning:vi.fn()},
@@ -68,7 +68,7 @@ describe('unaccepted rejection feedback',()=>{
   const bubbles=vi.fn()
   const discard=vi.fn(()=>true)
   const recover=vi.fn(()=>true)
-  const scope:any={pendingChatTurn:pending,talkList,content,chatTransport:{shouldRecoverTransientTurn:()=>true},
+  const scope:any={ownershipRevision:{value:0},pendingChatTurn:pending,talkList,content,chatTransport:{shouldRecoverTransientTurn:()=>true},
    messageQueue:{value:[]},tempContent:{value:''},replyContent:{value:''},thinkingContent:{value:''},
    rewrite:{value:true},contine:{value:false},clearStreamState:vi.fn(),appendChatErrorBubble:bubbles,
    resolveChatErrorMessage:()=> 'Insufficient credits',t:(s:string)=>s,message:{warning:vi.fn()},

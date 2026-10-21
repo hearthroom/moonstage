@@ -1,3 +1,5 @@
+import { resolveChatErrorMessage, resolveChatErrorTypeFromFailure } from '../utils/chat-error-message'
+import messages from '../locale/index'
 import { instructionsToAPI, instructionsFromAPI } from './instruction-fields'
 
 /**
@@ -20,6 +22,10 @@ export function setupHttp(http, deps) {
 		redirectToLogin,
 	} = deps
 	http.create({ host, timeout })
+    const failureText = (response) => resolveChatErrorMessage(resolveChatErrorTypeFromFailure(response), (key) => {
+      const locale = String(getLocale() || 'en');
+      return (messages[locale] || messages.en || {})[key] || (messages.en || {})[key] || key;
+    })
 
 	// 不需要顯示 loading 的接口（輪詢、背景請求）
 	const silentApis = [
@@ -116,7 +122,7 @@ export function setupHttp(http, deps) {
 		// 服务器错误 5xx
 		if (statusCode >= 500) {
 			if (!shouldSilenceError) {
-				toast.serverError(response.data?.error || response.data?.message);
+				toast.serverError(failureText(response));
 			}
 			return Promise.reject(response);
 		}
@@ -143,7 +149,7 @@ export function setupHttp(http, deps) {
 		// 其他客户端错误 4xx (除了 400，因为可能是业务错误需要特殊处理)
 		if (statusCode >= 402 && statusCode < 500) {
 			if (!shouldSilenceError) {
-				toast.error(response.data?.error || response.data?.message);
+				toast.error(failureText(response));
 			}
 			return Promise.reject(response);
 		}

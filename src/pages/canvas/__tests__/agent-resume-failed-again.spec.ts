@@ -98,7 +98,7 @@ describe('canvas.vue 的接線', () => {
   }
 
   it('中斷那一列帶「又停在同一個原因」的判斷（看伺服器給的操作清單），卡片的字從語系來', () => {
-    expect(slice('function messageProps(')).toContain('agentFailedAgain: item.agentInterrupted === true && agentResumeFailedAgain(unref(knownOperations), item.operationId)')
+    expect(slice('function messageProps(')).toContain('agentFailedAgain: item.agentInterrupted === true && !item.filterReason && canSwitchModelFor(item, index) && agentResumeFailedAgain(unref(knownOperations), item.operationId)')
     const labels = CANVAS.slice(CANVAS.indexOf('const messageLabels = computed('), CANVAS.indexOf('}))', CANVAS.indexOf('const messageLabels = computed(')))
     expect(labels).toContain("failedAgainSub: t('multiPass.failedAgainSub')")
     expect(labels).toContain("switchModel: t('chat.switchModel')")

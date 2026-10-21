@@ -112,11 +112,13 @@
   指名 color 的規則（作者明說要什麼顏色就照他的）。
 */
 .topTabbar:where([data-lt-tone="light"]),
-.u-popup__content:where([data-lt-tone="light"]) {
+.u-popup__content:where([data-lt-tone="light"]),
+:where(.agent-resume-card[data-lt-tone="light"]) {
   color: #17171c;
 }
 .topTabbar:where([data-lt-tone="dark"]),
-.u-popup__content:where([data-lt-tone="dark"]) {
+.u-popup__content:where([data-lt-tone="dark"]),
+:where(.agent-resume-card[data-lt-tone="dark"]) {
   color: #f2f2f5;
 }
 
@@ -852,9 +854,13 @@
     padding: 10px 12px;
     border-radius: var(--lt-canvas-block-radius, var(--lt-canvas-radius));
     border: var(--lt-canvas-block-border, 1px solid color-mix(in srgb, currentColor 22%, transparent));
-    background: var(--lt-canvas-block-bg, color-mix(in srgb, currentColor 7%, transparent));
-    color: inherit;
-    font-size: 13px;
+    background: linear-gradient(var(--lt-canvas-panel-bg, rgba(24,27,33,.98)), var(--lt-canvas-panel-bg, rgba(24,27,33,.98))) var(--lt-canvas-bg, #0f1217);
+    color: var(--lt-canvas-panel-fg, #e8eaed);
+    font-size: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.22);
+    width: 100%;
+    max-width: 560px;
+    flex-wrap: wrap;
   }
 
   .agent-resume-card__body {
@@ -871,10 +877,11 @@
 
   .agent-resume-card__sub {
     font-size: 12px;
-    opacity: 0.7;
+    opacity: 0.78;
   }
 
   .agent-resume-card__btn {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 32px;
     flex: 0 0 auto;
     padding: 6px 14px;
     border-radius: 9999px;
@@ -889,6 +896,7 @@
   /* 次要的「切換模型」：跟「繼續」同高同圓角，只描邊、跟著卡片的文字色（作者的配色吃得到）。
      「繼續」仍是這張卡的主行動，所以它排在後面、保留品牌色。 */
   .agent-resume-card__alt {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 32px;
     flex: 0 0 auto;
     padding: 5px 13px;
     border-radius: var(--lt-canvas-pill-radius, 9999px);
@@ -6015,4 +6023,9 @@ iframe.lt-frontend__frame { display: block; width: 100%; min-height: 1px; border
 .lt-choice { padding: 8px 14px; border-radius: 10px; border: 1px solid var(--chat-border, #333); background: var(--chat-surface, transparent); color: var(--chat-text, inherit); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
 .lt-choice:hover, .lt-choice:focus-visible { border-color: var(--chat-accent, #ff6d97); outline: none; }
 .lt-choice--own { border-style: dashed; color: var(--chat-text-muted, #999); }
+}
+
+@layer lt-base {
+ @media (pointer: coarse) { .agent-resume-card__btn, .agent-resume-card__alt { min-height: 44px; } }
+ .agent-resume-card__btn:focus-visible, .agent-resume-card__alt:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 }

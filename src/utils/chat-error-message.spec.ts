@@ -43,7 +43,7 @@ describe('resolveChatErrorMessage', () => {
 
   it('preserves known chat errors and falls back for unknown types', () => {
     expect(resolveChatErrorMessage('empty_response', translate)).toBe('error.emptyResponse')
-    expect(resolveChatErrorMessage('unexpected_error', translate)).toBe('error.connectionError')
+    expect(resolveChatErrorMessage('unexpected_error', translate)).toBe('error.serverError')
   })
 
   it('maps compact_retryable to its own honest recap message, not the generic connection error', () => {
@@ -87,7 +87,7 @@ describe('resolveChatErrorMessage', () => {
 
   it('keeps an unknown typed failure visible instead of creating a hidden system-only row', () => {
     expect(resolveChatErrorPresentation('unexpected_error', translate)).toMatchObject({
-      message: 'error.connectionError',
+      message: 'error.serverError',
       finishReason: 'error',
     })
   })
@@ -96,12 +96,12 @@ describe('resolveChatErrorMessage', () => {
     expect(resolveChatErrorMessage('conversation_stale', translate)).toBe('error.replyNotGenerated')
 
     const expected = {
-      en: "This reply wasn't generated; please try again.",
-      'zh-Hans': '这一条没有生成成功，请再试一次。',
-      'zh-Hant': '這一則沒有生成成功，請再試一次。',
-      ja: 'この返信は生成できなかったため、もう一度お試しください。',
-      ko: '이번 답변을 생성하지 못했으니 다시 시도해 주세요.',
-    }
+      "zh-Hant": "對話狀態已變更，請重新載入對話後再試。",
+      "zh-Hans": "对话状态已变更，请重新加载对话后再试。",
+      "en": "The conversation has changed. Reload it and try again.",
+      "ja": "会話の状態が変わりました。再読み込みしてからお試しください。",
+      "ko": "대화 상태가 변경됐어요. 대화를 다시 불러온 뒤 시도해 보세요."
+}
     Object.entries(expected).forEach(([locale, message]) => {
       expect(require(`../locale/${locale}.json`)['error.replyNotGenerated']).toBe(message)
     })

@@ -202,6 +202,7 @@ export function createShell(options: CreateShellOptions): Shell {
   doc.addEventListener('click', onChoiceClick)
 
   let busy = false
+  let sendBlocked = false
   // 這一輪在等什麼（宿主的 generation 訊息帶來）；since 是殼記下的進入時間，作者拿來顯示等了幾秒
   let genPhase = 'idle', genSince = Date.now()
   // 上一輪沒正常結束時的結局（宿主算好的那張卡）；用序列化的字比對，變了才發 generation:outcome
@@ -449,7 +450,7 @@ export function createShell(options: CreateShellOptions): Shell {
   refs.input.addEventListener('compositionend', () => { composing = false })
   const sendFromComposer = () => {
     const text = input.get()
-    if (!text.trim() || busy) return
+    if (!text.trim() || busy || sendBlocked) return
     request('message.send', [text]).then(() => { input.set(''); emitInput() }, (e) => debug.warn('send failed', e))
   }
   refs.send.addEventListener('click', sendFromComposer)
@@ -694,7 +695,8 @@ export function createShell(options: CreateShellOptions): Shell {
       case 'generation': {
         busy = !!message.busy
         refs.root.setAttribute('data-busy', busy ? '1' : '0')
-        refs.send.disabled = busy
+        sendBlocked = message.sendBlocked === true
+        refs.send.disabled = busy || sendBlocked
         const phase = busy ? String(message.phase && message.phase !== 'idle' ? message.phase : 'preparing') : 'idle'
         if (phase !== genPhase) { genPhase = phase; genSince = Date.now(); bus.emit('generation:phase', { phase: genPhase, since: genSince }) }
         // 舊宿主不帶 outcome：當作沒有結局。

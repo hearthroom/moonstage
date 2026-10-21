@@ -50,7 +50,7 @@ export function success(content, duration = config.duration) {
 /**
  * 错误提示
  */
-export function error(content, duration = config.duration) {
+export function error(content, duration = 5) {
 	return antMessage.error({
 		content: content || defaultTexts.error,
 		duration,
@@ -61,7 +61,7 @@ export function error(content, duration = config.duration) {
 /**
  * 警告提示
  */
-export function warning(content, duration = config.duration) {
+export function warning(content, duration = 5) {
 	return antMessage.warning({
 		content: content || '',
 		duration,
