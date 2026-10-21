@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { defineComponent, h, nextTick, reactive } from 'vue'
 import Panel from '../components/canvas-response-settings.vue'
 import { lengthTargetLadder, lengthTargetOf, readResponseSettings } from '../canvas-response-settings'
 
@@ -481,6 +482,39 @@ it('keeps the panel open and skips conversation saving when the card-level save 
  expect(wrapper.get('[role="alert"]').text()).toContain('saveFailed')
  expect(wrapper.emitted('close')).toBeUndefined()
  expect(await (async()=>{const closing=(wrapper.vm as any).mayClose();await flushPromises();return wrapper.get('.response-discard').attributes('hidden')})()).toBeUndefined()
+})
+
+it('retains the card draft when the parent optimistically publishes and rolls back a failed save', async()=>{
+ const hostFrame=reactive(frame({sandboxLevel:'light',jailbreak:'Saved rules'}))
+ const save=echo()
+ let fail=true
+ const saveFrame=vi.fn(async(value:{sandboxLevel:string,jailbreak:string})=>{
+  const before={sandboxLevel:hostFrame.sandboxLevel,jailbreak:hostFrame.jailbreak}
+  Object.assign(hostFrame,value)
+  await nextTick()
+  if(fail){Object.assign(hostFrame,before);await nextTick();return false}
+  return true
+ })
+ const Host=defineComponent({setup:()=>()=>h(Panel,{conversationId:'c1',load:async()=>initial(),save,t:(k:string)=>k,frame:hostFrame,saveFrame})})
+ const host=mount(Host),wrapper=host.findComponent(Panel)
+ await flushPromises()
+ await wrapper.get('.response-jailbreak-input').setValue('Unsaved 中文')
+ await pill(wrapper,'sandbox','deep').trigger('click')
+ await wrapper.get('[data-lt="streaming-toggle"]').trigger('click')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(hostFrame.jailbreak).toBe('Saved rules')
+ expect((wrapper.get('.response-jailbreak-input').element as HTMLTextAreaElement).value).toBe('Unsaved 中文')
+ expect(pill(wrapper,'sandbox','deep').attributes('aria-checked')).toBe('true')
+ expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-checked')).toBe('false')
+ expect(wrapper.get('[role="alert"]').text()).toContain('saveFailed')
+ expect(save).not.toHaveBeenCalled()
+ expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeUndefined()
+ fail=false
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(saveFrame).toHaveBeenLastCalledWith({sandboxLevel:'deep',jailbreak:'Unsaved 中文'})
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({streaming:'off'}))
+ expect(wrapper.emitted('close')).toHaveLength(1)
+ host.unmount()
 })
 
 it('still lets the card-level section save when the conversation settings fail to load', async()=>{

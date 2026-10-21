@@ -203,7 +203,8 @@ const frameDraft=reactive({sandboxLevel:props.frame?.sandboxLevel || '',jailbrea
 // 上一次存進去（或讀回來）的值：存好之後不必等頁面把新值傳回來，才不會把剛存的當成沒存。
 const frameSaved=reactive({...frameDraft})
 // 卡的設定可能在面板打開後才讀回來：讀回自己寫過的破限詞時把進階打開，玩家看得到它在生效。
-watch(()=>[props.frame?.sandboxLevel,props.frame?.jailbreak],()=>{frameDraft.sandboxLevel=props.frame?.sandboxLevel || '';frameDraft.jailbreak=props.frame?.jailbreak || '';Object.assign(frameSaved,frameDraft);if(frameDraft.jailbreak)jailbreakOpen.value=true})
+// 儲存期間父層會先發布候選值、失敗再還原；兩者都不是新的已儲存資料，不能蓋掉草稿。
+watch(()=>[props.frame?.sandboxLevel,props.frame?.jailbreak],()=>{if(saving.value)return;frameDraft.sandboxLevel=props.frame?.sandboxLevel || '';frameDraft.jailbreak=props.frame?.jailbreak || '';Object.assign(frameSaved,frameDraft);if(frameDraft.jailbreak)jailbreakOpen.value=true})
 // 沒設過就標在「標準」上：破甲永遠有一個正在生效的值，不標出來玩家會以為它沒開。
 const frameLevel=computed(()=>frameDraft.sandboxLevel || 'standard')
 const frameHint=computed(()=>props.frame?.options.find(o=>o.value===frameLevel.value)?.hint || props.t('chat.sandboxLevelDesc'))
