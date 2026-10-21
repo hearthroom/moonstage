@@ -44,6 +44,10 @@ export function operationFailureSub(cause: unknown, t: (key: string) => string, 
   if (restricted) return t(restricted + (opts.canSwitch === false && ['systemMsg.filterInputPolicy','systemMsg.filterSafety','systemMsg.filterRefusal'].includes(restricted) ? 'SubNoSwitch' : 'Sub'))
   if (typeof cause !== 'string') return ''
   switch (cause) {
+    case 'no_final_answer':
+    case 'empty_response':
+    case 'no_answer':
+      return opts.actions?.some(action => action.startsWith('retry')) ? t('chat.turnRetryable') : ''
     case 'content_filter':
       return opts.agent ? t('error.contentFilter') : ''
     case 'internal_error':

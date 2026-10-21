@@ -196,6 +196,7 @@ export default {
   width: 100%;
   padding: 10px 16px;
 }
+.sys-msg-wrap:lang(ko) { word-break: keep-all; overflow-wrap: anywhere; }
 .sys-msg-card {
   --sys-tone: currentColor;
   display: flex;

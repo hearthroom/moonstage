@@ -84,6 +84,7 @@ export function createShell(options: CreateShellOptions): Shell {
     hasStatusbar: !!String(config.card.statusbar || '').trim(),
     composerVisible: config.composer !== false,
   })
+  refs.root.lang = config.locale || ''
   // 背景：宿主送 background（玩家自選，見 canvas-player-background.ts）；舊宿主只送兩個網址，照卡片原圖畫。
   // 之後玩家換選項、作者換場景，宿主送 background 訊息，這裡立刻重畫。
   const stageBackground = ref<SandboxBackground>(config.background || { mode: 'card', portrait: config.backgroundUrl || '', landscape: config.backgroundLandscapeUrl || '', color: '' })

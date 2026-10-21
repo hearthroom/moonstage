@@ -636,6 +636,7 @@ defineExpose({ textareaEl, expand })
 <style scoped>
 @layer lt-base {
 .chat-balance-hint { padding: 4px 12px; font-size: 12px; line-height: 1.5; color: var(--lt-canvas-panel-fg); background-color: #0f1217; background-image: linear-gradient(var(--lt-canvas-panel-bg), var(--lt-canvas-panel-bg)); border-left: 3px solid #b58b24; border-radius: var(--lt-canvas-block-radius, 14px); overflow-wrap: anywhere; }
+.chat-balance-hint:lang(ko) { word-break: keep-all; }
 }
 </style>
 <style>

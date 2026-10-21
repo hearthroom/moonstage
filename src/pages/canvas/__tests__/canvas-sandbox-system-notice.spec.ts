@@ -45,12 +45,12 @@ function canvasFunctions(names: string[], env: Record<string, unknown>): Record<
   return new Function(...keys, `${js}\nreturn { ${names.join(', ')} };`)(...keys.map((k) => env[k]))
 }
 
-function resolver(timeline: any[], over: { capabilities?: unknown; operations?: unknown[]; ui?: Record<string, unknown> } = {}) {
+function resolver(timeline: any[], over: { capabilities?: unknown; operations?: unknown[]; ui?: Record<string, unknown>; translate?: (key:string)=>string } = {}) {
   const fns = canvasFunctions([
     'getSystemMsgKind', 'getSystemMsgLabel', 'getSystemMsgSub', 'getSystemMsgCtaLabel', 'getSystemMsgCta',
     'getSystemMsgCtas', 'getSystemMsgCtaAction', 'canSwitchModelFor', 'creditsOverrideFor', 'systemNoticeFor',
   ], {
-    t,
+    t: over.translate || t,
     unref: (v: any) => (v && typeof v === 'object' && 'value' in v ? v.value : v),
     talkList: { value: timeline },
     knownOperations: { value: over.operations || [] },
@@ -78,6 +78,19 @@ const failed = (over: Record<string, unknown> = {}) => ({
 })
 
 describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
+  it('selects R06 with retry, omits it without retry, and preserves R04 only with reasoning in all locales', () => {
+    for (const locale of ['zh-Hant','zh-Hans','en','ja','ko']) {
+      const strings = JSON.parse(fs.readFileSync(`src/locale/${locale}.json`,'utf8'))
+      const translate = (key:string) => strings[key] || ''
+      for (const actions of [['retry'], []]) {
+        const row = failed({finishReason:'error',failureCause:'no_final_answer',allowedActions:actions})
+        const notice = resolver([user('u1'),row],{translate})(1)
+        expect(notice.sub).toBe(actions.length ? translate('chat.turnRetryable') : '')
+        row.thinkingContent = 'Synthetic reasoning'
+        expect(resolver([user('u1'),row],{translate})(1).sub).toBe(translate('chat.noFinalAnswerSub'))
+      }
+    }
+  })
   it('內部錯誤（最新一列）：伺服器不穩定的字，重試與切換模型兩顆鍵', () => {
     const notice = resolver([user('u1'), failed()])(1)
     expect(notice).toEqual({

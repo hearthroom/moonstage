@@ -36,6 +36,23 @@ it('keeps all system panels opaque when inherited author background tokens conta
   } finally { rmSync(dir, {recursive:true, force:true}) }
 }, 30000)
 
+it('preserves Korean word boundaries in error subtitles and balance hints with an overflow fallback', () => {
+  const chrome = process.env.CHROME_BIN || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome','/usr/bin/google-chrome','/usr/bin/chromium','/usr/bin/chromium-browser'].find(existsSync)
+  expect(chrome).toBeTruthy()
+  const styles = ['src/components/chat-system-message/chat-system-message.vue','src/pages/canvas/components/canvas-composer.vue'].flatMap(file=>[...readFileSync(file,'utf8').matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(match=>match[1])).join('\n')
+  const text = '답변 길이는 미리 알 수 없어 시작할 때 예상 최대 비용을 충당할 포인트가 필요해요. 실제로 사용한 만큼만 차감돼요.'
+  const dir = mkdtempSync(join(tmpdir(),'stage-korean-wrap-'))
+  try {
+    const file = join(dir,'fixture.html')
+    writeFileSync(file, `<style>${styles}</style>${[190,217,244,271].map(width=>`<section lang="ko" style="width:${width}px"><div class="sys-msg-wrap"><div class="sys-msg-card"><div class="sys-body"><span class="sys-sub"><span class="sys-sub-text">${text}</span></span></div></div></div><div class="chat-balance-hint">${text}</div></section>`).join('')}<pre id="result"></pre><script>document.querySelector('#result').textContent=JSON.stringify(Array.from(document.querySelectorAll('.sys-sub-text,.chat-balance-hint')).map(el=>{const n=el.firstChild,words=el.textContent.split(' ');let start=0;const pieces=words.map(word=>{const r=document.createRange();r.setStart(n,start);r.setEnd(n,start+word.length);start+=word.length+1;return r.getClientRects().length});return {wordBreak:getComputedStyle(el).wordBreak,pieces,overflow:el.scrollWidth>el.clientWidth&&getComputedStyle(el).display!=='inline'}}))</script>`)
+    const run=spawnSync(chrome!,['--headless=new','--no-sandbox','--no-first-run','--no-default-browser-check',`--user-data-dir=${join(dir,'profile')}`,'--dump-dom','--virtual-time-budget=1000',`file://${file}`],{encoding:'utf8',timeout:20000,maxBuffer:2*1024*1024})
+    expect(run.error,run.stderr).toBeUndefined();expect(run.status,run.stderr).toBe(0)
+    const json=run.stdout.match(/<pre id="result">([^<]+)<\/pre>/)?.[1];expect(json,run.stdout).toBeTruthy()
+    const rows=JSON.parse(json!);expect(rows).toHaveLength(8)
+    for(const row of rows){expect(row.wordBreak).toBe('keep-all');expect(row.pieces.every((count:number)=>count===1)).toBe(true);expect(row.overflow).toBe(false)}
+  } finally {rmSync(dir,{recursive:true,force:true})}
+},30000)
+
 it('keeps a balance hint readable with dark author text and pale glass over its fixed backing', () => {
   const chrome = process.env.CHROME_BIN || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(existsSync)
   expect(chrome, 'Chrome is required for the balance hint contrast regression').toBeTruthy()
