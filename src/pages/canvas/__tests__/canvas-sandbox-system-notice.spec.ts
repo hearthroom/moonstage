@@ -107,6 +107,12 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
     expect(notice).toEqual({ kind: 'quota', label: t('chat.point_no_tips'), sub: t('chat.creditsNotEnoughSub'), actions: [] })
   })
 
+  it('free allowance exhaustion keeps its own explanation', () => {
+    const notice = resolver([user('u1'), failed({ finishReason: 'quota_exhausted', allowedActions: [] })])(1)
+    expect(notice?.sub).toBe(t('chat.freeQuotaExhaustedSub'))
+    expect(notice?.sub).not.toBe(t('chat.creditsNotEnoughSub'))
+  })
+
   it('點數不足、宿主給了說法與去處（綺夢社：今日任務、儲值）：照宿主的字畫，帶上連結', () => {
     const seen: unknown[] = []
     const ui = { creditsActions: (shortfall: unknown) => { seen.push(shortfall); return { title: '積分不夠聊這一輪', body: '這一輪大約要 300 積分，目前有 120。', links: [{ id: 'topup', label: '儲值', href: 'https://console.example/billing' }] } } }

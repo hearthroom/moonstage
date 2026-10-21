@@ -65,15 +65,30 @@ export function firstGradientColor(backgroundImage: string | null | undefined): 
   return m ? parseComputedColor(m[1]) : null
 }
 
-/** 一層的底：background-color 疊上漸層的第一個色標（漸層畫在底色之上）。都沒有就 null。 */
+/** Split background-image layers without splitting commas inside color functions. */
+function backgroundLayers(value: string): string[] {
+  const layers: string[] = []
+  let depth = 0, start = 0
+  for (let i = 0; i < value.length; i += 1) {
+    if (value[i] === '(') depth += 1
+    else if (value[i] === ')') depth -= 1
+    else if (value[i] === ',' && depth === 0) { layers.push(value.slice(start, i)); start = i + 1 }
+  }
+  layers.push(value.slice(start))
+  return layers
+}
+
+/** Each gradient paints above the base color; the first image is the topmost. */
 function layerBackground(view: Window, el: Element, pseudo?: string): RGBA | null {
   const cs = view.getComputedStyle(el, pseudo)
-  // 偽元素沒有 content 就不存在（jsdom 對偽元素回的是元素本身的樣式，content 也會是 normal，一樣略過）
   if (pseudo && (!cs.content || cs.content === 'none' || cs.content === 'normal')) return null
   const bg = parseComputedColor(cs.backgroundColor)
-  const grad = firstGradientColor(cs.backgroundImage)
   let acc: RGBA | null = bg && bg.a > 0 ? bg : null
-  if (grad && grad.a > 0) acc = acc ? blendOver(grad, acc) : grad
+  const layers = backgroundLayers(cs.backgroundImage || '')
+  for (let i = layers.length - 1; i >= 0; i -= 1) {
+    const color = firstGradientColor(layers[i])
+    if (color && color.a > 0) acc = acc ? blendOver(color, acc) : color
+  }
   return acc
 }
 
