@@ -9914,12 +9914,12 @@ const responseSettingsSupported = computed(() => responseSettingsVersion.value =
 const responseSettingsOffered = computed(() => offersResponseSettings(responseSettingsSupported.value, pendingGreetingStart.value, previewOnly.value))
 const responseSettingsPanel = ref<InstanceType<typeof CanvasResponseSettings> | null>(null)
 async function loadResponseSettings(id: string) {
-  const res = await _this.http.get('/open/v1/conversation/response-settings', { data: { conversationId: id }, showLoading: false })
+  const res = await _this.http.get('/open/v1/conversation/response-settings', { data: { conversationId: id, model: formData.selectModel || '' }, showLoading: false })
   if (res.statusCode !== 200) throw { status: res.statusCode }
   return res.data
 }
 async function saveResponseSettings(id: string, revision: number, patch: Record<string, string | null>) {
-  const res = await _this.http.post('/open/v1/conversation/response-settings/save', { data: { conversationId: id, expectedRevision: revision, patch }, showLoading: false })
+  const res = await _this.http.post('/open/v1/conversation/response-settings/save', { data: { conversationId: id, model: formData.selectModel || '', expectedRevision: revision, patch }, showLoading: false })
   if (res.statusCode !== 200) throw { status: res.statusCode }
   return res.data
 }
