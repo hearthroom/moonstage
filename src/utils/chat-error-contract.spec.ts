@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { operationFailureTitle, operationFailureSub } from './operation-failure-copy'
 import { normalizeChatOperationStatus, operationProjectionMetadata, operationStatusFromProjectionRow, projectionFinishReason, mergeOperationStatusIntoStreamEntry, operationResumeIdentity } from '../pages/canvas/chat-transport-ownership'
 import { resolveChatActionButtonState } from '../pages/canvas/chat-operation-ui-state'
 import { resolveChatErrorMessage, resolveChatErrorTypeFromFailure, resolveCreditsShortfall } from './chat-error-message'
 const t = (key: string) => key
+
+it('keeps the outcome-unconfirmed fallbacks consistent with the approved R26 copy', () => {
+ const canvas = readFileSync('src/pages/canvas/canvas.vue', 'utf8')
+ expect(canvas).toContain("t('chat.operationStatusUnavailable') || '正在確認回覆狀態'")
+ expect(canvas).toContain("t('chat.operationStatusUnavailableSub') || '確認完成後會自動更新。'")
+})
 
 describe('bounded content restriction presentation', () => {
  for (const [reason, suffix] of Object.entries({input_policy:'InputPolicy',safety:'Safety',prohibited:'Safety',blocklist:'Safety',privacy:'Privacy',recitation:'Recitation',refusal:'Refusal',unknown:'Unknown'})) {

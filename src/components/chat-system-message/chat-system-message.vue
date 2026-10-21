@@ -208,7 +208,8 @@ export default {
   border-radius: var(--lt-canvas-block-radius, 14px);
   border: 1px solid color-mix(in srgb, var(--sys-tone) 40%, transparent);
   /* The opaque base also backs translucent author panel tokens. */
-  background: linear-gradient(var(--lt-canvas-panel-bg, rgba(24,27,33,.98)), var(--lt-canvas-panel-bg, rgba(24,27,33,.98))) var(--lt-canvas-bg, #0f1217);
+  background-color: #0f1217;
+  background-image: linear-gradient(var(--lt-canvas-panel-bg, rgba(24,27,33,.98)), var(--lt-canvas-panel-bg, rgba(24,27,33,.98)));
   color: var(--lt-canvas-panel-fg, #e8eaed);
   box-shadow: 0 1px 3px rgba(0,0,0,.22);
 }
@@ -277,7 +278,8 @@ export default {
   min-height: 44px;
   padding: 0 16px;
   border-radius: var(--lt-canvas-pill-radius, 9999px);
-  background: linear-gradient(var(--lt-canvas-panel-bg), var(--lt-canvas-panel-bg)) var(--lt-canvas-bg);
+  background-color: #0f1217;
+  background-image: linear-gradient(var(--lt-canvas-panel-bg), var(--lt-canvas-panel-bg));
   color: var(--lt-canvas-panel-fg);
   font-size: 13px;
   font-weight: 600;

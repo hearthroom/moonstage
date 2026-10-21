@@ -4766,7 +4766,7 @@ function getSystemMsgLabel(finishReason) {
     'pause_turn':       t('systemMsg.stopped')      || '已停止生成',
     'user_stop':        t('systemMsg.stopped')      || '已停止生成',
     'agent_progress_preserved': t('multiPass.interruptedNotice') || '這一輪還沒跑完，進度已經留著',
-    'outcome_unconfirmed': t('chat.operationStatusUnavailable') || '結果還在路上，請稍等',
+    'outcome_unconfirmed': t('chat.operationStatusUnavailable') || '正在確認回覆狀態',
     'rate_limit':       t('systemMsg.rateLimit')    || '請求過於頻繁',
     // 上游把「這個模型現在用不了」分類成 service_unavailable，但終局錯誤這張表
     // 先前沒有這個鍵,於是落到通用的「AI 模型連線失敗」——使用者看不出是模型的問題,
@@ -4817,7 +4817,7 @@ function getSystemMsgSub(finishReason, item = null, index = -1) {
     'error':            t('systemMsg.modelErrorSub')   || '可以重試，或換一個模型再試',
     'pause_turn':       t('systemMsg.stoppedSub'),
     'user_stop':        t('systemMsg.stoppedSub'),
-    'outcome_unconfirmed': t('chat.operationStatusUnavailableSub') || '好了會自動顯示在這裡，不用重送。',
+    'outcome_unconfirmed': t('chat.operationStatusUnavailableSub') || '確認完成後會自動更新。',
     // agent 準備沒跑完時,主標只說「進度已經留著」——使用者不知道除了按繼續之外
     // 還能換模型。實測模型整條掛掉時(上游 100% 失敗),他會一直按繼續,而那個模型
     // 不會好。副標把兩條路都講出來,按鈕維持不變。

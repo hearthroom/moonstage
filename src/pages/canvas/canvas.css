@@ -854,7 +854,8 @@
     padding: 10px 12px;
     border-radius: var(--lt-canvas-block-radius, var(--lt-canvas-radius));
     border: var(--lt-canvas-block-border, 1px solid color-mix(in srgb, currentColor 22%, transparent));
-    background: linear-gradient(var(--lt-canvas-panel-bg, rgba(24,27,33,.98)), var(--lt-canvas-panel-bg, rgba(24,27,33,.98))) var(--lt-canvas-bg, #0f1217);
+    background-color: #0f1217;
+    background-image: linear-gradient(var(--lt-canvas-panel-bg, rgba(24,27,33,.98)), var(--lt-canvas-panel-bg, rgba(24,27,33,.98)));
     color: var(--lt-canvas-panel-fg, #e8eaed);
     font-size: 14px;
     box-shadow: 0 1px 3px rgba(0,0,0,.22);
