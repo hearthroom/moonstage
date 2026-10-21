@@ -7,6 +7,19 @@ const initial = () => ({conversationId:'c1',scope:'conversation',schemaVersion:1
 const echo = () => vi.fn().mockImplementation(async (_id, rev, patch)=>({...initial(),revision:rev+1,overrides:Object.fromEntries(Object.entries(patch).filter(([,v])=>v!==null))}))
 const pill = (wrapper:any, axis:string, value:string) => wrapper.get(`.mode-item[data-axis="${axis}"][data-value="${value}"]`)
 
+it('preserves an explicit streaming choice equal to the current model default',async()=>{
+ const save=echo()
+ const settings={...initial(),defaults:{...initial().effective,streaming:'off'},effective:{...initial().effective,streaming:'off'}}
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>settings,save,t:(k:string)=>k}})
+ await flushPromises()
+ expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-checked')).toBe('false')
+ await wrapper.get('[data-lt="streaming-toggle"]').trigger('click')
+ await wrapper.get('[data-lt="streaming-toggle"]').trigger('click')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({streaming:'off'}))
+ wrapper.unmount()
+})
+
 it('hides streaming controls in world mode while retaining other response preferences',async()=>{
  const save=echo()
  const wrapper=mount(Panel,{props:{conversationId:'c1',worldMode:true,load:async()=>({...initial(),overrides:{streaming:'off'},effective:{...initial().effective,streaming:'off'}}),save,t:(k:string)=>k}})

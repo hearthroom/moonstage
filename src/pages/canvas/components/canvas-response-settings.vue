@@ -152,8 +152,7 @@ const base=computed(()=>responseBase(saved.value))
 const streaming=computed(()=>(draft.value.streaming ?? base.value.streaming ?? 'on')!=='off')
 function setStreaming(value:boolean){
  const picked=value?'on':'off'
- if(picked===(base.value.streaming ?? 'on')) delete draft.value.streaming
- else draft.value.streaming=picked
+ draft.value.streaming=picked
 }
 const dirty=computed(()=>JSON.stringify(responsePatch(draft.value,base.value))!==JSON.stringify(responsePatch(saved.value?.overrides || {},base.value)))
 const jailbreakOpen=ref(!!props.frame?.jailbreak)
