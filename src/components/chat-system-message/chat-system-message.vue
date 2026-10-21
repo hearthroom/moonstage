@@ -300,4 +300,8 @@ export default {
 :where(.sys-msg-card[data-lt-contrast="high"], .sys-link[data-lt-contrast="high"]) { --sys-sub-opacity: 1; }
 :where(.sys-msg-card[data-lt-contrast="high"][data-lt-tone="light"], .sys-link[data-lt-contrast="high"][data-lt-tone="light"]) { color: #000; }
 :where(.sys-msg-card[data-lt-contrast="high"][data-lt-tone="dark"], .sys-link[data-lt-contrast="high"][data-lt-tone="dark"]) { color: #fff; }
+:where(.sys-cta-primary[data-lt-tone="light"]) { color: #17171c; }
+:where(.sys-cta-primary[data-lt-tone="dark"]) { color: #e8eaed; }
+:where(.sys-cta-primary[data-lt-contrast="high"][data-lt-tone="light"]) { color: #000; }
+:where(.sys-cta-primary[data-lt-contrast="high"][data-lt-tone="dark"]) { color: #fff; }
 </style>

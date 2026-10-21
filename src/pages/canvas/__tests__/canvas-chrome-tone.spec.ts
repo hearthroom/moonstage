@@ -114,3 +114,11 @@ it('uses a readable foreground for mid-tone author panels as well as white panel
   expect(panel.getAttribute('data-lt-tone')).toBe('light')
   expect(panel.getAttribute('data-lt-contrast')).toBe('high')
 })
+
+it('measures primary error and Agent recovery buttons independently of their panel', () => {
+  for (const className of ['sys-cta-primary', 'agent-resume-card__btn']) {
+    document.body.innerHTML = `<div class="${className}" style="background:rgb(255,204,51)"></div>`
+    syncChromeTone(document)
+    expect(document.body.firstElementChild!.getAttribute('data-lt-tone')).toBe('light')
+  }
+})
