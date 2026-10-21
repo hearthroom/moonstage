@@ -4157,7 +4157,6 @@
 	"canvas.assist.retry": "다시 시도",
 	"responseSettings.streamingTitle": "스트리밍 출력",
 	"responseSettings.streamingOffHint": "끄면 답장이 완성된 뒤 한 번에 표시되며, 긴 답장은 조금 더 걸립니다",
-	"responseSettings.streamingOnlyHint": "이 경로는 스트리밍 출력만 지원합니다",
 	"responseSettings.title": "답변 취향",
 	"responseSettings.scope": "이 대화에 다음 답변부터 적용되며, 같은 카드로 새 대화를 시작하면 이어집니다.",
 	"responseSettings.frameScope": "아래 두 항목은 이 카드의 설정으로, 이 카드의 모든 대화에 적용됩니다.",

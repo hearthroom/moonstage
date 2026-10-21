@@ -21,16 +21,12 @@ it('defaults old responses to streaming and saves the complete-response preferen
  expect(readResponseSettings(settings,'c1').overrides.streaming).toBe('off')
 })
 
-it('disables only a streaming-only route without changing its saved choice',async()=>{
- const wrapper=mount(Panel,{props:{conversationId:'c1',model:'only-stream',load:async()=>({...initial(),streamingOnlyModels:['only-stream'],overrides:{streaming:'off'},effective:{...initial().effective,streaming:'off'}}),save:vi.fn(),t:(k:string)=>k}})
+it('allows buffered delivery even when an old server sent a route restriction',async()=>{
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>({...initial(),streamingOnlyModels:['old-route'],overrides:{streaming:'off'},effective:{...initial().effective,streaming:'off'}}),save:vi.fn(),t:(k:string)=>k}})
  await flushPromises()
- expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-disabled')).toBe('true')
- expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-checked')).toBe('true')
- expect(wrapper.get('[data-hint="streaming"]').text()).toBe('responseSettings.streamingOnlyHint')
- expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeDefined()
- await wrapper.setProps({model:'another-route'})
  expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-disabled')).toBe('false')
  expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-checked')).toBe('false')
+ expect(wrapper.get('[data-hint="streaming"]').text()).toBe('responseSettings.streamingOffHint')
 })
 
 // 跟「用戶人設」同一套版面：每一項一張卡、一排藥丸，作者替人設頁寫的美化在這裡同樣生效。

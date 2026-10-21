@@ -4157,7 +4157,6 @@
 	"canvas.assist.retry": "Try again",
 	"responseSettings.streamingTitle": "Streaming",
 	"responseSettings.streamingOffHint": "When off, the reply appears once it is complete; long replies take a little longer",
-	"responseSettings.streamingOnlyHint": "This route only supports streaming",
 	"responseSettings.title": "Response preferences",
 	"responseSettings.scope": "Applies to this conversation from the next reply. New conversations with this card start from it.",
 	"responseSettings.frameScope": "The two settings below belong to this card and apply to every conversation with it.",

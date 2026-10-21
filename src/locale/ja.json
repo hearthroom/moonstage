@@ -4157,7 +4157,6 @@
 	"canvas.assist.retry": "再試行",
 	"responseSettings.streamingTitle": "ストリーミング出力",
 	"responseSettings.streamingOffHint": "オフにすると返信は完成後にまとめて表示され、長い返信は少し時間がかかります",
-	"responseSettings.streamingOnlyHint": "このルートはストリーミング出力のみ対応しています",
 	"responseSettings.title": "返信の好み",
 	"responseSettings.scope": "この会話に次の返信から適用されます。同じカードで新しい会話を始めると引き継がれます。",
 	"responseSettings.frameScope": "以下の2項目はこのカードの設定で、このカードのすべての会話に適用されます。",
