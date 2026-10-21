@@ -30,6 +30,19 @@ afterEach(() => {
 })
 
 describe('輸入區兩態', () => {
+  it('measures the balance hint after it appears and again when its content changes', async () => {
+    const wrapper = mountComposer()
+    try {
+      await wrapper.setProps({balanceHint:'Synthetic balance hint'})
+      await wrapper.vm.$nextTick()
+      const hint = wrapper.find('.chat-balance-hint')
+      expect(hint.attributes('data-lt-tone')).toBe('dark')
+      ;(hint.element as HTMLElement).style.backgroundColor = 'white'
+      await wrapper.setProps({balanceHint:'Updated balance hint'})
+      await wrapper.vm.$nextTick()
+      expect(hint.attributes('data-lt-tone')).toBe('light')
+    } finally { wrapper.unmount() }
+  })
   it('初始是折疊態：狀態 class 掛在 .uni-textarea 與 .chat-input-scope 兩處，只露折疊列', () => {
     const wrapper = mountComposer()
     const el = wrapper.element as HTMLElement
