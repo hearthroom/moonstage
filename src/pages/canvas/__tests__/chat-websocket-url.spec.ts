@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { resolveChatWebSocketBase } from '../chat-websocket-url'
 
 describe('聊天串流位址', () => {
+  it('保留宿主同源代理前綴，HTTP 與 WebSocket 不會分流', () => {
+    for (const host of ['sukisuki.chat', 'sukisuki.pro', 'play.sukisuki.chat', 'play.sukisuki.pro']) {
+      expect(resolveChatWebSocketBase('wss://api.harperharbor.com', 'localhost:8888', `https://${host}/hh-api`))
+        .toBe(`wss://${host}/hh-api/open/v1/conversation/ws`)
+    }
+  })
   it('嵌入宿主的 API 主機同時決定串流主機，優先於建置與開發設定', () => {
     expect(resolveChatWebSocketBase('wss://api.harperharbor.com', 'localhost:8888', 'https://api.harperharbor.com/'))
       .toBe('wss://api.harperharbor.com/open/v1/conversation/ws')
