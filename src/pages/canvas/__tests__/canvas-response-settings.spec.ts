@@ -435,6 +435,21 @@ it('asks above the scrolling panel, focuses keep-editing, and dismisses with Esc
  wrapper.unmount()
 })
 
+it('returns to editing when back requests another close while discard confirmation is open', async()=>{
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:echo(),t:(k:string)=>k}})
+ await flushPromises()
+ await pill(wrapper,'pace','advance').trigger('click')
+ const first=(wrapper.vm as any).mayClose();await flushPromises()
+ expect(wrapper.get('.response-discard').attributes('hidden')).toBeUndefined()
+ expect(await (wrapper.vm as any).mayClose()).toBe(false)
+ expect(await first).toBe(false)
+ await flushPromises()
+ expect(wrapper.get('.response-discard').attributes('hidden')).toBeDefined()
+ expect(pill(wrapper,'pace','advance').attributes('aria-checked')).toBe('true')
+ expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeUndefined()
+ wrapper.unmount()
+})
+
 it('edits the card-level bypass strength and content rules in their own section', async()=>{
  const save=echo(), saveFrame=vi.fn().mockResolvedValue(true)
  const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save,t:(k:string)=>k,frame:frame(),saveFrame}})

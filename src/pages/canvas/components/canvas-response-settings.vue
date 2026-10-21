@@ -253,7 +253,10 @@ function choose(axis:ResponseAxis,value:string){
 function resetAll(){draft.value={}}
 const responseDirty=computed(()=>!!saved.value && dirty.value)
 const canSave=computed(()=>!saving.value && !loading.value && (frameDirty.value || responseDirty.value) && !(responseDirty.value && (invalid.value || error.value==='conflict')))
-async function mayClose(){return !saving.value && (!(responseDirty.value || frameDirty.value) || await askDiscard())}
+async function mayClose(){
+ if(discardAsked.value){answerDiscard(false);return false}
+ return !saving.value && (!(responseDirty.value || frameDirty.value) || await askDiscard())
+}
 function cancel(){
  if(saving.value)return
  draft.value={...saved.value?.overrides}
@@ -293,7 +296,8 @@ defineExpose({mayClose})
 <style scoped>
 @layer lt-base {
  .response-discard :deep(.u-popup__content){width:min(440px,calc(100vw - 32px))}
- .response-discard-body{display:flex;flex-direction:column;gap:16px;padding-top:24px}
+ .response-discard :deep(.u-popup__content__close){display:none}
+ .response-discard-body{display:flex;flex-direction:column;gap:16px}
  .response-discard-text{margin:0;font-size:14px;line-height:1.5;text-align:center}
  .response-discard-actions{display:flex;gap:8px}
  .response-discard-keep,.response-discard-ok{flex:1;min-height:44px;padding:8px 12px;border:1px solid var(--lt-canvas-sheet-line);border-radius:var(--lt-canvas-radius);background:var(--lt-canvas-sheet-item-bg);color:var(--lt-canvas-sheet-fg);font:inherit;cursor:pointer}

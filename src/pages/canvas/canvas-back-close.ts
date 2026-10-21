@@ -15,18 +15,16 @@ export function createCanvasBackClose(options: { window: Window; close: () => vo
   let watcher: NativeWatcher | null = null
   let armed = false
   let removing = false
-  let closing = false
   let armedUrl = ''
   const ownsEntry = () => win.history.state?.[MARKER] === token && win.location.href === armedUrl
 
   const close = async () => {
-    if (disposed || closing) return
-    closing = true
-    // The callback may ask about unsaved settings. Rearm if it keeps the sheet.
-    try { await options.close() }
+    if (disposed) return
+    // A pending discard decision is itself an overlay. Keep Back available so
+    // another request can dismiss that decision and return to editing.
+    try { const pending = options.close(); sync(open); await pending }
     catch { console.warn('[canvas] 無法關閉面板，保留目前畫面') }
     finally {
-      closing = false
       sync(open)
     }
   }
@@ -35,7 +33,7 @@ export function createCanvasBackClose(options: { window: Window; close: () => vo
     if (disposed) return
     if (win.CloseWatcher) {
       if (!open) { watcher?.destroy(); watcher = null }
-      else if (!watcher && !closing) {
+      else if (!watcher) {
         watcher = new win.CloseWatcher()
         watcher.addEventListener('close', () => { watcher = null; close() }, { once: true })
       }
@@ -45,7 +43,7 @@ export function createCanvasBackClose(options: { window: Window; close: () => vo
       armed = false
       removing = true
       win.history.back()
-    } else if (open && !armed && !removing && !closing) {
+    } else if (open && !armed && !removing) {
       const state = win.history.state || {}
       armedUrl = win.location.href
       win.history.pushState({
