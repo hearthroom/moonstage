@@ -727,6 +727,12 @@ export function projectionFinishReason(
   current = '',
   thinkingContent = '',
 ): string {
+  // A rejected input produced no reply. Reuse the input-filter card's five-language
+  // guidance; repeating the unchanged input is not a recovery action.
+  if (['failed_retryable', 'failed_terminal', 'interrupted'].includes(status.state)
+    && status.failureCause === 'content_filter' && status.outputDisposition === 'none') {
+    return 'content_filter_input'
+  }
   if (isBufferedTerminalFailure(status)) {
     if (status.state === 'stopped') return 'user_stop'
     if (['content_filter', 'refusal', 'length', 'interrupted'].includes(String(status.finishReason))) return String(status.finishReason)

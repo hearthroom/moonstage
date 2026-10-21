@@ -15,6 +15,7 @@ export function operationFailureTitle(cause: unknown, t: (key: string) => string
     context_capacity_exceeded: 'error.contextCapacityTitle',
     insufficient_credits: 'chat.point_no_tips',
     internal_error: 'systemMsg.ourError',
+    content_filter: 'systemMsg.filtered',
   }
   const key = typeof cause === 'string' && Object.prototype.hasOwnProperty.call(keys, cause) ? keys[cause] : ''
   return key ? t(key) : ''
@@ -30,6 +31,8 @@ export function operationFailureTitle(cause: unknown, t: (key: string) => string
 export function operationFailureSub(cause: unknown, t: (key: string) => string, opts: { agent?: boolean } = {}): string {
   if (typeof cause !== 'string') return ''
   switch (cause) {
+    case 'content_filter':
+      return opts.agent ? t('error.contentFilter') : ''
     case 'internal_error':
       return t('systemMsg.ourErrorSub')
     case 'service_unavailable':

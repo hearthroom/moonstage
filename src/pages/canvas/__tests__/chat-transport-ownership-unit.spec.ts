@@ -47,6 +47,19 @@ const completePayloadInput = (overrides: Record<string, unknown> = {}) => ({
 })
 
 describe('desktop chat transport ownership state machine', () => {
+  it('projects a zero-output content rejection to the existing actionable input-filter card', () => {
+    for (const nonStreaming of [false, true]) {
+      for (const kind of ['send', 'rewrite_response', 'continue']) {
+        const status = { kind, nonStreaming, state: 'failed_retryable', reasonCode: 'temporary_failure',
+          failureCause: 'content_filter', finishReason: 'content_filter', outputDisposition: 'none' }
+        expect(projectionFinishReason(status)).toBe('content_filter_input')
+        expect(projectionFinishReason({ ...status, state: 'stopped' })).not.toBe('content_filter_input')
+        expect(projectionFinishReason({ ...status, state: 'interrupted', outputDisposition: 'partial' })).toBe('content_filter')
+        expect(projectionFinishReason({ ...status, failureCause: 'service_unavailable', finishReason: 'interrupted' })).not.toBe('content_filter_input')
+      }
+    }
+  })
+
   it.each(['content_filter', 'refusal', 'length'])(
     'preserves canonical %s on live, replay and restored partial rows', (finishReason) => {
       for (const state of ['interrupted', 'failed_retryable']) {

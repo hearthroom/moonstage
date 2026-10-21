@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { defineComponent, h, nextTick, reactive } from 'vue'
 import Panel from '../components/canvas-response-settings.vue'
 import { lengthTargetLadder, lengthTargetOf, readResponseSettings } from '../canvas-response-settings'
 
@@ -387,6 +388,69 @@ it('lists allow-writing first and uses it as the platform default', async()=>{
 // 破甲強度與破限詞從用戶人設搬到這裡：跟著這張卡，另一句範圍說明，存的地方是玩家對卡的設定。
 const frame = (over:Record<string,unknown>={}) => ({sandboxLevel:'',jailbreak:'',defaultJailbreak:'Card rules',maxLength:2000,
  options:[{value:'light',label:'L',hint:'hl'},{value:'standard',label:'S',hint:'hs'},{value:'immersive',label:'I',hint:'hi'},{value:'deep',label:'D',hint:'hd'}],...over})
+it('saves visible Chinese content rules while the mobile IME is still composing', async()=>{
+ const save=echo(), saveFrame=vi.fn().mockResolvedValue(true)
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save,t:(k:string)=>k,frame:frame(),saveFrame}})
+ await flushPromises()
+ await wrapper.get('[data-action="toggle-jailbreak"]').trigger('click')
+ const input=wrapper.get('.response-jailbreak-input')
+ await input.trigger('compositionstart')
+ ;(input.element as HTMLTextAreaElement).value='中文測試'
+ await input.trigger('input', {isComposing:true})
+ expect(wrapper.get('.response-jailbreak .char-count').text()).toBe('4/2000')
+ expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeUndefined()
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(saveFrame).toHaveBeenCalledWith({sandboxLevel:'',jailbreak:'中文測試'})
+ expect(save).not.toHaveBeenCalled()
+ wrapper.unmount()
+})
+
+it('cancels edited preferences directly without asking the parent to confirm again', async()=>{
+ let closable:boolean|undefined
+ const save=echo(),saveFrame=vi.fn()
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save,t:(k:string)=>k,frame:frame(),saveFrame,
+  onClose:async()=>{closable=await (wrapper.vm as any).mayClose()}}})
+ await flushPromises()
+ await wrapper.get('.response-jailbreak-input').setValue('不要保留')
+ await pill(wrapper,'pace','advance').trigger('click')
+ await wrapper.get('[data-action="cancel"]').trigger('click');await flushPromises()
+ expect(closable).toBe(true)
+ expect(save).not.toHaveBeenCalled();expect(saveFrame).not.toHaveBeenCalled()
+ wrapper.unmount()
+})
+
+it('asks above the scrolling panel, focuses keep-editing, and dismisses with Escape or the mask', async()=>{
+ const wrapper=mount(Panel,{attachTo:document.body,props:{conversationId:'c1',load:async()=>initial(),save:echo(),t:(k:string)=>k}})
+ await flushPromises()
+ await pill(wrapper,'pace','advance').trigger('click')
+ const closing=(wrapper.vm as any).mayClose();await flushPromises()
+ const popup=wrapper.get('.response-discard')
+ expect(popup.attributes('popover')).toBe('manual')
+ expect(document.activeElement).toBe(popup.get('[data-action="keep-editing"]').element)
+ document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await flushPromises()
+ expect(await closing).toBe(false)
+ const second=(wrapper.vm as any).mayClose();await flushPromises()
+ await popup.get('.u-popup__mask').trigger('click')
+ expect(await second).toBe(false)
+ expect(pill(wrapper,'pace','advance').attributes('aria-checked')).toBe('true')
+ wrapper.unmount()
+})
+
+it('returns to editing when back requests another close while discard confirmation is open', async()=>{
+ const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save:echo(),t:(k:string)=>k}})
+ await flushPromises()
+ await pill(wrapper,'pace','advance').trigger('click')
+ const first=(wrapper.vm as any).mayClose();await flushPromises()
+ expect(wrapper.get('.response-discard').attributes('hidden')).toBeUndefined()
+ expect(await (wrapper.vm as any).mayClose()).toBe(false)
+ expect(await first).toBe(false)
+ await flushPromises()
+ expect(wrapper.get('.response-discard').attributes('hidden')).toBeDefined()
+ expect(pill(wrapper,'pace','advance').attributes('aria-checked')).toBe('true')
+ expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeUndefined()
+ wrapper.unmount()
+})
+
 it('edits the card-level bypass strength and content rules in their own section', async()=>{
  const save=echo(), saveFrame=vi.fn().mockResolvedValue(true)
  const wrapper=mount(Panel,{props:{conversationId:'c1',load:async()=>initial(),save,t:(k:string)=>k,frame:frame(),saveFrame}})
@@ -418,6 +482,39 @@ it('keeps the panel open and skips conversation saving when the card-level save 
  expect(wrapper.get('[role="alert"]').text()).toContain('saveFailed')
  expect(wrapper.emitted('close')).toBeUndefined()
  expect(await (async()=>{const closing=(wrapper.vm as any).mayClose();await flushPromises();return wrapper.get('.response-discard').attributes('hidden')})()).toBeUndefined()
+})
+
+it('retains the card draft when the parent optimistically publishes and rolls back a failed save', async()=>{
+ const hostFrame=reactive(frame({sandboxLevel:'light',jailbreak:'Saved rules'}))
+ const save=echo()
+ let fail=true
+ const saveFrame=vi.fn(async(value:{sandboxLevel:string,jailbreak:string})=>{
+  const before={sandboxLevel:hostFrame.sandboxLevel,jailbreak:hostFrame.jailbreak}
+  Object.assign(hostFrame,value)
+  await nextTick()
+  if(fail){Object.assign(hostFrame,before);await nextTick();return false}
+  return true
+ })
+ const Host=defineComponent({setup:()=>()=>h(Panel,{conversationId:'c1',load:async()=>initial(),save,t:(k:string)=>k,frame:hostFrame,saveFrame})})
+ const host=mount(Host),wrapper=host.findComponent(Panel)
+ await flushPromises()
+ await wrapper.get('.response-jailbreak-input').setValue('Unsaved 中文')
+ await pill(wrapper,'sandbox','deep').trigger('click')
+ await wrapper.get('[data-lt="streaming-toggle"]').trigger('click')
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(hostFrame.jailbreak).toBe('Saved rules')
+ expect((wrapper.get('.response-jailbreak-input').element as HTMLTextAreaElement).value).toBe('Unsaved 中文')
+ expect(pill(wrapper,'sandbox','deep').attributes('aria-checked')).toBe('true')
+ expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-checked')).toBe('false')
+ expect(wrapper.get('[role="alert"]').text()).toContain('saveFailed')
+ expect(save).not.toHaveBeenCalled()
+ expect(wrapper.get('[data-action="save"]').attributes('disabled')).toBeUndefined()
+ fail=false
+ await wrapper.get('[data-action="save"]').trigger('click');await flushPromises()
+ expect(saveFrame).toHaveBeenLastCalledWith({sandboxLevel:'deep',jailbreak:'Unsaved 中文'})
+ expect(save).toHaveBeenCalledWith('c1',0,expect.objectContaining({streaming:'off'}))
+ expect(wrapper.emitted('close')).toHaveLength(1)
+ host.unmount()
 })
 
 it('still lets the card-level section save when the conversation settings fail to load', async()=>{
