@@ -6033,3 +6033,7 @@ iframe.lt-frontend__frame { display: block; width: 100%; min-height: 1px; border
 :where(.agent-resume-card[data-lt-contrast="high"][data-lt-tone="light"]) { color: #000; }
 :where(.agent-resume-card[data-lt-contrast="high"][data-lt-tone="dark"]) { color: #fff; }
 :where(.agent-resume-card[data-lt-contrast="high"]) .agent-resume-card__sub { opacity: 1; }
+:where(.agent-resume-card__btn[data-lt-tone="light"]) { color: #17171c; }
+:where(.agent-resume-card__btn[data-lt-tone="dark"]) { color: #e8eaed; }
+:where(.agent-resume-card__btn[data-lt-contrast="high"][data-lt-tone="light"]) { color: #000; }
+:where(.agent-resume-card__btn[data-lt-contrast="high"][data-lt-tone="dark"]) { color: #fff; }
