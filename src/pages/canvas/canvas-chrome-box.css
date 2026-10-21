@@ -4,13 +4,6 @@
 .role-setting.response-settings .mode-item {
     padding: 4px 12px
 }
-.role-setting.response-settings .response-discard {
-    padding: 8px 12px
-}
-.role-setting.response-settings .response-discard-keep,
-  .role-setting.response-settings .response-discard-ok {
-    padding: 0 8px
-}
 .header-box {
     padding: 0 10px
 }
