@@ -4792,7 +4792,7 @@ function getSystemMsgSub(finishReason, item = null, index = -1) {
   if (item) {
     const actions = getSystemMsgCtas(item, index).map(entry => entry.action);
     const legacyAction = getSystemMsgCtaAction(finishReason, item, index);
-    if (legacyAction) actions.push(legacyAction);
+    if (legacyAction && getSystemMsgCta(finishReason, item, index)) actions.push(legacyAction);
     const cause = item.failureCause || finishReason;
     if (['no_final_answer', 'empty_response', 'no_answer'].includes(cause)) {
       return operationFailureSub(cause, t, { actions, hasReasoning: !!item.thinkingContent });
