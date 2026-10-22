@@ -95,6 +95,8 @@ export interface BackwardOperationEntry {
   operationId: string
   conversationId: string
   targetChatId: string
+  historyEpoch: number
+  nextSeq: number
   attempt: number
   createdAt: number
   updatedAt: number
@@ -104,6 +106,8 @@ export function createBackwardOperationEntry(input: {
   operationId: unknown
   conversationId: unknown
   targetChatId: unknown
+  historyEpoch?: number
+  nextSeq?: number
   now?: number
 }): BackwardOperationEntry {
   const now = Number.isFinite(input.now) ? Number(input.now) : Date.now()
@@ -112,6 +116,8 @@ export function createBackwardOperationEntry(input: {
     operationId: String(input.operationId || '').trim(),
     conversationId: String(input.conversationId || '').trim(),
     targetChatId: String(input.targetChatId || '').trim(),
+    historyEpoch: input.historyEpoch ?? 0,
+    nextSeq: input.nextSeq ?? 1,
     attempt: 0,
     createdAt: now,
     updatedAt: now,
@@ -132,9 +138,12 @@ export function normalizeBackwardOperationEntry(
   const updatedAt = Number(input.updatedAt)
   const attempt = Number(input.attempt)
   if (!operationId || !conversationId || !targetChatId) return null
+  if (!Number.isSafeInteger(input.historyEpoch) || input.historyEpoch < 0 || !Number.isSafeInteger(input.nextSeq) || input.nextSeq < 1) return null
   if (expected && conversationId !== expected) return null
   if (
     !Number.isFinite(createdAt)
+    || createdAt <= 0
+    || createdAt > now
     || !Number.isFinite(updatedAt)
     || !Number.isInteger(attempt)
     || attempt < 0
@@ -144,6 +153,8 @@ export function normalizeBackwardOperationEntry(
     operationId,
     conversationId,
     targetChatId,
+    historyEpoch: input.historyEpoch,
+    nextSeq: input.nextSeq,
     attempt,
     createdAt,
     updatedAt,

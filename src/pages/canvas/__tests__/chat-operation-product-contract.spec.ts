@@ -626,6 +626,8 @@ describe('desktop chat operation product contract', () => {
       operationId: 'rollback-one',
       conversationId: 'conv-1',
       targetChatId: 'chat-5',
+      historyEpoch: 0,
+      nextSeq: 1,
       attempt: 0,
       createdAt: 1_000,
       updatedAt: 1_000,
