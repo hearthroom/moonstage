@@ -94,6 +94,8 @@
 	"chat.noFinalAnswerTimeout": "等待回复超时",
 	"chat.switchModel": "切换模型",
 	"chat.switchLane": "切换线路",
+	"chat.resendNewLane": "用新线路重新发送",
+	"chat.resendNewModel": "用新模型重新发送",
 	"chat.editFilteredMessage": "修改消息",
 	"chat.streamingTurnOffFailed": "这次没有关闭流式输出，请再试一次。",
 	"chat.streamingTurnedOff": "已关闭流式输出，回复会整段生成完才显示。可在「回复偏好」改回。",

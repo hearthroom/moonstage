@@ -95,6 +95,8 @@
 	"chat.noFinalAnswerTimeout": "返信の待機時間超過",
 	"chat.switchModel": "モデルを変更",
 	"chat.switchLane": "回線を変更",
+	"chat.resendNewLane": "新しい回線で再送信",
+	"chat.resendNewModel": "新しいモデルで再送信",
 	"chat.editFilteredMessage": "メッセージを編集",
 	"chat.streamingTurnOffFailed": "ストリーミング出力をオフにできませんでした。もう一度お試しください。",
 	"chat.streamingTurnedOff": "ストリーミング出力をオフにしました。返信は完成後にまとめて表示され、「返信の好み」でオンに戻せます。",

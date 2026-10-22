@@ -27,7 +27,9 @@ export interface FilterCardContext {
   streamingApplies: boolean
   canEditMessage: boolean
   hasOtherLanes: boolean
-  labels: { retryAsIs: string; streamOffRetry: string; switchLane: string; editMessage: string }
+  /** 前置被擋後，玩家從這張卡換了線路（同一個模型）或模型、而且選好了；'' ＝還沒換。 */
+  switchedTo?: '' | 'lane' | 'model'
+  labels: { retryAsIs: string; streamOffRetry: string; switchLane: string; editMessage: string; resendLane: string; resendModel: string }
 }
 
 export interface FilterCardResult {
@@ -57,8 +59,8 @@ export function isUnknownOutputFilter(item: any): boolean {
   return copyKey(item) === 'systemMsg.filterUnknown' && (item.failureCause || item.finishReason) === 'content_filter'
 }
 
-/** 「關閉流式輸出並重試」存完偏好後要走的那一顆重試（伺服器給哪一種不一定）。 */
-export function streamOffRetryTarget(base: FilterCardEntry[]): string {
+/** 卡上那顆重試（伺服器給哪一種不一定）：關閉流式輸出並重試、換線路／模型後重送都走它。 */
+export function cardRetryTarget(base: FilterCardEntry[]): string {
   return base.find(entry => isRetry(entry.action))?.action || ''
 }
 
@@ -72,12 +74,18 @@ export function filterCardActions(ctx: FilterCardContext): FilterCardResult {
       if (entry.action === 'switch_model' && ctx.hasOtherLanes) ctas.push({ action: 'switch_lane', label: labels.switchLane })
       ctas.push(entry)
     }
-    if (ctx.canEditMessage) ctas.push({ action: 'edit_message', label: labels.editMessage })
+    // 換了線路或模型之後，原樣重送才有意義：主行動換成重送（玩家按了才送，只看看選單不會扣費）。
+    // 伺服器沒給任何重試動作就沒有路可走，維持修改訊息。
+    if (ctx.switchedTo && cardRetryTarget(base)) {
+      ctas.push({ action: 'resend_filtered', label: ctx.switchedTo === 'lane' ? labels.resendLane : labels.resendModel })
+    } else if (ctx.canEditMessage) {
+      ctas.push({ action: 'edit_message', label: labels.editMessage })
+    }
     return { ctas, offersStreamOff: false, streamingOff: false, stacked: ctas.length >= 3 }
   }
   if (!isUnknownOutputFilter(item) || !ctx.streamingApplies) return unchanged
   if (ctx.streaming === 'off') return { ...unchanged, streamingOff: true }
-  if (ctx.streaming !== 'on' || !streamOffRetryTarget(base)) return unchanged
+  if (ctx.streaming !== 'on' || !cardRetryTarget(base)) return unchanged
   return {
     ctas: [
       ...base.map(entry => (isRetry(entry.action) ? { ...entry, label: labels.retryAsIs } : entry)),

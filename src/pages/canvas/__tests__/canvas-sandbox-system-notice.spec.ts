@@ -48,7 +48,7 @@ function canvasFunctions(names: string[], env: Record<string, unknown>): Record<
   return new Function(...keys, `${js}\nreturn { ${names.join(', ')} };`)(...keys.map((k) => env[k]))
 }
 
-type FilterEnv = { streaming?: '' | 'on' | 'off'; settings?: boolean; world?: boolean; agent?: boolean; lanes?: number; busy?: string }
+type FilterEnv = { streaming?: '' | 'on' | 'off'; settings?: boolean; world?: boolean; agent?: boolean; lanes?: number; busy?: string; switched?: { itemId: string; from: string }; current?: string }
 function resolver(timeline: any[], over: { capabilities?: unknown; operations?: unknown[]; ui?: Record<string, unknown>; translate?: (key:string)=>string; filter?: FilterEnv } = {}) {
   const f = over.filter || {}
   // 一顆模型、lanes 條線路（目前用的是第一條）
@@ -56,7 +56,7 @@ function resolver(timeline: any[], over: { capabilities?: unknown; operations?: 
   const fns = canvasFunctions([
     'getSystemMsgKind', 'getSystemMsgLabel', 'getSystemMsgSub', 'getSystemMsgCtaLabel', 'getSystemMsgCta',
     'getSystemMsgCtas', 'getSystemMsgCtaAction', 'canSwitchModelFor', 'creditsOverrideFor',
-    'filterCardFor', 'filterCardBase', 'canEditFilteredMessage', 'filterCardPlayerIndex', 'currentModelHasOtherLanes',
+    'filterCardFor', 'filterCardBase', 'canEditFilteredMessage', 'filterCardPlayerIndex', 'filterCardSwitchedTo', 'familyOfVariant', 'currentModelHasOtherLanes',
     'exactTimelineRowIndex', 'firstExactTimelineRowIndex', 'systemNoticeFor',
   ], {
     filterCardActions,
@@ -69,8 +69,9 @@ function resolver(timeline: any[], over: { capabilities?: unknown; operations?: 
     roleView: { value: f.world ? { world: {} } : {} },
     multiPassEffective: { value: f.agent ?? false },
     previewOnly: { value: false },
-    selectedVariantValue: { value: 'm-lane0' },
-    modelGroups: { value: [{ families: [{ family: 'M', variants }] }] },
+    selectedVariantValue: { value: f.current ?? 'm-lane0' },
+    modelGroups: { value: [{ families: [{ family: 'M', variants }, { family: 'Other', variants: [{ value: 'other-1' }] }] }] },
+    filterCardSwitch: { value: f.switched ?? null },
     formData: { context: 1 },
     filterCardBusy: { value: f.busy ?? '' },
     t: over.translate || t,
@@ -231,6 +232,15 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
     const single = resolver(timeline, { filter: { lanes: 1 } })(1)!
     expect(single.actions.map((a) => a.action)).toEqual(['switch_model', 'edit_message'])
     expect(single).not.toHaveProperty('stackedPrimary')
+  })
+
+  it('從這張卡換了線路並選好：主行動換成用新線路重送；換成別的模型是用新模型重送；選單打開又沒換就照舊', () => {
+    const timeline = [user('u1'), failed({ finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'input_policy' })]
+    const switched = { itemId: 'operation-projection-op1', from: 'm-lane0' }
+    expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'm-lane1' } })(1)!.actions.map((a) => a.label)).toEqual(['切換線路', '切換模型', '用新線路重送'])
+    expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'other-1' } })(1)!.actions.at(-1)).toEqual({ action: 'resend_filtered', label: '用新模型重送' })
+    expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'm-lane0' } })(1)!.actions.at(-1)!.action).toBe('edit_message')
+    expect(resolver(timeline, { filter: { lanes: 3, switched: { itemId: 'another-card', from: 'm-lane0' }, current: 'm-lane1' } })(1)!.actions.at(-1)!.action).toBe('edit_message')
   })
 
   it('前置被擋的舊卡（不是最新一列）沒有修改訊息', () => {
