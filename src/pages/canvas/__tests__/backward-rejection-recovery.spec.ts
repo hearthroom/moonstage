@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it, vi as mock } from 'vitest'
-import { classifyBackwardOperationResponse, normalizeBackwardOperationEntry } from '../chat-operation-ui-state'
+import { classifyBackwardOperationResponse, createBackwardOperationEntry, normalizeBackwardOperationEntry } from '../chat-operation-ui-state'
 import { isChatOperationVisibleOutcomeExpired } from '../chat-transport-ownership'
 const chat = fs.readFileSync(path.join(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
 const start = chat.indexOf('function schedulePendingBackwardOperation(')
@@ -72,7 +72,7 @@ describe('Backward rejection and waiting bounds', () => {
     }
     env._this = env
     const post = new Function(...Object.keys(env), POST_SOURCE + '\nreturn postPendingBackwardOperation;')(...Object.values(env))
-    post.call(env, { version: 1, operationId: 'rollback-fixture', conversationId: 'fixture-conversation', targetChatId: 'fixture-target', createdAt: Date.now(), updatedAt: Date.now(), attempt: 0 })
+    post.call(env, createBackwardOperationEntry({ operationId: 'rollback-fixture', conversationId: 'fixture-conversation', targetChatId: 'fixture-target' }))
     for (let i = 0; i < 5; i++) await Promise.resolve()
     expect(fail).toHaveBeenCalledTimes(1)
     expect(retry).not.toHaveBeenCalled()
