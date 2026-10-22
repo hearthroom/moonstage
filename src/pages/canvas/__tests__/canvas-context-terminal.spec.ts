@@ -4,7 +4,7 @@ import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick, ref, unref } from 'vue'
 import { operationFailureTitle } from '@/utils/operation-failure-copy'
-import { findOperationCandidate } from '../chat-operation-ui-state'
+import { findOperationCandidate, nextBackwardHistorySnapshot } from '../chat-operation-ui-state'
 import {
   normalizeChatOperationStatus, shouldApplyOperationStatus,
   mergeOperationStatusIntoStreamEntry, isChatOperationTerminal, projectionFinishReason,
@@ -16,7 +16,8 @@ import {
 const canvas = readFileSync(resolve(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
 const handlers = canvas.slice(canvas.indexOf('function operationKindFromServer('),
   canvas.indexOf('\nfunction ', canvas.indexOf('function handleOperationStatusEvent(') + 1))
-const js = ts.transpileModule(handlers, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
+const snapshotHandler = canvas.slice(canvas.indexOf('function applyBackwardHistorySnapshot('), canvas.indexOf('function backwardStorageKey('))
+const js = ts.transpileModule(snapshotHandler + handlers, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
 
 function harness() {
   const row = ref<any>({ id: 'pending-ai', operationBubbleId: 'pending-ai', type: 0,
@@ -26,6 +27,8 @@ function harness() {
   const bindings: Record<string, any> = {
     pendingChatTurn: { aiBubbleId: 'pending-ai', operationId: 'op-1', operationState: 'generating', operationVersion: 1 },
     conversationId: ref('conv-1'), talkList: ref([row.value]), unref,
+    backwardHistorySnapshot: ref({ conversationId: 'conv-1', historyEpoch: 1, nextSeq: 1 }),
+    nextBackwardHistorySnapshot,
     normalizeChatOperationStatus, shouldApplyOperationStatus,
     mergeOperationStatusIntoStreamEntry, isChatOperationTerminal, projectionFinishReason,
     notifyBufferedTerminal, isBufferedTerminalFailure,
@@ -51,6 +54,7 @@ function harness() {
 }
 
 const terminal = { operationId: 'op-1', conversationId: 'conv-1', kind: 'send',
+  historyEpoch: 2, nextSeq: 5,
   state: 'completed', version: 2, assistantChatId: 'reply-1', outputDisposition: 'adopted',
   hasContextUsage: true, model: 'test-model',
   contextUsage: { inputTokens: 200, outputTokens: 30, cachedTokens: 20, cacheWriteTokens: 0 } }
@@ -79,6 +83,11 @@ describe('context usage on the newly completed reply', () => {
     expect(app.clearStreamState).toHaveBeenCalledOnce()
     expect(app.clearStreamState).toHaveBeenCalledWith({ preservePersistedOperation: true })
     expect(app.getHistoryMsg).toHaveBeenCalledOnce()
+    // The page-one request remains unresolved: the terminal metadata itself
+    // must make a first rollback use the current timeline.
+    expect(app.bindings.backwardHistorySnapshot.value).toEqual({
+      conversationId: 'conv-1', historyEpoch: 2, nextSeq: 5,
+    })
   })
 
   // 輸入框旁的小圓環看最新一輪：伺服器確認這一輪結束時重讀，不必等玩家離開再進來。
