@@ -68,7 +68,10 @@ describe('Backward retry exhaustion has no dead end (desktop)', () => {
       'function failPendingBackwardOperation',
       'function schedulePendingBackwardOperation',
     )
-    expect(failFn).toContain('rollbackPending.value = false')
+    expect(failFn).toContain('finishPendingBackwardOperation(entry)')
+    const finishFn = chat.slice(chat.indexOf('function finishPendingBackwardOperation('), chat.indexOf('function failPendingBackwardOperation('))
+    expect(finishFn).toContain('rollbackPending.value = false')
+    expect(finishFn).toContain('getHistoryMsg()')
   })
 
   it('preserves the existing bounded-retry behavior for non-exhausted attempts (no regression)', () => {
