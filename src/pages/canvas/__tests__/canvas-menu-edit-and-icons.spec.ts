@@ -24,6 +24,29 @@ describe('改寫態', () => {
   })
 })
 
+// 任務 2026-10-23-content-filter-stop-actions：從內容限制卡按「修改訊息」、或從選單按「編輯並重送」，
+// 進編輯態時輸入框就拿到焦點、游標在字尾，玩家可以直接改字（手機上順勢叫出鍵盤）。
+describe('進編輯態就能打字', () => {
+  it('editing 由 false 變 true：輸入框拿到焦點，游標在字尾', async () => {
+    const w = mount(CanvasMessageMenu, { attachTo: document.body, props: { open: true, editing: false, draft: '原本那句話' } })
+    try {
+      await w.setProps({ editing: true })
+      await new Promise((r) => setTimeout(r, 0))
+      const ta = w.find('textarea').element as HTMLTextAreaElement
+      expect(document.activeElement).toBe(ta)
+      expect(ta.selectionStart).toBe('原本那句話'.length)
+      expect(ta.selectionEnd).toBe('原本那句話'.length)
+    } finally { w.unmount() }
+  })
+  it('一打開就是編輯態也一樣', async () => {
+    const w = mount(CanvasMessageMenu, { attachTo: document.body, props: { open: true, editing: true, draft: 'abc' } })
+    try {
+      await new Promise((r) => setTimeout(r, 0))
+      expect(document.activeElement).toBe(w.find('textarea').element)
+    } finally { w.unmount() }
+  })
+})
+
 describe('倒回這裡', () => {
   it('開場白可以當倒回目標（不是最新一則時）：一步回到起點，長期指令與手帳留著', () => {
     const src = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')

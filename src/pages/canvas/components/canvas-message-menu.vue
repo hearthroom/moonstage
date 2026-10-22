@@ -41,6 +41,7 @@
     <div class="msg-modify-scope" :class="{ 'is-open': editing }">
       <div class="modify-input-box">
         <CanvasTextarea
+          ref="editEl"
           el-class="edit_textarea"
           :value="draft"
           @input="$emit('update:draft', ($event.target as HTMLTextAreaElement).value)"
@@ -100,6 +101,19 @@ const emit = defineEmits<{
 const MENU_ARM_MS = 400
 const openedAt = ref(0)
 watch(() => props.open, (open) => { if (open) openedAt.value = Date.now() }, { immediate: true })
+
+// 進編輯態就把焦點交給輸入框、游標放字尾：玩家要做的就是改字，不必再點一下（手機上順勢叫出鍵盤）。
+const editEl = ref<{ el?: HTMLTextAreaElement | null } | null>(null)
+watch(() => props.editing, (editing) => {
+  if (!editing) return
+  nextTick(() => {
+    const ta = editEl.value?.el
+    if (!ta) return
+    ta.focus({ preventScroll: true })
+    const end = ta.value.length
+    ta.setSelectionRange(end, end)
+  })
+}, { immediate: true })
 
 function pick(item: { key: string; disabled?: boolean }) {
   if (!item || item.disabled) return
