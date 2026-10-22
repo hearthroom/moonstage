@@ -163,8 +163,9 @@ export default {
   },
   methods: {
     measurePanel() { syncChromeTone(this.$el); },
+    // resend_filtered：換線路／模型後重送那一則，就是重試；不掛 data-lt="retry"（作者樣式契約只認 retry 開頭的鍵）。
     showsRetryIcon(action) {
-      return action === 'rewrite' || String(action || '').startsWith('retry');
+      return action === 'rewrite' || action === 'resend_filtered' || String(action || '').startsWith('retry');
     },
     isRetryAction(action) {
       return String(action || '').startsWith('retry');
