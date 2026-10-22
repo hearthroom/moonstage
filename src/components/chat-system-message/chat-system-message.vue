@@ -38,8 +38,9 @@
       </view>
 
       <!-- busy：按下去之後要先存偏好才重試，這段時間整列不能按，免得重複送出或同時按了別顆。
-           stackedPrimary：手機上主行動整行排第一（三顆排不進一行時），由呼叫端決定，這裡不認動作名。 -->
-      <view v-if="resolvedCtas.length" class="sys-ctas" :class="{ 'is-busy': busy, 'sys-ctas--stacked-primary': stackedPrimary }">
+           stackedPrimary：手機上主行動整行排第一（三顆排不進一行時），由呼叫端決定，這裡不認動作名。
+           三顆以上時桌機也整排落到說明下方：放在說明旁邊會依說明長短時而並排、時而換行，說明還會被擠窄。 -->
+      <view v-if="resolvedCtas.length" class="sys-ctas" :class="{ 'is-busy': busy, 'sys-ctas--stacked-primary': stackedPrimary, 'sys-ctas--below': stackedPrimary && resolvedCtas.length >= 3 }">
         <!-- data-lt="retry" 是作者樣式契約裡的穩定選擇器（見 author-theme-vars.css）：
              重試鍵在這一端就是系統訊息卡上的那顆 CTA，作者要改它得抓得到。 -->
         <view v-for="(entry, index) in resolvedCtas" :key="entry.action"
@@ -297,6 +298,7 @@ export default {
   overflow-wrap: anywhere;
 }
 .sys-ctas.is-busy .sys-cta { opacity: .6; cursor: default; pointer-events: none; }
+.sys-ctas--below { flex: 1 1 100%; }
 @media (max-width: 480px) {
   .sys-ctas--stacked-primary { flex: 1 1 100%; }
   .sys-ctas--stacked-primary .sys-cta { flex: 1 1 0; min-width: 0; }
