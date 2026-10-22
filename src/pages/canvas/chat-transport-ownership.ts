@@ -735,6 +735,9 @@ export function isBufferedTerminalFailure(status: ChatOperationStatus): boolean 
     && ['interrupted', 'stopped', 'failed_retryable', 'failed_terminal'].includes(status.state)
 }
 
+const CONTENT_RESTRICTION = ['content_filter', 'content_filter_input', 'refusal']
+
+// 內容限制家族不跳：那張卡就在剛才等待的位置，有完整說明與下一步，提示的字跟卡標題一樣，只是重複。
 export function notifyBufferedTerminal(
   status: ChatOperationStatus,
   body: unknown,
@@ -742,6 +745,7 @@ export function notifyBufferedTerminal(
   notify: () => void,
 ): void {
   if (!isBufferedTerminalFailure(status) || String(body ?? '').trim() || !status.operationId || shown.has(status.operationId)) return
+  if (CONTENT_RESTRICTION.includes(String(status.finishReason || '')) || CONTENT_RESTRICTION.includes(String(status.failureCause || ''))) return
   shown.add(status.operationId)
   if (shown.size > 128) shown.delete(shown.values().next().value!)
   notify()

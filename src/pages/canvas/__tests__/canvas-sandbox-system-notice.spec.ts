@@ -27,6 +27,9 @@ import {
 import { operationFailureSub, operationFailureTitle } from '@/utils/operation-failure-copy'
 import { findResumableAgentOperation } from '@/utils/agent-composer-action'
 import { allowsStageAction } from '@/host/capabilities'
+import { filterCardActions, isInputPolicyFilter } from '../canvas-filter-card'
+import { canEditResendPlayerIndex, latestTerminalAIIndex } from '../chat-operation-ui-state'
+import { isDeadLane } from '../canvas-model-lanes'
 import zh from '@/locale/zh-Hant.json'
 
 const CANVAS = fs.readFileSync(path.join(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
@@ -45,11 +48,31 @@ function canvasFunctions(names: string[], env: Record<string, unknown>): Record<
   return new Function(...keys, `${js}\nreturn { ${names.join(', ')} };`)(...keys.map((k) => env[k]))
 }
 
-function resolver(timeline: any[], over: { capabilities?: unknown; operations?: unknown[]; ui?: Record<string, unknown>; translate?: (key:string)=>string } = {}) {
+type FilterEnv = { streaming?: '' | 'on' | 'off'; settings?: boolean; world?: boolean; agent?: boolean; lanes?: number; busy?: string }
+function resolver(timeline: any[], over: { capabilities?: unknown; operations?: unknown[]; ui?: Record<string, unknown>; translate?: (key:string)=>string; filter?: FilterEnv } = {}) {
+  const f = over.filter || {}
+  // 一顆模型、lanes 條線路（目前用的是第一條）
+  const variants = Array.from({ length: f.lanes ?? 1 }, (_, i) => ({ value: `m-lane${i}` }))
   const fns = canvasFunctions([
     'getSystemMsgKind', 'getSystemMsgLabel', 'getSystemMsgSub', 'getSystemMsgCtaLabel', 'getSystemMsgCta',
-    'getSystemMsgCtas', 'getSystemMsgCtaAction', 'canSwitchModelFor', 'creditsOverrideFor', 'systemNoticeFor',
+    'getSystemMsgCtas', 'getSystemMsgCtaAction', 'canSwitchModelFor', 'creditsOverrideFor',
+    'filterCardFor', 'filterCardBase', 'canEditFilteredMessage', 'filterCardPlayerIndex', 'currentModelHasOtherLanes',
+    'exactTimelineRowIndex', 'firstExactTimelineRowIndex', 'systemNoticeFor',
   ], {
+    filterCardActions,
+    isInputPolicyFilter,
+    canEditResendPlayerIndex,
+    latestTerminalAIIndex,
+    isDeadLane,
+    cardStreamingValue: { value: f.streaming ?? '' },
+    responseSettingsSupported: { value: f.settings ?? true },
+    roleView: { value: f.world ? { world: {} } : {} },
+    multiPassEffective: { value: f.agent ?? false },
+    previewOnly: { value: false },
+    selectedVariantValue: { value: 'm-lane0' },
+    modelGroups: { value: [{ families: [{ family: 'M', variants }] }] },
+    formData: { context: 1 },
+    filterCardBusy: { value: f.busy ?? '' },
     t: over.translate || t,
     unref: (v: any) => (v && typeof v === 'object' && 'value' in v ? v.value : v),
     talkList: { value: timeline },
@@ -171,6 +194,48 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
     ]
     const resolve = resolver(rows)
     rows.forEach((_, i) => expect(resolve(i)).toBeNull())
+  })
+
+  it('內容限制、原因未提供、流式開：多一顆關閉流式輸出並重試（主行動），重試改叫直接重試，手機疊排', () => {
+    const timeline = [user('u1'), failed({ finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'unknown' })]
+    const notice = resolver(timeline, { filter: { streaming: 'on' } })(1)!
+    expect(notice.actions).toEqual([
+      { action: 'retry', label: '直接重試' }, { action: 'switch_model', label: '切換模型' }, { action: 'retry_stream_off', label: '關閉流式輸出並重試' },
+    ])
+    expect(notice.sub).toBe(t('systemMsg.filterUnknownSubStream'))
+    expect(notice.stackedPrimary).toBe(true)
+    expect(notice).not.toHaveProperty('busy')
+    expect(resolver(timeline, { filter: { streaming: 'on', busy: 'operation-projection-op1' } })(1)!.busy).toBe(true)
+  })
+
+  it('流式已關：動作照舊，說明建議切換模型；世界卡、Agent、值還沒讀到：卡完全照舊', () => {
+    const timeline = [user('u1'), failed({ finishReason: 'content_filter', failureCause: 'content_filter' })]
+    const off = resolver(timeline, { filter: { streaming: 'off' } })(1)!
+    expect(off.actions.map((a) => a.action)).toEqual(['retry', 'switch_model'])
+    expect(off.sub).toBe(t('systemMsg.filterUnknownSubSwitch'))
+    for (const filter of [{ streaming: 'on' as const, world: true }, { streaming: 'on' as const, agent: true }, { streaming: '' as const }, { streaming: 'on' as const, settings: false }]) {
+      const n = resolver(timeline, { filter })(1)!
+      expect(n.actions).toEqual([{ action: 'retry', label: '重試' }, { action: 'switch_model', label: '切換模型' }])
+      expect(n.sub).toBe(t('systemMsg.filterUnknownSub'))
+      expect(n).not.toHaveProperty('stackedPrimary')
+    }
+  })
+
+  it('前置被擋：拿掉重試；有別條線路時 [切換線路][切換模型][修改訊息]，沒有就不給切換線路', () => {
+    const timeline = [user('u1'), failed({ finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'input_policy' })]
+    const notice = resolver(timeline, { filter: { streaming: 'on', lanes: 3 } })(1)!
+    expect(notice.label).toBe(t('systemMsg.filterInputPolicy'))
+    expect(notice.sub).toBe(t('systemMsg.filterInputPolicySub'))
+    expect(notice.actions).toEqual([{ action: 'switch_lane', label: '切換線路' }, { action: 'switch_model', label: '切換模型' }, { action: 'edit_message', label: '修改訊息' }])
+    expect(notice.stackedPrimary).toBe(true)
+    const single = resolver(timeline, { filter: { lanes: 1 } })(1)!
+    expect(single.actions.map((a) => a.action)).toEqual(['switch_model', 'edit_message'])
+    expect(single).not.toHaveProperty('stackedPrimary')
+  })
+
+  it('前置被擋的舊卡（不是最新一列）沒有修改訊息', () => {
+    const timeline = [user('u1'), failed({ finishReason: 'content_filter', filterReason: 'input_policy' }), user('u2', '再來'), { id: 'a2', chatId: 'a2', type: 0, content: '好', chatFinish: true }]
+    expect(resolver(timeline, { filter: { lanes: 3 } })(1)!.actions).toEqual([])
   })
 
   it('模板與 systemNoticeFor 用的是同一組運算式（改一邊沒改另一邊就紅）', () => {

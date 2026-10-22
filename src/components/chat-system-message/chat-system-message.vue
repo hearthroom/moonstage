@@ -2,6 +2,7 @@
   <view class="sys-msg-wrap" :class="['sys-tone-' + tone]">
     <view class="sys-msg-card" :class="['sys-kind-' + kind]"
           :role="liveRegionRole" :aria-live="liveRegionPoliteness"
+          :aria-busy="busy ? 'true' : null"
           aria-atomic="true">
       <view class="sys-icon-box">
         <!-- model-error: alert triangle -->
@@ -36,17 +37,21 @@
         </text>
       </view>
 
-      <view v-if="resolvedCtas.length" class="sys-ctas">
+      <!-- busy：按下去之後要先存偏好才重試，這段時間整列不能按，免得重複送出或同時按了別顆。
+           stackedPrimary：手機上主行動整行排第一（三顆排不進一行時），由呼叫端決定，這裡不認動作名。 -->
+      <view v-if="resolvedCtas.length" class="sys-ctas" :class="{ 'is-busy': busy, 'sys-ctas--stacked-primary': stackedPrimary }">
         <!-- data-lt="retry" 是作者樣式契約裡的穩定選擇器（見 author-theme-vars.css）：
              重試鍵在這一端就是系統訊息卡上的那顆 CTA，作者要改它得抓得到。 -->
         <view v-for="(entry, index) in resolvedCtas" :key="entry.action"
               class="sys-cta"
               :data-lt="isRetryAction(entry.action) ? 'retry' : null"
               role="button" tabindex="0" :aria-label="entry.label"
+              :aria-disabled="busy ? 'true' : null"
               :class="{ 'sys-cta-primary': index === resolvedCtas.length - 1 }"
               @click.stop="onCta(entry.action)"
               @keydown="onCtaKeydown($event, entry.action)">
           <view v-if="showsRetryIcon(entry.action)" class="sys-cta-svg" v-html="'<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.5&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><polyline points=&quot;23 4 23 10 17 10&quot;/><polyline points=&quot;1 20 1 14 7 14&quot;/><path d=&quot;M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15&quot;/></svg>'"></view>
+          <view v-else-if="entry.action === 'edit_message'" class="sys-cta-svg sys-cta-edit-icon" v-html="'<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.5&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><path d=&quot;M12 20h9&quot;/><path d=&quot;M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z&quot;/></svg>'"></view>
           <view v-else-if="entry.action === 'open_vip'" class="sys-cta-svg" v-html="'<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.5&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><rect x=&quot;2&quot; y=&quot;5&quot; width=&quot;20&quot; height=&quot;14&quot; rx=&quot;2&quot;/><path d=&quot;M2 10h20&quot;/></svg>'"></view>
           <view v-else class="sys-cta-svg" v-html="'<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.5&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;width:100%;height:100%;display:block;&quot;><polyline points=&quot;13 17 18 12 13 7&quot;/><polyline points=&quot;6 17 11 12 6 7&quot;/></svg>'"></view>
           <text class="sys-cta-text">{{ entry.label }}</text>
@@ -112,6 +117,8 @@ export default {
     ctas: { type: Array, default: () => [] },
     // 宿主給的連結：[{ id, label, href }]
     links: { type: Array, default: () => [] },
+    busy: { type: Boolean, default: false },
+    stackedPrimary: { type: Boolean, default: false },
   },
   emits: ['cta'],
   mounted() {
@@ -162,6 +169,7 @@ export default {
       return String(action || '').startsWith('retry');
     },
     onCta(action) {
+      if (this.busy) return;
       this.$emit('cta', action);
     },
     onCtaKeydown(event, action) {
@@ -287,6 +295,12 @@ export default {
   text-decoration: none;
   max-width: 100%;
   overflow-wrap: anywhere;
+}
+.sys-ctas.is-busy .sys-cta { opacity: .6; cursor: default; pointer-events: none; }
+@media (max-width: 480px) {
+  .sys-ctas--stacked-primary { flex: 1 1 100%; }
+  .sys-ctas--stacked-primary .sys-cta { flex: 1 1 0; min-width: 0; }
+  .sys-ctas--stacked-primary .sys-cta-primary { flex: 1 1 100%; order: -1; }
 }
 @media (pointer: coarse) { .sys-cta { min-height: 44px; } }
 }

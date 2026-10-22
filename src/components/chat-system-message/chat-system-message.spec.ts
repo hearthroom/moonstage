@@ -197,3 +197,49 @@ describe('error panel legibility', () => {
     style.mockRestore()
   })
 })
+
+// 內容限制卡的新動作（任務 2026-10-23-content-filter-stop-actions）
+describe('ChatSystemMessage：處理中、手機疊排、修改訊息', () => {
+  const ctas = [{ action: 'retry', label: '直接重試' }, { action: 'switch_model', label: '切換模型' }, { action: 'retry_stream_off', label: '關閉流式輸出並重試' }]
+
+  it('busy：鍵全部不可按、按了不送出，卡標成忙碌', async () => {
+    const wrapper = mountCard({ kind: 'filtered', label: 'x', ctas, busy: true })
+    expect(wrapper.find('.sys-msg-card').attributes('aria-busy')).toBe('true')
+    expect(wrapper.find('.sys-ctas').classes()).toContain('is-busy')
+    for (const cta of wrapper.findAll('.sys-cta')) {
+      expect(cta.attributes('aria-disabled')).toBe('true')
+      await cta.trigger('click')
+      await cta.trigger('keydown', { key: 'Enter' })
+    }
+    expect(wrapper.emitted('cta')).toBeUndefined()
+  })
+
+  it('不忙時沒有忙碌標記', () => {
+    const wrapper = mountCard({ kind: 'filtered', label: 'x', ctas })
+    expect(wrapper.find('.sys-msg-card').attributes('aria-busy')).toBeUndefined()
+    expect(wrapper.find('.sys-cta').attributes('aria-disabled')).toBeUndefined()
+  })
+
+  it('stackedPrimary 由呼叫端決定，元件不認動作名', () => {
+    expect(mountCard({ kind: 'filtered', label: 'x', ctas, stackedPrimary: true }).find('.sys-ctas').classes()).toContain('sys-ctas--stacked-primary')
+    expect(mountCard({ kind: 'filtered', label: 'x', ctas }).find('.sys-ctas').classes()).not.toContain('sys-ctas--stacked-primary')
+  })
+
+  it('主行動仍是最後一顆；關閉流式輸出並重試也掛作者的重試選擇器', () => {
+    const wrapper = mountCard({ kind: 'filtered', label: 'x', ctas })
+    const buttons = wrapper.findAll('.sys-cta')
+    expect(buttons[2].classes()).toContain('sys-cta-primary')
+    expect(buttons[0].attributes('data-lt')).toBe('retry')
+    expect(buttons[2].attributes('data-lt')).toBe('retry')
+    expect(buttons[1].attributes('data-lt')).toBeUndefined()
+  })
+
+  it('修改訊息有自己的鉛筆圖示，不掛重試選擇器；切換線路沿用雙箭頭', () => {
+    const wrapper = mountCard({ kind: 'filtered', label: 'x', ctas: [{ action: 'switch_lane', label: '切換線路' }, { action: 'edit_message', label: '修改訊息' }] })
+    const [lane, edit] = wrapper.findAll('.sys-cta')
+    expect(edit.find('.sys-cta-edit-icon').exists()).toBe(true)
+    expect(edit.attributes('data-lt')).toBeUndefined()
+    expect(lane.find('.sys-cta-edit-icon').exists()).toBe(false)
+    expect(lane.attributes('data-lt')).toBeUndefined()
+  })
+})

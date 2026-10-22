@@ -77,6 +77,17 @@ describe('沙箱殼：系統訊息卡', () => {
     ])
   })
 
+  it('內容限制卡：手機疊排與存檔中的忙碌狀態照宿主給的畫，忙碌時按了不交回宿主', () => {
+    const h = listHarness()
+    const actions = [{ action: 'retry', label: '直接重試' }, { action: 'switch_model', label: '切換模型' }, { action: 'retry_stream_off', label: '關閉流式輸出並重試' }]
+    h.ml.reset([systemRow('h2', notice({ kind: 'filtered', actions, stackedPrimary: true, busy: true }))])
+    const card = h.frameOf('h2').querySelector('.sys-msg-card') as HTMLElement
+    expect(card.getAttribute('aria-busy')).toBe('true')
+    expect(card.querySelector('.sys-ctas')!.classList.contains('sys-ctas--stacked-primary')).toBe(true)
+    ;(card.querySelectorAll<HTMLElement>('.sys-cta')[2]).click()
+    expect(h.ui).toEqual([])
+  })
+
   it('作者腳本收不到系統列的任何事件（新增、掛上、定稿、移除都沒有）', () => {
     const h = listHarness()
     h.ml.reset([

@@ -28,6 +28,10 @@ const AUTHOR_ACTION: Record<string, string> = {
   open_model_settings: 'model-settings',
   capacity_choice: 'capacity',
   refresh_history: 'refresh',
+  // 內容限制卡上這一端接上的鍵（canvas-filter-card）：關閉流式輸出並重試、修改被擋的那則訊息、同一個模型換線路。
+  retry_stream_off: 'retry-stream-off',
+  edit_message: 'edit-message',
+  switch_lane: 'switch-lane',
 }
 
 export function outcomeFromSystemNotice(

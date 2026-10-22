@@ -8,7 +8,8 @@ export function normalizeFilterReason(reason: unknown): string {
 }
 function filterKey(cause: unknown, reason: unknown): string {
  if (!['content_filter', 'content_filter_input', 'refusal'].includes(String(cause)) && !reason) return ''
- const value = normalizeFilterReason(reason) || (cause === 'refusal' ? 'refusal' : 'unknown')
+ // 舊歷史的輸入端拒絕沒有原因：它就是前置被擋，跟 input_policy 用同一組字。
+ const value = normalizeFilterReason(reason) || (cause === 'refusal' ? 'refusal' : cause === 'content_filter_input' ? 'input_policy' : 'unknown')
  return 'systemMsg.filter' + FILTER_COPY[value]
 }
 /** Public causes only: never render raw provider errors or guess a network failure. */
@@ -38,10 +39,16 @@ export function operationFailureTitle(cause: unknown, t: (key: string) => string
 }
 
 /** Select copy from confirmed reasons, available actions and settlement evidence. */
-export function operationFailureSub(cause: unknown, t: (key: string) => string, opts: { agent?: boolean; filterReason?: unknown; canSwitch?: boolean; actions?: string[]; settled?: boolean; chargeCredits?: number; hasReasoning?: boolean } = {}): string {
+// offersStreamOff／streamingOff 來自卡上的鍵（canvas-filter-card），說明不會提到一顆卡上沒有的鍵。
+// 前置被擋的說明不點名按鍵，按鍵少一顆時同一句仍成立，所以沒有「不能切換」的變體。
+export function operationFailureSub(cause: unknown, t: (key: string) => string, opts: { agent?: boolean; filterReason?: unknown; canSwitch?: boolean; actions?: string[]; settled?: boolean; chargeCredits?: number; hasReasoning?: boolean; offersStreamOff?: boolean; streamingOff?: boolean } = {}): string {
   if (opts.hasReasoning && ['no_final_answer', 'empty_response', 'no_answer'].includes(String(cause))) return t('chat.noFinalAnswerSub')
   const restricted = filterKey(cause, opts.filterReason)
-  if (restricted) return t(restricted + (opts.canSwitch === false && ['systemMsg.filterInputPolicy','systemMsg.filterSafety','systemMsg.filterRefusal'].includes(restricted) ? 'SubNoSwitch' : 'Sub'))
+  if (restricted === 'systemMsg.filterUnknown') {
+    if (opts.offersStreamOff) return t(restricted + (opts.canSwitch === false ? 'SubStreamNoSwitch' : 'SubStream'))
+    if (opts.streamingOff && opts.canSwitch === true) return t(restricted + 'SubSwitch')
+  }
+  if (restricted) return t(restricted + (opts.canSwitch === false && ['systemMsg.filterSafety','systemMsg.filterRefusal'].includes(restricted) ? 'SubNoSwitch' : 'Sub'))
   if (typeof cause !== 'string') return ''
   switch (cause) {
     case 'no_final_answer':

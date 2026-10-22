@@ -553,10 +553,15 @@
 		/** 殼底部放設定鍵與攤開面板的位置；沒給（還沒掛上、或單獨掛這個元件）時就地渲染 */
 		dockChips?: HTMLElement | null
 		dockPanel?: HTMLElement | null
+		/**
+		 * 'lanes'：打開時直接停在目前這顆模型的線路清單（內容限制卡的「切換線路」——同一個模型換服務商）。
+		 * 不接回上次瀏覽的分類、切到目前模型所在那一格、把它的線路全部攤開並捲到看得見。
+		 */
+		focus?: '' | 'lanes'
 	}>(), {
 		roleId: '', open: true, selectModel: '', selectModelName: '', context: 1,
 		thinkingDepth: '', showThinkingProcess: true, autoCompactEnabled: false,
-		compactExtraInstruction: '', searchQuery: '', dockChips: null, dockPanel: null,
+		compactExtraInstruction: '', searchQuery: '', dockChips: null, dockPanel: null, focus: '',
 	});
 
 	const emit = defineEmits<{
@@ -1485,6 +1490,16 @@ const truncationText = (completionRate: number) => {
 	 */
 	const sheetEl = ref(null);
 	const REVEAL_FADE_PX = 32; // 捲動區下緣淡出的高度，跟 canvas.css 的遮罩同一個數
+	/** 打開到目前這顆模型的線路清單：展開它、攤開收合的線路、捲到看得見（props.focus === 'lanes'）。 */
+	const focusCurrentLanes = () => {
+		const family = displayFamilies.value.find(f => isFamilySelected(f));
+		if (!family) return;
+		detailFamilyName.value = family.family;
+		closeLaneDetail();
+		expandedLaneFamilies.value = { ...expandedLaneFamilies.value, [family.family]: true };
+		revealFamily(familyKey(family));
+	};
+
 	const revealFamily = (key) => {
 		nextTick(() => {
 			const root = sheetEl.value;
@@ -2081,7 +2096,8 @@ const truncationText = (completionRate: number) => {
 				// 接回使用者上一輪瀏覽到的分類（見 utils/model-select-category-memory）。
 				// 接得回來就不要再跳到目前使用中的模型——那個跳轉是給「沒有瀏覽意圖」
 				// 的進場用的，重放在回頁上等於把使用者剛看到的位置洗掉。
-				const resumedBrowsedCategory = resumeBrowsedCategory();
+				const focusLanes = props.focus === 'lanes';
+				const resumedBrowsedCategory = !focusLanes && resumeBrowsedCategory();
 				if (!resumedBrowsedCategory) showGlobalTop(false);
 
 
@@ -2091,6 +2107,7 @@ const truncationText = (completionRate: number) => {
 					// Sync selectItem
 					syncSelectItem();
 					isLoading.value = false;
+					if (focusLanes) focusCurrentLanes();
 				});
 			} else {
 				message.error(res.data.error);
