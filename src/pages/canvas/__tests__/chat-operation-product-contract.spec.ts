@@ -646,6 +646,16 @@ describe('desktop chat operation product contract', () => {
     })).toBe('legacy_fallback')
   })
 
+  it('does not resume a legacy Backward marker created before durable mutation receipts', () => {
+    const entry = createBackwardOperationEntry({
+      operationId: 'legacy-backward',
+      conversationId: 'conv-1',
+      targetChatId: 'chat-5',
+      now: 1_000,
+    })
+    expect(normalizeBackwardOperationEntry({ ...entry, version: 1 }, 'conv-1', 2_000)).toBeNull()
+  })
+
   it('keeps one Backward identity and a mutation guard after six consecutive 202 responses', () => {
     let entry = createBackwardOperationEntry({
       operationId: 'rollback-six-202',

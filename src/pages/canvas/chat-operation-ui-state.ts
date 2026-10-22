@@ -83,7 +83,10 @@ export interface RewriteSnapshot {
   aiBubble: any
 }
 
-export const BACKWARD_OPERATION_ENTRY_VERSION = 1
+// Version 1 predates durable server mutation receipts. Reposting one after an
+// upgrade could execute an already-completed rollback against newer replies.
+// Discard it and reconcile history; version 2 identities are receipt-backed.
+export const BACKWARD_OPERATION_ENTRY_VERSION = 2
 const BACKWARD_OPERATION_RETRY_DELAYS = [2_000, 5_000, 10_000, 20_000, 30_000] as const
 export const BACKWARD_OPERATION_SLOW_RETRY_DELAY_MS = 60_000
 
