@@ -45,7 +45,7 @@ function terminationHarness(queued: boolean, pollingAvailable: boolean) {
     + take('function requestPendingOperationReconciliation(', 'function resumePendingOperationReconciliationOnForeground(')
     + take('function handleOwnedSocketTermination(', 'function handleModExpiryAckRequired(')
     + take('function handleChatTransportDeadline(', 'function handleOwnedSocketTermination(')
-    + '\nreturn { terminate: handleOwnedSocketTermination, deadline: handleChatTransportDeadline, sendQueued: sendQueuedChatPayload, getPending: () => pendingChatTurn };'
+    + '\nreturn { terminate: handleOwnedSocketTermination, deadline: handleChatTransportDeadline, sendQueued: sendQueuedChatPayload, getPending: () => pendingChatTurn, setPending: (pending) => { pendingChatTurn = pending } };'
   scope.requestAuthoritativeOperationReconciliation = () => false
   scope.canUseChatOperationOutcome = () => true
   scope.prepareChatPayload = (v: any) => ({ ok: true, payload: v })
@@ -101,6 +101,32 @@ describe('WS never ready', () => {
     expect(h.scope.content.value).toBe(payload.message)
     expect(h.scope.persisted).toBeNull()
     expect(h.scope.probePendingTurnAfterDurableAckTimeout).not.toHaveBeenCalled()
+  })
+
+  it('does not restore an accepted turn whose operationId has not arrived', () => {
+    const h = terminationHarness(false, false)
+    h.getPending().accepted = true
+    h.scope.streamId.value = 'synthetic-accepted-stream'
+    h.scope.isStreamActive.value = true
+    h.deadline('open', h.token)
+    expect(h.scope.content.value).toBe('')
+    expect(h.scope.message.warning).not.toHaveBeenCalled()
+    expect(h.scope.persisted).not.toBeNull()
+    expect(h.getPending().accepted).toBe(true)
+    expect(h.scope.probePendingTurnAfterDurableAckTimeout).toHaveBeenCalledOnce()
+  })
+
+  it('does not invent an unsent draft when refresh resumes a stream without an in-memory turn', () => {
+    const h = terminationHarness(false, false)
+    h.setPending(null)
+    h.scope.streamId.value = 'synthetic-restored-stream'
+    h.scope.isStreamActive.value = true
+    h.deadline('open', h.token)
+    expect(h.scope.content.value).toBe('')
+    expect(h.scope.message.warning).not.toHaveBeenCalled()
+    expect(h.scope.persisted).not.toBeNull()
+    expect(h.getPending()).toBeNull()
+    expect(h.scope.attemptReconnectWithResume).toHaveBeenCalledOnce()
   })
 
   for (const kind of ['rewrite', 'retry_generation', 'continue']) {
