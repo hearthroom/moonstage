@@ -947,11 +947,26 @@ export function keepInterruptedAgentBubble(bubble: any, prepSteps: string[]): bo
   return true
 }
 
-export interface BackwardHistorySnapshot { conversationId:string; historyEpoch:number; nextSeq:number }
-export function nextBackwardHistorySnapshot(current:BackwardHistorySnapshot|null,payload:any,conversationId:string):BackwardHistorySnapshot|null {
- if (!conversationId || payload?.conversationId && String(payload.conversationId)!==conversationId) return current
- const {historyEpoch,nextSeq}=payload||{}
- if (!Number.isSafeInteger(historyEpoch)||historyEpoch<0||!Number.isSafeInteger(nextSeq)||nextSeq<1) return current
- if (current?.conversationId===conversationId && (historyEpoch<current.historyEpoch || historyEpoch===current.historyEpoch && nextSeq<current.nextSeq)) return current
- return {conversationId,historyEpoch,nextSeq}
+export interface BackwardHistorySnapshot {
+  conversationId: string
+  historyEpoch: number
+  nextSeq: number
+}
+
+export function nextBackwardHistorySnapshot(
+  current: BackwardHistorySnapshot | null,
+  payload: any,
+  conversationId: string,
+  authoritative = false,
+): BackwardHistorySnapshot | null {
+  if (!conversationId || (payload?.conversationId && String(payload.conversationId) !== conversationId)) return current
+  const { historyEpoch, nextSeq } = payload || {}
+  if (!Number.isSafeInteger(historyEpoch) || historyEpoch < 0 || !Number.isSafeInteger(nextSeq) || nextSeq < 1) return current
+  if (current?.conversationId === conversationId && (historyEpoch < current.historyEpoch
+    || (historyEpoch === current.historyEpoch && nextSeq < current.nextSeq))) return current
+  // A terminal or mutation proves only its own transition. It cannot consent to
+  // earlier rows or edits that this tab has not read from canonical history.
+  if (!authoritative && (!current || current.conversationId !== conversationId
+    || payload.startHistoryEpoch !== current.historyEpoch || payload.startNextSeq !== current.nextSeq)) return current
+  return { conversationId, historyEpoch, nextSeq }
 }

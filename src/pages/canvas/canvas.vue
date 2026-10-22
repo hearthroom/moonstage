@@ -5107,9 +5107,9 @@ function onSystemMsgCta(action, item, index) {
   }
 }
 
-function applyBackwardHistorySnapshot(payload:any, expectedConversationId=String(unref(conversationId)||'')) {
+function applyBackwardHistorySnapshot(payload:any, expectedConversationId=String(unref(conversationId)||''),authoritative=false) {
  if (expectedConversationId!==String(unref(conversationId)||'')) return;
- backwardHistorySnapshot.value=nextBackwardHistorySnapshot(backwardHistorySnapshot.value,payload,expectedConversationId);
+ backwardHistorySnapshot.value=nextBackwardHistorySnapshot(backwardHistorySnapshot.value,payload,expectedConversationId,authoritative);
 }
 
 function backwardStorageKey(conversation: string): string {
@@ -6835,7 +6835,7 @@ function getHistoryMsg(preloadedFirstPage?: any) {
         historyRecoveryKey = '';
       }
       if (pageAtHistoryRequest === 1 && Number.isSafeInteger(res.data.historyEpoch) && Number.isSafeInteger(res.data.nextSeq)) {
-        applyBackwardHistorySnapshot(res.data,conversationIdAtHistoryRequest);
+        applyBackwardHistorySnapshot(res.data,conversationIdAtHistoryRequest,true);
       }
       const chatList = res.data.chats;
       reportConversationActivity(String(unref(roleId)), conversationIdAtHistoryRequest, chatList);
