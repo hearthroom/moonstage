@@ -622,6 +622,7 @@ import {
   clearOperationCandidateMarker,
   commitRewriteCandidate,
   createBackwardOperationEntry,
+  nextBackwardHistorySnapshot,
   createPreAdmissionOperationErrorProjection,
   createRewriteSnapshot,
   createRewriteSnapshotForAI,
@@ -5106,6 +5107,11 @@ function onSystemMsgCta(action, item, index) {
   }
 }
 
+function applyBackwardHistorySnapshot(payload:any, expectedConversationId=String(unref(conversationId)||'')) {
+ if (expectedConversationId!==String(unref(conversationId)||'')) return;
+ backwardHistorySnapshot.value=nextBackwardHistorySnapshot(backwardHistorySnapshot.value,payload,expectedConversationId);
+}
+
 function backwardStorageKey(conversation: string): string {
   return `${BACKWARD_LS_PREFIX}${conversation}`;
 }
@@ -5358,6 +5364,7 @@ function loadConversation(chatId) {
 
 function chatDelete(chatId) {
   if (!stopRunningTurnForTimelineMutation()) return;
+  const mutationConversationId=String(unref(conversationId));
   _this.http.post(_this.requestUrl.chatDelete, {
     header: {
       'content-type': 'application/json'
@@ -5369,6 +5376,7 @@ function chatDelete(chatId) {
     }
   }).then(res => {
     if (res.statusCode == 200) {
+      applyBackwardHistorySnapshot(res.data,mutationConversationId);
       unref(ajax).flag = true;
       unref(ajax).page = 1;
       teardownStreamForConversationSwitch({ invalidateHistory: true });
@@ -5991,6 +5999,10 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
       redirectToOpenLogin();
       return;
     }
+    if (event.event === 'historySnapshot') {
+      applyBackwardHistorySnapshot(event.data);
+      return;
+    }
     if (event.event === 'accepted') {
       markPendingChatTurnAccepted(event.data);
       return;
@@ -6143,6 +6155,7 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
         break;
 
       case 'done':
+        applyBackwardHistorySnapshot(event.data);
         // Phase 2a：v2 協定的正式結束訊號，清 localStorage
         {
           // Bad Case 1 修正：cold-resume 連上的是「已結束」session，server 只發 done 不 replay
@@ -6822,7 +6835,7 @@ function getHistoryMsg(preloadedFirstPage?: any) {
         historyRecoveryKey = '';
       }
       if (pageAtHistoryRequest === 1 && Number.isSafeInteger(res.data.historyEpoch) && Number.isSafeInteger(res.data.nextSeq)) {
-        backwardHistorySnapshot.value = {conversationId:conversationIdAtHistoryRequest,historyEpoch:res.data.historyEpoch,nextSeq:res.data.nextSeq};
+        applyBackwardHistorySnapshot(res.data,conversationIdAtHistoryRequest);
       }
       const chatList = res.data.chats;
       reportConversationActivity(String(unref(roleId)), conversationIdAtHistoryRequest, chatList);
@@ -7389,6 +7402,7 @@ function recordAuthoritativeOperationStatus(input: any) {
 
 const bufferedTerminalNotices = new Set<string>();
 function refreshHistoryAfterAuthoritativeOperation(status: any) {
+  applyBackwardHistorySnapshot(status);
   const pending = pendingChatTurn;
   const operationBubble = pending?.aiBubbleId == null
     ? null
@@ -9100,6 +9114,7 @@ const sureRewrite = async (chatId) => {
     return;
   }
   manualEditSubmitting.value = true;
+  const mutationConversationId=String(unref(conversationId));
   try {
     const res = await _this.http.post(_this.requestUrl.rewriteChat, {
       header: {
@@ -9113,6 +9128,7 @@ const sureRewrite = async (chatId) => {
     })
 
     if (res.statusCode == 200) {
+      applyBackwardHistorySnapshot(res.data,mutationConversationId);
       bottomPopupShow.value = false
       const data = {
         "id": targetChatId,
@@ -9931,6 +9947,7 @@ function resendPlayerRowWithoutReply(index: number, text: string) {
   if (actionBtnState.value === 'stop') {
     sendStop();
   }
+  const mutationConversationId=String(unref(conversationId));
   _this.http.post(_this.requestUrl.chatDelete, {
     header: { 'content-type': 'application/json' },
     showLoading: false,
@@ -9940,6 +9957,7 @@ function resendPlayerRowWithoutReply(index: number, text: string) {
       message.error(resolveChatErrorMessage(resolveChatErrorTypeFromFailure(res), t))
       return
     }
+    applyBackwardHistorySnapshot(res.data,mutationConversationId);
     const at = talkList.value.findIndex((item: any) => item && String(item.chatId || item.id || '') === chatId)
     if (at >= 0) talkList.value.splice(at, 1)
     content.value = text
