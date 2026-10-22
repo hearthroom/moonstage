@@ -20,6 +20,17 @@ describe('沙箱卡的上一輪結局', () => {
     expect(names).toEqual(['capacity', 'model-settings', 'refresh', 'continue'])
   })
 
+  it('內容限制卡這一端接上的三顆鍵，作者也拿得到（動作名跟 skills 的說明一致）', () => {
+    const outcome = outcomeFromSystemNotice('1', { kind: 'filtered', label: '', sub: '', actions: [
+      { action: 'retry_stream_off', label: 'a' }, { action: 'edit_message', label: 'b' }, { action: 'switch_lane', label: 'c' },
+    ] })
+    expect(outcome.actions).toEqual([
+      { action: 'retry-stream-off', label: 'a', key: 'sys:retry_stream_off' },
+      { action: 'edit-message', label: 'b', key: 'sys:edit_message' },
+      { action: 'switch-lane', label: 'c', key: 'sys:switch_lane' },
+    ])
+  })
+
   it('Agent 中斷卡：繼續；續跑又停在同一個原因才多一顆換模型', () => {
     const card = { label: '這一輪還沒跑完', sub: '進度留著', continueLabel: '繼續', switchModelLabel: '切換模型', failedAgain: false }
     expect(outcomeFromInterruption('9', card)).toEqual({

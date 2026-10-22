@@ -147,3 +147,31 @@ it('shows the actual chat discount as a green strip on the family and its lane',
     expect(wrapper.find('.ms-badge.is-accent').text()).not.toBe('-50%')
   } finally { wrapper.unmount() }
 })
+
+// 內容限制卡的「切換線路」（任務 2026-10-23-content-filter-stop-actions）：玩家上次瀏覽過別的分類時，
+// 一般開法會回到那個分類、目前模型不在那格就什麼都不展開；focus 'lanes' 要直接停在目前模型的全部線路。
+it('focus lanes opens on the current model with every lane showing, even after browsing another category', async () => {
+  const { rememberBrowsedCategory, forgetBrowsedCategory } = await import('../../utils/model-select-category-memory')
+  const live = JSON.parse(JSON.stringify((await import('../../pages/canvas/__tests__/fixtures/model-catalog-live.json')).default))
+  const get = vi.fn(async (url: string) => url === '/models' ? { statusCode: 200, data: live } : { statusCode: 200, data: [] })
+  const mount = (focus: '' | 'lanes') => shallowMount(ModelSelectPanel, {
+    props: { open: true, roleId: 'fixture-role', selectModel: 'deepseek-v4-flash-ripple', focus },
+    global: { config: { globalProperties: { http: { get }, requestUrl: { playerAgentMode: '/agent-mode', getModelListV2: '/models' } } } },
+  })
+  try {
+    rememberBrowsedCategory('Claude')
+    const plain = mount('')
+    try {
+      await flushPromises()
+      expect((plain.vm as any).detailFamily).toBeNull()
+    } finally { plain.unmount() }
+
+    rememberBrowsedCategory('Claude')
+    const focused = mount('lanes')
+    try {
+      await flushPromises()
+      expect((focused.vm as any).detailFamily?.family).toBe('DeepSeek V4 Flash')
+      expect(focused.findAll('.ms-opt').length).toBeGreaterThan(4)
+    } finally { focused.unmount() }
+  } finally { forgetBrowsedCategory() }
+})

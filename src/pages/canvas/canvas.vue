@@ -82,11 +82,13 @@
           v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason)"
           :kind="getSystemMsgKind(item.finishReason)"
           :label="creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || getSystemMsgLabel(item.finishReason)"
-          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent }) || getSystemMsgSub(item.finishReason, item, index)"
+          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff }) || getSystemMsgSub(item.finishReason, item, index)"
           :links="creditsOverrideFor(item)?.links ?? []"
           :cta="getSystemMsgCta(item.finishReason, item, index)"
           :cta-action="getSystemMsgCtaAction(item.finishReason, item, index)"
-          :ctas="getSystemMsgCtas(item, index)"
+          :ctas="filterCardFor(item, index).ctas"
+          :busy="filterCardBusy === String(item.id)"
+          :stacked-primary="filterCardFor(item, index).stacked"
           @cta="onSystemMsgCta($event, item, index)"
         ></chat-system-message>
       </CanvasMessage>
@@ -167,6 +169,7 @@
         :thinking-depth="formData.thinkingDepth"
         :show-thinking-process="formData.showThinkingProcess !== false"
         :labels="modelPanelLabels"
+        :focus="modelPanelFocus"
         @apply="onApplyModelSettings"
         @close="closeCanvasSheet"
       />
@@ -532,7 +535,9 @@ import {
 import { createCanvasBackClose } from './canvas-back-close'
 import { incompleteTerminalHistoryOperation } from './chat-history-snapshot'
 import { findVariant, resolveVariant, scoreParts, priceMeaning, balanceWarning } from './canvas-model-catalog'
-import { resolveStoredModel, composeModelDisplayName } from './canvas-model-lanes'
+import { resolveStoredModel, composeModelDisplayName, isDeadLane } from './canvas-model-lanes'
+import { filterCardActions, isInputPolicyFilter, streamOffRetryTarget } from './canvas-filter-card'
+import { readResponseSettings, responseBase, responsePatch } from './canvas-response-settings'
 import {
   BREAKDOWN_META,
   contextRingFromReport,
@@ -658,6 +663,7 @@ import {
   openingChatIdFromLoadedList,
   canEditResendPlayerIndex,
   hasAIReplyAfterPlayerIndex,
+  latestTerminalAIIndex,
 } from './chat-operation-ui-state';
 import {
   createHistoryRequestKey,
@@ -3335,17 +3341,78 @@ function creditsOverrideFor(item: any) {
 
 }
 
+/*
+  內容限制卡（kind filtered）的鍵與說明的開關。原本的鍵之外，前置被擋與原因未提供兩種情況由這一端接上
+  （規則與理由在 canvas-filter-card.ts）。模板、systemNoticeFor 與 onSystemMsgCta 都從這裡拿，說明與鍵不會各說各話；
+  其他卡原樣回 getSystemMsgCtas，跟以前一模一樣。
+*/
+function filterCardFor(item: any, index: number) {
+  if (getSystemMsgKind(item?.finishReason) !== 'filtered') {
+    return { ctas: getSystemMsgCtas(item, index), offersStreamOff: false, streamingOff: false, stacked: false };
+  }
+  return filterCardActions({
+    item,
+    base: filterCardBase(item, index),
+    streaming: unref(cardStreamingValue),
+    // 世界卡與 Agent 一輪伺服器一律流式，偏好不生效；預覽沒有對話可存。
+    streamingApplies: unref(responseSettingsSupported) && !(unref(roleView) as any)?.world && !unref(multiPassEffective),
+    canEditMessage: canEditFilteredMessage(item, index),
+    hasOtherLanes: currentModelHasOtherLanes(),
+    labels: { retryAsIs: t('chat.retryAsIs'), streamOffRetry: t('chat.filterStopStreamingRetry'), switchLane: t('chat.switchLane'), editMessage: t('chat.editFilteredMessage') },
+  });
+}
+/** 卡原本的鍵：伺服器列給的那幾顆，舊歷史則是凍結備援那一顆。 */
+function filterCardBase(item: any, index: number) {
+  const ctas = getSystemMsgCtas(item, index);
+  if (ctas.length) return ctas;
+  const action = getSystemMsgCtaAction(item?.finishReason, item, index);
+  const label = action ? getSystemMsgCta(item?.finishReason, item, index) : '';
+  return action && label ? [{ action, label }] : [];
+}
+/** 被擋的那一則玩家訊息：最新那張卡、那一句還是玩家最新的一句、時間軸沒鎖，才交回給他改。 */
+function canEditFilteredMessage(item: any, index: number) {
+  if (!isInputPolicyFilter(item) || unref(previewOnly) || isTimelineMutationBlocked()) return false;
+  if (!allowsStageAction(stageHost.capabilities, 'rewrite') || latestTerminalAIIndex(talkList.value) !== index) return false;
+  const playerIndex = filterCardPlayerIndex(item, index);
+  return playerIndex >= 0 && canEditResendPlayerIndex(talkList.value, playerIndex);
+}
+function filterCardPlayerIndex(item: any, index: number) {
+  const exact = firstExactTimelineRowIndex([item?.sourceChatId, item?.userChatId, item?.targetChatId], 1);
+  if (exact >= 0 && exact < index) return exact;
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const row = talkList.value[i];
+    if (row?.type == 1) return i;
+    if (row?.type == 0 && !row.systemOnly && String(row.content || '').trim()) return -1;
+  }
+  return -1;
+}
+/** 目前這顆模型在目錄裡還有沒有別條能用的線路（跟模型選單同一套：MAX 檔只算支援的、全掛的不算）。 */
+function currentModelHasOtherLanes() {
+  const current = unref(selectedVariantValue);
+  for (const group of unref(modelGroups) || []) {
+    for (const family of group?.families || []) {
+      const variants = (family?.variants || []).filter((v: any) => v && (formData.context !== 100 || v.isSupportMax));
+      if (!variants.some((v: any) => v.value === current)) continue;
+      return variants.some((v: any) => v.value !== current && !isDeadLane(v));
+    }
+  }
+  return false;
+}
+
 function systemNoticeFor(item: any, index: number) {
   if (!item || !(item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason))) return null;
-  const ctas = getSystemMsgCtas(item, index);
+  const ctas = filterCardFor(item, index).ctas;
   const cta = getSystemMsgCta(item.finishReason, item, index);
   const ctaAction = getSystemMsgCtaAction(item.finishReason, item, index);
   const actions: Array<{ action: string; label: string }> = ctas.length ? ctas : (cta && ctaAction ? [{ action: ctaAction, label: cta }] : []);
   return {
     kind: getSystemMsgKind(item.finishReason),
     label: creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || getSystemMsgLabel(item.finishReason),
-    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent }) || getSystemMsgSub(item.finishReason, item, index),
+    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff }) || getSystemMsgSub(item.finishReason, item, index),
     actions: actions.map((entry) => ({ action: String(entry.action), label: String(entry.label) })),
+    // 內容限制卡：存偏好期間整列不能按、手機上主行動整行排第一。只在成立時才帶，其他卡跟以前一模一樣。
+    ...(filterCardBusy.value === String(item.id) ? { busy: true } : {}),
+    ...(filterCardFor(item, index).stacked ? { stackedPrimary: true } : {}),
     // 宿主給的去處（積分不夠）：有才帶，殼照畫；沒有的卡跟以前一模一樣
     ...((creditsOverrideFor(item)?.links ?? []).length ? { links: creditsOverrideFor(item)?.links ?? [] } : {}),
   };
@@ -4690,12 +4757,14 @@ function goBackToEntry() {
   uni.reLaunch({ url: '/pages/play/entry' });
 }
 
-function openModelSelect() {
+// focus 'lanes'：直接停在目前這顆模型的線路清單（內容限制卡的「切換線路」）。
+function openModelSelect(focus: '' | 'lanes' = '') {
   // 純預覽不會呼叫模型。節點留著（作者的卡對它寫外觀），按下去講清楚為什麼沒東西可選。
   if (previewOnly.value) {
     uni.showToast({ title: t('openChat.preview.noModel'), icon: 'none' })
     return
   }
+  modelPanelFocus.value = focus
   panel.value = openSheet(panel.value, 'model')
 }
 
@@ -4973,6 +5042,27 @@ function onSystemMsgCta(action, item, index) {
     ajax.value.page = 1;
     ajax.value.flag = true;
     getHistoryMsg();
+    return;
+  }
+  // 內容限制卡上這一端接上的三顆鍵（filterCardFor）：伺服器的 allowedActions 裡沒有它們，各自有自己的閘。
+  if (action === 'retry_stream_off') {
+    void turnOffStreamingAndRetry(item, index);
+    return;
+  }
+  if (action === 'edit_message') {
+    const playerIndex = filterCardPlayerIndex(item, index);
+    if (playerIndex < 0 || !canEditFilteredMessage(item, index)) {
+      notifyTimelineMutationBlocked();
+      return;
+    }
+    // 走訊息選單既有的「編輯並重送」：改好送出時被擋的那一則被取代，不會留在歷史裡繼續被檢查。
+    openMessageMenu(playerIndex);
+    menuDraft.value = String(talkList.value[playerIndex]?.content || '');
+    menuEditing.value = true;
+    return;
+  }
+  if (action === 'switch_lane') {
+    openModelSelect('lanes');
     return;
   }
   if (!isTerminalActionAllowed(talkList.value, index, action)) {
@@ -10007,6 +10097,9 @@ const shortcutItems = computed(() => previewOnly.value ? [] : [
 // 自訂指令、用戶人設、設定補充、劇情總結、遊玩教程都不在 v1 裡，
 // 放一顆按下去沒反應的鍵比沒有那顆鍵更糟。
 const panel = ref<CanvasPanelState>(createPanelState())
+// 模型選單這次要停在哪裡：'lanes' ＝目前這顆模型的線路清單。選單關掉就歸零，下次照一般方式開。
+const modelPanelFocus = ref<'' | 'lanes'>('')
+watch(() => panel.value.sheet, (sheet) => { if (sheet !== 'model') modelPanelFocus.value = '' })
 let canvasBackClose: ReturnType<typeof createCanvasBackClose> | null = null
 function hasCanvasOverlay() { return menuOpen.value || Boolean(panel.value.sheet) || panel.value.more }
 async function closeTopCanvasOverlay() {
@@ -10033,9 +10126,75 @@ async function loadResponseSettings(id: string) {
   return res.data
 }
 async function saveResponseSettings(id: string, revision: number, patch: Record<string, string | null>) {
-  const res = await _this.http.post('/open/v1/conversation/response-settings/save', { data: { conversationId: id, model: formData.selectModel || '', expectedRevision: revision, patch }, showLoading: false })
+  const model = formData.selectModel || ''
+  const res = await _this.http.post('/open/v1/conversation/response-settings/save', { data: { conversationId: id, model, expectedRevision: revision, patch }, showLoading: false })
   if (res.statusCode !== 200) throw { status: res.statusCode }
+  rememberCardStreaming(res.data, id, `${id}|${model}`)
   return res.data
+}
+
+// 內容限制卡要在畫出來之前就知道這個對話目前生效的流式輸出（含模型預設，例如 Gemini 4 預設關），
+// 所以進對話、換模型時先讀好，回覆偏好存檔後跟著更新。讀不到或還沒讀到是 ''：卡照舊，
+// 不在卡出現之後才多長一顆鍵（版面會跳）。
+const cardStreaming = ref<{ key: string; value: 'on' | 'off' } | null>(null)
+const cardStreamingKey = computed(() => `${String(unref(conversationId) || '')}|${String(formData.selectModel || '')}`)
+const cardStreamingValue = computed(() => (cardStreaming.value?.key === cardStreamingKey.value ? cardStreaming.value.value : ''))
+function rememberCardStreaming(raw: unknown, id: string, key: string) {
+  try {
+    const streaming = readResponseSettings(raw, id).effective.streaming
+    if (streaming === 'on' || streaming === 'off') cardStreaming.value = { key, value: streaming }
+  } catch {}
+}
+async function refreshCardStreaming() {
+  const id = String(unref(conversationId) || '')
+  const key = cardStreamingKey.value
+  if (!responseSettingsSupported.value || !id) return
+  try { rememberCardStreaming(await loadResponseSettings(id), id, key) } catch {}
+}
+watch([cardStreamingKey, responseSettingsSupported], () => { void refreshCardStreaming() }, { immediate: true })
+
+/*
+  內容限制卡的「關閉流式輸出並重試」：把這個對話的流式偏好存成關閉（等同玩家在回覆偏好裡手動關），
+  存成功才照卡上那顆重試走一次。存的時候帶上玩家其他所有偏好——responsePatch 把沒帶的欄位當成清除，
+  只送 streaming 會清掉文風、篇幅等設定。版本衝突時重讀一次再存，仍失敗就不重試、卡維持原樣。
+*/
+const filterCardBusy = ref('')
+async function saveStreamingOff(id: string) {
+  for (let attempt = 0; ; attempt += 1) {
+    const settings = readResponseSettings(await loadResponseSettings(id), id)
+    try {
+      return await saveResponseSettings(id, settings.revision, responsePatch({ ...settings.overrides, streaming: 'off' }, responseBase(settings)))
+    } catch (e) {
+      if ((e as { status?: number })?.status !== 409 || attempt >= 1) throw e
+    }
+  }
+}
+async function turnOffStreamingAndRetry(item: any, index: number) {
+  if (filterCardBusy.value) return
+  const target = streamOffRetryTarget(filterCardBase(item, index))
+  const id = String(unref(conversationId) || '')
+  // 先過閘再存：按下時就做不了，連偏好都不改。
+  if (!target || !id || isTimelineMutationBlocked() || !isTerminalActionAllowed(talkList.value, index, target)) {
+    notifyTimelineMutationBlocked()
+    return
+  }
+  const itemId = String(item?.id ?? '')
+  filterCardBusy.value = itemId
+  try {
+    await saveStreamingOff(id)
+  } catch (e) {
+    console.warn('關閉流式輸出失敗', e)
+    uni.showToast({ title: t('chat.streamingTurnOffFailed'), icon: 'none', duration: 3000 })
+    return
+  } finally {
+    filterCardBusy.value = ''
+  }
+  uni.showToast({ title: t('chat.streamingTurnedOff'), icon: 'none', duration: 5000 })
+  // 存檔期間時間軸可能變了：重新找這張卡，還能重試才重試。不能的話偏好已改、卡換成「流式已關」的樣子，
+  // 玩家看得到剛才的提示，也看得到卡上的下一步；不再另跳被擋的提示蓋掉它。
+  const at = String(unref(conversationId) || '') === id ? talkList.value.findIndex((row: any) => row && String(row.id ?? '') === itemId) : -1
+  if (at < 0 || isTimelineMutationBlocked() || !isTerminalActionAllowed(talkList.value, at, target)) return
+  onSystemMsgCta(target, talkList.value[at], at)
 }
 watch(conversationId, () => { if (panel.value.sheet === 'response-settings') panel.value = closeSheet(panel.value) })
 watch(assistContext, key => { assistSession.context(key); if(panel.value.sheet === 'assist') closeCanvasSheet() }, {flush:'sync'})

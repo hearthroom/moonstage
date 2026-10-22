@@ -9,10 +9,29 @@ describe('buffered empty terminal notice', () => {
   it.each(['content_filter', 'refusal', 'length', 'interrupted', 'user_stop'])('keeps the known %s cause with no final body', (finishReason) => {
     expect(projectionFinishReason({ ...terminal, finishReason, state: finishReason === 'user_stop' ? 'stopped' : terminal.state } as any)).toBe(finishReason)
   })
+  // 內容限制家族的卡本身就在畫面上、字完整，頂部提示只是重複（任務 2026-10-23-content-filter-stop-actions）；
+  // 其他原因照舊通知，所以這裡用一個非內容限制的原因量「只通知一次」。
   it('notifies once across terminal replay and polling', async () => {
     const seen = new Set<string>(), notify = vi.fn()
-    notifyBufferedTerminal(terminal as any, '', seen, notify)
-    notifyBufferedTerminal({ ...terminal, version: 4 } as any, '', seen, notify)
+    const upstream = { ...terminal, finishReason: 'server_error' }
+    notifyBufferedTerminal(upstream as any, '', seen, notify)
+    notifyBufferedTerminal({ ...upstream, version: 4 } as any, '', seen, notify)
+    expect(notify).toHaveBeenCalledOnce()
+  })
+  it.each([
+    { finishReason: 'content_filter' },
+    { finishReason: 'content_filter', filterReason: 'input_policy' },
+    { finishReason: 'content_filter_input' },
+    { finishReason: 'refusal' },
+    { finishReason: 'stop', failureCause: 'content_filter' },
+  ])('content restrictions leave the explanation to the card: %j', (over) => {
+    const notify = vi.fn()
+    notifyBufferedTerminal({ ...terminal, ...over } as any, '', new Set(), notify)
+    expect(notify).not.toHaveBeenCalled()
+  })
+  it.each(['server_error', 'length', 'interrupted'])('other buffered failures still notify: %s', (finishReason) => {
+    const notify = vi.fn()
+    notifyBufferedTerminal({ ...terminal, finishReason } as any, '', new Set(), notify)
     expect(notify).toHaveBeenCalledOnce()
   })
   it.each([

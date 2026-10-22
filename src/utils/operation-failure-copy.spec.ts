@@ -56,3 +56,33 @@ it('uses localized causes without confusing tool failures with player network er
     for (const cause of ['toString', '__proto__', 'private error text']) expect(operationFailureSub(cause, t)).toBe('')
   }
 })
+
+// 內容限制停止的兩個出口（任務 2026-10-23-content-filter-stop-actions）：說明句跟卡上的鍵吃同一個判斷。
+describe('content restriction copy follows the actions on the card', () => {
+  it('unknown output stop: suggests turning streaming off only when that action is on the card', () => {
+    expect(operationFailureSub('content_filter', key, { filterReason: 'unknown', offersStreamOff: true })).toBe('systemMsg.filterUnknownSubStream')
+    expect(operationFailureSub('content_filter', key, { offersStreamOff: true, canSwitch: false })).toBe('systemMsg.filterUnknownSubStreamNoSwitch')
+    expect(operationFailureSub('content_filter', key, { streamingOff: true, canSwitch: true })).toBe('systemMsg.filterUnknownSubSwitch')
+    expect(operationFailureSub('content_filter', key, { streamingOff: true, canSwitch: false })).toBe('systemMsg.filterUnknownSub')
+    expect(operationFailureSub('content_filter', key, {})).toBe('systemMsg.filterUnknownSub')
+  })
+  it('the streaming options never change another reason', () => {
+    expect(operationFailureSub('content_filter', key, { filterReason: 'safety', offersStreamOff: true, streamingOff: true })).toBe('systemMsg.filterSafetySub')
+  })
+  it('input policy has one explanation whatever the buttons, including the legacy input-side cause', () => {
+    for (const canSwitch of [true, false]) {
+      expect(operationFailureSub('content_filter', key, { filterReason: 'input_policy', canSwitch })).toBe('systemMsg.filterInputPolicySub')
+      expect(operationFailureSub('content_filter_input', key, { canSwitch })).toBe('systemMsg.filterInputPolicySub')
+    }
+    expect(operationFailureTitle('content_filter_input', key)).toBe('systemMsg.filterInputPolicy')
+  })
+  it('every locale has the new keys and no longer carries the input-policy no-switch variant', () => {
+    const keys = ['systemMsg.filterUnknownSubStream', 'systemMsg.filterUnknownSubStreamNoSwitch', 'systemMsg.filterUnknownSubSwitch',
+      'chat.filterStopStreamingRetry', 'chat.retryAsIs', 'chat.streamingTurnedOff', 'chat.streamingTurnOffFailed',
+      'chat.editFilteredMessage', 'chat.switchLane', 'systemMsg.filterInputPolicy', 'systemMsg.filterInputPolicySub']
+    for (const locale of [zhHant, zhHans, en, ja, ko] as Array<Record<string, string>>) {
+      for (const k of keys) expect(locale[k], k).toBeTruthy()
+      expect(locale['systemMsg.filterInputPolicySubNoSwitch']).toBeUndefined()
+    }
+  })
+})

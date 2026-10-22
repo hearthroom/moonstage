@@ -64,11 +64,19 @@ describe('context usage on the newly completed reply', () => {
     const app = harness()
     app.row.value.content = ''
     const status = { ...terminal, nonStreaming: true, state: 'failed_retryable', version: 3,
-      finishReason: 'content_filter', failureCause: 'content_filter', outputDisposition: 'none' }
+      finishReason: 'error', failureCause: 'upstream_timeout', outputDisposition: 'none' }
     app.handle(status)
-    expect(app.bindings.uni.showToast).toHaveBeenCalledWith({ title: 'systemMsg.filterUnknown', icon: 'error' })
+    expect(app.bindings.uni.showToast).toHaveBeenCalledWith({ title: 'multiPass.failureTimeout', icon: 'error' })
     app.handle(status)
     expect(app.bindings.uni.showToast).toHaveBeenCalledOnce()
+  })
+  // 內容限制的卡就在剛才等待的位置、字完整，頂部不再重複跳一次（任務 2026-10-23-content-filter-stop-actions）。
+  it('leaves a buffered content restriction to its card', () => {
+    const app = harness()
+    app.row.value.content = ''
+    app.handle({ ...terminal, nonStreaming: true, state: 'failed_retryable', version: 3,
+      finishReason: 'content_filter', failureCause: 'content_filter', outputDisposition: 'none' })
+    expect(app.bindings.uni.showToast).not.toHaveBeenCalled()
   })
   // 選單裡「這一輪的用量」看的是列上的 hasContextUsage 與 chatId：剛收尾的那則不必重新整理就要有。
   it.each(['stream', 'polled', 'wrapped'] as const)('%s completion marks the reply as measured without history or page reload', async (path) => {

@@ -244,6 +244,8 @@ export function createMessageList(deps: MessageListDeps): MessageList {
             sub: notice.sub,
             ctas: notice.actions,
             links: notice.links ?? [],
+            busy: notice.busy === true,
+            stackedPrimary: notice.stackedPrimary === true,
             onCta: (action: string) => { if (deps.onUi) deps.onUi(id, { kind: 'action', key: `sys:${action}` }) },
           } as Record<string, unknown>)
         },

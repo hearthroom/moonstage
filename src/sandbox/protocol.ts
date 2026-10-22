@@ -168,6 +168,10 @@ export interface SystemNotice {
   label: string
   sub: string
   actions: Array<{ action: string; label: string }>
+  /** 宿主正在處理這張卡的鍵（例如存偏好再重試）：整列暫時不能按。 */
+  busy?: boolean
+  /** 手機上主行動整行排第一（三顆排不進一行時）。 */
+  stackedPrimary?: boolean
 }
 
 /** 標準訊息元件的文案（宿主的語系）。 */
