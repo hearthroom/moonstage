@@ -1276,6 +1276,7 @@ function persistPendingSend(payload: any) {
   // 伺服器在準備階段又還沒把它標成 agent，持久化這一筆是掛載路徑唯一的依據。
   writeLsEntry({
     ...createPendingStreamEntry(prepared.payload, pendingSince),
+    chatPayloadDispatched: false,
     agentTurn: multiPassEffective.value === true,
   });
   pendingResendPayload.value = { payload: prepared.payload, pendingSince };
@@ -5959,6 +5960,7 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
       const readySocket = socketsAwaitingReady.get(socketToken);
       socketsAwaitingReady.delete(socketToken);
       if (!readySocket) return;
+      chatTransport.markSocketOpened(socketToken);
       const mockWebSocket = {
         readyState: 1,
         send: (data: string) => {
@@ -8371,6 +8373,10 @@ function handleChatTransportDeadline(kind: 'open' | 'accepted', socketToken: num
     probePendingTurnAfterDurableAckTimeout(socketToken);
     return;
   }
+  if (messageQueue.value.some(entry => entry?.socketToken === socketToken)) {
+    handleOwnedSocketTermination('error', { errMsg: 'chat connection deadline exceeded' }, socketToken);
+    return;
+  }
   const storedDraft = pendingChatTurn?.draft || readLsEntry()?.pendingPayload?.message || '';
   const recovered = recoverPendingChatTurnBeforeAccepted();
   if (!recovered) recoverStoredStreamDraft({ draft: storedDraft });
@@ -8379,7 +8385,12 @@ function handleChatTransportDeadline(kind: 'open' | 'accepted', socketToken: num
 
 function sendQueuedChatPayload(capturedSocket: any, socketToken: number) {
   const entryIndex = messageQueue.value.findIndex(entry => entry && entry.socketToken === socketToken);
-  if (entryIndex < 0 || !chatTransport.consumeChatPayload(socketToken)) return;
+  if (entryIndex < 0 || !chatTransport.isCurrentSocket(socketToken)) return;
+  if (!capturedSocket || typeof capturedSocket.send !== 'function') {
+    handleOwnedSocketTermination('error', { errMsg: 'captured SocketTask.send unavailable' }, socketToken);
+    return;
+  }
+  if (!chatTransport.consumeChatPayload(socketToken)) return;
   const entry = messageQueue.value.splice(entryIndex, 1)[0];
   const options = {
     data: JSON.stringify(entry.payload),
@@ -8398,10 +8409,6 @@ function sendQueuedChatPayload(capturedSocket: any, socketToken: number) {
       else sendError(0, t('message.disconnect_tips'));
     }
   };
-  if (!capturedSocket || typeof capturedSocket.send !== 'function') {
-    options.fail({ errMsg: 'captured SocketTask.send unavailable', errCode: 'socket_task_send_unavailable' });
-    return;
-  }
   const pending = pendingChatTurn;
   if (pending?.socketToken === socketToken && chatTransport.shouldAwaitDurableTurnAck(pending)) {
     chatTransport.armAcceptedDeadline(socketToken, CHAT_ACCEPTED_DEADLINE_MS, token => {
@@ -8409,6 +8416,10 @@ function sendQueuedChatPayload(capturedSocket: any, socketToken: number) {
     });
   }
   try {
+    // From this point delivery may be ambiguous. Persist before invoking send so
+    // refresh cannot mistake a dispatched intent for an unsent draft.
+    const stored = readLsEntry();
+    if (stored) writeLsEntry({ ...stored, chatPayloadDispatched: true });
     capturedSocket.send(options);
   } catch (err) {
     options.fail(err || { errMsg: 'captured SocketTask.send threw' });
@@ -8416,6 +8427,25 @@ function sendQueuedChatPayload(capturedSocket: any, socketToken: number) {
 }
 
 function handleOwnedSocketTermination(kind: 'close' | 'error', detail: any, socketToken: number) {
+  // A queued chat frame has never left this client. Polling cannot discover an
+  // operation that was never sent, even when the status endpoint is reachable.
+  if (messageQueue.value.some(entry => entry?.socketToken === socketToken)
+    && pendingChatTurn?.socketToken === socketToken
+    && pendingChatTurn.accepted !== true
+    && !pendingChatTurn.operationId
+    && pendingChatTurn.serverProgress !== true) {
+    const pending = pendingChatTurn;
+    if (discardPendingChatOperationCandidate(pending)) {
+      const original = String(pending.rewriteSnapshot?.userBubble?.content || '').trim();
+      if (pending.draft && pending.draft.trim() !== original && !content.value) content.value = pending.draft;
+      clearStreamState();
+      message.warning(t('chat.messageNotSentDraftSaved'));
+    } else {
+      recoverPendingChatTurnBeforeAccepted();
+    }
+    closeWebSocket();
+    return;
+  }
   chatTransport.clearDeadlines(socketToken);
   isConnecting.value = false;
   if (activeSocketToken === socketToken) socket.value = null;
@@ -8830,6 +8860,10 @@ async function connectWebSocket(
   if (resumeParams) chatTransport.retireChatPayload(socketToken);
   activeSocketToken = socketToken;
   const capturedGeneration = conversationGeneration.value;
+  // Includes ticket acquisition and auth ready, both of which precede chat send.
+  chatTransport.armOpenDeadline(socketToken, CHAT_OPEN_DEADLINE_MS, token => {
+    handleChatTransportDeadline('open', token);
+  });
 
   const ticket = await fetchChatWsTicket(!!resumeParams);
   // 換票期間可能已經有別的連線接手，或者這一輪被取消了。
@@ -8875,13 +8909,9 @@ async function connectWebSocket(
   });
   socket.value = capturedSocket;
   isConnecting.value = false;
-  chatTransport.armOpenDeadline(socketToken, CHAT_OPEN_DEADLINE_MS, token => {
-    handleChatTransportDeadline('open', token);
-  });
 
   const onOpen = () => {
     if (!isOwnedSocketCallback(socketToken, capturedGeneration)) return;
-    chatTransport.markSocketOpened(socketToken);
     console.log('WebSocket連線已開啟！');
     isConnecting.value = true;
     // 第一幀一定是驗票；伺服器在收到 ready 之前只讀這一幀。
@@ -8978,6 +9008,7 @@ function attemptReconnectWithResume() {
 // 关闭WebSocket连接
 function closeWebSocket() {
   const staleSocket: any = socket.value;
+  socketsAwaitingReady.delete(activeSocketToken);
   if (activeSocketToken) chatTransport.invalidateSocketGeneration(activeSocketToken);
   detachGlobalSocketListeners();
   socket.value = null;
