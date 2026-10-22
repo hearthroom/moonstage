@@ -1789,6 +1789,7 @@ const roleId = ref(0);//角色ID
 const pic = ref("");//角色头像
 const historyConversation = ref(false); //是否有历史对话
 const conversationId = ref(''); //历史对话ID
+const backwardHistorySnapshot = ref<{conversationId:string;historyEpoch:number;nextSeq:number}|null>(null);
 
 // Phase 2a：當 conversationId 首次被設定時，嘗試從 localStorage 拉回未完成的 stream
 watch(conversationId, (newId, oldId) => {
@@ -5169,14 +5170,8 @@ function finishPendingBackwardOperation(entry: any) {
 
 function failPendingBackwardOperation(entry: any, messageKey = 'chat.rollbackFailed') {
   if (!isPendingBackwardOperationCurrent(entry)) return;
-  cancelPendingBackwardRetryTimer();
-  backwardOperationRequestKey = '';
-  clearPendingBackwardOperation(entry);
-  rollbackPending.value = false;
-  uni.showToast({
-    title: t(messageKey) || t('chat.rollbackFailed'),
-    icon: 'none',
-  });
+  uni.showToast({ title: t(messageKey) || t('chat.rollbackFailed'), icon: 'none' });
+  finishPendingBackwardOperation(entry);
 }
 
 function schedulePendingBackwardOperation(entry: any, legacyFallbackUsed = false): boolean {
@@ -5240,6 +5235,10 @@ function schedulePendingBackwardOperation(entry: any, legacyFallbackUsed = false
 function postPendingBackwardOperation(entry: any, legacyFallbackUsed = false): boolean {
   entry = normalizeBackwardOperationEntry(entry, String(unref(conversationId) || ''));
   if (!entry || !isPendingBackwardOperationCurrent(entry)) return false;
+  if (isChatOperationVisibleOutcomeExpired({localStartedAt:entry.createdAt,now:Date.now(),agentTurn:false})) {
+    finishPendingBackwardOperation(entry);
+    return false;
+  }
   const requestKey = `${entry.operationId}:${legacyFallbackUsed ? 'legacy' : 'v1'}`;
   if (backwardOperationRequestKey === requestKey) return true;
   backwardOperationRequestKey = requestKey;
@@ -5254,6 +5253,8 @@ function postPendingBackwardOperation(entry: any, legacyFallbackUsed = false): b
       chatId: entry.targetChatId,
       rollbackMutationCapability: 'v1',
       clientOperationID: entry.operationId,
+      historyEpoch: entry.historyEpoch,
+      nextSeq: entry.nextSeq,
     };
   _this.http.post(_this.requestUrl.loadConversation, {
     header: { 'content-type': 'application/json' },
@@ -5308,6 +5309,10 @@ function postPendingBackwardOperation(entry: any, legacyFallbackUsed = false): b
 function resumePendingBackwardOperation(conversation: string): boolean {
   const entry = readPendingBackwardOperation(conversation);
   if (!entry) return false;
+  if (isChatOperationVisibleOutcomeExpired({localStartedAt:entry.createdAt,now:Date.now(),agentTurn:false})) {
+    finishPendingBackwardOperation(entry);
+    return true;
+  }
   cancelPendingBackwardRetryTimer();
   rollbackPending.value = true;
   return postPendingBackwardOperation(entry, false);
@@ -5331,7 +5336,13 @@ function loadConversation(chatId) {
     postPendingBackwardOperation(existing, false);
     return;
   }
+  const snapshot = backwardHistorySnapshot.value;
+  if (!snapshot || snapshot.conversationId !== currentConversationId) {
+    unref(ajax).flag = true; unref(ajax).page = 1; getHistoryMsg(); return;
+  }
   const entry = createBackwardOperationEntry({
+    historyEpoch: snapshot.historyEpoch,
+    nextSeq: snapshot.nextSeq,
     operationId: `rollback-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
     conversationId: currentConversationId,
     targetChatId: chatId,
@@ -6809,6 +6820,9 @@ function getHistoryMsg(preloadedFirstPage?: any) {
         historySnapshotPollScheduler.cancel();
         historyRecoveryAttemptedKey = '';
         historyRecoveryKey = '';
+      }
+      if (pageAtHistoryRequest === 1 && Number.isSafeInteger(res.data.historyEpoch) && Number.isSafeInteger(res.data.nextSeq)) {
+        backwardHistorySnapshot.value = {conversationId:conversationIdAtHistoryRequest,historyEpoch:res.data.historyEpoch,nextSeq:res.data.nextSeq};
       }
       const chatList = res.data.chats;
       reportConversationActivity(String(unref(roleId)), conversationIdAtHistoryRequest, chatList);

@@ -59,6 +59,8 @@ describe('Backward rejection and waiting bounds', () => {
     const env = {
       isPendingBackwardOperationCurrent: () => true,
       normalizeBackwardOperationEntry,
+      isChatOperationVisibleOutcomeExpired,
+      finishPendingBackwardOperation:mock.fn(),
       classifyBackwardOperationResponse,
       conversationId: CONVERSATION,
       unref: value => value && typeof value === 'object' ? value.value : value,
@@ -78,4 +80,17 @@ describe('Backward rejection and waiting bounds', () => {
     expect(retry).not.toHaveBeenCalled()
   })
 
+})
+
+it('does not POST an expired persisted rollback on reload and refreshes history', () => {
+ const begin=chat.indexOf('function resumePendingBackwardOperation(')
+ const end=chat.indexOf('// 劇情回溯：',begin)
+ const source=ts.transpile(chat.slice(begin,end),{target:ts.ScriptTarget.ES2020})
+ const entry=createBackwardOperationEntry({operationId:'old',conversationId:'fixture-conversation',targetChatId:'target',now:Date.now()-600000})
+ const post=mock.fn(()=>true),refresh=mock.fn()
+ const env={readPendingBackwardOperation:()=>entry,cancelPendingBackwardRetryTimer:()=>{},rollbackPending:{value:false},postPendingBackwardOperation:post,isChatOperationVisibleOutcomeExpired,finishPendingBackwardOperation:refresh}
+ const resume=new Function(...Object.keys(env),source+';return resumePendingBackwardOperation;')(...Object.values(env))
+ resume('fixture-conversation')
+ expect(post).not.toHaveBeenCalled()
+ expect(refresh).toHaveBeenCalledWith(entry)
 })
