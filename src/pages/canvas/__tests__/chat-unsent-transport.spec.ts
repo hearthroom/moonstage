@@ -22,6 +22,7 @@ function terminationHarness(queued: boolean, pollingAvailable: boolean) {
     messageQueue: { value: queued ? [{ socketToken: token, payload }] : [] },
     isConnecting: { value: true }, socket: { value: {} },
     heartbeatManager: { stop: vi.fn() }, sseParser: { reset: vi.fn() },
+    attemptReconnectWithResume: vi.fn(),
     clearCompactWatchdog: vi.fn(), isCompacting: false, unref: (v: any) => v?.value ?? v,
     store: { commit: vi.fn() }, isStreamActive: { value: false }, streamId: { value: '' },
     requestPendingOperationReconciliation: vi.fn(() => true),
@@ -40,6 +41,7 @@ function terminationHarness(queued: boolean, pollingAvailable: boolean) {
   // Use the real reconciliation entry point. The probe stands in for an empty
   // or unavailable HTTP endpoint; neither may be reached for an unsent frame.
   const source = take('function recoverPendingChatTurnBeforeAccepted(', 'function markPendingChatTurnAccepted(')
+    + take('function recoverStoredStreamDraft(', 'function recoverPendingTurnAfterMissingDurableAck(')
     + take('function requestPendingOperationReconciliation(', 'function resumePendingOperationReconciliationOnForeground(')
     + take('function handleOwnedSocketTermination(', 'function handleModExpiryAckRequired(')
     + take('function handleChatTransportDeadline(', 'function handleOwnedSocketTermination(')
@@ -121,9 +123,16 @@ describe('WS never ready', () => {
   }
 
   for (const phase of ['ticket', 'auth ready']) {
-    it(`bounds waiting for ${phase} to ten seconds and fences late callbacks`, async () => {
+    for (const resume of [false, true]) {
+    it(`${resume ? 'reconciles an accepted resume' : 'recovers an unsent draft'} waiting for ${phase} at ten seconds and fences late callbacks`, async () => {
       vi.useFakeTimers()
-      const h = terminationHarness(true, false)
+      const h = terminationHarness(!resume, false)
+      if (resume) {
+        h.getPending().accepted = true
+        h.getPending().operationId = 'synthetic-accepted-operation'
+        h.scope.streamId.value = 'synthetic-stream'
+        h.scope.isStreamActive.value = true
+      }
       const callbacks: any = {}
       let resolveTicket: (ticket: string) => void = () => {}
       const ticket = new Promise<string>(resolve => { resolveTicket = resolve })
@@ -144,18 +153,27 @@ describe('WS never ready', () => {
       const connect = new Function(...Object.keys(scope), js)(...Object.values(scope))
       // The actual connect routine should see an empty socket at entry.
       scope.socket.value = null
-      const connecting = connect(undefined, h.token)
+      const connecting = connect(resume ? { resumeStreamId: 'synthetic-stream' } : undefined, h.token)
       await Promise.resolve()
       if (phase === 'auth ready') { await connecting; callbacks.open() }
       await vi.advanceTimersByTimeAsync(10000)
-      expect(h.scope.content.value).toBe(payload.message)
-      expect(h.scope.persisted).toBeNull()
-      expect(h.scope.closeWebSocket).toHaveBeenCalledOnce()
+      if (resume) {
+        expect(h.scope.content.value).toBe('')
+        expect(h.scope.persisted).not.toBeNull()
+        expect(h.scope.message.warning).not.toHaveBeenCalled()
+        expect(h.scope.probePendingTurnAfterDurableAckTimeout).toHaveBeenCalledOnce()
+        expect(h.getPending().operationId).toBe('synthetic-accepted-operation')
+      } else {
+        expect(h.scope.content.value).toBe(payload.message)
+        expect(h.scope.persisted).toBeNull()
+        expect(h.scope.closeWebSocket).toHaveBeenCalledOnce()
+      }
       if (phase === 'ticket') { resolveTicket('late-ticket'); await connecting }
       else callbacks.open()
       expect(scope.uni.connectSocket).toHaveBeenCalledTimes(phase === 'ticket' ? 0 : 1)
       expect(socket.send).toHaveBeenCalledTimes(phase === 'ticket' ? 0 : 1) // auth only
     })
+    }
   }
 
   it('recovers a draft immediately after refresh before dispatch', () => {

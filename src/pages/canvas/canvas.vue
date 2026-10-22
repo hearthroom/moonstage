@@ -8373,14 +8373,15 @@ function handleChatTransportDeadline(kind: 'open' | 'accepted', socketToken: num
     probePendingTurnAfterDurableAckTimeout(socketToken);
     return;
   }
-  if (messageQueue.value.some(entry => entry?.socketToken === socketToken)) {
-    handleOwnedSocketTermination('error', { errMsg: 'chat connection deadline exceeded' }, socketToken);
-    return;
+  const timedOutSocket: any = socket.value;
+  // A resume timeout says nothing about admission. Use the same queue/durable
+  // identity decision as a disconnect, then fence this attempt's late ready.
+  handleOwnedSocketTermination('error', { errMsg: 'chat connection deadline exceeded' }, socketToken);
+  if (chatTransport.isCurrentSocket(socketToken)) {
+    chatTransport.invalidateSocketGeneration(socketToken);
+    socketsAwaitingReady.delete(socketToken);
+    try { timedOutSocket?.close?.({ code: 1000, reason: 'connection_deadline' }); } catch (_) {}
   }
-  const storedDraft = pendingChatTurn?.draft || readLsEntry()?.pendingPayload?.message || '';
-  const recovered = recoverPendingChatTurnBeforeAccepted();
-  if (!recovered) recoverStoredStreamDraft({ draft: storedDraft });
-  closeWebSocket();
 }
 
 function sendQueuedChatPayload(capturedSocket: any, socketToken: number) {
