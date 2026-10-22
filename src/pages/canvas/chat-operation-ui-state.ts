@@ -946,3 +946,12 @@ export function keepInterruptedAgentBubble(bubble: any, prepSteps: string[]): bo
   bubble.agentInterrupted = true
   return true
 }
+
+export interface BackwardHistorySnapshot { conversationId:string; historyEpoch:number; nextSeq:number }
+export function nextBackwardHistorySnapshot(current:BackwardHistorySnapshot|null,payload:any,conversationId:string):BackwardHistorySnapshot|null {
+ if (!conversationId || payload?.conversationId && String(payload.conversationId)!==conversationId) return current
+ const {historyEpoch,nextSeq}=payload||{}
+ if (!Number.isSafeInteger(historyEpoch)||historyEpoch<0||!Number.isSafeInteger(nextSeq)||nextSeq<1) return current
+ if (current?.conversationId===conversationId && (historyEpoch<current.historyEpoch || historyEpoch===current.historyEpoch && nextSeq<current.nextSeq)) return current
+ return {conversationId,historyEpoch,nextSeq}
+}
