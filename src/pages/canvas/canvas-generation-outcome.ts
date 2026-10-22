@@ -32,6 +32,8 @@ const AUTHOR_ACTION: Record<string, string> = {
   retry_stream_off: 'retry-stream-off',
   edit_message: 'edit-message',
   switch_lane: 'switch-lane',
+  // 換了線路或模型之後原樣重送那一則：對作者就是重試。
+  resend_filtered: 'retry',
 }
 
 export function outcomeFromSystemNotice(

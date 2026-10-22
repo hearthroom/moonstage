@@ -79,7 +79,7 @@ describe('content restriction copy follows the actions on the card', () => {
   it('every locale has the new keys and no longer carries the input-policy no-switch variant', () => {
     const keys = ['systemMsg.filterUnknownSubStream', 'systemMsg.filterUnknownSubStreamNoSwitch', 'systemMsg.filterUnknownSubSwitch',
       'chat.filterStopStreamingRetry', 'chat.retryAsIs', 'chat.streamingTurnedOff', 'chat.streamingTurnOffFailed',
-      'chat.editFilteredMessage', 'chat.switchLane', 'systemMsg.filterInputPolicy', 'systemMsg.filterInputPolicySub']
+      'chat.editFilteredMessage', 'chat.switchLane', 'chat.resendNewLane', 'chat.resendNewModel', 'systemMsg.filterInputPolicy', 'systemMsg.filterInputPolicySub']
     for (const locale of [zhHant, zhHans, en, ja, ko] as Array<Record<string, string>>) {
       for (const k of keys) expect(locale[k], k).toBeTruthy()
       expect(locale['systemMsg.filterInputPolicySubNoSwitch']).toBeUndefined()

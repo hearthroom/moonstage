@@ -536,7 +536,7 @@ import { createCanvasBackClose } from './canvas-back-close'
 import { incompleteTerminalHistoryOperation } from './chat-history-snapshot'
 import { findVariant, resolveVariant, scoreParts, priceMeaning, balanceWarning } from './canvas-model-catalog'
 import { resolveStoredModel, composeModelDisplayName, isDeadLane } from './canvas-model-lanes'
-import { filterCardActions, isInputPolicyFilter, streamOffRetryTarget } from './canvas-filter-card'
+import { filterCardActions, isInputPolicyFilter, cardRetryTarget } from './canvas-filter-card'
 import { readResponseSettings, responseBase, responsePatch } from './canvas-response-settings'
 import {
   BREAKDOWN_META,
@@ -3359,7 +3359,8 @@ function filterCardFor(item: any, index: number) {
     streamingApplies: unref(responseSettingsSupported) && !(unref(roleView) as any)?.world && !unref(multiPassEffective) && item?.agentTurn !== true,
     canEditMessage: canEditFilteredMessage(item, index),
     hasOtherLanes: currentModelHasOtherLanes(),
-    labels: { retryAsIs: t('chat.retryAsIs'), streamOffRetry: t('chat.filterStopStreamingRetry'), switchLane: t('chat.switchLane'), editMessage: t('chat.editFilteredMessage') },
+    switchedTo: filterCardSwitchedTo(item),
+    labels: { retryAsIs: t('chat.retryAsIs'), streamOffRetry: t('chat.filterStopStreamingRetry'), switchLane: t('chat.switchLane'), editMessage: t('chat.editFilteredMessage'), resendLane: t('chat.resendNewLane'), resendModel: t('chat.resendNewModel') },
   });
 }
 /** 卡原本的鍵：伺服器列給的那幾顆，舊歷史則是凍結備援那一顆。 */
@@ -3386,6 +3387,23 @@ function filterCardPlayerIndex(item: any, index: number) {
     if (row?.type == 0 && !row.systemOnly && String(row.content || '').trim()) return -1;
   }
   return -1;
+}
+/** 前置被擋後玩家從這張卡換了什麼：同一個模型的別條線路是 'lane'，別的模型是 'model'；還沒換（或只是打開看看）是 ''。 */
+function filterCardSwitchedTo(item: any): '' | 'lane' | 'model' {
+  const pending = unref(filterCardSwitch);
+  if (!pending || pending.itemId !== String(item?.id ?? '')) return '';
+  const now = unref(selectedVariantValue);
+  if (!now || now === pending.from) return '';
+  const family = familyOfVariant(pending.from);
+  return family && family === familyOfVariant(now) ? 'lane' : 'model';
+}
+function familyOfVariant(value: string) {
+  for (const group of unref(modelGroups) || []) {
+    for (const family of group?.families || []) {
+      if ((family?.variants || []).some((v: any) => v?.value === value)) return String(family.family || '');
+    }
+  }
+  return '';
 }
 /** 目前這顆模型在目錄裡還有沒有別條能用的線路（跟模型選單同一套：MAX 檔只算支援的、全掛的不算）。 */
 function currentModelHasOtherLanes() {
@@ -5063,7 +5081,19 @@ function onSystemMsgCta(action, item, index) {
     return;
   }
   if (action === 'switch_lane') {
+    rememberFilterCardSwitch(item);
     openModelSelect('lanes');
+    return;
+  }
+  // 換了線路或模型之後原樣重送：走卡上原本那顆重試（前置被擋卡上它被收起來了）。
+  if (action === 'resend_filtered') {
+    const target = cardRetryTarget(filterCardBase(item, index));
+    if (!target || !isTerminalActionAllowed(talkList.value, index, target)) {
+      notifyTimelineMutationBlocked();
+      return;
+    }
+    filterCardSwitch.value = null;
+    onSystemMsgCta(target, item, index);
     return;
   }
   if (!isTerminalActionAllowed(talkList.value, index, action)) {
@@ -5071,6 +5101,7 @@ function onSystemMsgCta(action, item, index) {
     return;
   }
   if (action === 'switch_model') {
+    rememberFilterCardSwitch(item);
     openModelSelect();
     return;
   }
@@ -10161,6 +10192,12 @@ watch([cardStreamingKey, responseSettingsSupported], () => { void refreshCardStr
   只送 streaming 會清掉文風、篇幅等設定。版本衝突時重讀一次再存，仍失敗就不重試、卡維持原樣。
 */
 const filterCardBusy = ref('')
+// 前置被擋卡上按了「切換線路／切換模型」：記住是哪張卡、當時用的是哪條線路。選好之後那張卡的主行動換成重送。
+const filterCardSwitch = ref<{ itemId: string; from: string } | null>(null)
+function rememberFilterCardSwitch(item: any) {
+  filterCardSwitch.value = isInputPolicyFilter(item) ? { itemId: String(item?.id ?? ''), from: String(unref(selectedVariantValue) || '') } : null
+}
+watch(conversationId, () => { filterCardSwitch.value = null })
 async function saveStreamingOff(id: string) {
   for (let attempt = 0; ; attempt += 1) {
     const settings = readResponseSettings(await loadResponseSettings(id), id)
@@ -10175,7 +10212,7 @@ async function saveStreamingOff(id: string) {
 }
 async function turnOffStreamingAndRetry(item: any, index: number) {
   if (filterCardBusy.value) return
-  const target = streamOffRetryTarget(filterCardBase(item, index))
+  const target = cardRetryTarget(filterCardBase(item, index))
   const id = String(unref(conversationId) || '')
   // 先過閘再存：按下時就做不了，連偏好都不改。
   if (!target || !id || isTimelineMutationBlocked() || !isTerminalActionAllowed(talkList.value, index, target)) {

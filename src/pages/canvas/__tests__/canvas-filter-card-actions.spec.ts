@@ -12,7 +12,7 @@ import path from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
 import { readResponseSettings, responseBase, responsePatch } from '../canvas-response-settings'
-import { streamOffRetryTarget } from '../canvas-filter-card'
+import { cardRetryTarget } from '../canvas-filter-card'
 
 const CANVAS = fs.readFileSync(path.join(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
 
@@ -47,7 +47,7 @@ function harness(over: { load?: any[]; save?: Array<'ok' | number | Record<strin
     t: (k: string) => k,
     uni: { showToast: vi.fn() },
     console: { warn: vi.fn() },
-    readResponseSettings, responseBase, responsePatch, streamOffRetryTarget,
+    readResponseSettings, responseBase, responsePatch, cardRetryTarget,
     filterCardBase: () => [{ action: 'retry_rewrite', label: '直接重試' }, { action: 'switch_model', label: '切換模型' }],
     isTimelineMutationBlocked: () => over.blocked === true,
     isTerminalActionAllowed: vi.fn(() => over.allowed !== false),
@@ -141,7 +141,7 @@ describe('關閉流式輸出並重試', () => {
 })
 
 describe('修改訊息、切換線路', () => {
-  function cta(over: { canEdit?: boolean } = {}) {
+  function cta(over: { canEdit?: boolean; retryAllowed?: boolean } = {}) {
     const env = {
       talkList: { value: [{ id: 'u1', type: 1, content: '原本那句' }, { id: 'card-1', type: 0 }] },
       menuDraft: { value: '' },
@@ -152,10 +152,17 @@ describe('修改訊息、切換線路', () => {
       filterCardPlayerIndex: () => 0,
       canEditFilteredMessage: () => over.canEdit !== false,
       turnOffStreamingAndRetry: vi.fn(),
-      isTerminalActionAllowed: vi.fn(() => false),
+      isTerminalActionAllowed: vi.fn(() => over.retryAllowed === true),
+      rememberFilterCardSwitch: vi.fn(),
+      cardRetryTarget,
+      filterCardBase: () => [{ action: 'retry_rewrite', label: '重試' }, { action: 'switch_model', label: '切換模型' }],
+      filterCardSwitch: { value: { itemId: 'card-1', from: 'm-a' } as any },
     }
-    const { onSystemMsgCta } = canvasFunctions(['onSystemMsgCta'], env)
-    return { env, onSystemMsgCta }
+    // onSystemMsgCta 會遞迴呼叫自己走那顆重試：外面包一層記下來，不真的往下走。
+    const calls: any[] = []
+    const fns = canvasFunctions(['onSystemMsgCta'], env)
+    const onSystemMsgCta = (action: string, item: any, index: number) => { calls.push(action); return fns.onSystemMsgCta(action, item, index) }
+    return { env, onSystemMsgCta, calls }
   }
 
   it('修改訊息：打開那一則的編輯，草稿是原本的字', () => {
@@ -172,6 +179,40 @@ describe('修改訊息、切換線路', () => {
     onSystemMsgCta('edit_message', env.talkList.value[1], 1)
     expect(env.openMessageMenu).not.toHaveBeenCalled()
     expect(env.notifyTimelineMutationBlocked).toHaveBeenCalledOnce()
+  })
+
+  it('從卡上按切換線路／切換模型：先記住是哪張卡、當時哪條線路', () => {
+    const { env, onSystemMsgCta } = cta({ retryAllowed: true })
+    onSystemMsgCta('switch_lane', env.talkList.value[1], 1)
+    onSystemMsgCta('switch_model', env.talkList.value[1], 1)
+    expect(env.rememberFilterCardSwitch).toHaveBeenCalledTimes(2)
+    expect(env.openModelSelect).toHaveBeenNthCalledWith(1, 'lanes')
+    expect(env.openModelSelect).toHaveBeenNthCalledWith(2)
+  })
+
+  it('用新線路／模型重送：走卡上原本那顆重試，清掉記住的切換', () => {
+    const { env, onSystemMsgCta, calls } = cta({ retryAllowed: true })
+    try { onSystemMsgCta('resend_filtered', env.talkList.value[1], 1) } catch { /* 重試的路徑在這個環境裡沒有接上 */ }
+    expect(env.isTerminalActionAllowed).toHaveBeenCalledWith(env.talkList.value, 1, 'retry_rewrite')
+    expect(env.filterCardSwitch.value).toBeNull()
+    expect(calls).toEqual(['resend_filtered'])
+  })
+
+  it('重送時卡已經不能重試：不送，說被擋', () => {
+    const { env, onSystemMsgCta } = cta({ retryAllowed: false })
+    onSystemMsgCta('resend_filtered', env.talkList.value[1], 1)
+    expect(env.notifyTimelineMutationBlocked).toHaveBeenCalledOnce()
+    expect(env.filterCardSwitch.value).not.toBeNull()
+  })
+
+  it('記住切換只對前置被擋卡：其他卡按切換模型不記', () => {
+    const env = { filterCardSwitch: { value: null as any }, selectedVariantValue: { value: 'm-a' }, isInputPolicyFilter: (i: any) => i.filterReason === 'input_policy',
+      unref: (v: any) => (v && typeof v === 'object' && 'value' in v ? v.value : v) }
+    const { rememberFilterCardSwitch } = canvasFunctions(['rememberFilterCardSwitch'], env)
+    rememberFilterCardSwitch({ id: 'c', filterReason: 'input_policy' })
+    expect(env.filterCardSwitch.value).toEqual({ itemId: 'c', from: 'm-a' })
+    rememberFilterCardSwitch({ id: 'd', finishReason: 'server_error' })
+    expect(env.filterCardSwitch.value).toBeNull()
   })
 
   it('切換線路：打開模型選單並停在線路；關閉流式輸出並重試交給它自己的流程', () => {

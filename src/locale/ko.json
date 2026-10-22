@@ -95,6 +95,8 @@
 	"chat.noFinalAnswerTimeout": "답변 대기 시간 초과",
 	"chat.switchModel": "모델 변경",
 	"chat.switchLane": "회선 변경",
+	"chat.resendNewLane": "새 회선으로 다시 보내기",
+	"chat.resendNewModel": "새 모델로 다시 보내기",
 	"chat.editFilteredMessage": "메시지 수정",
 	"chat.streamingTurnOffFailed": "스트리밍 출력을 끄지 못했어요. 다시 시도해 보세요.",
 	"chat.streamingTurnedOff": "스트리밍 출력을 껐어요. 답변은 완성된 뒤 한 번에 표시되며, “답변 취향”에서 다시 켤 수 있어요.",

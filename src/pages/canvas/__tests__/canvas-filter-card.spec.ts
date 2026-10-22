@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { filterCardActions, isInputPolicyFilter, isUnknownOutputFilter, streamOffRetryTarget, type FilterCardContext } from '../canvas-filter-card'
+import { filterCardActions, isInputPolicyFilter, isUnknownOutputFilter, cardRetryTarget, type FilterCardContext } from '../canvas-filter-card'
 
-const labels = { retryAsIs: '直接重試', streamOffRetry: '關閉流式輸出並重試', switchLane: '切換線路', editMessage: '修改訊息' }
+const labels = { retryAsIs: '直接重試', streamOffRetry: '關閉流式輸出並重試', switchLane: '切換線路', editMessage: '修改訊息', resendLane: '用新線路重送', resendModel: '用新模型重送' }
 const retry = { action: 'retry', label: '重試' }
 const switchModel = { action: 'switch_model', label: '切換模型' }
 const unknown = { finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'unknown' }
 const input = { finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'input_policy' }
 
 function ctx(over: Partial<FilterCardContext> = {}): FilterCardContext {
-  return { item: unknown, base: [retry, switchModel], streaming: 'on', streamingApplies: true, canEditMessage: true, hasOtherLanes: true, labels, ...over }
+  return { item: unknown, base: [retry, switchModel], streaming: 'on', streamingApplies: true, canEditMessage: true, hasOtherLanes: true, switchedTo: '', labels, ...over }
 }
 const actions = (over: Partial<FilterCardContext> = {}) => filterCardActions(ctx(over)).ctas.map(e => e.action)
 
@@ -51,8 +51,8 @@ describe('原因未提供：流式輸出出口', () => {
   it('伺服器給的是別的重試動作時照樣接上，按下去走那一顆', () => {
     const base = [{ action: 'retry_rewrite', label: '重試' }, switchModel]
     expect(actions({ base })).toEqual(['retry_rewrite', 'switch_model', 'retry_stream_off'])
-    expect(streamOffRetryTarget(base)).toBe('retry_rewrite')
-    expect(streamOffRetryTarget([switchModel])).toBe('')
+    expect(cardRetryTarget(base)).toBe('retry_rewrite')
+    expect(cardRetryTarget([switchModel])).toBe('')
   })
   it('B：流式已關 → 動作不變，說明改建議切換模型', () => {
     const r = filterCardActions(ctx({ streaming: 'off' }))
@@ -100,5 +100,21 @@ describe('前置被擋：修改訊息、切換線路、切換模型', () => {
   it('伺服器各種重試動作都拿掉', () => {
     const base = [{ action: 'retry_rewrite', label: '重試' }, { action: 'rewrite', label: '重試' }, switchModel]
     expect(actions({ item: input, base })).toEqual(['switch_lane', 'switch_model', 'edit_message'])
+  })
+
+  it('從這張卡換了線路、選好之後：主行動換成用新線路重送（照卡上那顆重試走），修改訊息讓位', () => {
+    const r = filterCardActions(ctx({ item: input, switchedTo: 'lane' }))
+    expect(r.ctas).toEqual([{ action: 'switch_lane', label: '切換線路' }, switchModel, { action: 'resend_filtered', label: '用新線路重送' }])
+    expect(r.stacked).toBe(true)
+  })
+  it('換的是別的模型：用新模型重送', () => {
+    expect(filterCardActions(ctx({ item: input, switchedTo: 'model' })).ctas.at(-1)).toEqual({ action: 'resend_filtered', label: '用新模型重送' })
+  })
+  it('伺服器沒給任何重試動作時沒有重送可走：維持修改訊息', () => {
+    expect(actions({ item: input, switchedTo: 'lane', base: [switchModel] })).toEqual(['switch_lane', 'switch_model', 'edit_message'])
+  })
+  it('還沒換（只是打開選單看看）不給重送；原因未提供的卡不受影響', () => {
+    expect(actions({ item: input })).not.toContain('resend_filtered')
+    expect(actions({ switchedTo: 'model' })).not.toContain('resend_filtered')
   })
 })

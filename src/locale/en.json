@@ -94,6 +94,8 @@
 	"chat.noFinalAnswerTimeout": "Reply timed out",
 	"chat.switchModel": "Switch model",
 	"chat.switchLane": "Switch lane",
+	"chat.resendNewLane": "Resend on new lane",
+	"chat.resendNewModel": "Resend with new model",
 	"chat.editFilteredMessage": "Edit message",
 	"chat.streamingTurnOffFailed": "Couldn’t turn off streaming. Try again.",
 	"chat.streamingTurnedOff": "Streaming is off, so replies appear once they’re complete. You can turn it back on in Response preferences.",

@@ -24,6 +24,9 @@ describe('沙箱卡的上一輪結局', () => {
     const outcome = outcomeFromSystemNotice('1', { kind: 'filtered', label: '', sub: '', actions: [
       { action: 'retry_stream_off', label: 'a' }, { action: 'edit_message', label: 'b' }, { action: 'switch_lane', label: 'c' },
     ] })
+    // 換線路／模型之後的重送，對作者就是重試
+    expect(outcomeFromSystemNotice('1', { kind: 'filtered', label: '', sub: '', actions: [{ action: 'resend_filtered', label: 'd' }] }).actions)
+      .toEqual([{ action: 'retry', label: 'd', key: 'sys:resend_filtered' }])
     expect(outcome.actions).toEqual([
       { action: 'retry-stream-off', label: 'a', key: 'sys:retry_stream_off' },
       { action: 'edit-message', label: 'b', key: 'sys:edit_message' },
