@@ -352,6 +352,8 @@ export function createOperationStatusPollScheduler(options: {
 export interface ChatOperationStatus {
  historyEpoch?: number
  nextSeq?: number
+ startHistoryEpoch?: number
+ startNextSeq?: number
   operationId: string
   clientOperationId?: string
   kind: string
@@ -441,6 +443,9 @@ export function normalizeChatOperationStatus(input: any): ChatOperationStatus | 
   // Missing measurements stay absent, including replies recorded before usage persistence.
   if (Number.isSafeInteger(source.historyEpoch) && source.historyEpoch >= 0 && Number.isSafeInteger(source.nextSeq) && source.nextSeq >= 1) {
     normalized.historyEpoch=source.historyEpoch; normalized.nextSeq=source.nextSeq
+  }
+  if (Number.isSafeInteger(source.startHistoryEpoch) && source.startHistoryEpoch>=0 && Number.isSafeInteger(source.startNextSeq) && source.startNextSeq>=1) {
+    normalized.startHistoryEpoch=source.startHistoryEpoch; normalized.startNextSeq=source.startNextSeq
   }
   if (typeof source.hasContextUsage === 'boolean') normalized.hasContextUsage = source.hasContextUsage
   if (typeof source.model === 'string' && source.model.trim()) normalized.model = source.model.trim()

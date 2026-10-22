@@ -54,7 +54,7 @@ function harness() {
 }
 
 const terminal = { operationId: 'op-1', conversationId: 'conv-1', kind: 'send',
-  historyEpoch: 2, nextSeq: 5,
+  historyEpoch: 2, nextSeq: 5, startHistoryEpoch: 1, startNextSeq: 1,
   state: 'completed', version: 2, assistantChatId: 'reply-1', outputDisposition: 'adopted',
   hasContextUsage: true, model: 'test-model',
   contextUsage: { inputTokens: 200, outputTokens: 30, cachedTokens: 20, cacheWriteTokens: 0 } }
