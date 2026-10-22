@@ -1554,6 +1554,11 @@ export function decideStreamResume(entry: any, now = Date.now(), options: any = 
     ? entry.pendingPayload.message
     : ''
   if (!prepared.ok) return { kind: 'recoverDraft', reason: 'incomplete_pending_payload', draft }
+  // Explicit evidence recorded before ticket/WS/auth, not a missing server ack.
+  // Old entries lack this field and retain conservative reconciliation.
+  if (entry.chatPayloadDispatched === false && entry.accepted !== true && !entry.streamId) {
+    return { kind: 'recoverDraft', reason: 'chat_payload_not_dispatched', draft }
+  }
 
   const pendingSince = Number(entry.pendingSince) || 0
   const clientOperationId = String(

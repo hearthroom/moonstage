@@ -1143,8 +1143,11 @@ describe('desktop chat operation product contract', () => {
     expect(record).toContain('operationBubble.assistantChatId = status.assistantChatId')
     expect(record).toContain('operationBubble.sourceChatId = status.sourceChatId')
     expect(termination).toContain('requestPendingOperationReconciliation(`socket_${kind}`)')
-    expect(termination.indexOf('requestPendingOperationReconciliation(`socket_${kind}`)')).toBeLessThan(
-      termination.indexOf('recoverPendingChatTurnBeforeAccepted()'),
+    // Only a frame still in the local queue is provably unsent. Once dispatch
+    // was attempted, reconciliation must continue to precede draft recovery.
+    const dispatchedTermination = termination.slice(termination.indexOf('chatTransport.clearDeadlines(socketToken)'))
+    expect(dispatchedTermination.indexOf('requestPendingOperationReconciliation(`socket_${kind}`)')).toBeLessThan(
+      dispatchedTermination.indexOf('recoverPendingChatTurnBeforeAccepted()'),
     )
     expect(recovery).toContain('operationStatusPollScheduler.schedule')
     expect(recovery).toContain('scheduleOperationStatusReconciliation')
