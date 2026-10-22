@@ -16,8 +16,13 @@ describe('哪一種內容限制', () => {
   it('輸入端：伺服器標成 input_policy，或舊的 content_filter_input', () => {
     expect(isInputPolicyFilter(input)).toBe(true)
     expect(isInputPolicyFilter({ finishReason: 'content_filter_input' })).toBe(true)
-    expect(isInputPolicyFilter({ failureCause: 'content_filter_input', filterReason: 'unknown' })).toBe(true)
     expect(isInputPolicyFilter(unknown)).toBe(false)
+  })
+  it('跟卡上的字同一個判斷：舊紀錄 failureCause 是 content_filter、finishReason 被換成 content_filter_input 時，字是「原因未提供」，鍵也照舊（不給輸入端的鍵，也不給流式輸出出口）', () => {
+    const legacy = { failureCause: 'content_filter', finishReason: 'content_filter_input' }
+    expect(isInputPolicyFilter(legacy)).toBe(false)
+    expect(isUnknownOutputFilter(legacy)).toBe(false)
+    expect(isInputPolicyFilter({ failureCause: 'content_filter_input', filterReason: 'unknown' })).toBe(false)
   })
   it('原因未提供的輸出端停止：沒有原因或 unknown，而且不是輸入端', () => {
     expect(isUnknownOutputFilter(unknown)).toBe(true)

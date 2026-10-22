@@ -6,7 +6,8 @@ export function normalizeFilterReason(reason: unknown): string {
  if (!reason) return ''
  return typeof reason === 'string' && Object.prototype.hasOwnProperty.call(FILTER_COPY, reason) ? reason : 'unknown'
 }
-function filterKey(cause: unknown, reason: unknown): string {
+/** 內容限制卡用哪一組字（systemMsg.filterXxx）；不是內容限制回 ''。卡上的鍵（canvas-filter-card）照同一個判斷。 */
+export function filterKey(cause: unknown, reason: unknown): string {
  if (!['content_filter', 'content_filter_input', 'refusal'].includes(String(cause)) && !reason) return ''
  // 舊歷史的輸入端拒絕沒有原因：它就是前置被擋，跟 input_policy 用同一組字。
  const value = normalizeFilterReason(reason) || (cause === 'refusal' ? 'refusal' : cause === 'content_filter_input' ? 'input_policy' : 'unknown')

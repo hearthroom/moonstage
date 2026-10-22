@@ -34,9 +34,9 @@ const settings = (revision: number, overrides: Record<string, string>) => ({
 })
 const playerPrefs = { agency: 'protect', style: 'custom', customStyle: '短句、多對白', perspective: 'second_user', length: 'target', lengthTarget: '1500', paceNote: '慢慢來' }
 
-function harness(over: { load?: any[]; save?: Array<'ok' | number>; blocked?: boolean; allowed?: boolean; afterSave?: () => void } = {}) {
+function harness(over: { load?: any[]; save?: Array<'ok' | number | Record<string, number>>; blocked?: boolean; allowed?: boolean; afterSave?: () => void } = {}) {
   const loads = [...(over.load || [settings(4, playerPrefs)])]
-  const saves = [...(over.save || ['ok'])]
+  const saves: Array<'ok' | number | Record<string, number>> = [...(over.save || ['ok'])]
   const saved: Array<{ revision: number; patch: Record<string, string | null> }> = []
   const card = { id: 'card-1', allowedActions: ['retry_rewrite', 'switch_model'] }
   const env = {
@@ -57,6 +57,8 @@ function harness(over: { load?: any[]; save?: Array<'ok' | number>; blocked?: bo
     saveResponseSettings: vi.fn(async (_id: string, revision: number, patch: Record<string, string | null>) => {
       saved.push({ revision, patch })
       const next = saves.shift() ?? 'ok'
+      // 真的請求層把 4xx 原樣 reject（statusCode，沒有 status）；saveResponseSettings 自己丟的是 { status }。
+      if (typeof next === 'object') throw next
       if (next !== 'ok') throw { status: next }
       over.afterSave?.()
       return settings(revision + 1, { ...playerPrefs, streaming: 'off' })
@@ -96,6 +98,13 @@ describe('關閉流式輸出並重試', () => {
     await h.run()
     expect(h.saved.map((s) => s.revision)).toEqual([4, 5])
     expect(h.saved[1].patch).toMatchObject({ streaming: 'off', pace: 'linger', customStyle: '短句、多對白' })
+    expect(h.env.onSystemMsgCta).toHaveBeenCalledOnce()
+  })
+
+  it('請求層原樣回的 409（statusCode）一樣算版本衝突，重讀再存', async () => {
+    const h = harness({ load: [settings(4, playerPrefs), settings(5, playerPrefs)], save: [{ statusCode: 409 }, 'ok'] })
+    await h.run()
+    expect(h.saved.map((s) => s.revision)).toEqual([4, 5])
     expect(h.env.onSystemMsgCta).toHaveBeenCalledOnce()
   })
 
@@ -175,6 +184,17 @@ describe('修改訊息、切換線路', () => {
 })
 
 describe('流式值的快取跟著對話與模型', () => {
+  it('進對話時的背景讀取不跳網路錯誤提示（玩家沒做任何事）', async () => {
+    const loadResponseSettings = vi.fn(async () => settings(1, {}))
+    const env = { readResponseSettings, cardStreaming: { value: null as any }, conversationId: { value: 'c1' },
+      cardStreamingKey: { value: 'c1|m' }, responseSettingsSupported: { value: true }, loadResponseSettings,
+      unref: (v: any) => (v && typeof v === 'object' && 'value' in v ? v.value : v) }
+    const { refreshCardStreaming } = canvasFunctions(['rememberCardStreaming', 'refreshCardStreaming'], env)
+    await refreshCardStreaming()
+    expect(loadResponseSettings).toHaveBeenCalledWith('c1', true)
+    expect(env.cardStreaming.value).toEqual({ key: 'c1|m', value: 'on' })
+  })
+
   it('回覆偏好存檔後用回傳的值更新；讀不到合法的值就不動', () => {
     const env = { readResponseSettings, cardStreaming: { value: null as any } }
     const { rememberCardStreaming } = canvasFunctions(['rememberCardStreaming'], env)

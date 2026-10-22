@@ -3355,7 +3355,8 @@ function filterCardFor(item: any, index: number) {
     base: filterCardBase(item, index),
     streaming: unref(cardStreamingValue),
     // 世界卡與 Agent 一輪伺服器一律流式，偏好不生效；預覽沒有對話可存。
-    streamingApplies: unref(responseSettingsSupported) && !(unref(roleView) as any)?.world && !unref(multiPassEffective),
+    // 這一輪本身是 Agent（伺服器有帶的話）也算：本地的 Agent 開關可能跟伺服器存的不一致。
+    streamingApplies: unref(responseSettingsSupported) && !(unref(roleView) as any)?.world && !unref(multiPassEffective) && item?.agentTurn !== true,
     canEditMessage: canEditFilteredMessage(item, index),
     hasOtherLanes: currentModelHasOtherLanes(),
     labels: { retryAsIs: t('chat.retryAsIs'), streamOffRetry: t('chat.filterStopStreamingRetry'), switchLane: t('chat.switchLane'), editMessage: t('chat.editFilteredMessage') },
@@ -10120,8 +10121,9 @@ const responseSettingsSupported = computed(() => responseSettingsVersion.value =
 // 點了先用畫面上這條開場白開對話，再打開設定（見 openResponseSettings）。
 const responseSettingsOffered = computed(() => offersResponseSettings(responseSettingsSupported.value, pendingGreetingStart.value, previewOnly.value))
 const responseSettingsPanel = ref<InstanceType<typeof CanvasResponseSettings> | null>(null)
-async function loadResponseSettings(id: string) {
-  const res = await _this.http.get('/open/v1/conversation/response-settings', { data: { conversationId: id, model: formData.selectModel || '' }, showLoading: false })
+// quiet：背景讀取（內容限制卡的流式值）不跳網路錯誤提示，玩家沒做任何事；面板的讀取照舊。
+async function loadResponseSettings(id: string, quiet = false) {
+  const res = await _this.http.get('/open/v1/conversation/response-settings', { data: { conversationId: id, model: formData.selectModel || '' }, showLoading: false, ...(quiet ? { quietTransport: true } : {}) })
   if (res.statusCode !== 200) throw { status: res.statusCode }
   return res.data
 }
@@ -10149,7 +10151,7 @@ async function refreshCardStreaming() {
   const id = String(unref(conversationId) || '')
   const key = cardStreamingKey.value
   if (!responseSettingsSupported.value || !id) return
-  try { rememberCardStreaming(await loadResponseSettings(id), id, key) } catch {}
+  try { rememberCardStreaming(await loadResponseSettings(id, true), id, key) } catch {}
 }
 watch([cardStreamingKey, responseSettingsSupported], () => { void refreshCardStreaming() }, { immediate: true })
 
@@ -10165,7 +10167,9 @@ async function saveStreamingOff(id: string) {
     try {
       return await saveResponseSettings(id, settings.revision, responsePatch({ ...settings.overrides, streaming: 'off' }, responseBase(settings)))
     } catch (e) {
-      if ((e as { status?: number })?.status !== 409 || attempt >= 1) throw e
+      // 請求層把 4xx 原樣 reject（statusCode）；saveResponseSettings 自己丟的是 { status }。兩種都認。
+      const status = (e as { status?: number })?.status ?? (e as { statusCode?: number })?.statusCode
+      if (status !== 409 || attempt >= 1) throw e
     }
   }
 }
