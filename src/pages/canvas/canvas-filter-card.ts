@@ -38,19 +38,23 @@ export interface FilterCardResult {
   stacked: boolean
 }
 
+import { filterKey } from '@/utils/operation-failure-copy'
+
 const RETRY_FAMILY = ['retry', 'retry_rewrite', 'rewrite', 'retry_continue']
 const isRetry = (action: string) => RETRY_FAMILY.includes(action)
 
+// 跟卡上的標題與說明同一個判斷（filterKey 吃的也是 failureCause || finishReason）：鍵不會跟字各說各話。
+const copyKey = (item: any) => filterKey(item?.failureCause || item?.finishReason, item?.filterReason)
+
 export function isInputPolicyFilter(item: any): boolean {
-  return item?.filterReason === 'input_policy'
-    || item?.failureCause === 'content_filter_input'
-    || item?.finishReason === 'content_filter_input'
+  return !!item && copyKey(item) === 'systemMsg.filterInputPolicy'
 }
 
+// 舊紀錄可能 failureCause 是 content_filter、finishReason 卻被換成 content_filter_input（沒有產出的輸入端拒絕）：
+// 字照「原因未提供」，但分不出是不是中途截斷，保守地不給流式輸出出口。
 export function isUnknownOutputFilter(item: any): boolean {
-  if (!item || isInputPolicyFilter(item)) return false
-  const cause = item.failureCause || item.finishReason
-  return cause === 'content_filter' && (!item.filterReason || item.filterReason === 'unknown')
+  if (!item || item.failureCause === 'content_filter_input' || item.finishReason === 'content_filter_input') return false
+  return copyKey(item) === 'systemMsg.filterUnknown' && (item.failureCause || item.finishReason) === 'content_filter'
 }
 
 /** 「關閉流式輸出並重試」存完偏好後要走的那一顆重試（伺服器給哪一種不一定）。 */
