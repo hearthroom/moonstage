@@ -21,7 +21,7 @@ function terminationHarness(queued: boolean, pollingAvailable: boolean) {
     ownershipRevision: { value: 0 },
     messageQueue: { value: queued ? [{ socketToken: token, payload }] : [] },
     isConnecting: { value: true }, socket: { value: {} },
-    heartbeatManager: { stop: vi.fn() }, sseParser: { reset: vi.fn() },
+    heartbeatManager: { stop: vi.fn(), start: vi.fn() }, sseParser: { reset: vi.fn() },
     attemptReconnectWithResume: vi.fn(),
     clearCompactWatchdog: vi.fn(), isCompacting: false, unref: (v: any) => v?.value ?? v,
     store: { commit: vi.fn() }, isStreamActive: { value: false }, streamId: { value: '' },
@@ -150,7 +150,7 @@ describe('WS never ready', () => {
 
   for (const phase of ['ticket', 'auth ready']) {
     for (const resume of [false, true]) {
-    it(`${resume ? 'reconciles an accepted resume' : 'recovers an unsent draft'} waiting for ${phase} at ten seconds and fences late callbacks`, async () => {
+    it(`${resume ? 'reconciles an accepted resume at ten seconds' : 'recovers an unsent draft at twenty seconds'} waiting for ${phase} and fences late callbacks`, async () => {
       vi.useFakeTimers()
       const h = terminationHarness(!resume, false)
       if (resume) {
@@ -170,19 +170,25 @@ describe('WS never ready', () => {
         handleChatTransportDeadline: h.deadline,
         handleOwnedSocketTermination: h.terminate,
         resolveChatWebSocketBase: () => 'ws://localhost.invalid/ws', WS_BASE: '', stageHost: {},
-        CHAT_OPEN_DEADLINE_MS: 10000, PROTOCOL_VERSION: '2',
+        PROTOCOL_VERSION: '2',
         uni: { connectSocket: vi.fn(() => socket) }, from: { value: '' }, version: { value: '' },
         detachGlobalSocketListeners: vi.fn(), globalSocketHandlers: null, handlerMessage: vi.fn(),
       }
       const connection = take('async function connectWebSocket(', '// Phase 2a：斷線自動重連').replaceAll('import.meta.env.VITE_CHAT_API_BASE', 'undefined')
-      const js = ts.transpile(connection + '\nreturn connectWebSocket;', { target: ts.ScriptTarget.ES2022 })
+      const deadlines = take('const CHAT_OPEN_DEADLINE_MS', 'const CHAT_ACCEPTED_DEADLINE_MS')
+      const js = ts.transpile(deadlines + connection + '\nreturn connectWebSocket;', { target: ts.ScriptTarget.ES2022 })
       const connect = new Function(...Object.keys(scope), js)(...Object.values(scope))
       // The actual connect routine should see an empty socket at entry.
       scope.socket.value = null
       const connecting = connect(resume ? { resumeStreamId: 'synthetic-stream' } : undefined, h.token)
       await Promise.resolve()
       if (phase === 'auth ready') { await connecting; callbacks.open() }
-      await vi.advanceTimersByTimeAsync(10000)
+      if (!resume) {
+        await vi.advanceTimersByTimeAsync(19999)
+        expect(h.scope.message.warning).not.toHaveBeenCalled()
+        expect(h.scope.content.value).toBe('')
+        await vi.advanceTimersByTimeAsync(1)
+      } else await vi.advanceTimersByTimeAsync(10000)
       if (resume) {
         expect(h.scope.content.value).toBe('')
         expect(h.scope.persisted).not.toBeNull()
@@ -201,6 +207,46 @@ describe('WS never ready', () => {
     })
     }
   }
+
+  it('allows five seconds each for ticket, handshake and auth ready without an unsent notice', async () => {
+    vi.useFakeTimers()
+    const h = terminationHarness(true, true)
+    const callbacks: any = {}
+    const socket = {
+      send: vi.fn((options: any) => {
+        if (JSON.parse(options.data).type === 'auth') {
+          setTimeout(() => callbacks.message({}), 5000)
+        } else options.success?.()
+      }),
+      onOpen: (fn: any) => { callbacks.open = fn },
+      onMessage: (fn: any) => { callbacks.message = fn }, onClose: vi.fn(), onError: vi.fn(),
+    }
+    const scope: any = { ...h.scope,
+      fetchChatWsTicket: () => new Promise(resolve => setTimeout(() => resolve('synthetic-ticket'), 5000)),
+      activeSocketToken: h.token, conversationGeneration: { value: 1 }, conversationId: { value: 'synthetic-conversation' },
+      isOwnedSocketCallback: (token: number) => h.transport.isCurrentSocket(token),
+      handleChatTransportDeadline: h.deadline, handleOwnedSocketTermination: h.terminate,
+      resolveChatWebSocketBase: () => 'ws://localhost.invalid/ws', WS_BASE: '', stageHost: {}, PROTOCOL_VERSION: '2',
+      uni: { connectSocket: vi.fn(() => { setTimeout(() => callbacks.open(), 5000); return socket }) },
+      from: { value: '' }, version: { value: '' }, detachGlobalSocketListeners: vi.fn(), globalSocketHandlers: null,
+      sendQueuedChatPayload: h.sendQueued,
+    }
+    const ready = take("if (event.event === 'ready')", "if (event.event === 'error'")
+    const source = take('const CHAT_OPEN_DEADLINE_MS', 'const CHAT_ACCEPTED_DEADLINE_MS')
+      + `function handlerMessage(res, eventGeneration, socketToken) { const event = { event: 'ready' }; ${ready} }\n`
+      + take('async function connectWebSocket(', '// Phase 2a：斷線自動重連').replaceAll('import.meta.env.VITE_CHAT_API_BASE', 'undefined')
+      + '\nreturn connectWebSocket;'
+    const connect = new Function(...Object.keys(scope), ts.transpile(source, { target: ts.ScriptTarget.ES2022 }))(...Object.values(scope))
+    scope.socket.value = null
+    const connecting = connect(undefined, h.token)
+    await vi.advanceTimersByTimeAsync(20001)
+    await connecting
+    expect(socket.send).toHaveBeenCalledTimes(2) // auth plus exactly one chat frame
+    expect(h.scope.content.value).toBe('')
+    expect(h.scope.message.warning).not.toHaveBeenCalled()
+    expect(h.scope.persisted.chatPayloadDispatched).toBe(true)
+    expect(h.scope.closeWebSocket).not.toHaveBeenCalled()
+  })
 
   it('recovers a draft immediately after refresh before dispatch', () => {
     const entry = { ...createPendingStreamEntry(payload, 1000), chatPayloadDispatched: false }

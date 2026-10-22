@@ -982,6 +982,7 @@ const STREAM_PENDING_TTL_MS = 20 * 1000;
 // pendingPayload 可自動 resend 的視窗（Fix A 針對 server 根本沒收到 message 的情況）
 const STREAM_PENDING_RESEND_TTL_MS = 10 * 1000;
 const CHAT_OPEN_DEADLINE_MS = 10 * 1000;
+const CHAT_UNSENT_CONNECT_DEADLINE_MS = 20 * 1000;
 const CHAT_ACCEPTED_DEADLINE_MS = 15 * 1000;
 const RECONNECT_DELAYS = [1000, 2000, 5000]; // 指數退避
 const streamId = ref('');
@@ -8861,8 +8862,12 @@ async function connectWebSocket(
   if (resumeParams) chatTransport.retireChatPayload(socketToken);
   activeSocketToken = socketToken;
   const capturedGeneration = conversationGeneration.value;
-  // Includes ticket acquisition and auth ready, both of which precede chat send.
-  chatTransport.armOpenDeadline(socketToken, CHAT_OPEN_DEADLINE_MS, token => {
+  // A fresh send needs time for ticket, handshake and auth on a slow network.
+  // Already dispatched turns keep their existing resume deadline and ownership.
+  const openDeadlineMs = messageQueue.value.some(entry => entry?.socketToken === socketToken)
+    ? CHAT_UNSENT_CONNECT_DEADLINE_MS
+    : CHAT_OPEN_DEADLINE_MS;
+  chatTransport.armOpenDeadline(socketToken, openDeadlineMs, token => {
     handleChatTransportDeadline('open', token);
   });
 
