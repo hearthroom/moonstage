@@ -225,6 +225,12 @@ describe('ChatSystemMessage：處理中、手機疊排、修改訊息', () => {
     expect(mountCard({ kind: 'filtered', label: 'x', ctas }).find('.sys-ctas').classes()).not.toContain('sys-ctas--stacked-primary')
   })
 
+  it('三顆以上又要疊排時，動作列在桌機也整排落到說明下方；兩顆維持原本的版面', () => {
+    expect(mountCard({ kind: 'filtered', label: 'x', ctas, stackedPrimary: true }).find('.sys-ctas').classes()).toContain('sys-ctas--below')
+    expect(mountCard({ kind: 'filtered', label: 'x', ctas: ctas.slice(1), stackedPrimary: true }).find('.sys-ctas').classes()).not.toContain('sys-ctas--below')
+    expect(mountCard({ kind: 'filtered', label: 'x', ctas }).find('.sys-ctas').classes()).not.toContain('sys-ctas--below')
+  })
+
   it('主行動仍是最後一顆；關閉流式輸出並重試也掛作者的重試選擇器', () => {
     const wrapper = mountCard({ kind: 'filtered', label: 'x', ctas })
     const buttons = wrapper.findAll('.sys-cta')
