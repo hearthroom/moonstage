@@ -42,12 +42,13 @@ export function operationFailureTitle(cause: unknown, t: (key: string) => string
 /** Select copy from confirmed reasons, available actions and settlement evidence. */
 // offersStreamOff／streamingOff 來自卡上的鍵（canvas-filter-card），說明不會提到一顆卡上沒有的鍵。
 // 前置被擋的說明不點名按鍵，按鍵少一顆時同一句仍成立，所以沒有「不能切換」的變體。
-export function operationFailureSub(cause: unknown, t: (key: string) => string, opts: { agent?: boolean; filterReason?: unknown; canSwitch?: boolean; actions?: string[]; settled?: boolean; chargeCredits?: number; hasReasoning?: boolean; offersStreamOff?: boolean; streamingOff?: boolean; switchedTo?: '' | 'lane' | 'model'; offersTraditional?: boolean } = {}): string {
+export function operationFailureSub(cause: unknown, t: (key: string) => string, opts: { agent?: boolean; filterReason?: unknown; canSwitch?: boolean; actions?: string[]; settled?: boolean; chargeCredits?: number; hasReasoning?: boolean; offersStreamOff?: boolean; streamingOff?: boolean; switchedTo?: '' | 'lane' | 'model'; offersTraditional?: boolean; traditionalFailed?: boolean } = {}): string {
   if (opts.hasReasoning && ['no_final_answer', 'empty_response', 'no_answer'].includes(String(cause))) return t('chat.noFinalAnswerSub')
   const restricted = filterKey(cause, opts.filterReason)
   // 前置被擋後從卡上換了線路或模型、卡上有重送鍵：說明只講現在可以直接重送。
   if (restricted === 'systemMsg.filterInputPolicy' && opts.switchedTo) return t(restricted + (opts.switchedTo === 'lane' ? 'SubSwitchedLane' : 'SubSwitchedModel'))
   if (restricted === 'systemMsg.filterInputPolicy' && opts.offersTraditional) return t(restricted + 'SubTraditional')
+  if (restricted === 'systemMsg.filterInputPolicy' && opts.traditionalFailed) return t(restricted + 'SubTraditionalFailed')
   if (restricted === 'systemMsg.filterUnknown') {
     if (opts.offersStreamOff) return t(restricted + (opts.canSwitch === false ? 'SubStreamNoSwitch' : 'SubStream'))
     if (opts.streamingOff && opts.canSwitch === true) return t(restricted + 'SubSwitch')

@@ -79,10 +79,10 @@
           這裡的閘或屬性改了，那裡要一起改。
         -->
         <chat-system-message
-          v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason)"
+          v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason) && !filterCardReplaced(item)"
           :kind="getSystemMsgKind(item.finishReason)"
           :label="creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || getSystemMsgLabel(item.finishReason)"
-          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched, offersTraditional: filterCardFor(item, index).offersTraditional }) || getSystemMsgSub(item.finishReason, item, index)"
+          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched, offersTraditional: filterCardFor(item, index).offersTraditional, traditionalFailed: filterCardFor(item, index).traditionalFailed }) || getSystemMsgSub(item.finishReason, item, index)"
           :links="creditsOverrideFor(item)?.links ?? []"
           :cta="getSystemMsgCta(item.finishReason, item, index)"
           :cta-action="getSystemMsgCtaAction(item.finishReason, item, index)"
@@ -3351,7 +3351,7 @@ function creditsOverrideFor(item: any) {
 */
 function filterCardFor(item: any, index: number) {
   if (getSystemMsgKind(item?.finishReason) !== 'filtered') {
-    return { ctas: getSystemMsgCtas(item, index), offersStreamOff: false, streamingOff: false, stacked: false, switched: '' as const, offersTraditional: false };
+    return { ctas: getSystemMsgCtas(item, index), offersStreamOff: false, streamingOff: false, stacked: false, switched: '' as const, offersTraditional: false, traditionalFailed: false };
   }
   return filterCardActions({
     item,
@@ -3364,6 +3364,7 @@ function filterCardFor(item: any, index: number) {
     hasOtherLanes: currentModelHasOtherLanes(),
     switchedTo: filterCardSwitchedTo(item),
     canResendTraditional: !!traditionalResendFor(item, index),
+    traditionalTried: traditionalResendWasTried(item, index),
     labels: { retryAsIs: t('chat.retryAsIs'), streamOffRetry: t('chat.filterStopStreamingRetry'), switchLane: t('chat.switchLane'), editMessage: t('chat.editFilteredMessage'), resendLane: t('chat.resendNewLane'), resendModel: t('chat.resendNewModel'), resendTraditional: t('chat.resendTraditional') },
   });
 }
@@ -3396,6 +3397,24 @@ function traditionalResendFor(item: any, index: number) {
   const original = String(talkList.value[filterCardPlayerIndex(item, index)]?.content || '');
   if (traditionalResendTried.value.includes(traditionalResendKey(original))) return '';
   return traditionalResendText(original);
+}
+function traditionalResendWasTried(item: any, index: number) {
+  if (!isInputPolicyFilter(item)) return false;
+  const line = String(talkList.value[filterCardPlayerIndex(item, index)]?.content || '');
+  return !!line && traditionalResendTried.value.includes(traditionalResendKey(line));
+}
+/*
+  前置被擋卡上的重送（轉繁體、修改訊息、換線路後重送）進行中，那張舊卡先收起來：它寫著「重試也會被擋」，
+  跟玩家剛按的事矛盾（QA W1）。只看 pendingChatTurn，所以這一輪結束（成功、再被擋、沒成換回來）時
+  pendingChatTurn 清掉、卡就照常畫：再被擋時畫的是新終局或換回來的那一列，不會沒有卡。
+  其他卡重試時照舊。
+*/
+function filterCardReplaced(item: any) {
+  void ownershipRevision.value;
+  const pending = pendingChatTurn;
+  if (!pending || !isReplacementOperationKind(pending.operationKind) || !isInputPolicyFilter(item)) return false;
+  const source = pending.rewriteSnapshot?.aiBubble;
+  return !!source && source.id != null && String(source.id) === String(item?.id ?? '');
 }
 function rememberTraditionalResend(original: string, converted: string) {
   traditionalResendTried.value = [...traditionalResendTried.value, traditionalResendKey(original), traditionalResendKey(converted)].slice(-40);
@@ -3441,7 +3460,7 @@ function currentModelHasOtherLanes() {
 }
 
 function systemNoticeFor(item: any, index: number) {
-  if (!item || !(item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason))) return null;
+  if (!item || !(item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason) && !filterCardReplaced(item))) return null;
   const ctas = filterCardFor(item, index).ctas;
   const cta = getSystemMsgCta(item.finishReason, item, index);
   const ctaAction = getSystemMsgCtaAction(item.finishReason, item, index);
@@ -3449,7 +3468,7 @@ function systemNoticeFor(item: any, index: number) {
   return {
     kind: getSystemMsgKind(item.finishReason),
     label: creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || getSystemMsgLabel(item.finishReason),
-    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched, offersTraditional: filterCardFor(item, index).offersTraditional }) || getSystemMsgSub(item.finishReason, item, index),
+    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched, offersTraditional: filterCardFor(item, index).offersTraditional, traditionalFailed: filterCardFor(item, index).traditionalFailed }) || getSystemMsgSub(item.finishReason, item, index),
     actions: actions.map((entry) => ({ action: String(entry.action), label: String(entry.label) })),
     // 內容限制卡：存偏好期間整列不能按、手機上主行動整行排第一。只在成立時才帶，其他卡跟以前一模一樣。
     ...(filterCardBusy.value === String(item.id) ? { busy: true } : {}),

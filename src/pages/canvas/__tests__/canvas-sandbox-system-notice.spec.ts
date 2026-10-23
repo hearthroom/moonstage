@@ -49,7 +49,7 @@ function canvasFunctions(names: string[], env: Record<string, unknown>): Record<
   return new Function(...keys, `${js}\nreturn { ${names.join(', ')} };`)(...keys.map((k) => env[k]))
 }
 
-type FilterEnv = { streaming?: '' | 'on' | 'off'; settings?: boolean; world?: boolean; agent?: boolean; lanes?: number; busy?: string; switched?: { itemId: string; from: string }; current?: string; tried?: string[] }
+type FilterEnv = { streaming?: '' | 'on' | 'off'; settings?: boolean; world?: boolean; agent?: boolean; lanes?: number; busy?: string; switched?: { itemId: string; from: string }; current?: string; tried?: string[]; pending?: any }
 function resolver(timeline: any[], over: { capabilities?: unknown; operations?: unknown[]; ui?: Record<string, unknown>; translate?: (key:string)=>string; filter?: FilterEnv } = {}) {
   const f = over.filter || {}
   // 一顆模型、lanes 條線路（目前用的是第一條）
@@ -58,13 +58,16 @@ function resolver(timeline: any[], over: { capabilities?: unknown; operations?: 
     'getSystemMsgKind', 'getSystemMsgLabel', 'getSystemMsgSub', 'getSystemMsgCtaLabel', 'getSystemMsgCta',
     'getSystemMsgCtas', 'getSystemMsgCtaAction', 'canSwitchModelFor', 'creditsOverrideFor',
     'filterCardFor', 'filterCardBase', 'canEditFilteredMessage', 'filterCardPlayerIndex', 'filterCardSwitchedTo', 'familyOfVariant', 'currentModelHasOtherLanes',
-    'traditionalResendKey', 'traditionalResendFor',
+    'traditionalResendKey', 'traditionalResendFor', 'traditionalResendWasTried', 'filterCardReplaced',
     'exactTimelineRowIndex', 'firstExactTimelineRowIndex', 'systemNoticeFor',
   ], {
     filterCardActions,
     isInputPolicyFilter,
     traditionalResendText,
     traditionalResendTried: { value: f.tried ?? [] },
+    ownershipRevision: { value: 0 },
+    pendingChatTurn: f.pending ?? null,
+    isReplacementOperationKind: (kind: string) => kind === 'rewrite' || kind === 'retry_generation',
     conversationId: { value: 'c1' },
     canEditResendPlayerIndex,
     latestTerminalAIIndex,
@@ -260,9 +263,28 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
     expect(notice.sub).toBe(t('systemMsg.filterInputPolicySubTraditional'))
     expect(notice.stackedPrimary).toBe(true)
     const tried = resolver(timeline, { filter: { lanes: 3, tried: ['c1\n我们一起去学校吧', 'c1\n我們一起去學校吧'] } })(1)!
-    expect(tried.actions.map((a) => a.action)).not.toContain('resend_traditional')
-    expect(tried.sub).toBe(t('systemMsg.filterInputPolicySub'))
+    expect(tried.actions.map((a) => a.action)).toEqual(['switch_lane', 'switch_model', 'edit_message'])
+    expect(tried.sub).toBe(t('systemMsg.filterInputPolicySubTraditionalFailed'))
+    // 伺服器留下的是轉好的字（重新整理前的同一頁）：一樣算轉過
+    expect(resolver([user('u1', '我們一起去學校吧'), blocked], { filter: { lanes: 3, tried: ['c1\n我们一起去学校吧', 'c1\n我們一起去學校吧'] } })(1)!.sub).toBe(t('systemMsg.filterInputPolicySubTraditionalFailed'))
     expect(resolver([user('u1', '我們一起去學校吧'), blocked], { filter: { lanes: 3 } })(1)!.actions.map((a) => a.action)).not.toContain('resend_traditional')
+  })
+
+  it('從前置被擋卡重送（轉繁體、修改訊息、換線路後重送）進行中：舊卡先收起來；這一輪結束（沒有進行中的重送）卡照常畫', () => {
+    const blocked = failed({ finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'input_policy' })
+    const timeline = [user('u1', '我们一起去学校吧'), blocked]
+    for (const operationKind of ['retry_generation', 'rewrite']) {
+      expect(resolver(timeline, { filter: { lanes: 3, pending: { operationKind, rewriteSnapshot: { aiBubble: { id: blocked.id } } } } })(1)).toBeNull()
+    }
+    // 別一列的重送、一般送出：不影響這張卡
+    expect(resolver(timeline, { filter: { lanes: 3, pending: { operationKind: 'retry_generation', rewriteSnapshot: { aiBubble: { id: 'other' } } } } })(1)).not.toBeNull()
+    expect(resolver(timeline, { filter: { lanes: 3, pending: { operationKind: 'send' } } })(1)).not.toBeNull()
+    expect(resolver(timeline, { filter: { lanes: 3 } })(1)).not.toBeNull()
+  })
+
+  it('其他卡重試進行中照舊（只收前置被擋卡）', () => {
+    const errorCard = failed()
+    expect(resolver([user('u1'), errorCard], { filter: { pending: { operationKind: 'retry_generation', rewriteSnapshot: { aiBubble: { id: errorCard.id } } } } })(1)).not.toBeNull()
   })
 
   it('前置被擋的舊卡（不是最新一列）沒有修改訊息', () => {
