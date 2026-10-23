@@ -32,6 +32,8 @@ export interface FilterCardContext {
   switchedTo?: '' | 'lane' | 'model'
   /** 被擋那則能改、含簡體、還沒轉過（canvas-traditional-resend）。 */
   canResendTraditional?: boolean
+  /** 被擋那則已經轉過繁體（這一頁裡），又被擋：說明換成「轉過仍被擋」。 */
+  traditionalTried?: boolean
   labels: { retryAsIs: string; streamOffRetry: string; switchLane: string; editMessage: string; resendLane: string; resendModel: string; resendTraditional: string }
 }
 
@@ -45,6 +47,8 @@ export interface FilterCardResult {
   switched: '' | 'lane' | 'model'
   /** 卡上有「轉成繁體再送出」：說明句跟著提到它。 */
   offersTraditional: boolean
+  /** 轉過繁體仍被擋：說明句換成交代試過了的那一版，動作照一般版本。 */
+  traditionalFailed: boolean
 }
 
 import { filterKey } from '@/utils/operation-failure-copy'
@@ -73,7 +77,7 @@ export function cardRetryTarget(base: FilterCardEntry[]): string {
 
 export function filterCardActions(ctx: FilterCardContext): FilterCardResult {
   const { item, base, labels } = ctx
-  const unchanged: FilterCardResult = { ctas: base, offersStreamOff: false, streamingOff: false, stacked: false, switched: '', offersTraditional: false }
+  const unchanged: FilterCardResult = { ctas: base, offersStreamOff: false, streamingOff: false, stacked: false, switched: '', offersTraditional: false, traditionalFailed: false }
   if (isInputPolicyFilter(item)) {
     const ctas: FilterCardEntry[] = []
     for (const entry of base) {
@@ -94,7 +98,8 @@ export function filterCardActions(ctx: FilterCardContext): FilterCardResult {
     } else if (ctx.canEditMessage) {
       ctas.push({ action: 'edit_message', label: labels.editMessage })
     }
-    return { ctas, offersStreamOff: false, streamingOff: false, stacked: ctas.length >= 3, switched, offersTraditional }
+    const traditionalFailed = !switched && !offersTraditional && ctx.traditionalTried === true
+    return { ctas, offersStreamOff: false, streamingOff: false, stacked: ctas.length >= 3, switched, offersTraditional, traditionalFailed }
   }
   if (!isUnknownOutputFilter(item) || !ctx.streamingApplies) return unchanged
   if (ctx.streaming === 'off') return { ...unchanged, streamingOff: true }
@@ -109,5 +114,6 @@ export function filterCardActions(ctx: FilterCardContext): FilterCardResult {
     stacked: true,
     switched: '',
     offersTraditional: false,
+    traditionalFailed: false,
   }
 }

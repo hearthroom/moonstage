@@ -71,7 +71,7 @@ describe('原因未提供：流式輸出出口', () => {
   it('其他原因與其他錯誤卡：照舊', () => {
     for (const item of [{ ...unknown, filterReason: 'safety' }, { finishReason: 'refusal' }, { finishReason: 'server_error' }]) {
       const r = filterCardActions(ctx({ item }))
-      expect(r).toEqual({ ctas: [retry, switchModel], offersStreamOff: false, streamingOff: false, stacked: false, switched: '', offersTraditional: false })
+      expect(r).toEqual({ ctas: [retry, switchModel], offersStreamOff: false, streamingOff: false, stacked: false, switched: '', offersTraditional: false, traditionalFailed: false })
     }
   })
 })
@@ -150,3 +150,17 @@ describe('前置被擋：轉成繁體再送出', () => {
     expect(filterCardActions(ctx({ canResendTraditional: true })).offersTraditional).toBe(false)
   })
 })
+
+describe('前置被擋：轉過繁體仍被擋', () => {
+  it('這一則轉過了 → 說明換成「轉過仍被擋」，動作是一般版本（修改訊息當主行動）', () => {
+    const r = filterCardActions(ctx({ item: input, traditionalTried: true }))
+    expect(r.ctas.map(e => e.action)).toEqual(['switch_lane', 'switch_model', 'edit_message'])
+    expect(r.traditionalFailed).toBe(true)
+    expect(r.offersTraditional).toBe(false)
+  })
+  it('換過線路之後說明講重送，不講轉過仍被擋；其他卡不受影響', () => {
+    expect(filterCardActions(ctx({ item: input, traditionalTried: true, switchedTo: 'lane' })).traditionalFailed).toBe(false)
+    expect(filterCardActions(ctx({ traditionalTried: true })).traditionalFailed).toBe(false)
+  })
+})
+
