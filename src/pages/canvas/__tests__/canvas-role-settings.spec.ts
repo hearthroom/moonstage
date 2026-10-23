@@ -185,6 +185,18 @@ describe('換模型時思考深度跟著模型走', () => {
     expect(thinkingDepthForVariant(pro, '')).toBe('max')
   })
 
+  it('空字串的「自動」是合法選擇：支援就保留，不支援時預設是自動就退回自動', async () => {
+    const { thinkingDepthForVariant } = await import('../canvas-role-settings')
+    const gemini = {
+      thinkingDepthOptions: [{ value: '' }, { value: 'high' }],
+      defaultThinkingDepth: '',
+    }
+    expect(thinkingDepthForVariant(gemini, '')).toBe('')
+    expect(thinkingDepthForVariant(gemini, 'high')).toBe('high')
+    expect(thinkingDepthForVariant(gemini, 'max')).toBe('')
+    expect(thinkingDepthForVariant({ thinkingDepthOptions: gemini.thinkingDepthOptions }, 'max')).toBe('')
+  })
+
   it('沒有思考檔位的模型送空字串；查不到線路就不動', async () => {
     const { thinkingDepthForVariant } = await import('../canvas-role-settings')
     expect(thinkingDepthForVariant(plain, 'max')).toBe('')
