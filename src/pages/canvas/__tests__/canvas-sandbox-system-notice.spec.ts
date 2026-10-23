@@ -282,6 +282,12 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
     expect(resolver(timeline, { filter: { lanes: 3 } })(1)).not.toBeNull()
   })
 
+  it('收起來的是整列，不只是卡：一般畫布不畫那一列，沙箱殼的訊息清單也不給（否則留下一列空的「⋯」）', () => {
+    const list = CANVAS.slice(CANVAS.indexOf('<CanvasStage'), CANVAS.indexOf('</CanvasStage>'))
+    expect(list).toMatch(/<template v-for="\(item, index\) in talkList"[^>]*>\s*<CanvasMessage\s+v-if="!filterCardReplaced\(item\)"/)
+    expect(CANVAS).toMatch(/messages: list\.flatMap\(\(item, index\) => \{\s*if \(filterCardReplaced\(item\)\) return \[\];/)
+  })
+
   it('其他卡重試進行中照舊（只收前置被擋卡）', () => {
     const errorCard = failed()
     expect(resolver([user('u1'), errorCard], { filter: { pending: { operationKind: 'retry_generation', rewriteSnapshot: { aiBubble: { id: errorCard.id } } } } })(1)).not.toBeNull()

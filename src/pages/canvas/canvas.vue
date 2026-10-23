@@ -61,9 +61,10 @@
     <CanvasStage v-if="!sandboxCard" :background="stageBackground" @scroll="onStageScroll">
       <CanvasIntro :text="introText" :open="introOpen" @toggle="introOpen = !introOpen" />
 
+      <!-- 前置被擋卡上的重送進行中，被擋那一列整列收起來（filterCardReplaced）：只收卡會留下一列空的「⋯」。 -->
+      <template v-for="(item, index) in talkList" :key="item.id != null ? item.id : index">
       <CanvasMessage
-        v-for="(item, index) in talkList"
-        :key="item.id != null ? item.id : index"
+        v-if="!filterCardReplaced(item)"
         :id="'msg-' + item.id"
         :message="messageProps(item, index)"
         :labels="messageLabels"
@@ -92,6 +93,7 @@
           @cta="onSystemMsgCta($event, item, index)"
         ></chat-system-message>
       </CanvasMessage>
+      </template>
 
       <!-- MMD 的「你可以選擇開場」：訊息列之後的獨立區塊（照 MMD 的 DOM 位置）。
            點一條把那句話填進輸入框，由玩家自己送出——不是換開場白。 -->
@@ -3536,11 +3538,13 @@ function buildHudHost(): HudHost {
           name: convertPlainText(view.roleName || '', displayScript),
           avatar: view.roleAvatar ? String(cfImage(view.roleAvatar, 'avatarMedium') || '') || null : null,
         },
-        messages: list.map((item, index) => {
+        // 前置被擋卡上的重送進行中，被擋那一列不給殼（跟一般畫布一樣整列收起，見 filterCardReplaced）。
+        messages: list.flatMap((item, index) => {
+          if (filterCardReplaced(item)) return [];
           const isUser = item.type == 1;
           const opening = isOpeningIndex(list, index);
           const isAI = !isUser && !item.systemOnly;
-          return {
+          return [{
             id: String(item.id),
             role: item.systemOnly ? 'system' as const : (isUser ? 'user' as const : 'assistant' as const),
             text: String(item.content || ''),
@@ -3553,7 +3557,7 @@ function buildHudHost(): HudHost {
             canContinue: isAI && canContinueFromIndex(index),
             // 沙箱殼用：標準訊息元件的整份呈現資料（html 走同一個快取，不重算），連同那一列底下的系統訊息卡。
             view: sandboxCard.value ? { ...messageProps(item, index, item.chatLoading ? '' : hudMessageHtml(item)), systemNotice: systemNoticeFor(item, index) } : undefined,
-          };
+          }];
         }),
         generation: generating ? (streamingId ? 'streaming' as const : 'starting' as const) : 'idle' as const,
         // 沙箱殼用：這一輪在等什麼——整理劇情（伺服器壓縮記憶，擋在第一個字前）、模型思考（推理串流中、正文還沒來）、
