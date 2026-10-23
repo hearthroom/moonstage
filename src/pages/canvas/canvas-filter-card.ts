@@ -8,7 +8,7 @@
  * 2. 前置被擋（input_policy；舊歷史是 content_filter_input）：同一份請求在同一條線路上重送必定
  *    再擋，所以拿掉重試；主行動是「修改訊息」（走既有的編輯並重送，取代被擋那則），另有
  *    「切換線路」（同一個模型換服務商）與「切換模型」。內容根本沒開始生成，不給流式輸出出口。
- *    被擋那則含簡體、還沒轉過時，主行動換成「轉成繁體再送出」（服務商多半用簡體詞庫），修改訊息仍在。
+ *    被擋那則含簡體、還沒轉過時，主行動換成「轉成繁體再送出」（服務商多半用簡體詞庫），修改訊息讓位。
  *
  * 兩個判斷要分清楚：伺服器的 filterKey 把「content_filter_input 且沒有原因」也算成 unknown
  * （標題一樣），但那是輸入端被拒，關流式輸出沒有道理。
@@ -84,14 +84,16 @@ export function filterCardActions(ctx: FilterCardContext): FilterCardResult {
     // 換了線路或模型之後，原樣重送才有意義：主行動換成重送（玩家按了才送，只看看選單不會扣費）。
     // 伺服器沒給任何重試動作就沒有路可走，維持修改訊息。
     const switched = ctx.switchedTo && cardRetryTarget(base) ? ctx.switchedTo : ''
+    // 轉繁體也是改這一則再送，能改才給；換過線路之後主行動已經是重送，不再疊一顆。
+    const offersTraditional = !switched && ctx.canEditMessage && ctx.canResendTraditional === true
+    // 主行動只有一顆，修改訊息跟換線路後一樣讓位：卡維持三顆，手機上兩顆次要鍵才排得進一行（改字仍可走⋯→編輯並重送）。
     if (switched) {
       ctas.push({ action: 'resend_filtered', label: switched === 'lane' ? labels.resendLane : labels.resendModel })
+    } else if (offersTraditional) {
+      ctas.push({ action: 'resend_traditional', label: labels.resendTraditional })
     } else if (ctx.canEditMessage) {
       ctas.push({ action: 'edit_message', label: labels.editMessage })
     }
-    // 轉繁體也是改這一則再送，能改才給；換過線路之後主行動已經是重送，不再疊一顆。
-    const offersTraditional = !switched && ctx.canEditMessage && ctx.canResendTraditional === true
-    if (offersTraditional) ctas.push({ action: 'resend_traditional', label: labels.resendTraditional })
     return { ctas, offersStreamOff: false, streamingOff: false, stacked: ctas.length >= 3, switched, offersTraditional }
   }
   if (!isUnknownOutputFilter(item) || !ctx.streamingApplies) return unchanged

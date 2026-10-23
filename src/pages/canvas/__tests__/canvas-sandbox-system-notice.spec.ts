@@ -255,7 +255,7 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
     const blocked = failed({ finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'input_policy' })
     const timeline = [user('u1', '我们一起去学校吧'), blocked]
     const notice = resolver(timeline, { filter: { lanes: 3 } })(1)!
-    expect(notice.actions.map((a) => a.action)).toEqual(['switch_lane', 'switch_model', 'edit_message', 'resend_traditional'])
+    expect(notice.actions.map((a) => a.action)).toEqual(['switch_lane', 'switch_model', 'resend_traditional'])
     expect(notice.actions.at(-1)).toEqual({ action: 'resend_traditional', label: '轉成繁體再送出' })
     expect(notice.sub).toBe(t('systemMsg.filterInputPolicySubTraditional'))
     expect(notice.stackedPrimary).toBe(true)

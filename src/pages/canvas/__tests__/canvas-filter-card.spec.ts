@@ -125,14 +125,14 @@ describe('前置被擋：修改訊息、切換線路、切換模型', () => {
 
 describe('前置被擋：轉成繁體再送出', () => {
   const traditional = { action: 'resend_traditional', label: '轉成繁體再送出' }
-  it('被擋那則含簡體 → 主行動是轉成繁體再送出，修改訊息仍在', () => {
+  it('被擋那則含簡體 → 主行動是轉成繁體再送出，修改訊息讓位（卡維持三顆，改字走⋯→編輯並重送）', () => {
     const r = filterCardActions(ctx({ item: input, canResendTraditional: true }))
-    expect(r.ctas).toEqual([{ action: 'switch_lane', label: '切換線路' }, switchModel, { action: 'edit_message', label: '修改訊息' }, traditional])
+    expect(r.ctas).toEqual([{ action: 'switch_lane', label: '切換線路' }, switchModel, traditional])
     expect(r.stacked).toBe(true)
     expect(r.offersTraditional).toBe(true)
   })
-  it('只剩修改訊息時也排在它後面當主行動', () => {
-    expect(actions({ item: input, base: [retry], canResendTraditional: true })).toEqual(['edit_message', 'resend_traditional'])
+  it('不能切換時只剩它一顆', () => {
+    expect(actions({ item: input, base: [retry], canResendTraditional: true })).toEqual(['resend_traditional'])
   })
   it('不含簡體、已轉過、不能編輯 → 不出現，說明照舊', () => {
     const r = filterCardActions(ctx({ item: input }))
