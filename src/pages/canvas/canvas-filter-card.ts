@@ -38,6 +38,8 @@ export interface FilterCardResult {
   streamingOff: boolean
   /** 手機上主行動整行排第一（三顆排不進一行時）。 */
   stacked: boolean
+  /** 卡上有「用新線路／模型重送」時是哪一種：說明句跟著換成「已換到新的…，可以直接重送」。 */
+  switched: '' | 'lane' | 'model'
 }
 
 import { filterKey } from '@/utils/operation-failure-copy'
@@ -66,7 +68,7 @@ export function cardRetryTarget(base: FilterCardEntry[]): string {
 
 export function filterCardActions(ctx: FilterCardContext): FilterCardResult {
   const { item, base, labels } = ctx
-  const unchanged: FilterCardResult = { ctas: base, offersStreamOff: false, streamingOff: false, stacked: false }
+  const unchanged: FilterCardResult = { ctas: base, offersStreamOff: false, streamingOff: false, stacked: false, switched: '' }
   if (isInputPolicyFilter(item)) {
     const ctas: FilterCardEntry[] = []
     for (const entry of base) {
@@ -76,12 +78,13 @@ export function filterCardActions(ctx: FilterCardContext): FilterCardResult {
     }
     // 換了線路或模型之後，原樣重送才有意義：主行動換成重送（玩家按了才送，只看看選單不會扣費）。
     // 伺服器沒給任何重試動作就沒有路可走，維持修改訊息。
-    if (ctx.switchedTo && cardRetryTarget(base)) {
-      ctas.push({ action: 'resend_filtered', label: ctx.switchedTo === 'lane' ? labels.resendLane : labels.resendModel })
+    const switched = ctx.switchedTo && cardRetryTarget(base) ? ctx.switchedTo : ''
+    if (switched) {
+      ctas.push({ action: 'resend_filtered', label: switched === 'lane' ? labels.resendLane : labels.resendModel })
     } else if (ctx.canEditMessage) {
       ctas.push({ action: 'edit_message', label: labels.editMessage })
     }
-    return { ctas, offersStreamOff: false, streamingOff: false, stacked: ctas.length >= 3 }
+    return { ctas, offersStreamOff: false, streamingOff: false, stacked: ctas.length >= 3, switched }
   }
   if (!isUnknownOutputFilter(item) || !ctx.streamingApplies) return unchanged
   if (ctx.streaming === 'off') return { ...unchanged, streamingOff: true }
@@ -94,5 +97,6 @@ export function filterCardActions(ctx: FilterCardContext): FilterCardResult {
     offersStreamOff: true,
     streamingOff: false,
     stacked: true,
+    switched: '',
   }
 }

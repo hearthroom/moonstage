@@ -238,6 +238,9 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
     const timeline = [user('u1'), failed({ finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'input_policy' })]
     const switched = { itemId: 'operation-projection-op1', from: 'm-lane0' }
     expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'm-lane1' } })(1)!.actions.map((a) => a.label)).toEqual(['切換線路', '切換模型', '用新線路重送'])
+    expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'm-lane1' } })(1)!.sub).toBe(t('systemMsg.filterInputPolicySubSwitchedLane'))
+    expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'other-1' } })(1)!.sub).toBe(t('systemMsg.filterInputPolicySubSwitchedModel'))
+    expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'm-lane0' } })(1)!.sub).toBe(t('systemMsg.filterInputPolicySub'))
     expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'other-1' } })(1)!.actions.at(-1)).toEqual({ action: 'resend_filtered', label: '用新模型重送' })
     expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'm-lane0' } })(1)!.actions.at(-1)!.action).toBe('edit_message')
     expect(resolver(timeline, { filter: { lanes: 3, switched: { itemId: 'another-card', from: 'm-lane0' }, current: 'm-lane1' } })(1)!.actions.at(-1)!.action).toBe('edit_message')

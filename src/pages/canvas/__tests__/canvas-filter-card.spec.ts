@@ -71,7 +71,7 @@ describe('原因未提供：流式輸出出口', () => {
   it('其他原因與其他錯誤卡：照舊', () => {
     for (const item of [{ ...unknown, filterReason: 'safety' }, { finishReason: 'refusal' }, { finishReason: 'server_error' }]) {
       const r = filterCardActions(ctx({ item }))
-      expect(r).toEqual({ ctas: [retry, switchModel], offersStreamOff: false, streamingOff: false, stacked: false })
+      expect(r).toEqual({ ctas: [retry, switchModel], offersStreamOff: false, streamingOff: false, stacked: false, switched: '' })
     }
   })
 })
@@ -106,12 +106,16 @@ describe('前置被擋：修改訊息、切換線路、切換模型', () => {
     const r = filterCardActions(ctx({ item: input, switchedTo: 'lane' }))
     expect(r.ctas).toEqual([{ action: 'switch_lane', label: '切換線路' }, switchModel, { action: 'resend_filtered', label: '用新線路重送' }])
     expect(r.stacked).toBe(true)
+    expect(r.switched).toBe('lane')
   })
   it('換的是別的模型：用新模型重送', () => {
     expect(filterCardActions(ctx({ item: input, switchedTo: 'model' })).ctas.at(-1)).toEqual({ action: 'resend_filtered', label: '用新模型重送' })
+    expect(filterCardActions(ctx({ item: input, switchedTo: 'model' })).switched).toBe('model')
   })
   it('伺服器沒給任何重試動作時沒有重送可走：維持修改訊息', () => {
     expect(actions({ item: input, switchedTo: 'lane', base: [switchModel] })).toEqual(['switch_lane', 'switch_model', 'edit_message'])
+    // 卡上沒有重送鍵時，說明也不能說「可以直接重送」
+    expect(filterCardActions(ctx({ item: input, switchedTo: 'lane', base: [switchModel] })).switched).toBe('')
   })
   it('還沒換（只是打開選單看看）不給重送；原因未提供的卡不受影響', () => {
     expect(actions({ item: input })).not.toContain('resend_filtered')

@@ -76,10 +76,16 @@ describe('content restriction copy follows the actions on the card', () => {
     }
     expect(operationFailureTitle('content_filter_input', key)).toBe('systemMsg.filterInputPolicy')
   })
+  it('input policy after a switch from the card: says the new lane or model is ready to resend', () => {
+    expect(operationFailureSub('content_filter', key, { filterReason: 'input_policy', switchedTo: 'lane' })).toBe('systemMsg.filterInputPolicySubSwitchedLane')
+    expect(operationFailureSub('content_filter', key, { filterReason: 'input_policy', switchedTo: 'model' })).toBe('systemMsg.filterInputPolicySubSwitchedModel')
+    expect(operationFailureSub('content_filter', key, { filterReason: 'unknown', switchedTo: 'lane' })).toBe('systemMsg.filterUnknownSub')
+  })
   it('every locale has the new keys and no longer carries the input-policy no-switch variant', () => {
     const keys = ['systemMsg.filterUnknownSubStream', 'systemMsg.filterUnknownSubStreamNoSwitch', 'systemMsg.filterUnknownSubSwitch',
       'chat.filterStopStreamingRetry', 'chat.retryAsIs', 'chat.streamingTurnedOff', 'chat.streamingTurnOffFailed',
-      'chat.editFilteredMessage', 'chat.switchLane', 'chat.resendNewLane', 'chat.resendNewModel', 'systemMsg.filterInputPolicy', 'systemMsg.filterInputPolicySub']
+      'chat.editFilteredMessage', 'chat.switchLane', 'chat.resendNewLane', 'chat.resendNewModel', 'systemMsg.filterInputPolicy', 'systemMsg.filterInputPolicySub',
+      'systemMsg.filterInputPolicySubSwitchedLane', 'systemMsg.filterInputPolicySubSwitchedModel']
     for (const locale of [zhHant, zhHans, en, ja, ko] as Array<Record<string, string>>) {
       for (const k of keys) expect(locale[k], k).toBeTruthy()
       expect(locale['systemMsg.filterInputPolicySubNoSwitch']).toBeUndefined()
