@@ -20,9 +20,13 @@ import TradOrSimp from '@/common/TradOrSimp'
 import { HAS_CJK } from '@/common/display-script-walk'
 import { isAmbiguousChar } from '@/common/ambiguous-chars'
 
+// 一簡對多繁字表沒收、繁體裡卻是常見姓氏的字（于先生 → 於先生）。
+const TWO_WAY_NAMES = '于'
+
 function hasPlainlySimplified(text: string): boolean {
   for (const char of text) {
-    if (!isAmbiguousChar(char) && TradOrSimp.detect(char).simplifiedCharacters > 0) return true
+    if (isAmbiguousChar(char) || TWO_WAY_NAMES.includes(char)) continue
+    if (TradOrSimp.detect(char).simplifiedCharacters > 0) return true
   }
   return false
 }

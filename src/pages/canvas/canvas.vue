@@ -5105,13 +5105,11 @@ function onSystemMsgCta(action, item, index) {
   // 轉成繁體再送出：不開編輯框，直接以編輯並重送送出轉好的字（玩家看到的那一則就是轉好的字）。
   if (action === 'resend_traditional') {
     const playerIndex = filterCardPlayerIndex(item, index);
-    const original = String(talkList.value[playerIndex]?.content || '');
     const converted = playerIndex >= 0 ? traditionalResendFor(item, index) : '';
     if (!converted) {
       notifyTimelineMutationBlocked();
       return;
     }
-    rememberTraditionalResend(original, converted);
     doEditResendPlayer(playerIndex, converted, 'to_traditional');
     return;
   }
@@ -10058,6 +10056,13 @@ function onMenuConfirmEdit() {
   sureRewrite(chatId)
 }
 
+// 編輯並重送真的要送出了：帶上是哪顆卡上的鍵改寫的。轉繁體的這時才記下轉過（原文與轉好的字），
+// 被時間軸擋下、刪不掉舊句這類沒送出的情況不記，玩家下次還拿得到這顆鍵。
+function beginResend(resendIntent: '' | 'to_traditional', original: string, text: string) {
+  requestedResendIntent = resendIntent
+  if (resendIntent === 'to_traditional') rememberTraditionalResend(original, text)
+}
+
 /**
  * 編輯並重送：改玩家自己最新那句，然後重跑這一輪。
  * 走的是「重新生成」同一條路（以這則玩家訊息為目標、換掉後面的 AI 回覆），只差內容換成
@@ -10095,7 +10100,7 @@ function doEditResendPlayer(index: number, draft: string, resendIntent: '' | 'to
   contine.value = false
   pendingRewriteSnapshot = snapshot
   rewriteTargetChatId.value = String(userBubble.chatId || userBubble.id || '')
-  requestedResendIntent = resendIntent
+  beginResend(resendIntent, String(userBubble.content || ''), text)
   send()
 }
 
@@ -10126,7 +10131,7 @@ function resendPlayerRowWithoutReply(index: number, text: string, resendIntent: 
     contine.value = false
     pendingRewriteSnapshot = null
     rewriteTargetChatId.value = ''
-    requestedResendIntent = resendIntent
+    beginResend(resendIntent, String(userBubble?.content || ''), text)
     send()
   }).catch((e: any) => {
     console.error('編輯並重送（沒有回覆）失敗', e)
