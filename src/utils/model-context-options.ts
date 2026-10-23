@@ -232,6 +232,28 @@ export const getVisibleThinkingDepthOptions = (
   return list
 }
 
+/**
+ * 換了模型或線路之後用哪個思考深度：新選項裡有原本的就留著；沒有就用它的預設；
+ * 預設不在選項裡時，有「自動」就退回自動，再不然挑最深的那一檔。
+ * 空字串是「自動」這個選項的值（不送深度參數），不是「沒選」，所以一律看它在不在
+ * 選項裡，不看真假值——用真假值判斷會把玩家選的自動換成「高」。
+ * current 傳 null 表示還沒有選擇（例如替沒選中的線路估價），直接取預設。
+ */
+export const pickThinkingDepth = (
+  values: string[],
+  current: string | null,
+  defaultValue?: unknown,
+): string => {
+  if (values.length === 0) return ''
+  if (current !== null && values.includes(current)) return current
+  if (typeof defaultValue === 'string' && values.includes(defaultValue)) return defaultValue
+  if (values.includes('')) return ''
+  for (const preferred of ['max', 'on', 'high']) {
+    if (values.includes(preferred)) return preferred
+  }
+  return values.find((v) => v && v !== 'off') || values[0]
+}
+
 const mergeStableFamilyMetadata = (
   family?: ModelFamily | null,
   variant?: ContextCapableModel | null,

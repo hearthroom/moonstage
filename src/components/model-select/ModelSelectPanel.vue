@@ -499,6 +499,7 @@
 		getThinkingControl,
 		getVisibleThinkingDepthOptions,
 		isAutoCompactForcedForModel,
+		pickThinkingDepth,
 		normalizeContextValue
 	} from '@/utils/model-context-options'
 	import { getAaAgenticIndex, getAaIntelligenceIndex, getModelHealthMetrics, getUsageRank } from '@/utils/model-health-metrics'
@@ -659,40 +660,24 @@
 		'--memory-depth-thumb-width': `${100 / Math.max(contextBudgetLevelOptions.value.length, 1)}%`,
 	}));
 
-	const defaultThinkingDepthValue = (options, defaultValue = '') => {
-		if (!options || options.length === 0) return '';
-		if (defaultValue && options.some(item => item.value === defaultValue)) {
-			return defaultValue;
-		}
-		const preferred = ['max', 'on', 'high'];
-		for (const value of preferred) {
-			const found = options.find(item => item.value === value);
-			if (found) return found.value;
-		}
-		const enabled = options.find(item => item.value && item.value !== 'off');
-		return enabled ? enabled.value : options[0].value;
+	const optionValues = (options) => (options || []).map(item => item.value);
+
+	// 換模型、換線路都走這裡：新線路有玩家原本選的深度就留著，沒有才退回預設。
+	const normalizeThinkingDepthForSelectedModel = () => {
+		formData.thinkingDepth = pickThinkingDepth(
+			optionValues(thinkingDepthOptions.value),
+			formData.thinkingDepth,
+			selectItem.value && selectItem.value.defaultThinkingDepth,
+		);
 	};
 
-	const normalizeThinkingDepthForSelectedModel = (forceDefault = false) => {
-		const options = thinkingDepthOptions.value;
-		if (!options.length) {
-			if (formData.thinkingDepth) {
-				formData.thinkingDepth = '';
-			}
-			return;
-		}
-		if (forceDefault || !options.some(item => item.value === formData.thinkingDepth)) {
-			formData.thinkingDepth = defaultThinkingDepthValue(options, selectItem.value && selectItem.value.defaultThinkingDepth);
-		}
-	};
-
-	const normalizeContextForSelectedModel = (forceThinkingDefault = false) => {
+	const normalizeContextForSelectedModel = () => {
 		if (!selectItem.value) return;
 		const nextContext = normalizeContextValue(formData.context, selectItem.value);
 		if (nextContext !== formData.context) {
 			formData.context = nextContext;
 		}
-		normalizeThinkingDepthForSelectedModel(forceThinkingDefault);
+		normalizeThinkingDepthForSelectedModel();
 		normalizeShowThinkingProcessForSelectedModel();
 	};
 
@@ -1885,7 +1870,7 @@ const truncationText = (completionRate: number) => {
 		if (variant) {
 			formData.selectModel = variant.value;
 			selectItem.value = { ...variant, family: family.family };
-			normalizeContextForSelectedModel(true);
+			normalizeContextForSelectedModel();
 			activatedFamilies.value.add(family.family);
 		}
 	};
@@ -1894,7 +1879,7 @@ const truncationText = (completionRate: number) => {
 	const selectVariant = (family, variant) => {
 		formData.selectModel = variant.value;
 		selectItem.value = { ...variant, family: family.family };
-		normalizeContextForSelectedModel(true);
+		normalizeContextForSelectedModel();
 		activatedFamilies.value.add(family.family);
 	};
 
@@ -1920,7 +1905,7 @@ const truncationText = (completionRate: number) => {
 		if (selectItem.value && variant.value === selectItem.value.value) {
 			return formData.thinkingDepth;
 		}
-		return defaultThinkingDepthValue(variant.thinkingDepthOptions, variant.defaultThinkingDepth);
+		return pickThinkingDepth(optionValues(variant.thinkingDepthOptions), null, variant.defaultThinkingDepth);
 	};
 
 	// 每輪點數的算法只有一份（canvas-model-catalog.ts 的 variantPrice）：面板的線路列、
