@@ -228,7 +228,7 @@ function buildContract() {
         phases: ['idle', 'preparing', 'summarizing', 'thinking', 'writing'],
         outcome: ['kind', 'label', 'sub', 'actions'],
         outcomeKinds: ['model-error', 'network-error', 'server-error', 'rate-limit', 'quota', 'filtered', 'length-cap', 'stopped', 'compact-retryable', 'outcome-unconfirmed', 'interrupted'],
-        actions: ['retry', 'continue', 'switch-model', 'model-settings', 'capacity', 'refresh', 'retry-stream-off', 'edit-message', 'switch-lane'],
+        actions: ['retry', 'continue', 'switch-model', 'model-settings', 'capacity', 'refresh', 'retry-stream-off', 'edit-message', 'switch-lane', 'resend-traditional'],
         outcomeIsNullWhile: 'a reply is being generated, or the last turn ended normally',
         labelsAre: 'the same player-language text as the platform card under that row',
         act: { gestureOnly: 'UNAUTHORIZED outside a trusted click (no dialog)', unknownAction: 'INVALID_ARGS', whileGenerating: 'BUSY', withoutSend: 'NOT_SUPPORTED', rateLimit: 'generation.act 3/min' },

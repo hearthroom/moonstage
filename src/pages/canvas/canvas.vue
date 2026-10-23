@@ -82,7 +82,7 @@
           v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason)"
           :kind="getSystemMsgKind(item.finishReason)"
           :label="creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || getSystemMsgLabel(item.finishReason)"
-          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched }) || getSystemMsgSub(item.finishReason, item, index)"
+          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched, offersTraditional: filterCardFor(item, index).offersTraditional }) || getSystemMsgSub(item.finishReason, item, index)"
           :links="creditsOverrideFor(item)?.links ?? []"
           :cta="getSystemMsgCta(item.finishReason, item, index)"
           :cta-action="getSystemMsgCtaAction(item.finishReason, item, index)"
@@ -537,6 +537,7 @@ import { incompleteTerminalHistoryOperation } from './chat-history-snapshot'
 import { findVariant, resolveVariant, scoreParts, priceMeaning, balanceWarning } from './canvas-model-catalog'
 import { resolveStoredModel, composeModelDisplayName, isDeadLane } from './canvas-model-lanes'
 import { filterCardActions, isInputPolicyFilter, cardRetryTarget } from './canvas-filter-card'
+import { traditionalResendText } from './canvas-traditional-resend'
 import { readResponseSettings, responseBase, responsePatch } from './canvas-response-settings'
 import {
   BREAKDOWN_META,
@@ -1023,6 +1024,8 @@ let pendingRewriteSnapshot: RewriteSnapshot | null = null;
 let requestedOperationKindOverride: ChatOperationKind | '' = '';
 // 續跑來源:被中斷的那一輪的 operationId。送出後即清,不讓它污染下一次普通送出。
 let resumeFromOperationIdOverride = '';
+// 這一次送出是前置被擋卡上的「轉成繁體再送出」：伺服器記這種重送的結果。只在 send() 讀一次就清掉。
+let requestedResendIntent: '' | 'to_traditional' = '';
 let operationStatusRequestKey = '';
 let durableAckProbeKey = '';
 let operationStatusSlowNoticeKey = '';
@@ -3348,7 +3351,7 @@ function creditsOverrideFor(item: any) {
 */
 function filterCardFor(item: any, index: number) {
   if (getSystemMsgKind(item?.finishReason) !== 'filtered') {
-    return { ctas: getSystemMsgCtas(item, index), offersStreamOff: false, streamingOff: false, stacked: false, switched: '' as const };
+    return { ctas: getSystemMsgCtas(item, index), offersStreamOff: false, streamingOff: false, stacked: false, switched: '' as const, offersTraditional: false };
   }
   return filterCardActions({
     item,
@@ -3360,7 +3363,8 @@ function filterCardFor(item: any, index: number) {
     canEditMessage: canEditFilteredMessage(item, index),
     hasOtherLanes: currentModelHasOtherLanes(),
     switchedTo: filterCardSwitchedTo(item),
-    labels: { retryAsIs: t('chat.retryAsIs'), streamOffRetry: t('chat.filterStopStreamingRetry'), switchLane: t('chat.switchLane'), editMessage: t('chat.editFilteredMessage'), resendLane: t('chat.resendNewLane'), resendModel: t('chat.resendNewModel') },
+    canResendTraditional: !!traditionalResendFor(item, index),
+    labels: { retryAsIs: t('chat.retryAsIs'), streamOffRetry: t('chat.filterStopStreamingRetry'), switchLane: t('chat.switchLane'), editMessage: t('chat.editFilteredMessage'), resendLane: t('chat.resendNewLane'), resendModel: t('chat.resendNewModel'), resendTraditional: t('chat.resendTraditional') },
   });
 }
 /** 卡原本的鍵：伺服器列給的那幾顆，舊歷史則是凍結備援那一顆。 */
@@ -3377,6 +3381,24 @@ function canEditFilteredMessage(item: any, index: number) {
   if (!allowsStageAction(stageHost.capabilities, 'rewrite') || latestTerminalAIIndex(talkList.value) !== index) return false;
   const playerIndex = filterCardPlayerIndex(item, index);
   return playerIndex >= 0 && canEditResendPlayerIndex(talkList.value, playerIndex);
+}
+/*
+  轉成繁體再送出：被擋那則能改、含簡體、還沒轉過，才給轉好的字。
+  轉過的記原文與轉好的字兩份：重送沒成時畫面會把原文換回來（restoreRewriteCandidate），
+  伺服器那邊留的是轉好的字，重新整理後看到的是那一份——兩種都不能再叫玩家轉一次。
+  玩家自己改了字就是新的一則，可以再轉。記在 traditionalResendTried（跟 filterCardSwitch 放在一起）。
+*/
+function traditionalResendKey(text: string) {
+  return String(unref(conversationId) || '') + '\n' + text
+}
+function traditionalResendFor(item: any, index: number) {
+  if (!canEditFilteredMessage(item, index)) return '';
+  const original = String(talkList.value[filterCardPlayerIndex(item, index)]?.content || '');
+  if (traditionalResendTried.value.includes(traditionalResendKey(original))) return '';
+  return traditionalResendText(original);
+}
+function rememberTraditionalResend(original: string, converted: string) {
+  traditionalResendTried.value = [...traditionalResendTried.value, traditionalResendKey(original), traditionalResendKey(converted)].slice(-40);
 }
 function filterCardPlayerIndex(item: any, index: number) {
   const exact = firstExactTimelineRowIndex([item?.sourceChatId, item?.userChatId, item?.targetChatId], 1);
@@ -3427,7 +3449,7 @@ function systemNoticeFor(item: any, index: number) {
   return {
     kind: getSystemMsgKind(item.finishReason),
     label: creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || getSystemMsgLabel(item.finishReason),
-    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched }) || getSystemMsgSub(item.finishReason, item, index),
+    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched, offersTraditional: filterCardFor(item, index).offersTraditional }) || getSystemMsgSub(item.finishReason, item, index),
     actions: actions.map((entry) => ({ action: String(entry.action), label: String(entry.label) })),
     // 內容限制卡：存偏好期間整列不能按、手機上主行動整行排第一。只在成立時才帶，其他卡跟以前一模一樣。
     ...(filterCardBusy.value === String(item.id) ? { busy: true } : {}),
@@ -5078,6 +5100,19 @@ function onSystemMsgCta(action, item, index) {
     openMessageMenu(playerIndex);
     menuDraft.value = String(talkList.value[playerIndex]?.content || '');
     menuEditing.value = true;
+    return;
+  }
+  // 轉成繁體再送出：不開編輯框，直接以編輯並重送送出轉好的字（玩家看到的那一則就是轉好的字）。
+  if (action === 'resend_traditional') {
+    const playerIndex = filterCardPlayerIndex(item, index);
+    const original = String(talkList.value[playerIndex]?.content || '');
+    const converted = playerIndex >= 0 ? traditionalResendFor(item, index) : '';
+    if (!converted) {
+      notifyTimelineMutationBlocked();
+      return;
+    }
+    rememberTraditionalResend(original, converted);
+    doEditResendPlayer(playerIndex, converted, 'to_traditional');
     return;
   }
   if (action === 'switch_lane') {
@@ -8772,6 +8807,8 @@ function send() {
   requestedOperationKindOverride = '';
   const explicitResumeFrom = resumeFromOperationIdOverride;
   resumeFromOperationIdOverride = '';
+  const resendIntent = requestedResendIntent;
+  requestedResendIntent = '';
   // IME composition 期間禁止送出(issue desktop#9 #5)。
   // confirm-type="send" + @confirm="send" 在 H5 textarea 用 Enter 時會觸發,
   // 即使 handleKeydown 攔住了,confirm event 仍可能在 IME flush 候選的瞬間誤 fire。
@@ -8924,6 +8961,7 @@ function send() {
     resumeFromOperationId: explicitResumeFrom,
     // 世界卡：這一句 @ 的成員；普通卡永遠是空字串，白名單不會帶上。
     mention: mention.value,
+    resendIntent,
   };
   const preparedPayload = prepareChatPayload(payloadInput);
   mention.value = '';
@@ -10026,7 +10064,7 @@ function onMenuConfirmEdit() {
  * 改好的字；伺服器在進提示詞前把那一列換成新內容。畫面先把句子換掉，這一輪沒成就由
  * restoreRewriteCandidate 從快照換回去。
  */
-function doEditResendPlayer(index: number, draft: string) {
+function doEditResendPlayer(index: number, draft: string, resendIntent: '' | 'to_traditional' = '') {
   // 不走「先停再做」：能改字重送的只有玩家最新那一句，回覆還在產生時它就是這一輪
   // 正在送的那句。停止在零輸出時會把這一輪的本地氣泡整組移除，index 指的列就不見了，
   // 而伺服器那頭這句還在；在這裡接著做會送錯列或多送一句。維持原本的等待。
@@ -10039,7 +10077,7 @@ function doEditResendPlayer(index: number, draft: string) {
   const userBubble = talkList.value[index]
   if (!userBubble || !canEditResendPlayerIndex(talkList.value, index)) return
   if (!hasAIReplyAfterPlayerIndex(talkList.value, index)) {
-    resendPlayerRowWithoutReply(index, text)
+    resendPlayerRowWithoutReply(index, text, resendIntent)
     return
   }
   const snapshot = createRewriteSnapshotForTarget(talkList.value, userBubble.chatId || userBubble.id)
@@ -10057,12 +10095,13 @@ function doEditResendPlayer(index: number, draft: string) {
   contine.value = false
   pendingRewriteSnapshot = snapshot
   rewriteTargetChatId.value = String(userBubble.chatId || userBubble.id || '')
+  requestedResendIntent = resendIntent
   send()
 }
 
 // 後面沒有 AI 回覆的那一句（那一輪失敗、或回覆被刪了）：沒有東西可「改寫」，
 // 改成先把這句從伺服器拿掉，再把改好的字當新訊息送出。拿不掉就不送——否則同一句會出現兩次。
-function resendPlayerRowWithoutReply(index: number, text: string) {
+function resendPlayerRowWithoutReply(index: number, text: string, resendIntent: '' | 'to_traditional' = '') {
   const userBubble = talkList.value[index]
   const chatId = String(userBubble?.chatId || userBubble?.id || '')
   if (!chatId) return
@@ -10087,6 +10126,7 @@ function resendPlayerRowWithoutReply(index: number, text: string) {
     contine.value = false
     pendingRewriteSnapshot = null
     rewriteTargetChatId.value = ''
+    requestedResendIntent = resendIntent
     send()
   }).catch((e: any) => {
     console.error('編輯並重送（沒有回覆）失敗', e)
@@ -10194,6 +10234,8 @@ watch([cardStreamingKey, responseSettingsSupported], () => { void refreshCardStr
 const filterCardBusy = ref('')
 // 前置被擋卡上按了「切換線路／切換模型」：記住是哪張卡、當時用的是哪條線路。選好之後那張卡的主行動換成重送。
 const filterCardSwitch = ref<{ itemId: string; from: string } | null>(null)
+// 轉成繁體再送出過的訊息（對話＋字，見 traditionalResendFor）。
+const traditionalResendTried = ref<string[]>([])
 function rememberFilterCardSwitch(item: any) {
   filterCardSwitch.value = isInputPolicyFilter(item) ? { itemId: String(item?.id ?? ''), from: String(unref(selectedVariantValue) || '') } : null
 }

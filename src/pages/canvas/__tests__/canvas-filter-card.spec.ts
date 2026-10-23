@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { filterCardActions, isInputPolicyFilter, isUnknownOutputFilter, cardRetryTarget, type FilterCardContext } from '../canvas-filter-card'
 
-const labels = { retryAsIs: '直接重試', streamOffRetry: '關閉流式輸出並重試', switchLane: '切換線路', editMessage: '修改訊息', resendLane: '用新線路重送', resendModel: '用新模型重送' }
+const labels = { retryAsIs: '直接重試', streamOffRetry: '關閉流式輸出並重試', switchLane: '切換線路', editMessage: '修改訊息', resendLane: '用新線路重送', resendModel: '用新模型重送', resendTraditional: '轉成繁體再送出' }
 const retry = { action: 'retry', label: '重試' }
 const switchModel = { action: 'switch_model', label: '切換模型' }
 const unknown = { finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'unknown' }
@@ -71,7 +71,7 @@ describe('原因未提供：流式輸出出口', () => {
   it('其他原因與其他錯誤卡：照舊', () => {
     for (const item of [{ ...unknown, filterReason: 'safety' }, { finishReason: 'refusal' }, { finishReason: 'server_error' }]) {
       const r = filterCardActions(ctx({ item }))
-      expect(r).toEqual({ ctas: [retry, switchModel], offersStreamOff: false, streamingOff: false, stacked: false, switched: '' })
+      expect(r).toEqual({ ctas: [retry, switchModel], offersStreamOff: false, streamingOff: false, stacked: false, switched: '', offersTraditional: false })
     }
   })
 })
@@ -120,5 +120,33 @@ describe('前置被擋：修改訊息、切換線路、切換模型', () => {
   it('還沒換（只是打開選單看看）不給重送；原因未提供的卡不受影響', () => {
     expect(actions({ item: input })).not.toContain('resend_filtered')
     expect(actions({ switchedTo: 'model' })).not.toContain('resend_filtered')
+  })
+})
+
+describe('前置被擋：轉成繁體再送出', () => {
+  const traditional = { action: 'resend_traditional', label: '轉成繁體再送出' }
+  it('被擋那則含簡體 → 主行動是轉成繁體再送出，修改訊息仍在', () => {
+    const r = filterCardActions(ctx({ item: input, canResendTraditional: true }))
+    expect(r.ctas).toEqual([{ action: 'switch_lane', label: '切換線路' }, switchModel, { action: 'edit_message', label: '修改訊息' }, traditional])
+    expect(r.stacked).toBe(true)
+    expect(r.offersTraditional).toBe(true)
+  })
+  it('只剩修改訊息時也排在它後面當主行動', () => {
+    expect(actions({ item: input, base: [retry], canResendTraditional: true })).toEqual(['edit_message', 'resend_traditional'])
+  })
+  it('不含簡體、已轉過、不能編輯 → 不出現，說明照舊', () => {
+    const r = filterCardActions(ctx({ item: input }))
+    expect(r.ctas.map(e => e.action)).not.toContain('resend_traditional')
+    expect(r.offersTraditional).toBe(false)
+    expect(actions({ item: input, canEditMessage: false, canResendTraditional: true })).toEqual(['switch_lane', 'switch_model'])
+  })
+  it('換過線路／模型之後是重送，不再出現轉繁體', () => {
+    const r = filterCardActions(ctx({ item: input, switchedTo: 'lane', canResendTraditional: true }))
+    expect(r.ctas.map(e => e.action)).toEqual(['switch_lane', 'switch_model', 'resend_filtered'])
+    expect(r.offersTraditional).toBe(false)
+  })
+  it('只在前置被擋卡上：原因未提供的卡不給', () => {
+    expect(actions({ canResendTraditional: true })).not.toContain('resend_traditional')
+    expect(filterCardActions(ctx({ canResendTraditional: true })).offersTraditional).toBe(false)
   })
 })

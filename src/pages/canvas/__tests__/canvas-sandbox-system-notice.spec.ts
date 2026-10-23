@@ -28,6 +28,7 @@ import { operationFailureSub, operationFailureTitle } from '@/utils/operation-fa
 import { findResumableAgentOperation } from '@/utils/agent-composer-action'
 import { allowsStageAction } from '@/host/capabilities'
 import { filterCardActions, isInputPolicyFilter } from '../canvas-filter-card'
+import { traditionalResendText } from '../canvas-traditional-resend'
 import { canEditResendPlayerIndex, latestTerminalAIIndex } from '../chat-operation-ui-state'
 import { isDeadLane } from '../canvas-model-lanes'
 import zh from '@/locale/zh-Hant.json'
@@ -48,7 +49,7 @@ function canvasFunctions(names: string[], env: Record<string, unknown>): Record<
   return new Function(...keys, `${js}\nreturn { ${names.join(', ')} };`)(...keys.map((k) => env[k]))
 }
 
-type FilterEnv = { streaming?: '' | 'on' | 'off'; settings?: boolean; world?: boolean; agent?: boolean; lanes?: number; busy?: string; switched?: { itemId: string; from: string }; current?: string }
+type FilterEnv = { streaming?: '' | 'on' | 'off'; settings?: boolean; world?: boolean; agent?: boolean; lanes?: number; busy?: string; switched?: { itemId: string; from: string }; current?: string; tried?: string[] }
 function resolver(timeline: any[], over: { capabilities?: unknown; operations?: unknown[]; ui?: Record<string, unknown>; translate?: (key:string)=>string; filter?: FilterEnv } = {}) {
   const f = over.filter || {}
   // 一顆模型、lanes 條線路（目前用的是第一條）
@@ -57,10 +58,14 @@ function resolver(timeline: any[], over: { capabilities?: unknown; operations?: 
     'getSystemMsgKind', 'getSystemMsgLabel', 'getSystemMsgSub', 'getSystemMsgCtaLabel', 'getSystemMsgCta',
     'getSystemMsgCtas', 'getSystemMsgCtaAction', 'canSwitchModelFor', 'creditsOverrideFor',
     'filterCardFor', 'filterCardBase', 'canEditFilteredMessage', 'filterCardPlayerIndex', 'filterCardSwitchedTo', 'familyOfVariant', 'currentModelHasOtherLanes',
+    'traditionalResendKey', 'traditionalResendFor',
     'exactTimelineRowIndex', 'firstExactTimelineRowIndex', 'systemNoticeFor',
   ], {
     filterCardActions,
     isInputPolicyFilter,
+    traditionalResendText,
+    traditionalResendTried: { value: f.tried ?? [] },
+    conversationId: { value: 'c1' },
     canEditResendPlayerIndex,
     latestTerminalAIIndex,
     isDeadLane,
@@ -244,6 +249,20 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
     expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'other-1' } })(1)!.actions.at(-1)).toEqual({ action: 'resend_filtered', label: '用新模型重送' })
     expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'm-lane0' } })(1)!.actions.at(-1)!.action).toBe('edit_message')
     expect(resolver(timeline, { filter: { lanes: 3, switched: { itemId: 'another-card', from: 'm-lane0' }, current: 'm-lane1' } })(1)!.actions.at(-1)!.action).toBe('edit_message')
+  })
+
+  it('前置被擋、被擋那則含簡體：主行動是轉成繁體再送出，說明提到它；轉過一次、或本來就是繁體就不給', () => {
+    const blocked = failed({ finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'input_policy' })
+    const timeline = [user('u1', '我们一起去学校吧'), blocked]
+    const notice = resolver(timeline, { filter: { lanes: 3 } })(1)!
+    expect(notice.actions.map((a) => a.action)).toEqual(['switch_lane', 'switch_model', 'edit_message', 'resend_traditional'])
+    expect(notice.actions.at(-1)).toEqual({ action: 'resend_traditional', label: '轉成繁體再送出' })
+    expect(notice.sub).toBe(t('systemMsg.filterInputPolicySubTraditional'))
+    expect(notice.stackedPrimary).toBe(true)
+    const tried = resolver(timeline, { filter: { lanes: 3, tried: ['c1\n我们一起去学校吧', 'c1\n我們一起去學校吧'] } })(1)!
+    expect(tried.actions.map((a) => a.action)).not.toContain('resend_traditional')
+    expect(tried.sub).toBe(t('systemMsg.filterInputPolicySub'))
+    expect(resolver([user('u1', '我們一起去學校吧'), blocked], { filter: { lanes: 3 } })(1)!.actions.map((a) => a.action)).not.toContain('resend_traditional')
   })
 
   it('前置被擋的舊卡（不是最新一列）沒有修改訊息', () => {
