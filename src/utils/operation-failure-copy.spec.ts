@@ -81,11 +81,18 @@ describe('content restriction copy follows the actions on the card', () => {
     expect(operationFailureSub('content_filter', key, { filterReason: 'input_policy', switchedTo: 'model' })).toBe('systemMsg.filterInputPolicySubSwitchedModel')
     expect(operationFailureSub('content_filter', key, { filterReason: 'unknown', switchedTo: 'lane' })).toBe('systemMsg.filterUnknownSub')
   })
+  it('input policy with the traditional resend on the card: the explanation mentions it; a switch still wins', () => {
+    expect(operationFailureSub('content_filter', key, { filterReason: 'input_policy', offersTraditional: true })).toBe('systemMsg.filterInputPolicySubTraditional')
+    expect(operationFailureSub('content_filter_input', key, { offersTraditional: true })).toBe('systemMsg.filterInputPolicySubTraditional')
+    expect(operationFailureSub('content_filter', key, { filterReason: 'input_policy', offersTraditional: true, switchedTo: 'lane' })).toBe('systemMsg.filterInputPolicySubSwitchedLane')
+    expect(operationFailureSub('content_filter', key, { filterReason: 'unknown', offersTraditional: true })).toBe('systemMsg.filterUnknownSub')
+  })
   it('every locale has the new keys and no longer carries the input-policy no-switch variant', () => {
     const keys = ['systemMsg.filterUnknownSubStream', 'systemMsg.filterUnknownSubStreamNoSwitch', 'systemMsg.filterUnknownSubSwitch',
       'chat.filterStopStreamingRetry', 'chat.retryAsIs', 'chat.streamingTurnedOff', 'chat.streamingTurnOffFailed',
       'chat.editFilteredMessage', 'chat.switchLane', 'chat.resendNewLane', 'chat.resendNewModel', 'systemMsg.filterInputPolicy', 'systemMsg.filterInputPolicySub',
-      'systemMsg.filterInputPolicySubSwitchedLane', 'systemMsg.filterInputPolicySubSwitchedModel']
+      'systemMsg.filterInputPolicySubSwitchedLane', 'systemMsg.filterInputPolicySubSwitchedModel',
+      'chat.resendTraditional', 'systemMsg.filterInputPolicySubTraditional']
     for (const locale of [zhHant, zhHans, en, ja, ko] as Array<Record<string, string>>) {
       for (const k of keys) expect(locale[k], k).toBeTruthy()
       expect(locale['systemMsg.filterInputPolicySubNoSwitch']).toBeUndefined()

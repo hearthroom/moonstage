@@ -20,9 +20,10 @@ describe('沙箱卡的上一輪結局', () => {
     expect(names).toEqual(['capacity', 'model-settings', 'refresh', 'continue'])
   })
 
-  it('內容限制卡這一端接上的三顆鍵，作者也拿得到（動作名跟 skills 的說明一致）', () => {
+  it('內容限制卡這一端接上的鍵，作者也拿得到（動作名跟 skills 的說明一致）', () => {
     const outcome = outcomeFromSystemNotice('1', { kind: 'filtered', label: '', sub: '', actions: [
       { action: 'retry_stream_off', label: 'a' }, { action: 'edit_message', label: 'b' }, { action: 'switch_lane', label: 'c' },
+      { action: 'resend_traditional', label: 'e' },
     ] })
     // 換線路／模型之後的重送，對作者就是重試
     expect(outcomeFromSystemNotice('1', { kind: 'filtered', label: '', sub: '', actions: [{ action: 'resend_filtered', label: 'd' }] }).actions)
@@ -31,6 +32,7 @@ describe('沙箱卡的上一輪結局', () => {
       { action: 'retry-stream-off', label: 'a', key: 'sys:retry_stream_off' },
       { action: 'edit-message', label: 'b', key: 'sys:edit_message' },
       { action: 'switch-lane', label: 'c', key: 'sys:switch_lane' },
+      { action: 'resend-traditional', label: 'e', key: 'sys:resend_traditional' },
     ])
   })
 

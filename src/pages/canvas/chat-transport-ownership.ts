@@ -1425,6 +1425,10 @@ export function prepareChatPayload(input: any) {
   if (mention) {
     Object.assign(payload, { mention })
   }
+  // 前置被擋卡上「轉成繁體再送出」的重送：伺服器只收這一個值，用來記這種重送的結果。其他值不送。
+  if (source.resendIntent === 'to_traditional') {
+    Object.assign(payload, { resendIntent: 'to_traditional' })
+  }
   if (source.supportsOperationOutcome === true) {
     Object.assign(payload, {
       supportsOperationOutcome: true,

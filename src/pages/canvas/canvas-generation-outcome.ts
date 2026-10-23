@@ -34,6 +34,8 @@ const AUTHOR_ACTION: Record<string, string> = {
   switch_lane: 'switch-lane',
   // 換了線路或模型之後原樣重送那一則：對作者就是重試。
   resend_filtered: 'retry',
+  // 被擋那則轉成繁體再送出。
+  resend_traditional: 'resend-traditional',
 }
 
 export function outcomeFromSystemNotice(

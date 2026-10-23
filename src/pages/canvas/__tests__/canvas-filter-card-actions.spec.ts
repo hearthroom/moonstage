@@ -13,6 +13,7 @@ import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
 import { readResponseSettings, responseBase, responsePatch } from '../canvas-response-settings'
 import { cardRetryTarget } from '../canvas-filter-card'
+import { traditionalResendText } from '../canvas-traditional-resend'
 
 const CANVAS = fs.readFileSync(path.join(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
 
@@ -141,9 +142,12 @@ describe('關閉流式輸出並重試', () => {
 })
 
 describe('修改訊息、切換線路', () => {
-  function cta(over: { canEdit?: boolean; retryAllowed?: boolean } = {}) {
+  function cta(over: { canEdit?: boolean; retryAllowed?: boolean; content?: string } = {}) {
     const env = {
-      talkList: { value: [{ id: 'u1', type: 1, content: '原本那句' }, { id: 'card-1', type: 0 }] },
+      talkList: { value: [{ id: 'u1', type: 1, content: over.content ?? '原本那句' }, { id: 'card-1', type: 0 }] },
+      doEditResendPlayer: vi.fn(),
+      rememberTraditionalResend: vi.fn(),
+      traditionalResendFor: (_item: any, _index: number) => (over.canEdit === false ? '' : traditionalResendText(String(env.talkList.value[0].content))),
       menuDraft: { value: '' },
       menuEditing: { value: false },
       openMessageMenu: vi.fn(),
@@ -172,6 +176,24 @@ describe('修改訊息、切換線路', () => {
     expect(env.menuDraft.value).toBe('原本那句')
     expect(env.menuEditing.value).toBe(true)
     expect(env.isTerminalActionAllowed).not.toHaveBeenCalled()
+  })
+
+  it('轉成繁體再送出：記下這一則已轉過，直接以編輯並重送送出轉好的字，標明是轉繁體的重送', () => {
+    const { env, onSystemMsgCta } = cta({ content: '我们一起去学校吧' })
+    onSystemMsgCta('resend_traditional', env.talkList.value[1], 1)
+    expect(env.rememberTraditionalResend).toHaveBeenCalledWith('我们一起去学校吧', '我們一起去學校吧')
+    expect(env.doEditResendPlayer).toHaveBeenCalledWith(0, '我們一起去學校吧', 'to_traditional')
+    expect(env.openMessageMenu).not.toHaveBeenCalled()
+  })
+
+  it('轉成繁體再送出：按下時已經不能改、或沒有可轉的字 → 不送，說被擋', () => {
+    for (const over of [{ canEdit: false, content: '我们一起去学校吧' }, { content: '我們一起去學校吧' }]) {
+      const { env, onSystemMsgCta } = cta(over)
+      onSystemMsgCta('resend_traditional', env.talkList.value[1], 1)
+      expect(env.doEditResendPlayer).not.toHaveBeenCalled()
+      expect(env.rememberTraditionalResend).not.toHaveBeenCalled()
+      expect(env.notifyTimelineMutationBlocked).toHaveBeenCalledOnce()
+    }
   })
 
   it('修改訊息：卡已經不能改（時間軸鎖住、不是最新）就不開，說被擋', () => {
@@ -246,5 +268,52 @@ describe('流式值的快取跟著對話與模型', () => {
     rememberCardStreaming({ broken: true }, 'c1', 'c1|m')
     rememberCardStreaming(settings(4, {}), 'other-conversation', 'c1|m')
     expect(env.cardStreaming.value).toEqual({ key: 'c1|m', value: 'off' })
+  })
+})
+
+describe('轉成繁體再送出：同一則只轉一次', () => {
+  function fns(content: string, over: { canEdit?: boolean; conversation?: string } = {}) {
+    const env = {
+      traditionalResendText,
+      traditionalResendTried: { value: [] as string[] },
+      conversationId: { value: over.conversation ?? 'c1' },
+      talkList: { value: [{ id: 'u1', type: 1, content }, { id: 'card-1', type: 0 }] },
+      filterCardPlayerIndex: () => 0,
+      canEditFilteredMessage: () => over.canEdit !== false,
+      unref: (v: any) => (v && typeof v === 'object' && 'value' in v ? v.value : v),
+    }
+    return { env, ...canvasFunctions(['traditionalResendKey', 'traditionalResendFor', 'rememberTraditionalResend'], env) }
+  }
+
+  it('能改、含簡體、還沒轉過 → 給轉好的字', () => {
+    const { env, traditionalResendFor } = fns('我们一起去学校吧')
+    expect(traditionalResendFor(env.talkList.value[1], 1)).toBe('我們一起去學校吧')
+  })
+
+  it('轉過之後：重送沒成、畫面換回原文，或留著轉好的字，都不再出現', () => {
+    const { env, traditionalResendFor, rememberTraditionalResend } = fns('我们一起去学校吧')
+    rememberTraditionalResend('我们一起去学校吧', '我們一起去學校吧')
+    expect(traditionalResendFor(env.talkList.value[1], 1)).toBe('')
+    env.talkList.value[0].content = '我們一起去學校吧'
+    expect(traditionalResendFor(env.talkList.value[1], 1)).toBe('')
+  })
+
+  it('玩家自己改了字（又有簡體）→ 那是新的一則，可以再轉', () => {
+    const { env, traditionalResendFor, rememberTraditionalResend } = fns('我们一起去学校吧')
+    rememberTraditionalResend('我们一起去学校吧', '我們一起去學校吧')
+    env.talkList.value[0].content = '我们换个地方说话'
+    expect(traditionalResendFor(env.talkList.value[1], 1)).toBe('我們換個地方說話')
+  })
+
+  it('不能改（時間軸鎖住、不是最新那張卡）→ 不給', () => {
+    const { env, traditionalResendFor } = fns('我们一起去学校吧', { canEdit: false })
+    expect(traditionalResendFor(env.talkList.value[1], 1)).toBe('')
+  })
+
+  it('記的是這個對話的這一句：別的對話同一句不受影響', () => {
+    const { env, traditionalResendFor, rememberTraditionalResend } = fns('我们一起去学校吧')
+    rememberTraditionalResend('我们一起去学校吧', '我們一起去學校吧')
+    env.conversationId.value = 'c2'
+    expect(traditionalResendFor(env.talkList.value[1], 1)).toBe('我們一起去學校吧')
   })
 })

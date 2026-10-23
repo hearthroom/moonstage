@@ -248,6 +248,14 @@ describe('ChatSystemMessage：處理中、手機疊排、修改訊息', () => {
     expect(buttons[0].find('.sys-cta-svg').html()).not.toBe(retryIcon)
   })
 
+  it('轉成繁體再送出也是重送那一則：重試圖示，不掛重試選擇器', () => {
+    const wrapper = mountCard({ kind: 'filtered', label: 'x', ctas: [{ action: 'edit_message', label: '修改訊息' }, { action: 'resend_traditional', label: '轉成繁體再送出' }] })
+    const retryIcon = mountCard({ kind: 'filtered', label: 'x', ctas: [{ action: 'retry', label: '重試' }] }).find('.sys-cta-svg').html()
+    const traditional = wrapper.findAll('.sys-cta')[1]
+    expect(traditional.find('.sys-cta-svg').html()).toBe(retryIcon)
+    expect(traditional.attributes('data-lt')).toBeUndefined()
+  })
+
   it('修改訊息有自己的鉛筆圖示，不掛重試選擇器；切換線路沿用雙箭頭', () => {
     const wrapper = mountCard({ kind: 'filtered', label: 'x', ctas: [{ action: 'switch_lane', label: '切換線路' }, { action: 'edit_message', label: '修改訊息' }] })
     const [lane, edit] = wrapper.findAll('.sys-cta')
