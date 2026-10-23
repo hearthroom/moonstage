@@ -213,7 +213,7 @@ describe('沙箱卡：殼的定稿等規則的完整結果', () => {
   it('hud 讀到的 finished 在暫時畫面時先不放行（殼收到 done 才啟動作者腳本、發 message:done）', () => {
     expect(SOURCE).toContain('finished: !!item.chatFinish && !(sandboxCard.value && renderIsProvisional(item)),')
     // html 一格排在 finished 之前：同一個物件字面裡先算畫面，renderIsProvisional 才讀得到這一趟的結果
-    const read = extractBraced(SOURCE, 'messages: list.map((item, index) => {')
+    const read = extractBraced(SOURCE, 'messages: list.flatMap((item, index) => {')
     expect(read.indexOf('html: item.chatLoading')).toBeLessThan(read.indexOf('finished: !!item.chatFinish'))
   })
 })
