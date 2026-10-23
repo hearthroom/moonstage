@@ -662,22 +662,24 @@
 
 	const optionValues = (options) => (options || []).map(item => item.value);
 
-	// 換模型、換線路都走這裡：新線路有玩家原本選的深度就留著，沒有才退回預設。
-	const normalizeThinkingDepthForSelectedModel = () => {
+	// keepChoice：同一個模型換線路時，新線路有玩家原本選的深度就留著，沒有才退回預設。
+	// 換了模型就一律用新模型的預設——存下來的值分不出是玩家選的還是上一個模型的預設，
+	// 帶過去會把預設「關閉」的思考帶到預設最深的模型上（反過來則是悄悄變慢變貴）。
+	const normalizeThinkingDepthForSelectedModel = (keepChoice = true) => {
 		formData.thinkingDepth = pickThinkingDepth(
 			optionValues(thinkingDepthOptions.value),
-			formData.thinkingDepth,
+			keepChoice ? formData.thinkingDepth : null,
 			selectItem.value && selectItem.value.defaultThinkingDepth,
 		);
 	};
 
-	const normalizeContextForSelectedModel = () => {
+	const normalizeContextForSelectedModel = (keepThinkingChoice = true) => {
 		if (!selectItem.value) return;
 		const nextContext = normalizeContextValue(formData.context, selectItem.value);
 		if (nextContext !== formData.context) {
 			formData.context = nextContext;
 		}
-		normalizeThinkingDepthForSelectedModel();
+		normalizeThinkingDepthForSelectedModel(keepThinkingChoice);
 		normalizeShowThinkingProcessForSelectedModel();
 	};
 
@@ -1870,16 +1872,17 @@ const truncationText = (completionRate: number) => {
 		if (variant) {
 			formData.selectModel = variant.value;
 			selectItem.value = { ...variant, family: family.family };
-			normalizeContextForSelectedModel();
+			normalizeContextForSelectedModel(false);
 			activatedFamilies.value.add(family.family);
 		}
 	};
 
 
 	const selectVariant = (family, variant) => {
+		const sameFamily = Boolean(selectItem.value) && selectItem.value.family === family.family;
 		formData.selectModel = variant.value;
 		selectItem.value = { ...variant, family: family.family };
-		normalizeContextForSelectedModel();
+		normalizeContextForSelectedModel(sameFamily);
 		activatedFamilies.value.add(family.family);
 	};
 
