@@ -4252,6 +4252,8 @@
 	"responseSettings.paceHints.advance": "Moves other characters and events forward, adding new developments when they fit.",
 	"systemMsg.filterInputPolicy": "Message stopped by the provider’s pre-check",
 	"systemMsg.filterInputPolicySub": "This message was stopped by the pre-check of this lane’s provider. Most likely this message contains words the provider doesn’t allow, but it didn’t say which word. Unless you edit it, retrying on this lane will be blocked too.",
+	"systemMsg.filterInputPolicySubSwitchedLane": "Switched to a new lane. You can resend now.",
+	"systemMsg.filterInputPolicySubSwitchedModel": "Switched to a new model. You can resend now.",
 	"systemMsg.filterSafety": "Reply stopped by safety checks",
 	"systemMsg.filterSafetySub": "The model provider’s content safety checks stopped this reply. Retrying may meet the same restriction; edit the message or try another model.",
 	"systemMsg.filterPrivacy": "Reply stopped for privacy",

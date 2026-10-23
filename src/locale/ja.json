@@ -4252,6 +4252,8 @@
 	"responseSettings.paceHints.advance": "他の人物や出来事を進め、自然な流れで新しい展開を加えます。",
 	"systemMsg.filterInputPolicy": "提供元の事前チェックで停止したメッセージ",
 	"systemMsg.filterInputPolicySub": "このメッセージは、この回線の提供元の事前チェックで止められました。このメッセージに許可されていない語句が含まれている可能性が高いですが、どの語句かは示されていません。修正しない場合、この回線で再試行しても止められます。",
+	"systemMsg.filterInputPolicySubSwitchedLane": "新しい回線に切り替えました。そのまま再送信できます。",
+	"systemMsg.filterInputPolicySubSwitchedModel": "新しいモデルに切り替えました。そのまま再送信できます。",
 	"systemMsg.filterSafety": "安全性の制限による返信停止",
 	"systemMsg.filterSafetySub": "モデル提供元の安全性チェックにより返信が停止しました。再試行でも同じ制限がかかる可能性があるため、メッセージを変更するか、別のモデルをお試しください。",
 	"systemMsg.filterPrivacy": "プライバシー制限による返信停止",

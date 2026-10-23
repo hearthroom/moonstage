@@ -4252,6 +4252,8 @@
 	"responseSettings.paceHints.advance": "主動推動其他角色和事件，適時加入新發展。",
 	"systemMsg.filterInputPolicy": "訊息被服務商的前置檢查擋下",
 	"systemMsg.filterInputPolicySub": "這則訊息被這條線路的服務商前置檢查擋下。多半是這則訊息含有它不允許的字詞，但它沒有指出是哪一個詞。不修改的話，在這條線路上重試也會被擋。",
+	"systemMsg.filterInputPolicySubSwitchedLane": "已換到新的線路，可以直接重送。",
+	"systemMsg.filterInputPolicySubSwitchedModel": "已換到新的模型，可以直接重送。",
 	"systemMsg.filterSafety": "回覆觸發內容安全限制",
 	"systemMsg.filterSafetySub": "模型服務商的內容安全檢查停止了回覆，重試仍可能遇到相同限制。請修改訊息，或切換模型後再試。",
 	"systemMsg.filterPrivacy": "回覆因隱私限制停止",

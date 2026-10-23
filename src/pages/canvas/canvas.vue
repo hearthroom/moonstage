@@ -82,7 +82,7 @@
           v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason)"
           :kind="getSystemMsgKind(item.finishReason)"
           :label="creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || getSystemMsgLabel(item.finishReason)"
-          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff }) || getSystemMsgSub(item.finishReason, item, index)"
+          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched }) || getSystemMsgSub(item.finishReason, item, index)"
           :links="creditsOverrideFor(item)?.links ?? []"
           :cta="getSystemMsgCta(item.finishReason, item, index)"
           :cta-action="getSystemMsgCtaAction(item.finishReason, item, index)"
@@ -3348,7 +3348,7 @@ function creditsOverrideFor(item: any) {
 */
 function filterCardFor(item: any, index: number) {
   if (getSystemMsgKind(item?.finishReason) !== 'filtered') {
-    return { ctas: getSystemMsgCtas(item, index), offersStreamOff: false, streamingOff: false, stacked: false };
+    return { ctas: getSystemMsgCtas(item, index), offersStreamOff: false, streamingOff: false, stacked: false, switched: '' as const };
   }
   return filterCardActions({
     item,
@@ -3427,7 +3427,7 @@ function systemNoticeFor(item: any, index: number) {
   return {
     kind: getSystemMsgKind(item.finishReason),
     label: creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || getSystemMsgLabel(item.finishReason),
-    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff }) || getSystemMsgSub(item.finishReason, item, index),
+    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched }) || getSystemMsgSub(item.finishReason, item, index),
     actions: actions.map((entry) => ({ action: String(entry.action), label: String(entry.label) })),
     // 內容限制卡：存偏好期間整列不能按、手機上主行動整行排第一。只在成立時才帶，其他卡跟以前一模一樣。
     ...(filterCardBusy.value === String(item.id) ? { busy: true } : {}),
