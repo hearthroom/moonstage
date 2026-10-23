@@ -21,6 +21,12 @@ async function mountOnGemini(thinkingDepth: string) {
   live[0].families.unshift({
     family: 'Gemini 3.8 Flash', description: '',
     variants: [lane('fixture-gemini-dew', 'lane:dew'), lane('fixture-gemini-dawn', 'lane:dawn')],
+  }, {
+    family: 'Fixture Deep', description: '',
+    variants: [{
+      ...lane('fixture-deep-dew', 'lane:dew'), name: 'Fixture Deep', thinkingControl: 'toggleable',
+      thinkingDepthOptions: [{ value: 'off' }, { value: 'high' }, { value: 'max' }], defaultThinkingDepth: 'max',
+    }],
   })
   const get = vi.fn(async (url: string) => url === '/models'
     ? { statusCode: 200, data: live }
@@ -62,6 +68,18 @@ describe('換線路時的思考深度', () => {
       vm.selectVariant(family, family.variants.find((v: any) => v.value === 'fixture-gemini-dawn'))
       await flushPromises()
       expect(vm.formData.thinkingDepth).toBe('')
+    } finally { wrapper.unmount() }
+  })
+
+  // 選單只拿得到存下來的值，分不出是玩家選的還是上一個模型的預設；換了模型就用新模型的預設。
+  it('換到別的模型時用新模型的預設，不帶走上一個模型的深度', async () => {
+    const { wrapper, vm } = await mountOnGemini('high')
+    try {
+      const other = vm.displayFamilies.find((f: any) => f.family === 'Fixture Deep')
+      vm.selectVariant(other, other.variants[0])
+      await flushPromises()
+      expect(vm.formData.selectModel).toBe('fixture-deep-dew')
+      expect(vm.formData.thinkingDepth).toBe('max')
     } finally { wrapper.unmount() }
   })
 })
