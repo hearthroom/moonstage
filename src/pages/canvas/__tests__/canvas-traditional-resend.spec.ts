@@ -15,6 +15,7 @@ describe('前置被擋：轉成繁體再送出的字', () => {
   })
   it('只有兩用字（范、干這類簡繁都寫得出來的字）→ 不出現：繁體人名不會被改成範先生', () => {
     expect(traditionalResendText('范先生')).toBe('')
+    expect(traditionalResendText('于先生')).toBe('')
     expect(traditionalResendText('范先生说的话我们都听到了')).toContain('說的話我們都聽到了')
   })
   it('沒有中文、空白 → 不出現', () => {

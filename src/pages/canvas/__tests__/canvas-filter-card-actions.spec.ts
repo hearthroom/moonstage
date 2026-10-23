@@ -178,10 +178,10 @@ describe('修改訊息、切換線路', () => {
     expect(env.isTerminalActionAllowed).not.toHaveBeenCalled()
   })
 
-  it('轉成繁體再送出：記下這一則已轉過，直接以編輯並重送送出轉好的字，標明是轉繁體的重送', () => {
+  it('轉成繁體再送出：直接以編輯並重送送出轉好的字，標明是轉繁體的重送（真的送出時才記下轉過）', () => {
     const { env, onSystemMsgCta } = cta({ content: '我们一起去学校吧' })
     onSystemMsgCta('resend_traditional', env.talkList.value[1], 1)
-    expect(env.rememberTraditionalResend).toHaveBeenCalledWith('我们一起去学校吧', '我們一起去學校吧')
+    expect(env.rememberTraditionalResend).not.toHaveBeenCalled()
     expect(env.doEditResendPlayer).toHaveBeenCalledWith(0, '我們一起去學校吧', 'to_traditional')
     expect(env.openMessageMenu).not.toHaveBeenCalled()
   })
@@ -315,5 +315,52 @@ describe('轉成繁體再送出：同一則只轉一次', () => {
     rememberTraditionalResend('我们一起去学校吧', '我們一起去學校吧')
     env.conversationId.value = 'c2'
     expect(traditionalResendFor(env.talkList.value[1], 1)).toBe('我們一起去學校吧')
+  })
+})
+
+describe('編輯並重送帶著轉繁體的標記', () => {
+  function edit(over: { blocked?: boolean; canEdit?: boolean } = {}) {
+    const sent: any[] = []
+    const env: Record<string, any> = {
+      talkList: { value: [{ id: 'u1', chatId: 'u1', type: 1, content: '我们一起去学校吧' }, { id: 'card-1', type: 0 }] },
+      isTimelineMutationBlocked: () => over.blocked === true,
+      notifyTimelineMutationBlocked: vi.fn(),
+      canEditResendPlayerIndex: () => over.canEdit !== false,
+      hasAIReplyAfterPlayerIndex: () => true,
+      createRewriteSnapshotForTarget: () => ({ aiIndex: 1 }),
+      doReiteration: vi.fn(),
+      resendPlayerRowWithoutReply: vi.fn(),
+      actionBtnState: { value: 'send' },
+      sendStop: vi.fn(),
+      content: { value: '' }, rewrite: { value: false }, contine: { value: false }, rewriteTargetChatId: { value: '' },
+      pendingRewriteSnapshot: null,
+      requestedResendIntent: '',
+      rememberTraditionalResend: vi.fn(),
+    }
+    const fns = canvasFunctions(['beginResend', 'doEditResendPlayer'], { ...env, send: () => sent.push(env.talkList.value[0].content) })
+    return { env, fns, sent }
+  }
+
+  it('真的送出時才記下這一則轉過（原文與轉好的字）', () => {
+    const { env, fns, sent } = edit()
+    fns.doEditResendPlayer(0, '我們一起去學校吧', 'to_traditional')
+    expect(sent).toEqual(['我們一起去學校吧'])
+    expect(env.rememberTraditionalResend).toHaveBeenCalledWith('我们一起去学校吧', '我們一起去學校吧')
+  })
+
+  it('時間軸鎖住、或這一則已經不能改：沒送出，也不記（下次還能轉）', () => {
+    for (const over of [{ blocked: true }, { canEdit: false }]) {
+      const { env, fns, sent } = edit(over)
+      fns.doEditResendPlayer(0, '我們一起去學校吧', 'to_traditional')
+      expect(sent).toEqual([])
+      expect(env.rememberTraditionalResend).not.toHaveBeenCalled()
+    }
+  })
+
+  it('一般的編輯並重送不記', () => {
+    const { env, fns, sent } = edit()
+    fns.doEditResendPlayer(0, '換個說法')
+    expect(sent).toEqual(['換個說法'])
+    expect(env.rememberTraditionalResend).not.toHaveBeenCalled()
   })
 })
