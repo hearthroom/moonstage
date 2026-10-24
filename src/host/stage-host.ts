@@ -131,7 +131,10 @@ export function browserHost(overrides: Partial<StageHost> = {}): StageHost {
       set: () => {},
     },
     clipboard: {
-      write: async (text) => { if (typeof navigator !== 'undefined' && navigator.clipboard) await navigator.clipboard.writeText(text) },
+      write: async (text) => {
+        if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') throw new Error('Clipboard unavailable')
+        await navigator.clipboard.writeText(text)
+      },
     },
     events: {
       on: (name, fn) => {

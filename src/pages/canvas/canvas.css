@@ -1884,6 +1884,13 @@
     cursor: pointer;
   }
 
+  .msg-option-scope [role="button"]:focus-visible,
+  .msg-option-scope textarea:focus-visible,
+  .u-popup [role="button"]:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -3px;
+  }
+
   .msg-options-box .option-item.is-disabled {
     opacity: 0.4;
     cursor: default;

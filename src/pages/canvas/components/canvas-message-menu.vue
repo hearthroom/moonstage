@@ -5,17 +5,24 @@
     ref="scopeEl"
     class="msg-option-scope"
     data-lt="message-menu"
+    role="dialog"
+    :aria-modal="open ? true : undefined"
+    :aria-hidden="!open ? true : undefined"
+    :inert="open ? undefined : ''"
+    tabindex="-1"
     :class="{ 'is-open': open, 'is-anchored': anchored, 'is-editing': editing }"
     @click.self="$emit('close')"
     @keydown.esc="$emit('close')"
   >
-    <div class="msg-content-box">
+    <div class="msg-content-box" :inert="editing ? '' : undefined" :aria-hidden="editing ? true : undefined">
       <div class="mes_text" v-html="message ? message.html : ''"></div>
     </div>
 
     <div
       ref="boxEl"
       class="msg-options-box"
+      :inert="editing ? '' : undefined"
+      :aria-hidden="editing ? true : undefined"
       :class="placementClass"
       data-lt="message-menu-box"
       :style="boxStyle"
@@ -27,9 +34,11 @@
           :class="[{ 'is-disabled': item.disabled }, 'lt-option-' + item.key]"
           :data-lt-action="item.key"
           role="button"
-          tabindex="0"
+          :tabindex="item.disabled ? -1 : 0"
+          :aria-disabled="item.disabled || undefined"
           @click="pick(item)"
           @keydown.enter.prevent="pick(item)"
+          @keydown.space.prevent="pick(item)"
         >
           <component :is="'uni-image'"><div></div></component>
           <span>{{ item.label }}</span>
@@ -38,7 +47,7 @@
     </div>
 
     <!-- 編輯態。酒館是 .edit_textarea，MMD 是 .msg-modify-scope > .modify-input-box。 -->
-    <div class="msg-modify-scope" :class="{ 'is-open': editing }">
+    <div class="msg-modify-scope" :class="{ 'is-open': editing }" :inert="editing ? undefined : ''" :aria-hidden="!editing ? true : undefined">
       <div class="modify-input-box">
         <CanvasTextarea
           ref="editEl"
@@ -49,9 +58,9 @@
       </div>
       <!-- 確認列同時掛 MMD 的 .option-box / .option-item：作者對編輯框那兩顆鍵寫的是這一組名字 -->
       <div class="confirm-edit-scope option-box">
-        <div class="cancel-btn option-item" role="button" tabindex="0" @click="$emit('cancel-edit')">{{ labels.cancel }}</div>
+        <div class="cancel-btn option-item" role="button" tabindex="0" @click="$emit('cancel-edit')" @keydown.enter.prevent="$emit('cancel-edit')" @keydown.space.prevent="$emit('cancel-edit')">{{ labels.cancel }}</div>
         <div class="btn-gap"></div>
-        <div class="ok-btn option-item" role="button" tabindex="0" @click="$emit('confirm-edit')">{{ labels.confirm }}</div>
+        <div class="ok-btn option-item" role="button" tabindex="0" @click="$emit('confirm-edit')" @keydown.enter.prevent="$emit('confirm-edit')" @keydown.space.prevent="$emit('confirm-edit')">{{ labels.confirm }}</div>
       </div>
     </div>
   </div>
@@ -59,6 +68,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { useCanvasModalFocus } from '../canvas-modal-focus'
 import CanvasTextarea from './canvas-textarea'
 import { placeMessageMenu, type MenuPlacement } from '../canvas-menu-position'
 import type { MessageMenuAnchor } from './canvas-message.vue'
@@ -123,6 +133,7 @@ function pick(item: { key: string; disabled?: boolean }) {
 
 const scopeEl = ref<HTMLElement | null>(null)
 const boxEl = ref<HTMLElement | null>(null)
+useCanvasModalFocus(scopeEl, () => props.open, { mode: () => props.editing, initial: () => props.editing ? 'textarea' : '.msg-options-box [role=button]' })
 const placed = ref<MenuPlacement | null>(null)
 /*
   覆蓋層自己在視窗裡的位置。它是 fixed inset:0，但作者的卡常把整個聊天區往右推

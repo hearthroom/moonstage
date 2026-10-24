@@ -8,6 +8,10 @@ afterEach(() => {
 })
 
 describe('browserHost', () => {
+  it('rejects unavailable clipboard instead of falsely reporting success', async () => {
+    await expect(browserHost().clipboard.write('text')).rejects.toThrow()
+  })
+
   it('storage 走 localStorage，缺的回 null', () => {
     const host = browserHost()
     expect(host.storage.get('k')).toBeNull()

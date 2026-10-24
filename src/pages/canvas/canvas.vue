@@ -418,7 +418,8 @@ const {t, locale} = useI18n();
 import {useUserDefine} from '@/mixins/UserDefine.js'
 import {useStore} from 'vuex' // Add this import
 
-import $fui from '@/components/firstui/fui-clipboard';
+import { copyMessageText } from './message-copy';
+import { useCanvasModalFocus } from './canvas-modal-focus';
 import { useStageHost } from '@/host/stage-host';
 import { createConversationActivityReporter } from './canvas-conversation-activity';
 // 主站的訊息／對話框元件庫在畫布上不用：卡片沒有沙盒，它的 CSS 會打到
@@ -9535,13 +9536,7 @@ function continueFromAuthoritativeTerminal(item, terminalIndex, action) {
 
 // ========== Quota Exhaustion Toast ==========
 
-const copyText = (e, text, tips) => {
-  $fui.getClipboardData(text, res => {
-    if (res) {
-      _this.fui.toast(tips || t('copy_success'))
-    }
-  }, e)
-}
+const copyText = (_event, text, tips) => copyMessageText(stageHost, text, tips || t('copy_success'), t('common.copyFailed'))
 
 function toggleSummaryExpand(item) {
   item.summaryExpanded = !item.summaryExpanded;
@@ -10300,6 +10295,10 @@ const shortcutItems = computed(() => previewOnly.value ? [] : [
 // 自訂指令、用戶人設、設定補充、劇情總結、遊玩教程都不在 v1 裡，
 // 放一顆按下去沒反應的鍵比沒有那顆鍵更糟。
 const panel = ref<CanvasPanelState>(createPanelState())
+// The shell traps focus inside its document; the host isolates everything outside the iframe.
+useCanvasModalFocus(sandboxFrame, () => !!sandboxCard.value && (menuOpen.value || !!panel.value.sheet), { backgroundOnly: true })
+
+
 // 模型選單這次要停在哪裡：'lanes' ＝目前這顆模型的線路清單。選單關掉就歸零，下次照一般方式開。
 const modelPanelFocus = ref<'' | 'lanes'>('')
 watch(() => panel.value.sheet, (sheet) => { if (sheet !== 'model') modelPanelFocus.value = '' })

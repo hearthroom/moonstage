@@ -1,5 +1,5 @@
 <template>
-  <div ref="root" class="u-popup" popover="manual" :class="{ 'is-open': open }" :data-open="open ? 'on' : 'off'" :hidden="!open">
+  <div ref="root" class="u-popup" popover="manual" :class="{ 'is-open': open }" :data-open="open ? 'on' : 'off'" :hidden="!open" :inert="open ? undefined : ''" :aria-hidden="!open ? true : undefined" tabindex="-1">
   <!--
     底部抽屜的殼。這一頁的每一個彈層都走這一份——不開新頁面：卡片的 CSS 只作用在
     這一頁，換頁等於卡片的裝修整個消失，而玩家會以為是壞了。
@@ -46,6 +46,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { leaveTopLayer, raiseStopAboveDialogs, raiseToTopLayer } from '../canvas-top-layer'
+import { useCanvasModalFocus } from '../canvas-modal-focus'
 import { syncChromeTone } from '../canvas-chrome-tone'
 
 /*
@@ -93,6 +94,8 @@ watch(() => props.open, (open) => {
     if (open) syncChromeTone(root.value?.ownerDocument || document)
   })
 }, { immediate: true })
+
+useCanvasModalFocus(root, () => props.open, { initial: () => '.confirm-scope .cancel-btn' })
 
 onBeforeUnmount(() => { unbind(); leaveTopLayer(root.value) })
 </script>
