@@ -38,10 +38,12 @@ function syncBackground(state: State) {
 }
 
 function stopControls(doc: Document): HTMLElement[] {
+  // A pending manual popover has UA display:none until showPopover runs nextTick.
+  // Its hidden attribute determines activity; ancestor display:none identifies the hidden sandbox host.
   return Array.from(doc.querySelectorAll<HTMLElement>('#mes_stop:not([hidden])')).filter(stop => {
     for (let node: HTMLElement | null = stop; node; node = node.parentElement) {
       const style = doc.defaultView?.getComputedStyle(node)
-      if (node.hidden || style?.display === 'none' || style?.visibility === 'hidden') return false
+      if (node.hidden || (node !== stop && style?.display === 'none') || style?.visibility === 'hidden') return false
     }
     return true
   })
