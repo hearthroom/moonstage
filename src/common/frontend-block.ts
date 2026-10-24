@@ -99,6 +99,7 @@ export function mountFrontendBlocks(root: ParentNode, opts: FrontendBlockOptions
     frame.className = `${FRONTEND_BLOCK_CLASS}__frame`
     frame.setAttribute('frameborder', '0')
     frame.setAttribute('title', 'frontend')
+    frame.setAttribute('allow', 'autoplay; fullscreen; web-share; clipboard-write')
     frame.srcdoc = buildFrontendDocument(text, opts)
     pre.insertAdjacentElement('afterend', frame)
     count++

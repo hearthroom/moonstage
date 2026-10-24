@@ -53,7 +53,7 @@
         class="canvas-sandbox-iframe"
         :src="sandboxUrl"
         :sandbox="sandboxAttr"
-        allow="autoplay; fullscreen"
+        allow="autoplay; fullscreen; web-share; clipboard-write"
         aria-label="chat sandbox"
       ></iframe>
     </div>
