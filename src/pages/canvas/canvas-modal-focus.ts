@@ -38,7 +38,13 @@ function syncBackground(state: State) {
 }
 
 function stopControls(doc: Document): HTMLElement[] {
-  return Array.from(doc.querySelectorAll<HTMLElement>('#mes_stop:not([hidden])'))
+  return Array.from(doc.querySelectorAll<HTMLElement>('#mes_stop:not([hidden])')).filter(stop => {
+    for (let node: HTMLElement | null = stop; node; node = node.parentElement) {
+      const style = doc.defaultView?.getComputedStyle(node)
+      if (node.hidden || style?.display === 'none' || style?.visibility === 'hidden') return false
+    }
+    return true
+  })
 }
 
 function focusables(root: HTMLElement): HTMLElement[] {

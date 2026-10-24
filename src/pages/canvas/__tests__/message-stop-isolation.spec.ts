@@ -22,3 +22,13 @@ it('keeps the active stop control operable and in the modal keyboard cycle while
  expect(document.activeElement).toBe(stop)
  stop.click(); expect(composer.emitted('stop')).toHaveLength(1)
 })
+it('excludes the hidden sandbox host composer stop from the modal Tab cycle', async () => {
+ const hiddenHost = document.createElement('div'); hiddenHost.style.display = 'none'; document.body.append(hiddenHost)
+ const composer = mount(Composer, { attachTo: hiddenHost, props: { generating: true, value: '', placeholder: '', sendState: 'send' } }); mounted.push(composer)
+ const menu = mount(Menu, { attachTo: document.body, props: { open: true, actions: [{ key: 'copy', label: 'Copy' }] } }); mounted.push(menu)
+ await nextTick(); await nextTick()
+ const action = menu.get('[data-lt-action=copy]').element as HTMLElement
+ action.focus(); action.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
+ expect(document.activeElement).toBe(action)
+ expect(hiddenHost.hasAttribute('inert')).toBe(true)
+})
