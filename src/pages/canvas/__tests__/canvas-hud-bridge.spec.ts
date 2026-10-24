@@ -267,6 +267,23 @@ describe('canvas-hud-bridge：動作', () => {
 })
 
 describe('owned history read-only capabilities', () => {
+ it('keeps input, generation and new conversations available when an owned resume is playable',async()=>{
+  const state=baseState({readOnly:false});const host=fakeHost(state);const bridge=createHudBridge(host);await bridge.start();
+  for(const action of ['setInputText','sendMessage','continueGeneration','regenerateMessage','createConversation'] as const){
+   expect(bridge.getCapabilities()[action].available,action).toBe(true)
+  }
+  expect((await bridge.invoke('setInputText',{text:'A retained story draft'})).ok).toBe(true)
+  expect((await bridge.invoke('sendMessage',{text:'Continue the story'})).ok).toBe(true)
+  expect((await bridge.invoke('continueGeneration',{messageId:'12'})).ok).toBe(true)
+  expect((await bridge.invoke('regenerateMessage',{messageId:'12'})).ok).toBe(true)
+  expect((await bridge.invoke('createConversation')).ok).toBe(true)
+  expect(host.calls).toEqual([
+   ['setInputText',['A retained story draft']],['sendMessage',['Continue the story']],
+   ['continueGeneration',['12']],['regenerateMessage',['12']],['createConversation',[]],
+  ])
+  expect(bridge.getSnapshot().messages[2].capabilities.regenerate).toBe(true)
+  bridge.destroy()
+ })
  it('revokes send/rewrite/continue/new story before calling the host while copy/exit remain',async()=>{
   const state=baseState(); const host=fakeHost(state); const bridge=createHudBridge(host); await bridge.start();
   Object.assign(state,{readOnly:true}); bridge.refresh();

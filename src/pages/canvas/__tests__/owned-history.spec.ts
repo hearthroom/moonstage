@@ -2,6 +2,7 @@ import {describe,expect,it,vi} from 'vitest'
 import {readFileSync} from 'node:fs'
 import {runInNewContext} from 'node:vm'
 import ts from 'typescript'
+import {computed,ref} from 'vue'
 
 const canvas=readFileSync('src/pages/canvas/canvas.vue','utf8')
 const script=canvas.slice(canvas.indexOf('<script setup lang="ts">')+24,canvas.indexOf('</script>'))
@@ -12,7 +13,6 @@ function actual(name:string, ctx:any){
  const js=ts.transpileModule(node.getText(tree),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText
  return runInNewContext(`${js}; ${name}`,ctx)
 }
-const ref=(value:any)=>({value})
 describe('owned read-only admission in actual canvas handlers',()=>{
  for(const name of ['send','sendWebSocketMessage','sendQueuedChatPayload','resumeAgentOperation','doReiteration','doContinue','onAssist','onCanvasSend','restartConversationFromScratch','startPendingGreeting']){
   it(`${name} leaves draft and canonical timeline intact without transport or start`,async()=>{
@@ -22,19 +22,44 @@ describe('owned read-only admission in actual canvas handlers',()=>{
    expect(content.value).toBe('Keep my draft');expect(talkList.value).toEqual([{id:'saved',content:'Saved history'}])
   })
  }
- it('owned bootstrap reads the original messages directly with no detail/start/greeting',async()=>{
-  const get=vi.fn(async()=>({statusCode:200,data:{conversationId:'conv',roleId:'old',title:'Saved title',canGenerate:false,reason:'author_private'}}))
+ for(const access of [{canGenerate:true,reason:''},{canGenerate:false,reason:'author_private'},{canGenerate:false,reason:'restricted'}]){
+ it(`owned bootstrap preserves generation capability ${JSON.stringify(access)} without detail/start/greeting`,async()=>{
+  const get=vi.fn(async()=>({statusCode:200,data:{conversationId:'conv',roleId:'old',title:'Saved title',...access}}))
   const history=vi.fn(),mark=vi.fn()
   const ctx:any={_this:{http:{get},requestUrl:{ownedConversation:'/owned'}}, roleId:ref(''),conversationId:ref(''),historyConversation:ref(false),historyTitle:ref(''),
    ownedHistoryMode:ref(false),authorAssetSettled:ref(false),conversationAccess:ref({canGenerate:true}),pendingGreetingStart:ref(false),formData:{},ajax:ref({flag:false,page:2}),
    ROLE_SETTINGS_DEFAULTS:{},setCurrentRoleId:vi.fn(),getHistoryMsg:history,contentReady:{mark},unref:(r:any)=>r.value,uni:{$emit:vi.fn()},message:{error:vi.fn()},t:(s:string)=>s,
-   normalizeConversationAccess:(v:any)=>v,ensureRoleSettings:vi.fn(async()=>{}),loadModelCatalog:vi.fn(),loadMultiPassPreference:vi.fn()}
+   ensureRoleSettings:vi.fn(async()=>{}),loadModelCatalog:vi.fn(),loadMultiPassPreference:vi.fn(),content:ref('Kept draft'),
+   hasLogin:ref(true),isTimelineMutationBlocked:()=>false,onCanvasSend:vi.fn(),archivesFull:ref(false),onConfirmStartNewConversation:vi.fn(),
+   talkList:ref([]),actionBtnState:ref('send'),menuEditing:ref(false),menuIndex:ref(0),roleView:ref({}),modelGroups:ref([]),sandboxCard:ref(false),
+   convertPlainText:(v:string)=>v,displayScript:'',previewOnly:ref(false),menuDraft:ref(''),selectedVariantValue:ref(''),archiveRows:ref([]),
+   asPersonaMode:(v:any)=>v,personaLabels:ref({}),effectivePersonaFields:()=>({userName:'',userSex:'',userDefine:''}),personaSexOptions:ref([]),moreItems:ref([])}
+  ctx.normalizeConversationAccess=actual('normalizeConversationAccess',ctx)
+  ctx.canGenerate=actual('canGenerate',{computed,conversationAccess:ctx.conversationAccess})
   await actual('bootOwnedHistory',ctx)('old','conv')
   expect(get).toHaveBeenCalledTimes(1);expect(history).toHaveBeenCalledTimes(1)
   expect(ctx.conversationId.value).toBe('conv');expect(ctx.roleId.value).toBe('old')
   expect(ctx.historyTitle.value).toBe('Saved title');expect(ctx.ownedHistoryMode.value).toBe(true);expect(ctx.authorAssetSettled.value).toBe(true)
-  expect(ctx.conversationAccess.value.canGenerate).toBe(false);expect(mark).toHaveBeenCalledTimes(1)
+  expect(ctx.conversationAccess.value).toEqual(access)
+  expect(ctx.canGenerate.value).toBe(access.canGenerate)
+  expect(mark).toHaveBeenCalledTimes(access.canGenerate?0:1)
+  expect(ctx.ensureRoleSettings).toHaveBeenCalledTimes(access.canGenerate?2:0)
+  await vi.waitFor(()=>{
+   expect(ctx.loadModelCatalog).toHaveBeenCalledTimes(access.canGenerate?1:0)
+   expect(ctx.loadMultiPassPreference).toHaveBeenCalledTimes(access.canGenerate?1:0)
+  })
+  const host=actual('buildHudHost',ctx)()
+  expect(host.read().readOnly).toBe(!access.canGenerate)
+  expect(host.read().inputText).toBe('Kept draft')
+  expect(host.sendMessage('Continue the saved story')).toBe(access.canGenerate)
+  expect(ctx.onCanvasSend).toHaveBeenCalledTimes(access.canGenerate?1:0)
+  expect(ctx.content.value).toBe(access.canGenerate?'Continue the saved story':'Kept draft')
+  if(access.canGenerate){
+   expect(host.createConversation()).toBe(true)
+   expect(ctx.onConfirmStartNewConversation).toHaveBeenCalledTimes(1)
+  }
  })
+ }
 })
 
 describe('owned policy refresh after a failed admission',()=>{
