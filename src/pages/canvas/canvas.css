@@ -3439,7 +3439,8 @@
     width: min(360px, 100%);
     padding: 20px;
     border-radius: var(--lt-canvas-sheet-radius);
-    background: var(--lt-canvas-sheet-pop-bg);
+    /* 和外層面板同一表面；pop-bg 會隨作者文字色變半透明，清單會透進確認正文。 */
+    background: var(--background-color, var(--lt-canvas-sheet-bg));
     color: var(--lt-canvas-sheet-fg);
   }
 
