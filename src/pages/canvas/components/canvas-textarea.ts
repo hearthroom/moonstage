@@ -18,6 +18,7 @@ export default defineComponent({
   name: 'CanvasTextarea',
   props: {
     value: { type: String, default: '' },
+    readOnly: { type: Boolean, default: false },
     /** 節點名照卡片的期待來，所以由呼叫端指定 */
     elId: { type: String, default: '' },
     elClass: { type: String, default: '' },
@@ -32,6 +33,7 @@ export default defineComponent({
         class: props.elClass,
         rows: 1,
         value: props.value,
+        readonly: props.readOnly,
         ref: el,
         onInput: (e: Event) => emit('input', e),
         onKeydown: (e: KeyboardEvent) => emit('keydown', e),

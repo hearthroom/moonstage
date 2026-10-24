@@ -117,3 +117,9 @@ describe('the provider code for a turn it could not serve', () => {
     })
   })
 })
+
+it('settles an explicit author-private admission refusal only before acceptance',()=>{
+ expect(isDefinitivePreAdmissionRejection(capablePending(),'author_private')).toBe(true)
+ expect(isDefinitivePreAdmissionRejection({...capablePending(),accepted:true},'author_private')).toBe(false)
+ expect(isDefinitivePreAdmissionRejection({...capablePending(),operationId:'known'},'author_private')).toBe(false)
+})

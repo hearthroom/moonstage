@@ -1211,7 +1211,7 @@ export function recordExactOperationProbeMiss(
 // the next turn's estimate, so nothing was stored or cleared. That makes the error itself the
 // proof, and the player gets the text back at once instead of after repeated empty
 // probes. Errors that can also come from transport stay on the probe path.
-const DEFINITIVE_PRE_ADMISSION_ERRORS = new Set(['insufficient_credits'])
+const DEFINITIVE_PRE_ADMISSION_ERRORS = new Set(['insufficient_credits', 'author_private'])
 
 export function isDefinitivePreAdmissionRejection(
   pending: any,

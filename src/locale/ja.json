@@ -1,4 +1,7 @@
 {
+	"canvas.historyAccess.closed": "作者は今このカードを開放していません。履歴は見返せますが、続きはできません。",
+	"canvas.historyAccess.back": "会話一覧に戻る",
+	"canvas.historyAccess.rejected": "作者がこのカードを閉じたため、送信されませんでした。入力した内容は残っています。",
 	"canvas.fullscreen.enter": "全画面表示",
 	"canvas.fullscreen.exit": "全画面表示を終了",
 	"canvas.fullscreen.failed": "全画面表示に切り替えられませんでした。そのまま続けるか、もう一度お試しください。",

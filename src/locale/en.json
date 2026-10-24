@@ -1,4 +1,7 @@
 {
+	"canvas.historyAccess.closed": "The author has closed this card for now. You can read back the history but can't continue.",
+	"canvas.historyAccess.back": "Back to my conversations",
+	"canvas.historyAccess.rejected": "The author just closed this card, so your message wasn't sent. Your text is still here.",
 	"canvas.fullscreen.enter": "Enter fullscreen",
 	"canvas.fullscreen.exit": "Exit fullscreen",
 	"canvas.fullscreen.failed": "Fullscreen could not open; you can keep playing or try again.",

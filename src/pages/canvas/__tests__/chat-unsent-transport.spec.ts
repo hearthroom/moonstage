@@ -17,6 +17,7 @@ function terminationHarness(queued: boolean, pollingAvailable: boolean) {
   const token = transport.openSocketGeneration()
   const pending = { socketToken: token, draft: payload.message, payload, userBubbleId: 1, aiBubbleId: 2 }
   const scope: any = {
+    canGenerate: {value:true},
     chatTransport: transport, activeSocketToken: token, pendingChatTurn: pending,
     ownershipRevision: { value: 0 },
     messageQueue: { value: queued ? [{ socketToken: token, payload }] : [] },

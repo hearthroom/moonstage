@@ -83,7 +83,7 @@
             點了只把 AI 替玩家寫的一句填進輸入框，不代送。
           -->
           <div
-            v-if="assistEnabled"
+            v-if="assistEnabled && !readOnly"
             class="ai-assistant"
             :class="{ 'is-busy': assistBusy }"
             role="button"
@@ -149,7 +149,7 @@
                 @click="onPrimary"
               ></div>
 
-              <div v-show="expanded" class="chat-input-toolbar">
+              <div v-show="expanded && !readOnly" class="chat-input-toolbar">
                 <div class="chat-input-tool-btn" role="button" tabindex="0"
                      @mousedown.prevent
                      @click="onPaste"
@@ -172,6 +172,7 @@
                     el-id="send_textarea"
                     el-class="uni-textarea-textarea"
                     :value="value"
+                    :read-only="readOnly"
                     @input="onInput"
                     @keydown="onKeydown"
                     @compositionstart="composing = true"
@@ -388,6 +389,7 @@ import { leaveTopLayer, raiseToTopLayer } from '../canvas-top-layer'
 
 const props = withDefaults(defineProps<{
   value: string
+  readOnly?: boolean
   placeholder: string
   /** send | send-disabled | continue | pending — 停止不佔這顆鍵，它有自己的節點 */
   sendState: string
@@ -587,6 +589,7 @@ onBeforeUnmount(() => {
 // ── 工具列 ────────────────────────────────────────────────────────────
 
 async function onPaste() {
+  if (props.readOnly) return;
   try {
     const clip = typeof navigator !== 'undefined' ? navigator.clipboard : undefined
     const text = clip && typeof clip.readText === 'function' ? await clip.readText() : ''
@@ -598,6 +601,7 @@ async function onPaste() {
 }
 
 function onClear() {
+  if (props.readOnly) return;
   emit('update:value', '')
   focusTextarea()
 }
@@ -606,6 +610,7 @@ function onClear() {
 // 能把字送進輸入框的方式（它不知道我們用什麼框架）。所以這裡聽的是原生事件，
 // 不是框架的雙向綁定。
 function onInput(event: Event) {
+  if (props.readOnly) return;
   emit('update:value', (event.target as HTMLTextAreaElement).value)
 }
 
@@ -620,12 +625,14 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 function onPrimary() {
+  if (props.readOnly) return;
   if (props.sendState === 'continue') emit('continue')
   else emit('send')
 }
 
 // 幫答：進行中不重複觸發（一次一筆點數）。
 function onAssist() {
+  if (props.readOnly) return;
   if (props.assistBusy) return
   emit('assist')
 }
