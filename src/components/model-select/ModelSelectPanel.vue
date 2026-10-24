@@ -423,7 +423,8 @@
 			</div>
 		</div>
 
-		<!-- 高消費確認。蓋在彈層之上（DESIGN §3.2：modal 100+），底要不透明。 -->
+		<!-- 清單的淡出 mask 會裁掉 fixed 子孫；確認框留在同一個模型殼，移出捲動清單。 -->
+		<Teleport :to="costDialogHost" :disabled="!costDialogHost">
 		<div v-if="costModalVisible" class="ms-cost-mask" @click.self="settleCostModal(false)">
 			<div class="ms-cost confirm-scope">
 				<span class="ms-cost-title">{{ costModalTitle }}</span>
@@ -436,6 +437,7 @@
 				</div>
 			</div>
 		</div>
+		</Teleport>
 	</div>
 </template>
 
@@ -553,6 +555,8 @@
 		/** 殼底部放設定鍵與攤開面板的位置；沒給（還沒掛上、或單獨掛這個元件）時就地渲染 */
 		dockChips?: HTMLElement | null
 		dockPanel?: HTMLElement | null
+		/** 高消費確認的落點：在模型殼內，但不受清單的 overflow／mask 裁切。 */
+		costDialogHost?: HTMLElement | null
 		/**
 		 * 'lanes'：打開時直接停在目前這顆模型的線路清單（內容限制卡的「切換線路」——同一個模型換服務商）。
 		 * 不接回上次瀏覽的分類、切到目前模型所在那一格、把它的線路全部攤開並捲到看得見。
@@ -561,7 +565,7 @@
 	}>(), {
 		roleId: '', open: true, selectModel: '', selectModelName: '', context: 1,
 		thinkingDepth: '', showThinkingProcess: true, autoCompactEnabled: false,
-		compactExtraInstruction: '', searchQuery: '', dockChips: null, dockPanel: null, focus: '',
+		compactExtraInstruction: '', searchQuery: '', dockChips: null, dockPanel: null, costDialogHost: null, focus: '',
 	});
 
 	const emit = defineEmits<{

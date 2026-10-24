@@ -9828,7 +9828,7 @@ function userDisplayName(): string {
 
 const messageLabels = computed(() => ({
   copy: t('chat.copy'),
-  edit: t('chat.rewrite'),
+  edit: t('main.edit'),
   regenerate: t('canvas.actions.regenerate'),
   reasoning: t('chat.thinkingProcess'),
   prepTrail: t('multiPass.prepTrailTitle'),
@@ -9961,7 +9961,7 @@ const menuActions = computed(() => {
   const latestAI = isAI && isLatestCanonicalAIIndex(index)
   const actions: Array<{ key: string; label: string; disabled?: boolean }> = []
   if (latestAI) {
-    actions.push({ key: 'edit', label: t('chat.rewrite') })
+    actions.push({ key: 'edit', label: t('main.edit') })
     if (canContinueFromIndex(index)) {
       actions.push({ key: 'continue', label: t('multiPass.continueAction') })
     }

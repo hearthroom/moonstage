@@ -54,6 +54,7 @@
         @draft="draft = $event"
         :dock-chips="dockChips"
         :dock-panel="dockPanel"
+        :cost-dialog-host="shellEl"
         @close="$emit('close')"
       />
     </div>
