@@ -27,11 +27,11 @@ const timeline = () => [
   { id: 'player', type: 1, content: 'Hello', chatFinish: true },
   { id: 'reply', type: 0, content: 'Original AI reply', chatFinish: true },
 ]
-function bindings(locale: string, index = 2, preview = false) {
+function bindings(locale: string, index = 2, preview = false, generatable = true) {
   const strings = JSON.parse(fs.readFileSync(path.resolve(__dirname, `../../../locale/${locale}.json`), 'utf8'))
   const talkList = ref(timeline())
   const env = {
-    computed, t: (key: string) => strings[key] || key, talkList,
+    computed, t: (key: string) => strings[key] || key, talkList, canGenerate: ref(generatable),
     menuIndex: ref(index), previewOnly: ref(preview), stageHost: {}, allowsStageAction,
     isOpeningIndex, isLatestCanonicalAIIndex: (i: number) => latestCanonicalAIIndex(talkList.value) === i,
     canEditResendPlayerIndex, canContinueFromIndex: () => false, archivesFull: ref(false),
@@ -63,5 +63,12 @@ describe('manual AI reply editing has its own label', () => {
   it('keeps previews and the opening out of manual AI editing', () => {
     expect(bindings('en', 2, true).actions.value.map((a: any) => a.key)).toEqual(['copy'])
     expect(bindings('en', 0).actions.value.map((a: any) => a.key)).not.toContain('edit')
+  })
+  it('keeps closed owned history copy-only even with the separate edit label', () => {
+    const { actions, env, pick } = bindings('en', 2, false, false)
+    expect(actions.value.map((a: any) => a.key)).toEqual(['copy'])
+    pick('edit')
+    expect(env.menuEditing.value).toBe(false)
+    expect(env.menuDraft.value).toBe('')
   })
 })
