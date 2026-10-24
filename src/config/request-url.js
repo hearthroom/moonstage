@@ -8,6 +8,7 @@
 const V1 = '/open/v1';
 export const requestUrl = {
 	// 對話核心迴圈
+	ownedConversation: `${V1}/conversation/owned`,
 	chatStart: `${V1}/conversation/start`,
 	chatStop: `${V1}/conversation/stop`,
 	rewriteChat: `${V1}/conversation/rewrite-by-id`,

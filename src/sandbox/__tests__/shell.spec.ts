@@ -319,6 +319,17 @@ describe('殼：功能欄、樣式、主題、輸入區、舞台與返回', () =
     expect(s.refs.input.value).toBe('')
   })
 
+  it('read-only generation revokes SDK send while preserving the typed input and history', async () => {
+    const s = boot(config())
+    s.refs.input.value = 'Keep my draft'
+    s.refs.input.dispatchEvent(new Event('input'))
+    s.handle({ type:'generation',busy:false,readOnly:true } as any)
+    expect(s.refs.input.readOnly).toBe(true)
+    expect(s.refs.send.disabled).toBe(true)
+    await expect(s.sdk.message.send('new turn')).rejects.toMatchObject({code:'NOT_SUPPORTED'})
+    expect(s.refs.input.value).toBe('Keep my draft')
+  })
+
   it('generation busy 時送出鈕停用；composer.hide 同步 data-composer', () => {
     const s = boot(config())
     s.handle({ type: 'generation', busy: true })

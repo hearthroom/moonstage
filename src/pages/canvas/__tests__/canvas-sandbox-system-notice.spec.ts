@@ -45,6 +45,7 @@ function canvasFunctions(names: string[], env: Record<string, unknown>): Record<
     return CANVAS.slice(start, end)
   }).join('\n')
   const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText
+  env = { canGenerate: {value:true}, ...env };
   const keys = Object.keys(env)
   return new Function(...keys, `${js}\nreturn { ${names.join(', ')} };`)(...keys.map((k) => env[k]))
 }

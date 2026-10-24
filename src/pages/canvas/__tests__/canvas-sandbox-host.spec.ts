@@ -162,9 +162,9 @@ describe('沙箱宿主橋', () => {
     h.posted.length = 0
     const gens = () => h.posted.filter((p) => p.type === 'generation')
     state.current = makeState({ messages: [greeting, failed], generationOutcome: outcome }); host.sync(); host.sync()
-    expect(gens()).toEqual([{ ms: 1, type: 'generation', busy: false, sendBlocked: false, phase: 'idle', outcome: { kind: 'network-error', label: '網路連線中斷', sub: '請檢查網路後重試', actions: [{ action: 'retry', label: '重試' }] } }])
+    expect(gens()).toEqual([{ ms: 1, type: 'generation', busy: false, readOnly: false, sendBlocked: false, phase: 'idle', outcome: { kind: 'network-error', label: '網路連線中斷', sub: '請檢查網路後重試', actions: [{ action: 'retry', label: '重試' }] } }])
     state.current = makeState({ messages: [greeting, failed], generationOutcome: null }); host.sync()
-    expect(gens().at(-1)).toEqual({ ms: 1, type: 'generation', busy: false, sendBlocked: false, phase: 'idle', outcome: null })
+    expect(gens().at(-1)).toEqual({ ms: 1, type: 'generation', busy: false, readOnly: false, sendBlocked: false, phase: 'idle', outcome: null })
     expect(gens()).toHaveLength(2)
     host.destroy()
   })
@@ -208,7 +208,7 @@ describe('沙箱宿主橋', () => {
       { id: 'h11', role: 'user', content: '嗨', serverId: null, state: 'done' },
       { id: 'h12', role: 'ai', content: '哈囉', serverId: '12', state: 'done' },
     ] })
-    expect(h.posted[2]).toEqual({ ms: 1, type: 'generation', busy: false, sendBlocked: false, phase: 'idle', outcome: null })
+    expect(h.posted[2]).toEqual({ ms: 1, type: 'generation', busy: false, readOnly: false, sendBlocked: false, phase: 'idle', outcome: null })
     host.destroy()
   })
 

@@ -1,4 +1,7 @@
 {
+	"canvas.historyAccess.closed": "작성자가 지금은 이 카드를 열어 두지 않았어요. 기록은 다시 볼 수 있지만 이어서 할 수는 없어요.",
+	"canvas.historyAccess.back": "내 대화로 돌아가기",
+	"canvas.historyAccess.rejected": "작성자가 방금 이 카드를 닫아서 전송되지 않았어요. 입력한 내용은 그대로 있어요.",
 	"canvas.fullscreen.enter": "전체 화면으로 보기",
 	"canvas.fullscreen.exit": "전체 화면 종료",
 	"canvas.fullscreen.failed": "전체 화면으로 전환하지 못했어요. 그대로 플레이하거나 다시 시도할 수 있어요.",

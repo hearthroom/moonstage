@@ -204,6 +204,7 @@ export function createShell(options: CreateShellOptions): Shell {
 
   let busy = false
   let sendBlocked = false
+  const historyReadOnly = ref(false)
   // 這一輪在等什麼（宿主的 generation 訊息帶來）；since 是殼記下的進入時間，作者拿來顯示等了幾秒
   let genPhase = 'idle', genSince = Date.now()
   // 上一輪沒正常結束時的結局（宿主算好的那張卡）；用序列化的字比對，變了才發 generation:outcome
@@ -250,7 +251,7 @@ export function createShell(options: CreateShellOptions): Shell {
       composing: () => composing,
     },
     composer: {
-      show: () => { composerVisible = true; setComposerVisible(refs, true); transport.send({ type: 'composer', visible: true }) },
+      show: () => { if (historyReadOnly.value) return; composerVisible = true; setComposerVisible(refs, true); transport.send({ type: 'composer', visible: true }) },
       hide: () => { composerVisible = false; setComposerVisible(refs, false); input.blur(); transport.send({ type: 'composer', visible: false }) },
       visible: () => composerVisible,
     },
@@ -501,6 +502,8 @@ export function createShell(options: CreateShellOptions): Shell {
         ref: composerVm,
         ...chromeState.composer,
         value: inputValue.value,
+        readOnly: historyReadOnly.value,
+        sendState: historyReadOnly.value ? 'send-disabled' : chromeState.composer?.sendState,
         'onUpdate:value': (v: string) => { inputValue.value = v; emitInput() },
         onSend: () => sendUi('send'),
         onStop: () => sendUi('stop'),
@@ -696,7 +699,11 @@ export function createShell(options: CreateShellOptions): Shell {
       case 'generation': {
         busy = !!message.busy
         refs.root.setAttribute('data-busy', busy ? '1' : '0')
-        sendBlocked = message.sendBlocked === true
+        historyReadOnly.value = message.readOnly === true
+        sdkHost.capabilities.send = !historyReadOnly.value && config.capabilities.send !== false
+        sdkHost.capabilities.edit = !historyReadOnly.value && !!config.capabilities.edit
+        refs.input.readOnly = historyReadOnly.value
+        sendBlocked = message.sendBlocked === true || historyReadOnly.value
         refs.send.disabled = busy || sendBlocked
         const phase = busy ? String(message.phase && message.phase !== 'idle' ? message.phase : 'preparing') : 'idle'
         if (phase !== genPhase) { genPhase = phase; genSince = Date.now(); bus.emit('generation:phase', { phase: genPhase, since: genSince }) }

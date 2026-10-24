@@ -1,4 +1,7 @@
 {
+	"canvas.historyAccess.closed": "作者目前不开放这张卡，你可以回顾记录，但不能继续。",
+	"canvas.historyAccess.back": "回我的对话",
+	"canvas.historyAccess.rejected": "作者刚把这张卡收起来了，这次没有发送，你打的字还在。",
 	"canvas.fullscreen.enter": "进入全屏",
 	"canvas.fullscreen.exit": "退出全屏",
 	"canvas.fullscreen.failed": "全屏未能开启，你可以继续游玩或重试。",

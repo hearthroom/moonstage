@@ -52,6 +52,7 @@ export interface StageHost {
   nav: {
     back(): void
     toEntry(): void
+    toConversations?(): void
     toLogin(returnTo?: string): void
     /**
      * 有沒有上一頁可回。沒有（例如從主畫面圖示開進來、整個 App 就只有這一張卡）就不畫返回鍵——

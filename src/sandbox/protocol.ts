@@ -295,7 +295,7 @@ export type HostToShell =
   | { type: 'message.stream'; id: string; content: string; view?: MessageView }
   | { type: 'message.done'; id: string; content: string; serverId: string | null; view?: MessageView }
   | { type: 'message.remove'; id: string }
-  | { type: 'generation'; busy: boolean; sendBlocked?: boolean; phase?: GenerationPhase; outcome?: GenerationOutcome | null }
+  | { type: 'generation'; busy: boolean; readOnly?: boolean; sendBlocked?: boolean; phase?: GenerationPhase; outcome?: GenerationOutcome | null }
   | { type: 'input'; value: string }
   | { type: 'reply'; reqId: number; ok: boolean; value?: unknown; error?: SandboxError }
   | { type: 'theme'; theme: SandboxTheme; vars?: Record<string, string> }

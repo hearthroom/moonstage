@@ -70,6 +70,7 @@ export interface HudHostState {
   prologue?: { title: string; items: string[] }
   messages: HudHostMessage[]
   sendBlocked?: boolean
+  readOnly?: boolean
   generation: 'idle' | 'starting' | 'streaming'
   /** 沙箱殼用：這一輪在等什麼（見 sandbox/protocol GenerationPhase）。 */
   generationPhase?: 'idle' | 'preparing' | 'summarizing' | 'thinking' | 'writing'
@@ -329,12 +330,13 @@ export function createHudBridge(host: HudHost): HudBridge {
   function buildSnapshot(state: HudHostState, rev: number): HudSnapshot {
     const generating = state.generation !== 'idle'
     const preview = !!state.previewOnly
+    const readOnly = state.readOnly === true
     const streamingId = state.generation === 'streaming' ? state.streamingMessageId : null
     const lastIndex = state.messages.length - 1
 
     const messages: HudMessage[] = state.messages.map((m, index) => {
       const isAI = m.role === 'assistant'
-      const deletable = !m.opening && m.id !== '0' && !preview
+      const deletable = !m.opening && m.id !== '0' && !preview && !readOnly
       return {
         id: m.id,
         role: m.role,
@@ -344,11 +346,11 @@ export function createHudBridge(host: HudHost): HudBridge {
         streaming: !!streamingId && streamingId === m.id,
         capabilities: {
           copy: true,
-          edit: isAI && m.canonicalLatestAI && !m.opening && !preview,
+          edit: isAI && m.canonicalLatestAI && !m.opening && !preview && !readOnly,
           delete: deletable,
-          regenerate: isAI && m.canonicalLatestAI && !m.opening && !preview,
-          rollback: !m.opening && m.id !== '0' && index !== lastIndex && !preview,
-          startNewStory: supportsFork && isAI && !m.opening && m.id !== '0' && !preview && !state.conversations.full,
+          regenerate: isAI && m.canonicalLatestAI && !m.opening && !preview && !readOnly,
+          rollback: !m.opening && m.id !== '0' && index !== lastIndex && !preview && !readOnly,
+          startNewStory: supportsFork && isAI && !m.opening && m.id !== '0' && !preview && !readOnly && !state.conversations.full,
           previousBranch: false,
           nextBranch: false,
         },
@@ -508,6 +510,9 @@ export function createHudBridge(host: HudHost): HudBridge {
       applyInstruction: unsupported,
     }
 
+    if (readOnly) {
+      for (const action of ['sendMessage','setInputText','continueGeneration','regenerateMessage','openEditMessage','submitEditMessage','rollbackMessage','startNewStoryFromMessage','createConversation','newChat','activateMoreMenuItem','deleteMessage','editMessage','rollbackMessage'] as HudAction[]) capabilities[action] = no(labels.notSupported);
+    }
     return {
       revision: rev,
       character: { id: state.character.id, name: state.character.name, avatar: state.character.avatar },

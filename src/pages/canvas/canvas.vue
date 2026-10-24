@@ -97,15 +97,22 @@
 
       <!-- MMD 的「你可以選擇開場」：訊息列之後的獨立區塊（照 MMD 的 DOM 位置）。
            點一條把那句話填進輸入框，由玩家自己送出——不是換開場白。 -->
-      <CanvasPrologue :title="prologueTitle" :items="prologueItems" @pick="onProloguePick" />
+      <CanvasPrologue v-if="canGenerate" :title="prologueTitle" :items="prologueItems" @pick="onProloguePick" />
     </CanvasStage>
 
+    <div v-if="!canGenerate" class="lt-history-access" :class="{'lt-history-access--rejected':accessInterrupted}" :role="accessInterrupted ? 'alert' : 'status'">
+      <p>{{ conversationAccess.reason === 'author_private' ? t(accessRejected ? 'canvas.historyAccess.rejected' : 'canvas.historyAccess.closed') : t('canvas.roleLoadFailed') }}</p>
+      <button type="button" @click="returnToConversations">{{ t('canvas.historyAccess.back') }}</button>
+    </div>
+
+    <template v-if="canGenerate || accessInterrupted || isGenerating">
     <CanvasComposer
       v-show="!sandboxCard"
       ref="composerRef"
+      :read-only="!canGenerate"
       :value="content"
       :placeholder="t('canvas.placeholder')"
-      :send-state="composerSendState"
+      :send-state="canGenerate ? composerSendState : 'send-disabled'"
       :generating="isGenerating"
       :enter-sends="!isTouchDevice"
       :shortcuts="shortcutItems"
@@ -132,6 +139,7 @@
       @meter-hint-done="onMeterHintDone"
       @shortcut="onShortcut"
     />
+    </template>
 
     <!-- 沙箱卡：訊息選單與面板（模型除外）改由殼用同一套元件畫（資料走 hud.read().panels），這裡的不畫。 -->
     <CanvasMessageMenu
@@ -1601,6 +1609,7 @@ function _onWheel() { _wheelScrollEndAt = Date.now(); }
 // 純預覽沒有角色：頂欄與訊息署名用草稿的名字。
 const roleView = computed(() => {
   if (previewOnly.value) return { roleName: previewRoleName() }
+  if (ownedHistoryMode.value) return {roleName:historyTitle.value,roleAvatar:''};
   const role = unref(currentRole) || {}
   return { ...role, roleAvatar: cardPortrait(role) }
 });
@@ -1695,8 +1704,72 @@ onLoad((options) => {
     bootFromDraft(draftId, options.roleId);
     return;
   }
+  if (options.conversationId) { void bootOwnedHistory(String(options.roleId), String(options.conversationId)); return; }
   bootRole(options.roleId, null);
 });
+
+// Owned history bypasses public role loading and every start/greeting path.
+const conversationAccess = ref({canGenerate:true, reason:''});
+const ownedHistoryMode = ref(false);
+const historyTitle = ref('');
+const accessInterrupted = ref(false);
+const accessRejected = ref(false);
+const canGenerate = computed(() => conversationAccess.value.canGenerate);
+function normalizeConversationAccess(value: any) {
+  const reason = ['author_private','restricted','unavailable'].includes(value?.reason) ? value.reason : 'unavailable';
+  return value?.canGenerate === true ? {canGenerate:true,reason:''} : {canGenerate:false,reason};
+}
+async function bootOwnedHistory(targetRoleId: string, id: string) {
+  ownedHistoryMode.value = true;
+  conversationAccess.value = {canGenerate:false,reason:'unavailable'};
+  try {
+    const response = await _this.http.get(_this.requestUrl.ownedConversation, {data:{conversationId:id},showLoading:false});
+    if (response.statusCode !== 200 || response.data?.conversationId !== id || response.data?.roleId !== targetRoleId) throw new Error('owned_history_binding');
+    roleId.value = targetRoleId;
+    Object.assign(formData, ROLE_SETTINGS_DEFAULTS);
+    formData.selectModelName = '';
+    formData.roleId = targetRoleId;
+    setCurrentRoleId(targetRoleId);
+    historyTitle.value = response.data.title || response.data.roleName || '';
+    conversationAccess.value = normalizeConversationAccess(response.data);
+    historyConversation.value = true;
+    pendingGreetingStart.value = false;
+    conversationId.value = id;
+    uni.$emit('updateConversationId', {conversationId:id});
+    ajax.value.flag = true;
+    ajax.value.page = 1;
+    // Owned history has no author asset to load; the access panel is itself renderable content.
+    authorAssetSettled.value = true;
+    getHistoryMsg();
+    if (!conversationAccess.value.canGenerate) contentReady.mark();
+    if (conversationAccess.value.canGenerate) {
+      ensureRoleSettings().then(loadModelCatalog);
+      ensureRoleSettings().then(loadMultiPassPreference);
+    }
+  } catch { message.error(t('canvas.roleLoadFailed')); contentReady.mark(); }
+}
+async function refreshConversationAccess(draft = '', rejected = false) {
+  const id = String(unref(conversationId) || '');
+  if (!id) return;
+  try {
+    const response = await _this.http.get(_this.requestUrl.ownedConversation, {data:{conversationId:id},showLoading:false,quietTransport:true});
+    if (String(unref(conversationId)) !== id || response.statusCode !== 200 || response.data?.conversationId !== id || response.data?.roleId !== String(unref(roleId))) return;
+    const access = normalizeConversationAccess(response.data);
+    // A failed read never turns a connection failure into an author decision.
+    if (!access.canGenerate) {
+      conversationAccess.value = access;
+      if ((draft || rejected) && access.reason === 'author_private') {
+        accessInterrupted.value = true;
+        accessRejected.value = rejected;
+        if (!content.value && draft) content.value = draft;
+      }
+    }
+  } catch { /* Existing input and operation recovery remain authoritative. */ }
+}
+function returnToConversations() {
+  if (stageHost.nav.toConversations) stageHost.nav.toConversations();
+  else stageHost.nav.toEntry();
+}
 
 async function bootFromDraft(draftId: string, targetRoleId: any) {
   let draft: AuthorDraft | null = null;
@@ -2174,6 +2247,7 @@ const actionBtnTooltip = computed(() => {
   回傳 false 代表沒有可以續的那一輪。
 */
 function resumeAgentOperation(): boolean {
+  if (!canGenerate.value) return false;
   if (isTimelineMutationBlocked()) return false;
   const resumable = findResumableAgentOperation(unref(knownOperations));
   const target = resolveAgentResumeTarget(resumable, unref(talkList));
@@ -2206,6 +2280,7 @@ function onActionBtnClick() {
   if (state === 'stop') {
     return sendStop();
   }
+  if (!canGenerate.value) return false;
   if (state === 'continue') {
     resumeAgentOperation();
     return;
@@ -3223,6 +3298,7 @@ let authorSubmitInFlight = false;
 function buildAuthorAssetHost() {
   const inputEl = () => document.querySelector('textarea#send_textarea');
   const writeDraft = (text) => {
+    if (!canGenerate.value) return false;
     const el = inputEl();
     if (!el) return false;
     el.value = text;
@@ -3237,6 +3313,7 @@ function buildAuthorAssetHost() {
     // 直接寫 DOM 的 textarea，兩者不同步——不補這一下，作者按鈕送出後輸入框會
     // 留著剛剛那句話，使用者以為沒送出去而再按一次。
     submit: () => {
+      if (!canGenerate.value) return false;
       authorSubmitInFlight = true;
       try {
         // 意圖 API 在呼叫 submit 之前已經把 beforeSend 改寫後的字寫進 DOM 了，
@@ -3352,6 +3429,7 @@ function creditsOverrideFor(item: any) {
   其他卡原樣回 getSystemMsgCtas，跟以前一模一樣。
 */
 function filterCardFor(item: any, index: number) {
+  if (!canGenerate.value) return {ctas:[],offersStreamOff:false,streamingOff:false,stacked:false,switched:'' as const,offersTraditional:false,traditionalFailed:false};
   if (getSystemMsgKind(item?.finishReason) !== 'filtered') {
     return { ctas: getSystemMsgCtas(item, index), offersStreamOff: false, streamingOff: false, stacked: false, switched: '' as const, offersTraditional: false, traditionalFailed: false };
   }
@@ -3485,6 +3563,7 @@ function systemNoticeFor(item: any, index: number) {
   （它出現時系統訊息卡被擋掉），否則是系統訊息卡。中斷卡的字跟 canvas-message.vue 那張卡同一組運算式。
 */
 function generationOutcomeFor(list: any[]) {
+  if (!canGenerate.value) return null;
   const index = list.length - 1;
   const item = list[index];
   if (!item || item.type != 0) return null;
@@ -3539,6 +3618,7 @@ function buildHudHost(): HudHost {
           avatar: view.roleAvatar ? String(cfImage(view.roleAvatar, 'avatarMedium') || '') || null : null,
         },
         // 前置被擋卡上的重送進行中，被擋那一列不給殼（跟一般畫布一樣整列收起，見 filterCardReplaced）。
+        readOnly: !canGenerate.value,
         messages: list.flatMap((item, index) => {
           if (filterCardReplaced(item)) return [];
           const isUser = item.type == 1;
@@ -3621,7 +3701,7 @@ function buildHudHost(): HudHost {
       };
     },
     // 遊客：送出會請宿主登入，這一句沒送出去——回 false（HOST_DENIED），作者的腳本才知道別等回覆。草稿已存，登入回來還在。
-    sendMessage: (text) => { if (isTimelineMutationBlocked()) return false; const signedIn = !!unref(hasLogin); content.value = text; onCanvasSend(); return signedIn; },
+    sendMessage: (text) => { if (!canGenerate.value) return false; if (isTimelineMutationBlocked()) return false; const signedIn = !!unref(hasLogin); content.value = text; onCanvasSend(); return signedIn; },
     setInputText: (text) => { content.value = text; return true; },
     // 沙箱殼捲到頂附近：跟一般卡的捲動處理同一條路（翻頁 + getHistoryMsg），守同樣的開關與節流。
     loadMoreHistory: () => {
@@ -5003,6 +5083,7 @@ function getSystemMsgCtaLabel(action: ChatOperationUIAction | 'refresh_history' 
 }
 
 function getSystemMsgCta(finishReason, item, index) {
+  if (!canGenerate.value) return ['history_load_error','conversation_stale'].includes(finishReason) ? getSystemMsgCtaLabel('refresh_history') : '';
   // 容量選擇是改設定再送出，不是「繼續」那一類操作，不受那個能力開關管。
   if (finishReason === 'context_capacity_choice') return getSystemMsgCtaLabel('capacity_choice');
   // 對話中途裝不下：打開模型設定調大上下文容量，同樣是改設定，不是重跑這一輪。
@@ -5014,6 +5095,7 @@ function getSystemMsgCta(finishReason, item, index) {
 }
 
 function getSystemMsgCtas(item, index) {
+  if (!canGenerate.value) return [];
   if (!allowsStageAction(stageHost.capabilities, 'continue')) return []
   if (item?.operationProjectionCapable !== true) return [];
   if (item?.finishReason === 'outcome_unconfirmed') return [];
@@ -5026,6 +5108,7 @@ function getSystemMsgCtas(item, index) {
     .filter(entry => !!entry.label);
 }
 function getSystemMsgCtaAction(finishReason, item, index) {
+  if (!canGenerate.value) return ['history_load_error','conversation_stale'].includes(finishReason) ? 'refresh_history' : '';
   if (finishReason === 'history_load_error' || finishReason === 'conversation_stale') return 'refresh_history';
   if (finishReason === 'context_capacity_choice') return 'capacity_choice';
   if (finishReason === 'context_capacity_exceeded') return 'open_model_settings';
@@ -5093,6 +5176,7 @@ function startRetryGenerationFromAuthoritativeTerminal(item): boolean {
 }
 
 function onSystemMsgCta(action, item, index) {
+  if (!canGenerate.value && action !== 'refresh_history') return;
   if (action === 'open_model_settings') {
     openModelSelect();
     return;
@@ -5627,6 +5711,7 @@ function adoptStartedConversation(started: any) {
 
 
 function chatStart(greetingIndex?: number) {
+  if (!canGenerate.value) return false;
   return _this.http.post(_this.requestUrl.chatStart, {
     header: {
       'content-type': 'application/json'
@@ -5692,6 +5777,7 @@ function chatStart(greetingIndex?: number) {
 
 let pendingCreditsShortfall: { needed: number; available: number; minimum?: number } | null = null;
 function appendChatErrorBubble(errorType, errorMessage = '', metadata: Record<string, any> = {}) {
+  if (errorType === 'author_private') return;
   removeOrphanPlaceholder();
   const presentation = resolveChatErrorPresentation(errorType, t);
   // 第一輪就裝不下、伺服器也說了哪種玩法裝得下：卡片換成講這張卡的大小，並打開選擇。
@@ -5725,6 +5811,7 @@ function appendChatErrorBubble(errorType, errorMessage = '', metadata: Record<st
 // 卡片(kind 由 getSystemMsgKind(finishReasonOverride) 決定)取代純文字錯誤泡泡，
 // content 留空避免文字重複兩次。空字串/未傳 = 既有行為不變。
 const sendError = (retryLimit, errMsg, finishReasonOverride = '', errorType = '') => {
+  void refreshConversationAccess(String(pendingChatTurn?.draft || tempContent.value || ''), errorType === 'author_private' && pendingChatTurn?.accepted !== true);
   const failedPendingTurn = pendingChatTurn;
   if (errorType) {
     if (recoverPendingChatTurnBeforeAccepted(false)) {
@@ -6610,6 +6697,8 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
         multiPassUpdating.value = false;
         // 解析後端傳來的錯誤類型
         const errorType = event.data?.error_type || 'connection_error';
+        if (errorType === 'author_private' && pendingChatTurn?.accepted !== true) { conversationAccess.value = {canGenerate:false,reason:'author_private'}; accessInterrupted.value = true; accessRejected.value = true; }
+        void refreshConversationAccess(String(pendingChatTurn?.draft || tempContent.value || ''), errorType === 'author_private' && pendingChatTurn?.accepted !== true);
         // 建議要在這裡、回合還在手上時記下：之後可能走對帳才確認失敗，那時回合已經清掉了。
         rememberCapacityAdvice(
           errorType === 'context_capacity_exceeded' ? resolveContextCapacityAdvice(event.data) : null,
@@ -8592,6 +8681,7 @@ function handleChatTransportDeadline(kind: 'open' | 'accepted', socketToken: num
 }
 
 function sendQueuedChatPayload(capturedSocket: any, socketToken: number) {
+  if (!canGenerate.value) return false;
   const entryIndex = messageQueue.value.findIndex(entry => entry && entry.socketToken === socketToken);
   if (entryIndex < 0 || !chatTransport.isCurrentSocket(socketToken)) return;
   if (!capturedSocket || typeof capturedSocket.send !== 'function') {
@@ -8824,6 +8914,7 @@ function generateClientTurnId() {
 
 // 发送信息
 function send() {
+  if (!canGenerate.value) return false;
   const explicitOperationKind = requestedOperationKindOverride;
   requestedOperationKindOverride = '';
   const explicitResumeFrom = resumeFromOperationIdOverride;
@@ -9012,6 +9103,7 @@ function send() {
 
 // 发送WebSocket消息
 function sendWebSocketMessage(data) {
+  if (!canGenerate.value) return false;
   const prepared = prepareChatPayload(data);
   if (!prepared.ok) {
     console.error('[Stream] chat payload 欄位不完整，已取消傳送:', prepared.missingFields.join(','));
@@ -9364,6 +9456,7 @@ function confirmReiteration(index) {
 }
 
 const doReiteration = (index) => {
+  if (!canGenerate.value) return false;
   if (isTimelineMutationBlocked()) {
     notifyTimelineMutationBlocked();
     return;
@@ -9395,6 +9488,7 @@ const doReiteration = (index) => {
 }
 
 function startContinueFromSource(item) {
+  if (!canGenerate.value) return false;
   continueTargetChatId.value = String(item?.chatId || item?.id || '');
   // 工單 #41-F1：重開新輪前若當前仍在活躍生成中，先走既有的停止機制（同步）。
   if (actionBtnState.value === 'stop') {
@@ -9410,6 +9504,7 @@ function startContinueFromSource(item) {
 }
 
 const doContinue = (item, index) => {
+  if (!canGenerate.value) return false;
   if (isTimelineMutationBlocked()) {
     notifyTimelineMutationBlocked();
     return;
@@ -9423,6 +9518,7 @@ const doContinue = (item, index) => {
 }
 
 function continueFromAuthoritativeTerminal(item, terminalIndex, action) {
+  if (!canGenerate.value) return false;
   if (isTimelineMutationBlocked()) {
     notifyTimelineMutationBlocked();
     return;
@@ -9648,6 +9744,7 @@ const showGreetingSwipes = computed(() => pendingGreetingStart.value && hasAlter
 // 幫答只準備草稿；打開面板與確認付費生成是不同的操作。
 const ASSIST_COST = 10
 const assistSession = createAssistSession(async (key, regenerate) => {
+  if (!canGenerate.value) throw new Error('read_only');
   const targetConversationId = JSON.parse(key)[0]
   const res: any = await _this.http.post(_this.requestUrl.chatSuggestReply, {
     data: { conversationId: targetConversationId, regenerate, count: 3 },
@@ -9666,6 +9763,7 @@ const assistContext = computed(() => {
   return conversationId.value ? JSON.stringify([String(conversationId.value), tail?.chatId || tail?.id || '', String(tail?.content || '')]) : ''
 })
 function onAssist() {
+  if (!canGenerate.value) return false;
   if(stageHost.capabilities?.assist === false || isGenerating.value) return
   if(previewOnly.value) { uni.showToast({title:t('openChat.preview.intercepted'),icon:'none'}); return }
   assistSession.context(assistContext.value)
@@ -9788,7 +9886,7 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     // 這一輪 Agent 做了什麼。用戶付了錢、等了一分多鐘，過程是他唯一能判斷
     // 「有沒有在幹活」的依據，不該隨氣泡出現而消失。
     prepTrail: Array.isArray(item.prepTrail) ? item.prepTrail : null,
-    agentInterrupted: item.agentInterrupted === true,
+    agentInterrupted: canGenerate.value && item.agentInterrupted === true,
     interruptedNotice: operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent),
     interruptedNoticeSub: operationFailureSub(item.failureCause || item.finishReason, t, { agent: true, filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent }),
     // 續跑的那次又停在跟上一次同一個原因上：卡片改建議換模型（看伺服器給的操作清單，重新載入也一樣）。
@@ -9803,7 +9901,7 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     // 串流進行中一律關掉：重新生成時新氣泡要等跑完才換上去，這段時間舊的那則仍是
     // 「最新一則 AI」，鍵還亮著就會再送一次（owner 2026-09-05：跑到 182 個 token 時還能按）。
     // 開場白是作者寫的，不是模型生成的：沒有「重新生成」。
-    latestAI: allowsStageAction(stageHost.capabilities, 'rewrite') && !previewOnly.value && !isUser && !isSystemOnly && !!item.chatFinish && !isTimelineMutationBlocked() && isLatestCanonicalAIIndex(index) && !isOpeningIndex(talkList.value, index),
+    latestAI: canGenerate.value && allowsStageAction(stageHost.capabilities, 'rewrite') && !previewOnly.value && !isUser && !isSystemOnly && !!item.chatFinish && !isTimelineMutationBlocked() && isLatestCanonicalAIIndex(index) && !isOpeningIndex(talkList.value, index),
     swipes: (index === 0 && showGreetingSwipes.value)
       ? { index: greeting.index, total: greeting.list.length }
       : null,
@@ -9826,6 +9924,7 @@ const menuMessage = computed(() => {
  * 照它，舊列照收尾原因），不另造一份會漂移的清單。
  */
 function canContinueFromIndex(index: number): boolean {
+  if (!canGenerate.value) return false;
   const item = talkList.value[index]
   if (!item || item.type != 0) return false
   if (!isTerminalActionAllowed(talkList.value, index, 'continue')) return false
@@ -9842,6 +9941,7 @@ function canContinueFromIndex(index: number): boolean {
  * 「能不能做」由既有的操作狀態機決定——一顆按得下去卻做不到的鍵比沒有更糟。
  */
 const menuActions = computed(() => {
+  if (!canGenerate.value) return [{key:'copy',label:t('chat.copy')}];
   const index = menuIndex.value
   const item = talkList.value[index]
   if (!item) return []
@@ -9909,6 +10009,7 @@ function closeMessageMenu() {
 }
 
 function onMenuPick(key: string) {
+  if (!canGenerate.value && !['copy','context-usage'].includes(key)) return;
   // 看用量不改對話，不受宿主的動作清單管（先前那顆 chip 也不經這道閘）。
   if (key !== 'context-usage' && !allowsStageAction(stageHost.capabilities, key)) return
   const index = menuIndex.value
@@ -9975,6 +10076,7 @@ function onMenuPick(key: string) {
 }
 
 function onMessageAction(key: string, index: number) {
+  if (!canGenerate.value && !['copy','context-usage','refresh_history','sys:refresh_history'].includes(key)) return;
   // 系統訊息卡上的鍵（沙箱殼把卡畫在那一列底下，按了回 sys:<動作>）：走一般卡那張卡同一個動作。
   // 訊息是跨源來的，先對這一列現在給的鍵核一次（卡已經不是最新、或卡上沒有這顆鍵就不做）。
   // 放在選單的能力閘之前：那道閘認的是選單的鍵名，不認得 sys:，卡上的鍵另有自己那道閘。
@@ -10093,6 +10195,7 @@ function beginResend(resendIntent: '' | 'to_traditional', original: string, text
  * restoreRewriteCandidate 從快照換回去。
  */
 function doEditResendPlayer(index: number, draft: string, resendIntent: '' | 'to_traditional' = '') {
+  if (!canGenerate.value) return false;
   // 不走「先停再做」：能改字重送的只有玩家最新那一句，回覆還在產生時它就是這一輪
   // 正在送的那句。停止在零輸出時會把這一輪的本地氣泡整組移除，index 指的列就不見了，
   // 而伺服器那頭這句還在；在這裡接著做會送錯列或多送一句。維持原本的等待。
@@ -12093,6 +12196,7 @@ const sandboxArchive: SandboxArchiveHost = {
     return { ok: true }
   }),
   start: (opening) => archiveGuarded(async () => {
+    if (!canGenerate.value) return {ok:false,code:'NOT_SUPPORTED',message:t('canvas.historyAccess.closed')};
     const res = await _this.http.post(_this.requestUrl.saveAndStartNew, {
       header: { 'content-type': 'application/json' }, showLoading: false,
       data: { conversationId: unref(conversationId), save: true, greetingIndex: opening },
@@ -12400,6 +12504,7 @@ function deleteConversationAndRestart(id: string) {
 // 從頭再開一段：拆掉串流、清掉畫面、讓伺服器重新建對話並落開場白。
 // 重置聊天與「刪掉正在聊的那段存檔、又沒有別段可接手」都走這裡。
 function restartConversationFromScratch() {
+  if (!canGenerate.value) return false;
   teardownStreamForConversationSwitch({ invalidateHistory: true })
   conversationId.value = ''
   talkList.value = []
@@ -12464,6 +12569,7 @@ function downloadConversationFile(text: string) {
  * 有替代開場白、還沒開對話的卡：用畫面上這條開場白開對話。開不成就回到選開場白的畫面。
  */
 async function startPendingGreeting(): Promise<boolean> {
+  if (!canGenerate.value) return false;
   if (!pendingGreetingStart.value) return true
   // 遊客不開對話：開對話要登入，被拒了畫面會卡在等回覆。直接往下交給 send() 的登入檢查——
   // 它會存草稿、請宿主登入（canvas-guest）。
@@ -12493,6 +12599,7 @@ async function startPendingGreeting(): Promise<boolean> {
  * 送出。有替代開場白的卡在這一刻才真的開對話——選到哪一條要跟著這一次請求走。
  */
 async function onCanvasSend() {
+  if (!canGenerate.value) return false;
   if (!await startPendingGreeting()) return
   onActionBtnClick()
 }
@@ -12552,3 +12659,15 @@ const menuLabels = computed(() => ({
 }))
 
 </script>
+
+<style>
+@layer lt-base {
+.lt-history-access { flex:none; display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--lt-canvas-panel-bg); color:var(--lt-canvas-fg); font-size:13px; overflow-wrap:anywhere; }
+.lt-history-access--rejected { border-top:1px solid var(--lt-canvas-danger); }
+.lt-history-access p { flex:1; margin:0; }
+.lt-history-access button { flex:none; min-height:36px; padding:8px 16px; border:1px solid var(--lt-canvas-line); border-radius:8px; color:inherit; background:var(--lt-canvas-panel-bg); cursor:pointer; }
+.lt-history-access button:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+.lt-history-access:lang(ko) { word-break:keep-all; }
+@media(max-width:480px) { .lt-history-access { flex-direction:column; align-items:stretch; } .lt-history-access button { min-height:44px; width:100%; } }
+}
+</style>

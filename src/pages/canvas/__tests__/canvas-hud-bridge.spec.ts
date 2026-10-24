@@ -265,3 +265,18 @@ describe('canvas-hud-bridge：動作', () => {
     expect((await bridge.invoke('exit')).error?.code).toBe('NOT_AVAILABLE')
   })
 })
+
+describe('owned history read-only capabilities', () => {
+ it('revokes send/rewrite/continue/new story before calling the host while copy/exit remain',async()=>{
+  const state=baseState(); const host=fakeHost(state); const bridge=createHudBridge(host); await bridge.start();
+  Object.assign(state,{readOnly:true}); bridge.refresh();
+  for(const action of ['sendMessage','continueGeneration','regenerateMessage','createConversation','newChat'] as const){
+   expect(bridge.getCapabilities()[action].available,action).toBe(false)
+   expect((await bridge.invoke(action,{text:'Do not replace my input'})).ok,action).toBe(false)
+  }
+  expect(host.calls).toEqual([])
+  expect(bridge.getCapabilities().copyMessage.available).toBe(true)
+  expect((await bridge.invoke('exit')).ok).toBe(true)
+  expect(bridge.getSnapshot().messages.every(m=>!m.capabilities.regenerate && m.capabilities.copy)).toBe(true)
+ })
+})

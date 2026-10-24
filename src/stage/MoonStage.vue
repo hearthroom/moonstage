@@ -19,8 +19,9 @@ import '@/static/icon/fui-custom-icon.css'
 import '@/common/html-card.css'
 import '@/static/styles/stage-tokens.css'
 
-const props = defineProps<{ roleId?: string; draft?: string; trial?: string }>()
+const props = defineProps<{ roleId?: string; draft?: string; trial?: string; conversationId?: string; readOnly?: boolean; accessReason?: string; historyTitle?: string }>()
 provide(STAGE_ROUTE_OPTIONS, {
+  ...(props.conversationId ? {conversationId:props.conversationId} : {}),
   ...(props.roleId ? { roleId: props.roleId } : {}),
   ...(props.draft ? { draft: props.draft } : {}),
   ...(props.trial ? { trial: props.trial } : {}),

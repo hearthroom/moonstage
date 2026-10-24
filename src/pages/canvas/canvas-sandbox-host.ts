@@ -290,17 +290,19 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     })
   }
 
+  let lastReadOnly = false
   const syncGeneration = (snapshot: HudHostState = hud.read()) => {
-    const sendBlocked = snapshot.sendBlocked === true
+    const readOnly = snapshot.readOnly === true
+    const sendBlocked = snapshot.sendBlocked === true || readOnly
     const busy = snapshot.generation !== 'idle'
     const phase = busy ? (snapshot.generationPhase && snapshot.generationPhase !== 'idle' ? snapshot.generationPhase : 'preparing') : 'idle'
     // 結局只送作者看得到的部分：那顆鍵交回宿主的鍵、那一列的 id 留在宿主這邊。
     const o = !busy && snapshot.generationOutcome ? snapshot.generationOutcome : null
     const outcome = o ? { kind: o.kind, label: o.label, sub: o.sub, actions: o.actions.map((a) => ({ action: a.action, label: a.label })) } : null
     const outcomeKey = JSON.stringify(outcome)
-    if (sendBlocked === lastSendBlocked && busy === lastBusy && phase === lastPhase && outcomeKey === lastOutcomeKey) return
-    lastSendBlocked = sendBlocked; lastBusy = busy; lastPhase = phase; lastOutcomeKey = outcomeKey
-    post({ type: 'generation', busy, sendBlocked, phase, outcome })
+    if (readOnly === lastReadOnly && sendBlocked === lastSendBlocked && busy === lastBusy && phase === lastPhase && outcomeKey === lastOutcomeKey) return
+    lastReadOnly = readOnly; lastSendBlocked = sendBlocked; lastBusy = busy; lastPhase = phase; lastOutcomeKey = outcomeKey
+    post({ type: 'generation', busy, readOnly, sendBlocked, phase, outcome })
   }
 
   const syncHistory = (snapshot: HudHostState) => {
@@ -426,7 +428,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     lastViewport = base.viewportHeight ?? viewportHeight()
     post({
       type: 'hello',
-      config: { ...base, ...(storageScope ? { storageScope } : {}), viewportHeight: lastViewport, capabilities: { saves: savesOk, edit: true, send: true, archive: !!deps.archive }, saves, chromeState: chrome ? (JSON.parse(lastChromeKey) as ChromeState) : undefined },
+      config: { ...base, ...(storageScope ? { storageScope } : {}), viewportHeight: lastViewport, capabilities: { saves: savesOk, edit: !helloSnapshot.readOnly, send: !helloSnapshot.readOnly, archive: !!deps.archive && !helloSnapshot.readOnly }, saves, chromeState: chrome ? (JSON.parse(lastChromeKey) as ChromeState) : undefined },
     })
     // 殼建好之後才有東西可畫：歷史一到就送全量訊息，殼跑完冷啟動再喊 ready。
     armColdStart()

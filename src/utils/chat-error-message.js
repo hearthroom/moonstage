@@ -1,5 +1,6 @@
 // Keep this mapping aligned with mobile/src/utils/chat-error-message.js.
 const CHAT_ERROR_I18N_KEYS = Object.freeze({
+  author_private: 'canvas.historyAccess.rejected',
   service_unavailable: 'error.serviceUnavailable',
   rate_limit: 'error.rateLimit',
   model_refused: 'error.modelRefused',
