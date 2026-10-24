@@ -268,7 +268,7 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '.mp-energy-pill', region: 'model-panel', origin: 'mmd', why: '一輪多少點的藥丸' },
   { selector: '.mp-ev', region: 'model-panel', origin: 'mmd', why: '點數數字' },
   { selector: '.mp-el', region: 'model-panel', origin: 'mmd', why: '點數單位' },
-  { selector: '.mp-setting-body', region: 'model-panel', origin: 'mmd', why: '可捲動的設定區' },
+  { selector: '.mp-setting-body', region: 'model-panel', origin: 'mmd', why: '可捲動的設定區；高消費確認留在 model-setting-scope 內、此區外，避免被淡出遮罩裁切' },
   { selector: '.bottom .btn', region: 'model-panel', origin: 'mmd', why: '卡片寫 .model-setting-scope .bottom .btn 改完成鍵' },
   // 模型清單本身用的是主站那一份選單的節點名（`ms-*`）——那一份原封搬進來，
   // 不重寫。MMD 的模型彈層裡沒有模型清單（它那一片是「輸出 Token 上限」的設定卡），
