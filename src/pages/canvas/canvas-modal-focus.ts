@@ -21,16 +21,24 @@ function restoreBackground(state: State) {
 function syncBackground(state: State) {
   restoreBackground(state)
   const root = state.stack.at(-1)?.root
-  // Isolate siblings along the whole ancestor path, including the embedding site's chrome.
-  // Never hide an ancestor of the dialog itself from assistive technology.
-  for (let branch: Element | undefined = root; branch?.parentElement; branch = branch.parentElement) {
-    for (const el of branch.parentElement.children) {
-      if (el === branch || ['SCRIPT', 'STYLE', 'LINK'].includes(el.tagName)) continue
-      state.saved.set(el, [el.getAttribute('inert'), el.getAttribute('aria-hidden')])
-      el.setAttribute('inert', ''); el.setAttribute('aria-hidden', 'true')
+  if (!root) return
+  const protectedRoots = [root, ...stopControls(root.ownerDocument)]
+  const visit = (el: Element) => {
+    if (protectedRoots.includes(el as HTMLElement) || ['SCRIPT', 'STYLE', 'LINK'].includes(el.tagName)) return
+    if (protectedRoots.some(target => el.contains(target))) {
+      for (const child of el.children) visit(child)
+      return
     }
-    if (branch.parentElement === root?.ownerDocument.body) break
+    state.saved.set(el, [el.getAttribute('inert'), el.getAttribute('aria-hidden')])
+    el.setAttribute('inert', ''); el.setAttribute('aria-hidden', 'true')
   }
+  // Stop is a foreground safety control, kept in the same interaction scope as the modal.
+  for (const child of root.ownerDocument.body.children) visit(child)
+
+}
+
+function stopControls(doc: Document): HTMLElement[] {
+  return Array.from(doc.querySelectorAll<HTMLElement>('#mes_stop:not([hidden])'))
 }
 
 function focusables(root: HTMLElement): HTMLElement[] {
@@ -60,7 +68,7 @@ export function useCanvasModalFocus(root: Ref<HTMLElement | null>, active: () =>
     await nextTick()
     if (current !== revision) return
     const el = root.value
-    if (!active() || !el) { release?.(); release = null; entry = null; return }
+    if (!active() || !el?.isConnected) { release?.(); release = null; entry = null; return }
     if (entry?.root === el) { entry.focus(); return }
     release?.()
     const doc = el.ownerDocument
@@ -84,18 +92,21 @@ export function useCanvasModalFocus(root: Ref<HTMLElement | null>, active: () =>
     focus(); syncBackground(state)
     const onKeydown = (event: KeyboardEvent) => {
       if (state.stack.at(-1) !== ownEntry || backgroundOnly || event.key !== 'Tab' || event.defaultPrevented) return
-      const targets = focusables(el)
+      const targets = [...focusables(el), ...stopControls(doc).filter(stop => !el.contains(stop))]
       const index = targets.indexOf(doc.activeElement as HTMLElement)
       event.preventDefault()
       if (!targets.length) { el.focus({ preventScroll: true }); return }
       targets[(index + (event.shiftKey ? -1 : 1) + targets.length) % targets.length].focus({ preventScroll: true })
     }
     const onFocus = (event: FocusEvent) => {
-      if (state.stack.at(-1) === ownEntry && !backgroundOnly && !el.contains(event.target as Node)) focus()
+      if (state.stack.at(-1) === ownEntry && !backgroundOnly && !el.contains(event.target as Node) && !stopControls(doc).some(stop => stop.contains(event.target as Node))) focus()
     }
+    const observer = new MutationObserver(() => { if (state.stack.at(-1) === ownEntry) syncBackground(state) })
+    observer.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] })
     doc.addEventListener('keydown', onKeydown, true)
     doc.addEventListener('focusin', onFocus, true)
     release = () => {
+      observer.disconnect()
       doc.removeEventListener('keydown', onKeydown, true); doc.removeEventListener('focusin', onFocus, true)
       const wasTop = state.stack.at(-1) === ownEntry
       state.stack = state.stack.filter(value => value !== ownEntry)
