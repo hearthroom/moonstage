@@ -456,6 +456,12 @@ describe('沙箱宿主橋', () => {
     await flush()
     expect(h.posted[0]).toMatchObject({ type: 'reply', reqId: 50, ok: true, value: { size: 21, path: 'M0 0h3' } })
     h.posted.length = 0
+    h.fromShell({ type: 'request', reqId: 52, op: 'share.qr', args: ['x'.repeat(1025)] })
+    h.fromShell({ type: 'request', reqId: 53, op: 'share.qr', args: [7] })
+    await flush()
+    expect(h.posted.map((p) => [p.reqId, (p.error as { code?: string } | undefined)?.code])).toEqual([[52, 'INVALID_ARGS'], [53, 'INVALID_ARGS']])
+    expect(share.qr).toHaveBeenCalledTimes(1)
+    h.posted.length = 0
     host.postShare()
     expect(h.posted).toEqual([])
     current = { ...current, url: 'https://sukisuki.ai/cards/1?ref=ABCD' }

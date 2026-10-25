@@ -19,7 +19,7 @@ import {
   type HostToShell, type SandboxHelloConfig, type SandboxMessage, type SandboxMessageRole, type ShellAction, type ShellToHost,
 } from '@/sandbox/protocol'
 import type { SandboxSavesStore } from '@/host/sandbox-host'
-import type { ShareQr, ShareState } from '@/common/share-context'
+import { SHARE_QR_MAX_CHARS, type ShareQr, type ShareState } from '@/common/share-context'
 import { observeViewport, visibleViewport } from './canvas-viewport'
 import { cardStorageScope, getAuthorRuleStorageScope, onStorageScopeChange } from '@/common/author-rules/storage-scope'
 import type { ChromeState, ChromeUiEvent, MessageMenuAnchor, MessageView, PanelsState, SandboxBackground, StageState } from '@/sandbox/protocol'
@@ -520,7 +520,10 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
         }
         case 'share.qr': {
           if (!deps.share?.qr) return reply(reqId, false, undefined, { code: 'HOST_DENIED' })
-          return reply(reqId, true, await deps.share.qr(String(args[0] ?? '')))
+          // 殼已經擋過；這裡再擋一次，別的殼版本或直接送來的請求也不會叫宿主畫一張掃不出來的碼
+          const text = typeof args[0] === 'string' ? args[0] : ''
+          if (!text || text.length > SHARE_QR_MAX_CHARS) return reply(reqId, false, undefined, { code: 'INVALID_ARGS' })
+          return reply(reqId, true, await deps.share.qr(text))
         }
         default:
           return reply(reqId, false, undefined, { code: 'UNKNOWN_CAPABILITY' })

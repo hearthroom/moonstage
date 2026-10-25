@@ -2694,7 +2694,12 @@ const sandboxComposerHidden = ref(false);
 let sandboxThemeObserver: MutationObserver | null = null;
 // 分享情境（sdk.share／stage.share）：兩種 pageMode 讀同一份宿主給的值；看自己的紀錄時不帶朋友的情境碼。
 const canvasShare = createCanvasShare({ host: stageHost.share, roleId: () => String(unref(roleId) || ''), historyMode: () => ownedHistoryMode.value });
-let stopSandboxShareWatch: (() => void) | null = null;
+// 值變了（推薦碼晚到）兩種 pageMode 都要知道：沙箱殼收 share 訊息後發 share:change，一般卡直接發 share:change。
+// 卡片可能在載入時就備好了連結與 QR，沒這個通知就會一直送出不帶推薦碼的連結。
+onUnmounted(canvasShare.onChange(() => {
+  if (sandboxHostRef.value) sandboxHostRef.value.postShare();
+  if (authorAssetRuntime) authorAssetRuntime.emit('share:change');
+}));
 let sandboxAsset: any = null;
 
 // 殼的深淺要跟宿主頁一致。宿主怎麼標主題沒有統一規格：站台可能放 data-mode（實際生效的深淺）、
@@ -3120,7 +3125,6 @@ function destroySandboxHost() {
   if (sandboxHostRef.value) { try { sandboxHostRef.value.destroy(); } catch (e) { /* 收尾不得拋錯 */ } }
   sandboxHostRef.value = null;
   if (sandboxThemeObserver) { sandboxThemeObserver.disconnect(); sandboxThemeObserver = null; }
-  if (stopSandboxShareWatch) { stopSandboxShareWatch(); stopSandboxShareWatch = null; }
   sandboxStage.value = 'closed';
   sandboxComposerHidden.value = false;
   sandboxShellReady.value = false;
@@ -3225,7 +3229,6 @@ function mountSandbox(asset: any) {
     sandboxHostRef.value = host;
     host.start();
     observeSandboxTheme(host);
-    stopSandboxShareWatch = canvasShare.onChange(() => host.postShare());
   });
 }
 

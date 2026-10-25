@@ -33,6 +33,8 @@ const AUTHOR_EVENTS = [
   'conversation:switch',
   'theme:change',
   'dispose',
+  // 分享情境變了（推薦碼晚到）：重讀 stage.share，跟沙箱卡的 share:change 一樣
+  'share:change',
 ]
 
 const CONTAINER_ATTR = 'data-stage-author-layer'
