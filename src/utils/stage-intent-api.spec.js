@@ -259,3 +259,32 @@ describe('share（分享情境，與沙箱 sdk.share 同語意）', () => {
     expect(await api.share.qr('abc')).toEqual({ size: 21, path: 'abc' })
   })
 })
+
+describe('shared 與 share 的回流（與沙箱 sdk.shared 同語意、同錯誤碼）', () => {
+  it('宿主沒接：鍵都在，呼叫以 HOST_DENIED 拒絕；poll 是 null', async () => {
+    const { api } = makeApi()
+    expect(Object.keys(api.shared).sort()).toEqual(['add', 'leaderboard', 'read', 'vote'])
+    expect(api.share.poll).toBeNull()
+    await expect(api.shared.read('boss')).rejects.toMatchObject({ code: 'HOST_DENIED' })
+    await expect(api.shared.add('boss', 1)).rejects.toMatchObject({ code: 'HOST_DENIED' })
+    await expect(api.share.tallyLink('p1-4.b', 'p1-4')).rejects.toMatchObject({ code: 'HOST_DENIED' })
+    await expect(api.share.respond('a')).rejects.toMatchObject({ code: 'HOST_DENIED' })
+    await expect(api.share.results()).rejects.toMatchObject({ code: 'HOST_DENIED' })
+  })
+
+  it('交給宿主的 shared 與 shareTally；poll 讀分享狀態的現值', async () => {
+    const calls = []
+    const rec = (name, value) => (...args) => { calls.push([name, ...args]); return Promise.resolve(value) }
+    const { api } = makeApi({ host: {
+      shareState: () => ({ enabled: true, context: 'p1-4.b', url: 'https://sukisuki.ai/cards/1', audience: 'link', poll: { key: 'p1-4', options: ['a', 'b'] } }),
+      shared: { read: rec('read', { boss: { kind: 'counter', total: 1 } }), vote: rec('vote', { mine: 'a' }), add: rec('add', { total: 2, mine: 1, reachedAt: null }), leaderboard: rec('leaderboard', { items: [] }) },
+      shareTally: { tallyLink: rec('tallyLink', 'https://sukisuki.ai/cards/1?share=~K7Q2M9XA'), respond: rec('respond', { ok: true }), results: rec('results', []) },
+    } })
+    expect(api.share.poll).toEqual({ key: 'p1-4', options: ['a', 'b'] })
+    expect(await api.shared.read(['boss'])).toEqual({ boss: { kind: 'counter', total: 1 } })
+    expect(await api.shared.leaderboard('boss', { limit: 5 })).toEqual({ items: [] })
+    expect(await api.share.tallyLink('p1-4.b', 'p1-4')).toBe('https://sukisuki.ai/cards/1?share=~K7Q2M9XA')
+    expect(await api.share.respond('b')).toEqual({ ok: true })
+    expect(calls).toEqual([['read', ['boss']], ['leaderboard', 'boss', { limit: 5 }], ['tallyLink', 'p1-4.b', 'p1-4'], ['respond', 'b']])
+  })
+})

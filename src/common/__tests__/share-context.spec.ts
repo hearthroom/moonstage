@@ -19,6 +19,16 @@ describe('分享情境碼', () => {
     expect(shareStateOf(null)).toBeNull()
   })
 
+  it('分享回流的投票（poll）：開關開著、key 與選項都合規則才帶；最多 12 個選項', () => {
+    const base = { enabled: true, context: 'p1-4.b', url: 'https://sukisuki.ai/cards/1', audience: 'link' }
+    expect(shareStateOf({ ...base, poll: { key: 'p1-4', options: ['a', 'b'], token: '~K7Q2M9XA' } })!.poll).toEqual({ key: 'p1-4', options: ['a', 'b'] })
+    expect(shareStateOf({ ...base, enabled: false, poll: { key: 'p1-4', options: ['a'] } })!.poll).toBeUndefined()
+    expect(shareStateOf({ ...base, poll: { key: 'a b', options: ['a'] } })!.poll).toBeUndefined()
+    expect(shareStateOf({ ...base, poll: { key: 'p1-4', options: ['a', '<b>', 3] } })!.poll).toEqual({ key: 'p1-4', options: ['a'] })
+    expect(shareStateOf({ ...base, poll: { key: 'p1-4', options: [] } })!.poll).toBeUndefined()
+    expect(shareStateOf({ ...base, poll: { key: 'p1-4', options: Array.from({ length: 13 }, (_, i) => `o${i}`) } })!.poll!.options).toHaveLength(12)
+  })
+
   it('連結：保留推薦碼、換掉舊的 share；沒給情境就是一般連結', () => {
     const state = shareStateOf({ enabled: true, context: null, url: 'https://sukisuki.ai/cards/100271?ref=ABCD&share=old', audience: 'public' })
     expect(shareLinkOf(state, 'p1-4.b')).toEqual({ ok: true, url: 'https://sukisuki.ai/cards/100271?ref=ABCD&share=p1-4.b' })

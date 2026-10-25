@@ -78,6 +78,20 @@ function createStageIntentApi(options) {
     return r.ok && r.value && typeof r.value === 'object' ? r.value : {}
   }
 
+  /**
+   * 共用狀態與分享回流：畫布給已驗參數、綁好這張卡的物件（pages/canvas/canvas-shared.ts）。
+   * 這兩組的錯誤碼跟沙箱的 sdk 一樣是大寫（HOST_DENIED、NOT_ELIGIBLE…），不用本檔的小寫慣例：
+   * 卡片在兩種 pageMode 寫同一段 catch。宿主沒接時鍵照樣在，呼叫一律以 HOST_DENIED 拒絕。
+   */
+  function hostDenied() { return Promise.reject({ code: 'HOST_DENIED' }) }
+  function delegate(target, name) {
+    return function () {
+      const obj = host[target]
+      if (!obj || typeof obj[name] !== 'function') return hostDenied()
+      return Promise.resolve(obj[name].apply(obj, arguments))
+    }
+  }
+
   function isComposing() {
     return typeof host.isComposing === 'function' && host.isComposing() === true
   }
@@ -178,6 +192,10 @@ function createStageIntentApi(options) {
       get enabled() { return shareState().enabled === true },
       get context() { const c = shareState().context; return typeof c === 'string' ? c : null },
       get audience() { const a = shareState().audience; return typeof a === 'string' ? a : null },
+      get poll() {
+        const p = shareState().poll
+        return p && typeof p.key === 'string' && Array.isArray(p.options) ? { key: p.key, options: p.options.slice() } : null
+      },
       link: function (context) {
         const r = call('shareLink', [context])
         return r.ok && typeof r.value === 'string' && r.value ? r.value : null
@@ -186,6 +204,17 @@ function createStageIntentApi(options) {
         if (typeof host.shareQr !== 'function') return Promise.reject({ code: ERR_UNSUPPORTED })
         return Promise.resolve(host.shareQr(String(text == null ? '' : text)))
       },
+      tallyLink: delegate('shareTally', 'tallyLink'),
+      respond: delegate('shareTally', 'respond'),
+      results: delegate('shareTally', 'results'),
+    },
+
+    /** 全服投票、共鬥計數器、排行榜：跟沙箱卡的 sdk.shared 同一組方法。 */
+    shared: {
+      read: delegate('shared', 'read'),
+      vote: delegate('shared', 'vote'),
+      add: delegate('shared', 'add'),
+      leaderboard: delegate('shared', 'leaderboard'),
     },
 
     /** 註冊送出前改寫。一個角色只有一個 handler，重複註冊以最後一次為準。 */

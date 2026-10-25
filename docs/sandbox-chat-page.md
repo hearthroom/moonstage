@@ -67,7 +67,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 | `history` | `{ more, loading }` 更早的歷史還有沒有、正在載嗎 | 狀態變了就送；殼捲到頂附近且 `more` 才會要 |
 | `prologue` | `{ title, items }` 開場選項（MMD「你可以选择开场」）；`items` 空＝拿掉 | 跟全量 `messages` 一起到，之後變了才送（玩家說出第一句後送空清單） |
 | `conversation.switch` | — | 切存檔：殼清氣泡、關舞台、清補發記錄，之後宿主再送 `messages` |
-| `share` | `{ share: {enabled, context, url, audience} }` | 分享情境變了（推薦碼晚到）：殼換掉現值並發 `share:change`；hello 之前不送 |
+| `share` | `{ share: {enabled, context, url, audience, poll?} }` | 分享情境變了（推薦碼晚到）：殼換掉現值並發 `share:change`；hello 之前不送 |
 | `back` | — | 宿主的返回：舞台開著殼先關舞台並回 `back-handled: true`；否則回 false 由宿主導頁 |
 | `dispose` | — | 離開頁面 |
 
@@ -77,7 +77,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 |---|---|
 | `ready-shell` | 殼載好，要 `hello` |
 | `ready` | 作者腳本已跑、`ready` 事件已發 |
-| `request` | `{ reqId, op, args }`，op ∈ `message.send`／`message.edit`／`save.set`／`save.remove`／`archive.list`／`archive.save`／`archive.fork`／`archive.open`／`archive.new`／`archive.rename`／`archive.remove`／`share.qr`（`save.get`／`keys` 讀殼內預載的副本，不經宿主） |
+| `request` | `{ reqId, op, args }`，op ∈ `message.send`／`message.edit`／`save.set`／`save.remove`／`archive.list`／`archive.save`／`archive.fork`／`archive.open`／`archive.new`／`archive.rename`／`archive.remove`／`share.qr`；v2 另有 `shared.read`／`shared.vote`／`shared.add`／`shared.leaderboard`／`share.tally`／`share.respond`／`share.results`（`save.get`／`keys` 讀殼內預載的副本，不經宿主） |
 | `input` | `{ value }` 殼內輸入框變了（宿主鏡射，讓草稿跨頁保留） |
 | `action` | `{ name }`：`back`／`more`／`open-model`／`open-persona`／`open-archives`／`stop`／`regenerate` |
 | `open-url` | `{ url }` 作者 HTML 裡的頁面外連結被點（殼已擋下導頁），宿主開新分頁 |
@@ -98,7 +98,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 
 ## 3. `sdk` 契約（殼內作者看到的）
 
-SDK 有 17 個鍵、47 個能力，其中 15 個為非同步；完整清單由 `contract/sandbox-contract.json` 產生。不同宿主支援的能力可能不同，使用前應依各能力的說明探測。`history` 需要協商至 transport v2；舊宿主可能沒有此入口，或回報 `available:false`。
+SDK 有 18 個鍵、54 個能力，其中 22 個為非同步；完整清單由 `contract/sandbox-contract.json` 產生。不同宿主支援的能力可能不同，使用前應依各能力的說明探測。`history` 與 `shared` 需要協商至 transport v2；舊宿主可能沒有此入口、回報 `available:false`，或回 `HOST_DENIED`。
 
 | 能力 | 狀態 | 備註 |
 |---|---|---|
@@ -116,12 +116,14 @@ SDK 有 17 個鍵、47 個能力，其中 15 個為非同步；完整清單由 `
 | `generation.act(action)` | 實作 | 按那張卡上的一顆鍵（`outcome.actions` 裡的動作名），走玩家點那張卡同一條路：重試沿用同一句、不多一則；容量與模型設定打開平台的面板。只在玩家手勢裡（不在手勢裡回 `UNAUTHORIZED`，不問——作者沒有理由替玩家自動重試）；結局裡沒有這個動作 `INVALID_ARGS`；生成中 `BUSY`；沒有送出能力 `NOT_SUPPORTED`；3／分。殼送 `request generation.act`，宿主照當下的結局核一次再交給 `onMessageAction`（`sys:<動作>`、`resume-agent`、`switch-model`） |
 | `archive.list/save/fork/open/start/rename/remove` | 實作 | 平台的對話存檔（每張卡最多 20 段，含目前這段；伺服器記的，跨裝置）。每段就是一段對話：`open(id)` 讀檔＝切過去，原本的進度原樣留著；`save(title?)` 把目前進度留一份（從最新一則分叉、留下的那份取名 title，回 `{id: 留下的那份, current: 接著玩的那份}`）；`fork(messageId)` 從某一則（氣泡的 `serverId`）另開一段並切過去；`start(opening?)` 另開新檔（目前這段留在清單裡，0＝主開場、1..＝替代開場）；`list()` 回 `{items:[{id,title,isCurrent,messageCount,lastMessage,createTime,lastUpdateTime}],count,limit}`（新的在前）。會改變存檔的操作在玩家手勢裡直接做（卡片用自己的確認畫面），不在手勢裡殼先問「允許這張卡變更你的存檔？」；生成中 `BUSY`；滿了 `LIMIT_REACHED`（`err.data = {count, limit}`）。宿主沒接（握手 `capabilities.archive` 為假）回 `HOST_DENIED`。切換後殼清空訊息、重載那一段並發 `conversation:switch` |
 | `share.enabled/context/audience`、`share.link(context?)`、`share.qr(text)` | 實作 | 分享情境。`context`：從帶 `?share=<碼>` 的連結開卡時那個碼，否則 `null`（平台開關關著、看自己的紀錄時也是 `null`；有沒有存檔不管，由卡片決定）。碼只許 `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`（`~` 開頭留給平台短碼），宿主驗過才給。`audience`：這張卡現在誰打得開（`author`／`link`／`public`，宿主不知道是 `null`）。`link(context?)` **同步**回這張卡的分享連結（宿主站的卡片頁，帶玩家的推薦碼），給了情境就加 `share=`——點擊裡直接拿去 `navigator.share`；碼不合規則 `SHARE_CONTEXT_INVALID`；平台開關關著不丟錯、回不帶情境的一般連結；宿主沒接（`capabilities.share` 為假）或給不出連結 `HOST_DENIED`。`qr(text)` 回 `{size, path}`（`size`×`size` 格的 SVG path），1–1024 字，否則 `INVALID_ARGS`；殼送 `request share.qr` 由宿主畫。值來自 `hello.config.share`，之後 `share` 訊息更新並發 `share:change`。情境碼從不進模型 |
+| `share.poll`、`share.tallyLink(context, pollKey)`、`share.respond(option)`、`share.results()` | 需 transport v2 | 分享回流，詳見「共用狀態」。`poll` 是朋友從平台短碼連結開卡時可以回答的那一題 `{key, options}`，否則 `null` |
+| `shared.read/vote/add/leaderboard` | 需 transport v2 | 全服投票、共鬥計數器、排行榜，詳見「共用狀態」 |
 | `history.capabilities/list/onChange` | 需 transport v2 | 只讀目前使用者、目前卡片、目前會話的完整有效訊息；先探測能力，按同一 revision 讀完分頁。`onChange` 回傳取消訂閱函式；詳見「可靠歷史」。 |
 | `on(event, fn)` | 實作 | 見事件表 |
 | `debug.log(...)` | 實作 | 殼內面板 + 轉宿主 console |
 | `version` | `'1'` | |
 
-錯誤碼：`UNAUTHORIZED`、`RATE_LIMITED`、`INVALID_ARGS`、`HOST_DENIED`、`NETWORK`、`NOT_SUPPORTED`、`BUSY`、`LIMIT_REACHED`（帶 `err.data`）、`SHARE_CONTEXT_INVALID`、`HISTORY_UNAVAILABLE`、`HISTORY_STALE`、`HISTORY_CURSOR_INVALID`、`HISTORY_LIMIT`（處理方式見「可靠歷史」）；`NETWORK`、`HOST_DENIED` 等通用錯誤仍可能出現。
+錯誤碼：`UNAUTHORIZED`、`RATE_LIMITED`、`INVALID_ARGS`、`HOST_DENIED`、`NETWORK`、`NOT_SUPPORTED`、`BUSY`、`LIMIT_REACHED`（帶 `err.data`）、`SHARE_CONTEXT_INVALID`、`HISTORY_UNAVAILABLE`、`HISTORY_STALE`、`HISTORY_CURSOR_INVALID`、`HISTORY_LIMIT`（處理方式見「可靠歷史」）、`SHARED_DISABLED`、`NOT_DECLARED`、`OPTION_INVALID`、`NOT_ELIGIBLE`（見「共用狀態」）；`NETWORK`、`HOST_DENIED` 等通用錯誤仍可能出現。
 （另有 `UNKNOWN_CAPABILITY` 備用）。非同步能力回 Promise；同步能力直接 throw `SdkError`——
 `save.get/keys` 在存檔尚未載入時同步丟 `HOST_DENIED`（跟原站一致，作者會用 try）。
 限頻（60 秒窗）：`save.set` 20、`message.send` 手勢 3／自動 3、`message.edit` 10、`archive.*` 的變更合計 10、`generation.act` 3 → `RATE_LIMITED`。
@@ -350,3 +352,21 @@ void rebuild();
 // 作者須把 cleanup() 接到自己的離場／dispose 生命週期。
 function cleanup() { ++epoch; clearTimeout(timer); off?.(); }
 ```
+
+## 共用狀態：`sdk.shared`／`stage.shared` 與分享回流
+
+設計見 monorepo `docs/studio/tasks/2026-10-25-card-share-context/design.md` §7。以卡為範圍、只存數字與作者定義的選項 ID：key 要先在作者的 `rules.json` 的 `sharedState` 宣告（投票、計數器，隨卡片版本走），沒宣告的讀不到、寫不進。讀取所有人都可以（遊客沒有 `mine`），寫入要登入且玩過這張卡；測試帳號與作者試玩各自有一份，不混進正式數字。只在 transport v2 提供；舊宿主或 v1 協商時所有方法回 `HOST_DENIED`，鍵照樣在。一般卡的 `window.stage.shared`／`stage.share` 是同一組方法、同一套大寫錯誤碼。
+
+| 呼叫 | 回傳 | 錯誤 |
+|---|---|---|
+| `shared.read(keys)` | 一個 key 或最多 16 個：`{ [key]: {kind:'poll', counts, total, mine?} \| {kind:'counter', total, mine?, goal?, reachedAt?, previous?} }`；沒宣告的 key 不在結果裡 | 參數不對 `INVALID_ARGS` |
+| `shared.vote(key, option)` | `{mine}`；同一人可以改票 | key 格式不對 `NOT_DECLARED`、選項不對 `OPTION_INVALID`、改票太多次 `LIMIT_REACHED` |
+| `shared.add(key, delta)` | `{total, mine, reachedAt}`；`delta` 是 1–1000 的整數（作者的 `maxStep` 以內） | 超過每人上限或已達標 `LIMIT_REACHED`（`err.data.reason`） |
+| `shared.leaderboard(key, {limit?})` | `{items:[{rank, name, value}], mine?}`；計數器這一期貢獻最多的人，預設 10、最多 50；`name` 是公開暱稱，可能是 `null` | |
+| `share.tallyLink(context, pollKey)` | 帶平台短碼的分享連結（`?share=~XXXXXXXX`，含分享者的推薦碼）。非同步，要先備好再放進點擊 | 情境碼不對 `SHARE_CONTEXT_INVALID` |
+| `share.respond(option)` | `{ok}`：回答 `share.poll` 那一題 | 回答自己的連結 `NOT_ELIGIBLE` |
+| `share.results()` | `[{context, pollKey, total, counts, updatedAt}]`：只給分享者自己發出去的連結。`total` 即時；`counts` 到 3 人才有、每天更新一次 | |
+
+共同錯誤：平台或作者關了 `SHARED_DISABLED`、沒登入 `UNAUTHORIZED`、沒玩過這張卡 `NOT_ELIGIBLE`、太頻繁 `RATE_LIMITED`、其他 `NETWORK`。看自己的紀錄（唯讀）時能讀、能看排行與結果，寫入一律 `HOST_DENIED`。讀取不會推播：卡片自己隔一段時間重讀，最快每 10 秒一次。數字從不進模型。
+
+殼只送 key、選項與數字；roleId、登入 token、短碼都在宿主。宿主（`StageHost.shared`，`common/shared-state.ts` 的 `SharedHost`）收到前，畫布（`pages/canvas/canvas-shared.ts`）會再驗一次參數，因為殼裡的作者腳本能自己 postMessage。

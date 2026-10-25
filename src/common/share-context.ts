@@ -27,7 +27,16 @@ export interface ShareState {
   url: string
   /** 現在誰打得開這張卡：只有作者／有連結的人／所有人。宿主不知道是 null。 */
   audience: ShareAudience | null
+  /**
+   * 從平台短碼的分享回流連結開卡時，朋友可以回答的那一題（sdk.share.respond）；不是就沒有這個欄位。
+   * 短碼本身留在宿主，卡片看不到，也就看不到分享者是誰。
+   */
+  poll?: SharePoll
 }
+
+export interface SharePoll { key: string; options: string[] }
+/** 每個投票最多幾個選項（跟作者宣告的上限一樣）。 */
+export const SHARE_POLL_MAX_OPTIONS = 12
 
 export interface ShareQr {
   /** 每邊幾格。 */
@@ -42,16 +51,26 @@ export function shareContextOf(raw: unknown): string | null {
 
 const AUDIENCES: readonly ShareAudience[] = ['author', 'link', 'public']
 
+function sharePollOf(raw: unknown): SharePoll | null {
+  if (!raw || typeof raw !== 'object') return null
+  const p = raw as { key?: unknown; options?: unknown }
+  const key = shareContextOf(p.key)
+  const options = Array.isArray(p.options) ? p.options.filter((o): o is string => shareContextOf(o) !== null).slice(0, SHARE_POLL_MAX_OPTIONS) : []
+  return key && options.length ? { key, options } : null
+}
+
 /** 宿主給的狀態只收形狀對的；壞的欄位當沒有。關著時情境碼一律拿掉。 */
 export function shareStateOf(raw: unknown): ShareState | null {
   if (!raw || typeof raw !== 'object') return null
   const s = raw as Partial<Record<keyof ShareState, unknown>>
   const enabled = s.enabled === true
+  const poll = enabled ? sharePollOf(s.poll) : null
   return {
     enabled,
     context: enabled ? shareContextOf(s.context) : null,
     url: typeof s.url === 'string' && /^https?:\/\//.test(s.url) ? s.url : '',
     audience: AUDIENCES.includes(s.audience as ShareAudience) ? (s.audience as ShareAudience) : null,
+    ...(poll ? { poll } : {}),
   }
 }
 

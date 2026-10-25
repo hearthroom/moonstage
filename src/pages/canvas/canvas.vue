@@ -471,6 +471,7 @@ import { bindAuthorSideDock, collectFixedRoots } from './canvas-author-side-dock
 import { bindBubbleFit } from './canvas-bubble-fit'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
 import { createCanvasShare } from './canvas-share'
+import { createCanvasShared } from './canvas-shared'
 import { createHistoryAdapter, bindHistoryAuthorScope } from './canvas-history'
 import { getAuthorRuleStorageScope, onStorageScopeChange } from '@/common/author-rules/storage-scope'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
@@ -2715,6 +2716,8 @@ const stopHistoryScopeWatch=onStorageScopeChange(()=>canvasHistory.reset());
 watch(()=>[String(unref(roleId)||''),String(unref(conversationId)||''),!!unref(hasLogin),previewOnly.value],()=>canvasHistory.reset(),{flush:'sync'});
 watch(()=>talkList.value.map((m:any)=>String(m.chatId||m.id||'')+':'+String(m.chatFinish)).join('|'),()=>{void canvasHistory.check();},{flush:'post'});
 const canvasShare = createCanvasShare({ host: stageHost.share, roleId: () => String(unref(roleId) || ''), historyMode: () => ownedHistoryMode.value });
+// 共用狀態與分享回流：兩種 pageMode 同一個入口。看紀錄、沒有生成權的對話只能讀不能寫。
+const canvasShared = createCanvasShared({ host: stageHost.shared, roleId: () => String(unref(roleId) || ''), writable: () => !ownedHistoryMode.value && canGenerate.value });
 // 值變了（推薦碼晚到）兩種 pageMode 都要知道：沙箱殼收 share 訊息後發 share:change，一般卡直接發 share:change。
 // 卡片可能在載入時就備好了連結與 QR，沒這個通知就會一直送出不帶推薦碼的連結。
 onUnmounted(canvasShare.onChange(() => {
@@ -3171,6 +3174,7 @@ function mountSandbox(asset: any) {
       roleId: targetRoleId,
       saves: resolved.saves,
       share: canvasShare.sandbox(),
+      shared: stageHost.shared ? { run: canvasShared.run } : null,
       history: canvasHistory,
       hello: () => {
         const info: any = unref(userInfo) || {};
@@ -3374,6 +3378,8 @@ function buildAuthorAssetHost() {
     // 用既有的 IME 旗標：組字期間改草稿會跟拼音打架。
     isComposing: () => imeComposing.value === true,
     ...canvasShare.intentHost(),
+    shared: canvasShared.api.shared,
+    shareTally: canvasShared.api.tally,
     history: {capabilities:canvasHistory.capabilities,list:canvasHistory.list,onChange:canvasHistory.onChange},
   };
 }
@@ -3384,8 +3390,11 @@ function hostOutsideAuthorScope(host, scope) {
   const wrapped = {};
   Object.keys(host).forEach((key) => {
     const value = host[key];
-    wrapped[key] = key === 'history' && value ? bindHistoryAuthorScope(value, scope) : typeof value === 'function'
-      ? function () { return scope.suspend(value, this, arguments); }
+    const outside = (fn) => function () { return scope.suspend(fn, this, arguments); };
+    wrapped[key] = key === 'history' && value ? bindHistoryAuthorScope(value, scope)
+      // 共用狀態與分享回流是一組方法的物件：每個方法一樣在作者範圍外執行
+      : (key === 'shared' || key === 'shareTally') && value ? Object.fromEntries(Object.entries(value).map(([name, fn]) => [name, typeof fn === 'function' ? outside(fn.bind(value)) : fn]))
+      : typeof value === 'function' ? outside(value)
       : value;
   });
   return wrapped;

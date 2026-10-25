@@ -27,6 +27,12 @@ describe('畫布的分享情境（兩種 pageMode 同一份值）', () => {
     expect(share.intentHost().shareLink('p1-1.c')).toBe('https://sukisuki.ai/cards/1?ref=AB&share=p1-1.c')
   })
 
+  it('看自己的紀錄時也不帶朋友連結上的投票（那不是從分享連結開的一局）', () => {
+    const poll = { key: 'p1-4', options: ['a', 'b'] }
+    expect(createCanvasShare({ host: { read: () => ({ ...state, poll }) }, roleId: () => '7', historyMode: () => false }).state()!.poll).toEqual(poll)
+    expect(createCanvasShare({ host: { read: () => ({ ...state, poll }) }, roleId: () => '7', historyMode: () => true }).state()!.poll).toBeUndefined()
+  })
+
   it('沙箱與一般卡拿到同一份值；qr、變化通知原樣轉給宿主', async () => {
     const listeners: Array<() => void> = []
     const host = { read: () => state, qr: vi.fn(async (t: string) => ({ size: 21, path: t })), onChange: (fn: () => void) => { listeners.push(fn); return () => {} } }

@@ -88,6 +88,13 @@ export interface StageHost {
     /** 把一段字畫成 QR（跟宿主站分享面板同一套）。 */
     qr?(text: string): Promise<import('../common/share-context').ShareQr>
   }
+  /**
+   * 卡片的共用狀態與分享回流（卡片腳本的 sdk.shared／stage.shared 與 share.tallyLink／respond／results）：
+   * 數字在宿主站，登入、草稿試玩、短碼都由宿主處理；舞台驗過參數、補上 roleId 才呼叫。
+   * 錯誤丟 { code, data? }，碼用 common/shared-state 的 SHARED_ERROR_CODES，其他一律當 NETWORK。
+   * 不實作＝這裡沒有共用狀態，卡片收到 HOST_DENIED。
+   */
+  shared?: import('../common/shared-state').SharedHost
   card?: {
     social(roleId: string): Promise<{ favorite: boolean; favorited: boolean; comments: boolean } | null>
     /** 回收藏後的實際狀態；失敗就丟，舞台還原並提示。 */

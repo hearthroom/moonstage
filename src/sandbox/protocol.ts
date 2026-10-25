@@ -10,6 +10,7 @@
  */
 import type { HistoryCapabilities, HistoryChange } from '../common/history'
 import type { ShareState } from '../common/share-context'
+import type { SharedOp } from '../common/shared-state'
 
 // v1 remains the bootstrap/legacy default; every live transport passes the
 // negotiated version explicitly. v2 adds authoritative author history.
@@ -85,6 +86,8 @@ export interface SandboxCapabilities {
   /** 宿主接了分享情境（sdk.share.*）。沒接時 link／qr 回 HOST_DENIED。 */
   share?: boolean
   history?: 1
+  /** 宿主接了共用狀態與分享回流（sdk.shared.*、share.tallyLink／respond／results）。只在 v2 協商時給；沒有就回 HOST_DENIED。 */
+  shared?: 1
 }
 
 export interface SandboxHelloConfig {
@@ -336,7 +339,7 @@ export type HostToShell =
 
 export type RequestOp = 'message.send' | 'message.edit' | 'save.set' | 'save.remove'
   | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove'
-  | 'generation.act' | 'share.qr' | 'history.list' | 'history.subscribe' | 'history.unsubscribe'
+  | 'generation.act' | 'share.qr' | 'history.list' | 'history.subscribe' | 'history.unsubscribe' | SharedOp
 
 /** 殼上的按鈕想請宿主開的面板／做的事。 */
 export type ShellAction = 'back' | 'open-model' | 'open-persona' | 'open-archives' | 'stop' | 'regenerate' | 'more'

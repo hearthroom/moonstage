@@ -47,18 +47,19 @@ const expectCode = async (p: Promise<unknown> | (() => unknown), code: string) =
 }
 
 describe('sdk 的形狀', () => {
-  it('恰好 17 個鍵、47 個能力、version 是值 "1"、沒有 once/off', () => {
+  it('恰好 18 個鍵、54 個能力、version 是值 "1"、沒有 once/off', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
-    expect(Object.keys(sdk).sort()).toEqual(['archive', 'cache', 'composer', 'debug', 'generation', 'history', 'input', 'message', 'model', 'on', 'role', 'save', 'share', 'stage', 'text', 'user', 'version'])
+    expect(Object.keys(sdk).sort()).toEqual(['archive', 'cache', 'composer', 'debug', 'generation', 'history', 'input', 'message', 'model', 'on', 'role', 'save', 'share', 'shared', 'stage', 'text', 'user', 'version'])
     const caps = [
       ...Object.keys(sdk.input).map((k) => `input.${k}`), ...Object.keys(sdk.composer).map((k) => `composer.${k}`),
       ...Object.keys(sdk.message).map((k) => `message.${k}`), ...Object.keys(sdk.cache).map((k) => `cache.${k}`),
       ...Object.keys(sdk.save).map((k) => `save.${k}`), ...Object.keys(sdk.stage).map((k) => `stage.${k}`),
       ...Object.keys(sdk.text).map((k) => `text.${k}`), ...Object.keys(sdk.archive).map((k) => `archive.${k}`),
-      'share.link', 'share.qr', 'history.capabilities', 'history.list', 'history.onChange',
+      ...Object.keys(sdk.shared).map((k) => `shared.${k}`),
+      'share.link', 'share.qr', 'share.tallyLink', 'share.respond', 'share.results', 'history.capabilities', 'history.list', 'history.onChange',
       'role.get', 'user.get', 'model.get', 'generation.get', 'generation.act', 'on', 'debug.log', 'version',
     ]
-    expect(caps.length).toBe(47)
+    expect(caps.length).toBe(54)
     expect(sdk.version).toBe('1')
     expect((sdk as unknown as { once?: unknown }).once).toBeUndefined()
     expect((sdk as unknown as { off?: unknown }).off).toBeUndefined()
@@ -365,5 +366,60 @@ describe('share（分享情境）', () => {
     await expectCode(sdk.share.qr(5 as unknown as string), 'INVALID_ARGS')
     await expectCode(sdk.share.qr('x'.repeat(1025)), 'INVALID_ARGS')
     await expectCode(sdk.share.qr(''), 'INVALID_ARGS')
+  })
+})
+
+describe('shared（全服投票、共鬥計數、排行榜）與 share 的回流', () => {
+  const on = { saves: true, edit: true, send: true, share: true, shared: true }
+  const replying = (value: unknown, requests: Array<{ op: string; args: unknown[] }>) => {
+    const host = fakeHost({ capabilities: on, requests })
+    host.request = async (op, args) => { requests.push({ op, args }); return value }
+    return host
+  }
+
+  it('宿主沒接（舊宿主、v1 協商）：鍵都在，呼叫一律 HOST_DENIED；poll 是 null', async () => {
+    const { sdk } = createSdk(fakeHost({ capabilities: { saves: true, edit: true, send: true, share: true } }), createEventBus())
+    expect(Object.keys(sdk.shared).sort()).toEqual(['add', 'leaderboard', 'read', 'vote'])
+    expect(sdk.share.poll).toBeNull()
+    await expectCode(sdk.shared.read('boss'), 'HOST_DENIED')
+    await expectCode(sdk.shared.vote('p1-4', 'a'), 'HOST_DENIED')
+    await expectCode(sdk.share.tallyLink('p1-4.b', 'p1-4'), 'HOST_DENIED')
+    await expectCode(sdk.share.results(), 'HOST_DENIED')
+  })
+
+  it('照宿主代辦，參數先驗：壞參數不出殼', async () => {
+    const requests: Array<{ op: string; args: unknown[] }> = []
+    const { sdk } = createSdk(replying({ boss: { kind: 'counter', total: 42, goal: 100 } }, requests), createEventBus())
+    expect(await sdk.shared.read(['boss', 'boss'])).toEqual({ boss: { kind: 'counter', total: 42, goal: 100 } })
+    expect(requests).toEqual([{ op: 'shared.read', args: [['boss']] }])
+    await expectCode(sdk.shared.add('boss', 0), 'INVALID_ARGS')
+    await expectCode(sdk.shared.vote('p1-4', '<b>'), 'OPTION_INVALID')
+    await expectCode(sdk.share.tallyLink('~K7Q2M9XA', 'p1-4'), 'SHARE_CONTEXT_INVALID')
+    await expectCode(sdk.shared.leaderboard('boss', { limit: 51 }), 'INVALID_ARGS')
+    expect(requests).toHaveLength(1)
+  })
+
+  it('宿主回的錯照碼丟給卡片（SdkError，含 data）', async () => {
+    const host = fakeHost({ capabilities: on })
+    host.request = async () => { throw new SdkError('LIMIT_REACHED', 'goal reached', { reason: 'goal' }) }
+    const { sdk } = createSdk(host, createEventBus())
+    try { await sdk.shared.add('boss', 1); throw new Error('no error') } catch (e) {
+      expect(e).toBeInstanceOf(SdkError)
+      expect((e as SdkError).code).toBe('LIMIT_REACHED')
+      expect((e as SdkError).data).toEqual({ reason: 'goal' })
+    }
+  })
+
+  it('poll 讀宿主的分享狀態（每次讀都是現值）；respond 只帶選項', async () => {
+    const requests: Array<{ op: string; args: unknown[] }> = []
+    let state: Record<string, unknown> = { enabled: true, context: 'p1-4.b', url: 'https://sukisuki.ai/cards/1', audience: 'link', poll: { key: 'p1-4', options: ['a', 'b'] } }
+    const host = replying({ ok: true }, requests)
+    host.share = () => state as never
+    const { sdk } = createSdk(host, createEventBus())
+    expect(sdk.share.poll).toEqual({ key: 'p1-4', options: ['a', 'b'] })
+    expect(await sdk.share.respond('b')).toEqual({ ok: true })
+    expect(requests).toEqual([{ op: 'share.respond', args: ['b'] }])
+    state = { ...state, poll: undefined }
+    expect(sdk.share.poll).toBeNull()
   })
 })

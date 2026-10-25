@@ -1,7 +1,7 @@
 /**
  * 畫布的分享情境：沙箱卡（sdk.share，經沙箱宿主橋）與一般卡（window.stage.share）讀的是同一份值。
  * 值全由宿主給（StageHost.share）：舞台不讀網址列，也不知道這張卡在宿主站上的網址與玩家的推薦碼。
- * 看自己的紀錄時不帶朋友的情境碼——那不是從分享連結開的一局；連結照給。
+ * 看自己的紀錄時不帶朋友的情境碼與回流的投票——那不是從分享連結開的一局；連結照給。
  */
 import type { StageHost } from '@/host/stage-host'
 import { shareLinkOf, shareStateOf, type ShareQr, type ShareState } from '@/common/share-context'
@@ -28,7 +28,9 @@ export function createCanvasShare(deps: CanvasShareDeps): CanvasShare {
     const target = deps.roleId()
     if (!target || !deps.host) return null
     const s = shareStateOf(deps.host.read(target))
-    return s && deps.historyMode() ? { ...s, context: null } : s
+    if (!s || !deps.historyMode()) return s
+    const { poll: _poll, ...rest } = s
+    return { ...rest, context: null }
   }
   const qr = deps.host?.qr ? (text: string) => deps.host!.qr!(text) : undefined
   return {

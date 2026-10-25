@@ -106,3 +106,26 @@ it('uses selected v2 while synchronous top-level author code runs inside hello',
   win.dispatchEvent(new win.MessageEvent('message',{source:parent,origin:'https://host.fixture.test',data:{ms:2,type:'dispose'}}))
  }finally{dom.window.close()}
 })
+
+it('shared state follows the negotiated version: v2 hello lets author code ask the host, v1 hello drops it', async () => {
+ const {JSDOM}=await import('jsdom')
+ const run=async(ms:1|2)=>{
+  const dom=new JSDOM('<div id="app"></div>',{url:'https://shell.fixture.test',runScripts:'dangerously'})
+  const win=dom.window as any,sent:any[]=[];const parent={postMessage:(m:any)=>sent.push(m)}
+  Object.defineProperty(win,'parent',{value:parent})
+  win.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}})
+  win.ResizeObserver=class{observe(){}disconnect(){}}
+  const computed=win.getComputedStyle.bind(win);win.getComputedStyle=(el:any)=>computed(el)
+  try{
+   bootSandbox(win)
+   const cfg={...config,capabilities:{...config.capabilities,shared:1},card:{rules:[{find:'not-matched',replace:'<script>sdk.shared.read("boss").catch(function(e){window.__code=e.code});<\/script>'}],statusbar:''}}
+   win.dispatchEvent(new win.MessageEvent('message',{source:parent,origin:'https://host.fixture.test',data:{ms,type:'hello',config:cfg}}))
+   await new Promise(r=>setTimeout(r,0))
+   return {ops:sent.filter(m=>m.type==='request').map(m=>m.op),code:win.__code}
+  }finally{dom.window.close()}
+ }
+ expect((await run(2)).ops).toContain('shared.read')
+ const legacy=await run(1)
+ expect(legacy.ops).not.toContain('shared.read')
+ expect(legacy.code).toBe('HOST_DENIED')
+})

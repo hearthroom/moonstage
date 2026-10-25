@@ -21,6 +21,7 @@ import {
 } from '@/sandbox/protocol'
 import type { SandboxSavesStore } from '@/host/sandbox-host'
 import { SHARE_QR_MAX_CHARS, type ShareQr, type ShareState } from '@/common/share-context'
+import { SHARED_OPS, type SharedOp } from '@/common/shared-state'
 import { observeViewport, visibleViewport } from './canvas-viewport'
 import { cardStorageScope, getAuthorRuleStorageScope, onStorageScopeChange } from '@/common/author-rules/storage-scope'
 import type { ChromeState, ChromeUiEvent, MessageMenuAnchor, MessageView, PanelsState, SandboxBackground, StageState } from '@/sandbox/protocol'
@@ -45,6 +46,10 @@ export interface SandboxArchiveHost {
   remove(id: string): Promise<SandboxArchiveResult>
 }
 
+export interface SandboxSharedHost {
+  run(op: SharedOp, args: unknown[]): Promise<unknown>
+}
+
 export interface SandboxShareHost {
   read(): ShareState | null
   qr?(text: string): Promise<ShareQr>
@@ -67,6 +72,11 @@ export interface SandboxHostDeps {
    */
   share?: SandboxShareHost | null
   history?: HistoryApi | null
+  /**
+   * 共用狀態與分享回流（sdk.shared.*、share.tallyLink／respond／results），只給 v2 的殼。
+   * run 是 pages/canvas/canvas-shared.ts 的入口：自己驗參數、補 roleId、擋唯讀；錯誤丟 { code, data? }。
+   */
+  shared?: SandboxSharedHost | null
   /** 殼上的按鈕想開宿主的面板。 */
   onAction?(name: ShellAction): void
   /** 殼沒處理的返回（舞台沒開）：宿主自己導頁。 */
@@ -450,7 +460,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     lastViewport = base.viewportHeight ?? viewportHeight()
     post({
       type: 'hello',
-      config: { ...base, ...(storageScope ? { storageScope } : {}), viewportHeight: lastViewport, history: protocolVersion === 2 ? deps.history?.capabilities() : undefined, capabilities: { ...(protocolVersion === 2 && deps.history ? {history: 1 as const} : {}), saves: savesOk, edit: !helloSnapshot.readOnly, send: !helloSnapshot.readOnly, archive: !!deps.archive && !helloSnapshot.readOnly, share: !!deps.share }, saves, ...(share ? { share } : {}), chromeState: chrome ? (JSON.parse(lastChromeKey) as ChromeState) : undefined },
+      config: { ...base, ...(storageScope ? { storageScope } : {}), viewportHeight: lastViewport, history: protocolVersion === 2 ? deps.history?.capabilities() : undefined, capabilities: { ...(protocolVersion === 2 && deps.history ? {history: 1 as const} : {}), ...(protocolVersion === 2 && deps.shared ? { shared: 1 as const } : {}), saves: savesOk, edit: !helloSnapshot.readOnly, send: !helloSnapshot.readOnly, archive: !!deps.archive && !helloSnapshot.readOnly, share: !!deps.share }, saves, ...(share ? { share } : {}), chromeState: chrome ? (JSON.parse(lastChromeKey) as ChromeState) : undefined },
     })
     // 殼建好之後才有東西可畫：歷史一到就送全量訊息，殼跑完冷啟動再喊 ready。
     armColdStart()
@@ -464,6 +474,17 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
 
   const handleRequest = async (reqId: number, op: string, args: unknown[]) => {
     try {
+      if ((SHARED_OPS as readonly string[]).includes(op)) {
+        if (protocolVersion !== 2 || !deps.shared) return reply(reqId, false, undefined, { code: 'HOST_DENIED' })
+        try { return reply(reqId, true, await deps.shared.run(op as SharedOp, Array.isArray(args) ? args : [])) } catch (e) {
+          const err = e as { code?: unknown; message?: unknown; data?: unknown }
+          return reply(reqId, false, undefined, {
+            code: typeof err?.code === 'string' ? err.code : 'NETWORK',
+            ...(typeof err?.message === 'string' ? { message: err.message } : {}),
+            ...(err?.data && typeof err.data === 'object' ? { data: err.data as Record<string, unknown> } : {}),
+          })
+        }
+      }
       if (op.startsWith('history.')) {
         if (protocolVersion !== 2 || !deps.history) return reply(reqId,false,undefined,{code:'HOST_DENIED'})
         if(op==='history.list') return reply(reqId,true,await deps.history.list(args[0] as any))

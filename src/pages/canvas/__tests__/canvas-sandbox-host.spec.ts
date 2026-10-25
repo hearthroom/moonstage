@@ -877,3 +877,33 @@ describe('history v2 host bridge',()=>{
   expect(list).not.toHaveBeenCalled();host.destroy();h.iframe.remove()
  })
 })
+
+describe('shared state host bridge (v2 only)',()=>{
+ const start=async(protocols?:number[])=>{
+  const h=harness(),state={current:makeState({messages:[msg({id:'opening',opening:true,text:'Hello'})]})}
+  const {hud}=fakeHud(state)
+  const run=vi.fn(async(op:string)=>{ if(op==='shared.add') throw Object.assign(new Error('x'),{code:'LIMIT_REACHED',data:{reason:'goal'}}); return {boss:{kind:'counter',total:3}} })
+  const host=createSandboxHost({hud,iframe:h.iframe,win:window,origin:ORIGIN,roleId:'1',hello,shared:{run}})
+  host.start();h.fromShell(protocols?{type:'ready-shell',protocols}:{type:'ready-shell'});await flush()
+  const ms=protocols?.includes(2)?2:1
+  const send=(message:any)=>window.dispatchEvent(new MessageEvent('message',{data:{...message,ms},origin:ORIGIN,source:h.iframe.contentWindow}))
+  return {h,host,run,send}
+ }
+ it('offers shared to a v2 shell and relays values and coded errors',async()=>{
+  const {h,host,run,send}=await start([1,2])
+  expect((h.posted.find(m=>m.type==='hello') as any).config.capabilities.shared).toBe(1)
+  send({type:'request',reqId:71,op:'shared.read',args:[['boss']]});await flush()
+  expect(run).toHaveBeenCalledWith('shared.read',[['boss']])
+  expect(h.posted.find(m=>m.type==='reply'&&m.reqId===71)).toMatchObject({ok:true,value:{boss:{kind:'counter',total:3}}})
+  send({type:'request',reqId:72,op:'shared.add',args:['boss',1]});await flush()
+  expect(h.posted.find(m=>m.type==='reply'&&m.reqId===72)).toMatchObject({ok:false,error:{code:'LIMIT_REACHED',data:{reason:'goal'}}})
+  host.destroy();h.iframe.remove()
+ })
+ it('does not offer shared to a legacy v1 shell',async()=>{
+  const {h,host,run,send}=await start()
+  expect((h.posted.find(m=>m.type==='hello') as any).config.capabilities.shared).toBeUndefined()
+  send({type:'request',reqId:73,op:'share.results',args:[]});await flush()
+  expect(h.posted.find(m=>m.type==='reply'&&m.reqId===73)).toMatchObject({ok:false,error:{code:'HOST_DENIED'}})
+  expect(run).not.toHaveBeenCalled();host.destroy();h.iframe.remove()
+ })
+})

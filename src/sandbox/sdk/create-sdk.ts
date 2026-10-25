@@ -1,5 +1,5 @@
 /**
- * 作者看到的 `sdk`：17 個鍵、47 個能力（後來加了 text、model、archive、generation、share），全部從第一版就存在——作者腳本在頂層探測它們，
+ * 作者看到的 `sdk`：18 個鍵、54 個能力（後來加了 text、model、archive、generation、share、shared），全部從第一版就存在——作者腳本在頂層探測它們，
  * 少一個就是「按鈕全不響應」而沒有任何報錯。每個能力有實作狀態：實作／宿主沒接（HOST_DENIED）。
  *
  * 錯誤慣例（作者的程式碼依賴）：
@@ -22,7 +22,8 @@ import { createRemoteHistory } from './history'
 import { SdkError } from './errors'
 import type { EventBus } from './events'
 import type { GenerationOutcome } from '../protocol'
-import { shareLinkOf, shareStateOf, SHARE_QR_MAX_CHARS, type ShareAudience, type ShareQr, type ShareState } from '../../common/share-context'
+import { shareLinkOf, shareStateOf, SHARE_QR_MAX_CHARS, type ShareAudience, type SharePoll, type ShareQr, type ShareState } from '../../common/share-context'
+import { createSharedApi, type SharedApi, type SharedOp, type ShareTallyApi } from '../../common/shared-state'
 
 export const SAVE_KEY_RE = /^[A-Za-z0-9_-]{1,64}$/
 export const SAVE_MAX_KEYS = 10
@@ -77,11 +78,12 @@ export interface SdkHost {
   model?: () => { name: string; cost: string }
   /** 這一輪在等什麼與從何時開始（殼收到宿主的 generation 訊息時記下），以及上一輪沒正常結束時的結局。 */
   generation?: () => { phase: string; since: number; outcome?: GenerationOutcome | null }
-  capabilities: { saves: boolean; edit: boolean; send: boolean; archive?: boolean; share?: boolean }
+  /** shared：宿主接了共用狀態與分享回流（只在 v2 協商時有）。 */
+  capabilities: { saves: boolean; edit: boolean; send: boolean; archive?: boolean; share?: boolean; shared?: boolean }
   /** 分享情境的現值（握手給、之後宿主可更新，例如推薦碼晚到）；每次讀都問。 */
   share?: () => ShareState | null
   /** 宿主代辦：送出、改寫、存檔寫入。 */
-  request(op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove' | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove' | 'generation.act' | 'share.qr' | 'history.list' | 'history.subscribe' | 'history.unsubscribe', args: unknown[]): Promise<unknown>
+  request(op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove' | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove' | 'generation.act' | 'share.qr' | 'history.list' | 'history.subscribe' | 'history.unsubscribe' | SharedOp, args: unknown[]): Promise<unknown>
   /** 現在是不是在使用者手勢裡（點擊當下）。 */
   inGesture(): boolean
   /** 非手勢送出前問使用者；回 true 表示允許。 */
@@ -141,14 +143,19 @@ export interface Sdk {
    * link(context?)：同步回這張卡的分享連結（帶分享者的推薦碼），給了情境就加上它——點擊裡直接拿去 navigator.share。
    * qr(text)：把一段字畫成 QR（{ size, path }，SVG path），卡片自己畫進分享圖。
    * 宿主更新了（例如推薦碼晚到）發 share:change。
+   * 分享回流（design §7.3）：tallyLink(context, pollKey) 產生帶平台短碼的連結（非同步，先備好再放進點擊）；
+   * 朋友從那條連結開卡時 poll 是 { key, options }、respond(option) 回答；results() 只給分享者自己看。
    */
   share: {
     readonly enabled: boolean
     readonly context: string | null
     readonly audience: ShareAudience | null
+    readonly poll: SharePoll | null
     link(context?: string): string
     qr(text: string): Promise<ShareQr>
-  }
+  } & ShareTallyApi
+  /** 全服投票、共鬥計數器、排行榜（design §7.3）：key 要先在作者的 rules.json 宣告；讀取所有人都可以，寫入要登入且玩過這張卡。 */
+  shared: SharedApi
   on(event: string, cb: (payload?: unknown) => void): void
   debug: { log(...args: unknown[]): void }
   version: string
@@ -222,6 +229,11 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
 
   // 宿主沒接就當沒有：讀到 null／false，link 丟 HOST_DENIED。
   const shareNow = (): ShareState | null => (host.capabilities.share && host.share ? shareStateOf(host.share()) : null)
+  // shared.*、share 的回流：參數在這裡先驗（壞參數不出殼），宿主沒接就 HOST_DENIED。
+  const sharedRemote = createSharedApi(async (op, args) => {
+    if (!host.capabilities.shared) throw new SdkError('HOST_DENIED', 'shared state is not available here')
+    return host.request(op, args)
+  }, (code, message, data) => new SdkError(code, message, data))
 
   const cache = new Map<string, unknown>()
   let cacheBytes = 0
@@ -411,6 +423,7 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
       get enabled() { return !!shareNow()?.enabled },
       get context() { return shareNow()?.context ?? null },
       get audience() { return shareNow()?.audience ?? null },
+      get poll() { const p = shareNow()?.poll; return p ? { key: p.key, options: [...p.options] } : null },
       link(context) {
         const r = shareLinkOf(shareNow(), context)
         if (r.ok) return r.url
@@ -423,7 +436,9 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
         if (!host.capabilities.share) throw new SdkError('HOST_DENIED', 'share is not available here')
         return (await host.request('share.qr', [t])) as ShareQr
       },
+      ...sharedRemote.tally,
     },
+    shared: sharedRemote.shared,
     on: (event, cb) => bus.on(event, cb),
     debug: { log: (...args) => host.debug(...args) },
     version: '1',

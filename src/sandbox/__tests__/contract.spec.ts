@@ -16,7 +16,8 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { createSdk, SAVE_KEY_RE, SAVE_MAX_KEYS, SAVE_MAX_VALUE_BYTES, CACHE_QUOTA_BYTES, RATE_LIMITS, type SdkHost } from '../sdk/create-sdk'
 import { createEventBus, SDK_EVENTS } from '../sdk/events'
-import { SHARE_CONTEXT_RE, SHARE_PARAM, SHARE_QR_MAX_CHARS } from '../../common/share-context'
+import { SHARE_CONTEXT_RE, SHARE_PARAM, SHARE_POLL_MAX_OPTIONS, SHARE_QR_MAX_CHARS } from '../../common/share-context'
+import { SHARED_DELTA_MAX, SHARED_ERROR_CODES, SHARED_KEY_RE, SHARED_LEADERBOARD_MAX, SHARED_READ_MAX_KEYS } from '../../common/shared-state'
 import { SDK_ERROR_CODES } from '../sdk/errors'
 import { ALLOWED_TAGS, UNWRAP_TAGS, DROP_TAGS, URL_ATTRS } from '../sanitize'
 import { buildShell } from '../render/shell-dom'
@@ -64,7 +65,7 @@ function capabilitiesOf(sdk: Record<string, unknown>): { keys: string[]; capabil
     capabilities.push(key)
   }
   // 非同步的四個：回 Promise；其餘同步、錯誤直接 throw。
-  const async = ['message.send', 'message.edit', 'save.set', 'save.remove', 'text.ready', 'archive.list', 'archive.save', 'archive.fork', 'archive.open', 'archive.start', 'archive.rename', 'archive.remove', 'generation.act', 'share.qr', 'history.list']
+  const async = ['message.send', 'message.edit', 'save.set', 'save.remove', 'text.ready', 'archive.list', 'archive.save', 'archive.fork', 'archive.open', 'archive.start', 'archive.rename', 'archive.remove', 'generation.act', 'share.qr', 'history.list', 'shared.read', 'shared.vote', 'shared.add', 'shared.leaderboard', 'share.tallyLink', 'share.respond', 'share.results']
   return { keys, capabilities: capabilities.sort(), async }
 }
 
@@ -215,7 +216,7 @@ function buildContract() {
     protocolVersion: SANDBOX_PROTOCOL_VERSION,
     sdkVersion: sdk.version,
     generatedBy: 'src/sandbox/__tests__/contract.spec.ts (UPDATE_CONTRACT=1)',
-    sources: ['src/sandbox/sdk/create-sdk.ts', 'src/sandbox/sdk/events.ts', 'src/sandbox/sdk/errors.ts', 'src/common/share-context.ts', 'src/sandbox/sanitize.ts', 'src/sandbox/render/shell-dom.ts', 'src/sandbox/shell.css', 'src/sandbox/shell.ts', 'src/sandbox/author-scripts.ts', 'src/sandbox/rules.ts', 'src/utils/display-rule-engine.js', 'src/common/author-style-policy.ts', 'src/pages/canvas/canvas-platform-defaults.ts', 'docs/sandbox-chat-page.md'],
+    sources: ['src/sandbox/sdk/create-sdk.ts', 'src/sandbox/sdk/events.ts', 'src/sandbox/sdk/errors.ts', 'src/common/share-context.ts', 'src/common/shared-state.ts', 'src/sandbox/sanitize.ts', 'src/sandbox/render/shell-dom.ts', 'src/sandbox/shell.css', 'src/sandbox/shell.ts', 'src/sandbox/author-scripts.ts', 'src/sandbox/rules.ts', 'src/utils/display-rule-engine.js', 'src/common/author-style-policy.ts', 'src/pages/canvas/canvas-platform-defaults.ts', 'docs/sandbox-chat-page.md'],
     supportedProtocols: [...SANDBOX_SUPPORTED_PROTOCOLS],
     sdk: {
       keys: caps.keys,
@@ -248,7 +249,7 @@ function buildContract() {
         lifecycle: 'independent of mount/unmount; switch/dispose fences old responses',
       },
       share: {
-        properties: ['enabled', 'context', 'audience'],
+        properties: ['enabled', 'context', 'audience', 'poll'],
         contextPattern: SHARE_CONTEXT_RE.source,
         param: SHARE_PARAM,
         audiences: ['author', 'link', 'public'],
@@ -257,6 +258,25 @@ function buildContract() {
         contextIsNullWhile: 'the page was not opened from a link with a valid context, the platform switch is off, or the player is viewing a past conversation',
         neverSentToTheModel: true,
         changeEvent: 'share:change',
+        poll: { shape: ['key', 'options'], maxOptions: SHARE_POLL_MAX_OPTIONS, isNullWhile: 'the page was not opened from a platform share-response link, the platform switch is off, or the player is viewing a past conversation', tokenVisibleToCard: false },
+        tally: {
+          requiresProtocol: 2,
+          tallyLink: { args: ['context', 'pollKey'], returns: 'url with ?share=~TOKEN and the sharer referral', async: true, prepareBeforeClick: true },
+          respond: { args: ['option'], returns: ['ok'], ownLink: 'NOT_ELIGIBLE' },
+          results: { item: ['context', 'pollKey', 'total', 'counts', 'updatedAt'], countsAreNullBelow: 3, countsUpdate: 'daily', totalIsLive: true, ownerOnly: true },
+        },
+      },
+      shared: {
+        requiresProtocol: 2, classic: 'stage.shared',
+        keyPattern: SHARED_KEY_RE.source,
+        read: { args: 'key or list of keys', maxKeys: SHARED_READ_MAX_KEYS, undeclaredKeys: 'omitted', poll: ['kind', 'counts', 'total', 'mine?'], counter: ['kind', 'total', 'mine?', 'goal?', 'reachedAt?', 'previous?'] },
+        vote: { args: ['key', 'option'], returns: ['mine'] },
+        add: { args: ['key', 'delta'], deltaRange: [1, SHARED_DELTA_MAX], returns: ['total', 'mine', 'reachedAt'] },
+        leaderboard: { args: ['key', '{ limit? }'], defaultLimit: 10, maxLimit: SHARED_LEADERBOARD_MAX, item: ['rank', 'name', 'value'], mine: ['rank', 'value'] },
+        errors: [...SHARED_ERROR_CODES],
+        writesWhileViewingHistory: 'HOST_DENIED',
+        withoutHost: 'HOST_DENIED',
+        neverSentToTheModel: true,
       },
       stage: { modes: ['content', 'full'], unknownModeBecomes: 'content', elReturnsNodeWhenClosed: true, ownCloseDoesNotEmitStageClose: true },
       input: { writesThrowWhileComposing: 'INVALID_ARGS' },
@@ -345,12 +365,12 @@ describe('沙箱作者契約', () => {
     expect(current).toBe(text)
   })
 
-  it('能力數與 sdk.spec 對得上：17 鍵、47 能力、15 個非同步', () => {
+  it('能力數與 sdk.spec 對得上：18 鍵、54 能力、22 個非同步', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
     const caps = capabilitiesOf(sdk as unknown as Record<string, unknown>)
-    expect(caps.keys.length).toBe(17)
-    expect(caps.capabilities.length).toBe(47)
-    expect(caps.async.length).toBe(15)
+    expect(caps.keys.length).toBe(18)
+    expect(caps.capabilities.length).toBe(54)
+    expect(caps.async.length).toBe(22)
     for (const a of caps.async) expect(caps.capabilities).toContain(a)
   })
 

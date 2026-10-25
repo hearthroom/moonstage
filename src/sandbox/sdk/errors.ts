@@ -14,6 +14,12 @@ export const SDK_ERROR_CODES = [
   'LIMIT_REACHED',
   // sdk.share.link 的情境碼不合規則（1–64 個英數與 . _ -，開頭英數）。
   'SHARE_CONTEXT_INVALID',
+  // 共用狀態（sdk.shared、sdk.share 的回流）：平台或作者關了、key 沒宣告、選項不在宣告裡、
+  // 沒玩過這張卡（或回答自己的分享連結）。LIMIT_REACHED 也用在改票次數、每人上限與已達標（data.reason）。
+  'SHARED_DISABLED',
+  'NOT_DECLARED',
+  'OPTION_INVALID',
+  'NOT_ELIGIBLE',
   'HISTORY_UNAVAILABLE',
   'HISTORY_STALE',
   'HISTORY_CURSOR_INVALID',

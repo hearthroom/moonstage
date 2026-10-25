@@ -272,7 +272,7 @@ export function createShell(options: CreateShellOptions): Shell {
     text: { convert: (text) => (convert && text ? convert(text) : text), ready: () => textReady },
     model: () => modelNow(),
     generation: () => ({ phase: genPhase, since: genSince, outcome: genOutcome }),
-    capabilities: { saves: !!config.capabilities.saves, edit: !!config.capabilities.edit, send: config.capabilities.send !== false, archive: !!config.capabilities.archive, share: !!config.capabilities.share },
+    capabilities: { saves: !!config.capabilities.saves, edit: !!config.capabilities.edit, send: config.capabilities.send !== false, archive: !!config.capabilities.archive, share: !!config.capabilities.share, shared: config.capabilities.shared === 1 },
     share: () => shareState,
     request,
     inGesture: () => gesture,

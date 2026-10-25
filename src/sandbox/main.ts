@@ -30,7 +30,8 @@ export function bootSandbox(win: Window & typeof globalThis = window) {
     if (!shell) {
       if (message.type !== 'hello') return
       selectedVersion = event.data.ms === 2 ? 2 : 1
-      if(selectedVersion===1){message.config={...message.config,history:undefined,capabilities:{...message.config.capabilities,history:undefined}}}
+      // history 與 shared 都是 v2 才有的能力：舊宿主送 v1 hello 時就算帶了旗標也當沒有
+      if(selectedVersion===1){message.config={...message.config,history:undefined,capabilities:{...message.config.capabilities,history:undefined,shared:undefined}}}
       hostOrigin = event.origin
       shell = createShell({
         doc,
