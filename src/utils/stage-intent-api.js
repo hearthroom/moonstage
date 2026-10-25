@@ -73,6 +73,11 @@ function createStageIntentApi(options) {
     return { ok: true, value: fn.apply(host, args || []) }
   }
 
+  function shareState() {
+    const r = call('shareState')
+    return r.ok && r.value && typeof r.value === 'object' ? r.value : {}
+  }
+
   function isComposing() {
     return typeof host.isComposing === 'function' && host.isComposing() === true
   }
@@ -161,6 +166,25 @@ function createStageIntentApi(options) {
     on: function (event, handler) {
       if (!runtime || typeof runtime.subscribe !== 'function') return false
       return runtime.subscribe(event, handler)
+    },
+
+    /**
+     * 分享情境：跟沙箱卡的 sdk.share 同一組語意（情境碼、分享連結、QR、誰打得開），
+     * 差別只在照這裡的慣例：同步的 link 給不出來回 null 不拋錯，qr 以錯誤碼拒絕。
+     * 情境碼的格式由宿主驗（canvas 用 common/share-context）；這裡維持零 import。
+     */
+    share: {
+      get enabled() { return shareState().enabled === true },
+      get context() { const c = shareState().context; return typeof c === 'string' ? c : null },
+      get audience() { const a = shareState().audience; return typeof a === 'string' ? a : null },
+      link: function (context) {
+        const r = call('shareLink', [context])
+        return r.ok && typeof r.value === 'string' && r.value ? r.value : null
+      },
+      qr: function (text) {
+        if (typeof host.shareQr !== 'function') return Promise.reject({ code: ERR_UNSUPPORTED })
+        return Promise.resolve(host.shareQr(String(text == null ? '' : text)))
+      },
     },
 
     /** 註冊送出前改寫。一個角色只有一個 handler，重複註冊以最後一次為準。 */

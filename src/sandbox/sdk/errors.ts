@@ -12,6 +12,8 @@ export const SDK_ERROR_CODES = [
   'UNKNOWN_CAPABILITY',
   // 平台的對話存檔滿了（伺服器數的，含目前這段）：err.data 帶 { count, limit }，卡片可以請玩家先刪一個。
   'LIMIT_REACHED',
+  // sdk.share.link 的情境碼不合規則（1–64 個英數與 . _ -，開頭英數）。
+  'SHARE_CONTEXT_INVALID',
 ] as const
 
 export type SdkErrorCode = (typeof SDK_ERROR_CODES)[number]

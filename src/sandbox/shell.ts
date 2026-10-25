@@ -9,6 +9,7 @@
 import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, RequestOp, SandboxBackground, SandboxHelloConfig, SandboxMessage, ShellToHost, StageState } from './protocol'
 import { createEventBus } from './sdk/events'
 import { createSdk, type Sdk, type SdkHost } from './sdk/create-sdk'
+import type { ShareState } from '../common/share-context'
 import { SdkError, sdkErrorFromHost } from './sdk/errors'
 import { installMessageScope } from './scope'
 import { installCard, renderAppliedContent } from './rules'
@@ -240,6 +241,8 @@ export function createShell(options: CreateShellOptions): Shell {
     transport.send(key == null ? { type: 'ui', event } : { type: 'ui', event, key })
   }
 
+  // 分享情境：握手給一次，之後宿主送 share 訊息換掉（推薦碼晚到）。
+  let shareState: ShareState | null = config.share ?? null
   const sdkHost: SdkHost = {
     input: {
       get: () => input.get(),
@@ -266,7 +269,8 @@ export function createShell(options: CreateShellOptions): Shell {
     text: { convert: (text) => (convert && text ? convert(text) : text), ready: () => textReady },
     model: () => modelNow(),
     generation: () => ({ phase: genPhase, since: genSince, outcome: genOutcome }),
-    capabilities: { saves: !!config.capabilities.saves, edit: !!config.capabilities.edit, send: config.capabilities.send !== false, archive: !!config.capabilities.archive },
+    capabilities: { saves: !!config.capabilities.saves, edit: !!config.capabilities.edit, send: config.capabilities.send !== false, archive: !!config.capabilities.archive, share: !!config.capabilities.share },
+    share: () => shareState,
     request,
     inGesture: () => gesture,
     askSendPermission: () => confirmDialog(doc, refs.root, { title: strings.allowSendTitle, body: strings.allowSendBody, ok: strings.allow, cancel: strings.deny }),
@@ -759,6 +763,10 @@ export function createShell(options: CreateShellOptions): Shell {
         bus.resetReplay()
         // 載荷 { conversationId }（宿主有給才帶）：卡片用它對上 sdk.archive.list() 裡的那一段
         bus.emit('conversation:switch', message.conversationId ? { conversationId: String(message.conversationId) } : undefined)
+        return
+      case 'share':
+        shareState = message.share ?? null
+        bus.emit('share:change')
         return
       case 'back':
         transport.send({ type: 'back-handled', handled: handleBack() })

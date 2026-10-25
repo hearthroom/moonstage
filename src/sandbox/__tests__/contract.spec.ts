@@ -16,6 +16,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { createSdk, SAVE_KEY_RE, SAVE_MAX_KEYS, SAVE_MAX_VALUE_BYTES, CACHE_QUOTA_BYTES, RATE_LIMITS, type SdkHost } from '../sdk/create-sdk'
 import { createEventBus, SDK_EVENTS } from '../sdk/events'
+import { SHARE_CONTEXT_RE, SHARE_PARAM, SHARE_QR_MAX_CHARS } from '../../common/share-context'
 import { SDK_ERROR_CODES } from '../sdk/errors'
 import { ALLOWED_TAGS, UNWRAP_TAGS, DROP_TAGS, URL_ATTRS } from '../sanitize'
 import { buildShell } from '../render/shell-dom'
@@ -63,7 +64,7 @@ function capabilitiesOf(sdk: Record<string, unknown>): { keys: string[]; capabil
     capabilities.push(key)
   }
   // 非同步的四個：回 Promise；其餘同步、錯誤直接 throw。
-  const async = ['message.send', 'message.edit', 'save.set', 'save.remove', 'text.ready', 'archive.list', 'archive.save', 'archive.fork', 'archive.open', 'archive.start', 'archive.rename', 'archive.remove', 'generation.act']
+  const async = ['message.send', 'message.edit', 'save.set', 'save.remove', 'text.ready', 'archive.list', 'archive.save', 'archive.fork', 'archive.open', 'archive.start', 'archive.rename', 'archive.remove', 'generation.act', 'share.qr']
   return { keys, capabilities: capabilities.sort(), async }
 }
 
@@ -214,7 +215,7 @@ function buildContract() {
     protocolVersion: SANDBOX_PROTOCOL_VERSION,
     sdkVersion: sdk.version,
     generatedBy: 'src/sandbox/__tests__/contract.spec.ts (UPDATE_CONTRACT=1)',
-    sources: ['src/sandbox/sdk/create-sdk.ts', 'src/sandbox/sdk/events.ts', 'src/sandbox/sdk/errors.ts', 'src/sandbox/sanitize.ts', 'src/sandbox/render/shell-dom.ts', 'src/sandbox/shell.css', 'src/sandbox/shell.ts', 'src/sandbox/author-scripts.ts', 'src/sandbox/rules.ts', 'src/utils/display-rule-engine.js', 'src/common/author-style-policy.ts', 'src/pages/canvas/canvas-platform-defaults.ts', 'docs/sandbox-chat-page.md'],
+    sources: ['src/sandbox/sdk/create-sdk.ts', 'src/sandbox/sdk/events.ts', 'src/sandbox/sdk/errors.ts', 'src/common/share-context.ts', 'src/sandbox/sanitize.ts', 'src/sandbox/render/shell-dom.ts', 'src/sandbox/shell.css', 'src/sandbox/shell.ts', 'src/sandbox/author-scripts.ts', 'src/sandbox/rules.ts', 'src/utils/display-rule-engine.js', 'src/common/author-style-policy.ts', 'src/pages/canvas/canvas-platform-defaults.ts', 'docs/sandbox-chat-page.md'],
     sdk: {
       keys: caps.keys,
       capabilities: caps.capabilities,
@@ -234,6 +235,17 @@ function buildContract() {
         act: { gestureOnly: 'UNAUTHORIZED outside a trusted click (no dialog)', unknownAction: 'INVALID_ARGS', whileGenerating: 'BUSY', withoutSend: 'NOT_SUPPORTED', rateLimit: 'generation.act 3/min' },
       },
       archive: { item: ['id', 'title', 'isCurrent', 'messageCount', 'lastMessage', 'createTime', 'lastUpdateTime'], list: ['items', 'count', 'limit'], limitError: { code: 'LIMIT_REACHED', data: ['count', 'limit'] }, gesture: 'save/fork/open/start/rename/remove run directly inside a user gesture; outside one the shell asks first', rateLimit: 'archive.write 10/min' },
+      share: {
+        properties: ['enabled', 'context', 'audience'],
+        contextPattern: SHARE_CONTEXT_RE.source,
+        param: SHARE_PARAM,
+        audiences: ['author', 'link', 'public'],
+        link: { sync: true, invalidContext: 'SHARE_CONTEXT_INVALID', withoutHost: 'HOST_DENIED', whenDisabled: 'returns the card link without the context (no error)', keepsReferral: true },
+        qr: { maxChars: SHARE_QR_MAX_CHARS, returns: ['size', 'path'], pathIs: 'SVG path in a size x size viewBox', invalidText: 'INVALID_ARGS', withoutHost: 'HOST_DENIED' },
+        contextIsNullWhile: 'the page was not opened from a link with a valid context, the platform switch is off, or the player is viewing a past conversation',
+        neverSentToTheModel: true,
+        changeEvent: 'share:change',
+      },
       stage: { modes: ['content', 'full'], unknownModeBecomes: 'content', elReturnsNodeWhenClosed: true, ownCloseDoesNotEmitStageClose: true },
       input: { writesThrowWhileComposing: 'INVALID_ARGS' },
       message: { sendBusy: 'BUSY', sendWithoutCapability: 'NOT_SUPPORTED', editWithoutCapability: 'HOST_DENIED', confirmOutsideGesture: true, declinedCode: 'UNAUTHORIZED', editIdIs: 'serverId (data-msg-id)' },
@@ -247,7 +259,7 @@ function buildContract() {
       replayedToLateSubscribers: ['message:mount', 'message:done'],
       readyReplayed: false,
       coldStartOrder: ['message:new', 'message:mount', 'message:done', '…', 'ready'],
-      payload: { 'message:new': ['content', 'id', 'role', 'serverId'], 'message:mount': ['content', 'id', 'role', 'serverId'], 'message:done': ['content', 'id', 'role', 'serverId'], 'message:stream': ['content', 'id', 'role'], 'message:unmount': ['content', 'id', 'role', 'serverId'], 'input:change': 'string', 'theme:change': 'none', 'model:change': ['cost', 'name'], 'generation:phase': ['phase', 'since'], 'generation:outcome': ['actions', 'kind', 'label', 'sub'], 'conversation:switch': ['conversationId'], others: 'none' },
+      payload: { 'message:new': ['content', 'id', 'role', 'serverId'], 'message:mount': ['content', 'id', 'role', 'serverId'], 'message:done': ['content', 'id', 'role', 'serverId'], 'message:stream': ['content', 'id', 'role'], 'message:unmount': ['content', 'id', 'role', 'serverId'], 'input:change': 'string', 'theme:change': 'none', 'model:change': ['cost', 'name'], 'generation:phase': ['phase', 'since'], 'generation:outcome': ['actions', 'kind', 'label', 'sub'], 'share:change': 'none', 'conversation:switch': ['conversationId'], others: 'none' },
       roles: ['user', 'ai'],
       systemRowsEmitNoEvents: true,
       handlerArity: 1,
@@ -321,11 +333,12 @@ describe('沙箱作者契約', () => {
     expect(current).toBe(text)
   })
 
-  it('能力數與 sdk.spec 對得上：15 鍵、42 能力、13 個非同步', () => {
+  it('能力數與 sdk.spec 對得上：16 鍵、44 能力、14 個非同步', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
     const caps = capabilitiesOf(sdk as unknown as Record<string, unknown>)
-    expect(caps.keys.length).toBe(15)
-    expect(caps.capabilities.length).toBe(42)
+    expect(caps.keys.length).toBe(16)
+    expect(caps.capabilities.length).toBe(44)
+    expect(caps.async.length).toBe(14)
     for (const a of caps.async) expect(caps.capabilities).toContain(a)
   })
 

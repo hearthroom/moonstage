@@ -1,5 +1,5 @@
 /**
- * 作者看到的 `sdk`：15 個鍵、42 個能力（後來加了 text、model、archive、generation），全部從第一版就存在——作者腳本在頂層探測它們，
+ * 作者看到的 `sdk`：16 個鍵、44 個能力（後來加了 text、model、archive、generation、share），全部從第一版就存在——作者腳本在頂層探測它們，
  * 少一個就是「按鈕全不響應」而沒有任何報錯。每個能力有實作狀態：實作／宿主沒接（HOST_DENIED）。
  *
  * 錯誤慣例（作者的程式碼依賴）：
@@ -14,10 +14,13 @@
  *     只認結局裡有的動作；3／分；生成中 → BUSY。
  *   - archive.*（平台的對話存檔）：會改變存檔的操作在手勢裡直接做（卡片用自己的確認畫面），不在手勢裡殼內先問；
  *     10／分；生成中 → BUSY；存檔滿了 → LIMIT_REACHED（err.data = { count, limit }）。
+ *   - share.link 同步：情境碼不合規則 → SHARE_CONTEXT_INVALID；宿主沒接或給不出連結 → HOST_DENIED。
+ *     平台開關關著不丟錯，回不帶情境的一般連結。share.qr 非同步、交宿主畫。
  */
 import { SdkError } from './errors'
 import type { EventBus } from './events'
 import type { GenerationOutcome } from '../protocol'
+import { shareLinkOf, shareStateOf, SHARE_QR_MAX_CHARS, type ShareAudience, type ShareQr, type ShareState } from '../../common/share-context'
 
 export const SAVE_KEY_RE = /^[A-Za-z0-9_-]{1,64}$/
 export const SAVE_MAX_KEYS = 10
@@ -71,9 +74,11 @@ export interface SdkHost {
   model?: () => { name: string; cost: string }
   /** 這一輪在等什麼與從何時開始（殼收到宿主的 generation 訊息時記下），以及上一輪沒正常結束時的結局。 */
   generation?: () => { phase: string; since: number; outcome?: GenerationOutcome | null }
-  capabilities: { saves: boolean; edit: boolean; send: boolean; archive?: boolean }
+  capabilities: { saves: boolean; edit: boolean; send: boolean; archive?: boolean; share?: boolean }
+  /** 分享情境的現值（握手給、之後宿主可更新，例如推薦碼晚到）；每次讀都問。 */
+  share?: () => ShareState | null
   /** 宿主代辦：送出、改寫、存檔寫入。 */
-  request(op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove' | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove' | 'generation.act', args: unknown[]): Promise<unknown>
+  request(op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove' | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove' | 'generation.act' | 'share.qr', args: unknown[]): Promise<unknown>
   /** 現在是不是在使用者手勢裡（點擊當下）。 */
   inGesture(): boolean
   /** 非手勢送出前問使用者；回 true 表示允許。 */
@@ -125,6 +130,20 @@ export interface Sdk {
   generation: {
     get(): { phase: 'idle' | 'preparing' | 'summarizing' | 'thinking' | 'writing'; since: number; outcome: GenerationOutcome | null }
     act(action: string): Promise<void>
+  }
+  /**
+   * 分享情境（design：docs/studio/tasks/2026-10-25-card-share-context/design.md）。
+   * context：朋友從帶情境的連結開卡時那個碼，否則 null；平台不判斷有沒有存檔，要不要用由卡片決定。
+   * link(context?)：同步回這張卡的分享連結（帶分享者的推薦碼），給了情境就加上它——點擊裡直接拿去 navigator.share。
+   * qr(text)：把一段字畫成 QR（{ size, path }，SVG path），卡片自己畫進分享圖。
+   * 宿主更新了（例如推薦碼晚到）發 share:change。
+   */
+  share: {
+    readonly enabled: boolean
+    readonly context: string | null
+    readonly audience: ShareAudience | null
+    link(context?: string): string
+    qr(text: string): Promise<ShareQr>
   }
   on(event: string, cb: (payload?: unknown) => void): void
   debug: { log(...args: unknown[]): void }
@@ -195,6 +214,9 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
     takeSlot('archive.write')
     return host.request(op, args)
   }
+
+  // 宿主沒接就當沒有：讀到 null／false，link 丟 HOST_DENIED。
+  const shareNow = (): ShareState | null => (host.capabilities.share && host.share ? shareStateOf(host.share()) : null)
 
   const cache = new Map<string, unknown>()
   let cacheBytes = 0
@@ -377,6 +399,23 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
         if (!host.inGesture()) throw new SdkError('UNAUTHORIZED', 'act only inside a user gesture')
         takeSlot('generation.act')
         await host.request('generation.act', [name])
+      },
+    },
+    share: {
+      get enabled() { return !!shareNow()?.enabled },
+      get context() { return shareNow()?.context ?? null },
+      get audience() { return shareNow()?.audience ?? null },
+      link(context) {
+        const r = shareLinkOf(shareNow(), context)
+        if (r.ok) return r.url
+        if (r.code === 'invalid') throw new SdkError('SHARE_CONTEXT_INVALID', 'context must be 1-64 letters, digits, ".", "_" or "-", starting with a letter or digit')
+        throw new SdkError('HOST_DENIED', 'share links are not available here')
+      },
+      async qr(text) {
+        const t = requireString(text, 'text')
+        if (!t || t.length > SHARE_QR_MAX_CHARS) throw new SdkError('INVALID_ARGS', `text must be 1-${SHARE_QR_MAX_CHARS} characters`)
+        if (!host.capabilities.share) throw new SdkError('HOST_DENIED', 'share is not available here')
+        return (await host.request('share.qr', [t])) as ShareQr
       },
     },
     on: (event, cb) => bus.on(event, cb),

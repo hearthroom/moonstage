@@ -470,6 +470,7 @@ import { bindComposerOverhang } from './canvas-composer-overhang'
 import { bindAuthorSideDock, collectFixedRoots } from './canvas-author-side-dock'
 import { bindBubbleFit } from './canvas-bubble-fit'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
+import { createCanvasShare } from './canvas-share'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
 import { clearPendingReplyPhase, insertBeforePendingReply, markPendingReplyPhase, pendingReplyLabel } from './canvas-pending-reply'
 import { createWaitClock } from '@/utils/wait-clock'
@@ -2691,6 +2692,9 @@ const sandboxStage = ref<'closed' | 'content' | 'full'>('closed');
 /** 作者用 sdk.composer.hide 把輸入區收起來（輸入區是宿主畫的，所以由宿主藏）。 */
 const sandboxComposerHidden = ref(false);
 let sandboxThemeObserver: MutationObserver | null = null;
+// 分享情境（sdk.share／stage.share）：兩種 pageMode 讀同一份宿主給的值；看自己的紀錄時不帶朋友的情境碼。
+const canvasShare = createCanvasShare({ host: stageHost.share, roleId: () => String(unref(roleId) || ''), historyMode: () => ownedHistoryMode.value });
+let stopSandboxShareWatch: (() => void) | null = null;
 let sandboxAsset: any = null;
 
 // 殼的深淺要跟宿主頁一致。宿主怎麼標主題沒有統一規格：站台可能放 data-mode（實際生效的深淺）、
@@ -3116,6 +3120,7 @@ function destroySandboxHost() {
   if (sandboxHostRef.value) { try { sandboxHostRef.value.destroy(); } catch (e) { /* 收尾不得拋錯 */ } }
   sandboxHostRef.value = null;
   if (sandboxThemeObserver) { sandboxThemeObserver.disconnect(); sandboxThemeObserver = null; }
+  if (stopSandboxShareWatch) { stopSandboxShareWatch(); stopSandboxShareWatch = null; }
   sandboxStage.value = 'closed';
   sandboxComposerHidden.value = false;
   sandboxShellReady.value = false;
@@ -3140,6 +3145,7 @@ function mountSandbox(asset: any) {
       origin: resolved.origin,
       roleId: targetRoleId,
       saves: resolved.saves,
+      share: canvasShare.sandbox(),
       hello: () => {
         const info: any = unref(userInfo) || {};
         const view: any = roleView.value || {};
@@ -3219,6 +3225,7 @@ function mountSandbox(asset: any) {
     sandboxHostRef.value = host;
     host.start();
     observeSandboxTheme(host);
+    stopSandboxShareWatch = canvasShare.onChange(() => host.postShare());
   });
 }
 
@@ -3341,6 +3348,7 @@ function buildAuthorAssetHost() {
     scrollToBottom: () => { scrollToBottom(true); return true; },
     // 用既有的 IME 旗標：組字期間改草稿會跟拼音打架。
     isComposing: () => imeComposing.value === true,
+    ...canvasShare.intentHost(),
   };
 }
 

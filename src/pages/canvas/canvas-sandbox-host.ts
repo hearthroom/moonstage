@@ -19,6 +19,7 @@ import {
   type HostToShell, type SandboxHelloConfig, type SandboxMessage, type SandboxMessageRole, type ShellAction, type ShellToHost,
 } from '@/sandbox/protocol'
 import type { SandboxSavesStore } from '@/host/sandbox-host'
+import type { ShareQr, ShareState } from '@/common/share-context'
 import { observeViewport, visibleViewport } from './canvas-viewport'
 import { cardStorageScope, getAuthorRuleStorageScope, onStorageScopeChange } from '@/common/author-rules/storage-scope'
 import type { ChromeState, ChromeUiEvent, MessageMenuAnchor, MessageView, PanelsState, SandboxBackground, StageState } from '@/sandbox/protocol'
@@ -43,6 +44,11 @@ export interface SandboxArchiveHost {
   remove(id: string): Promise<SandboxArchiveResult>
 }
 
+export interface SandboxShareHost {
+  read(): ShareState | null
+  qr?(text: string): Promise<ShareQr>
+}
+
 export interface SandboxHostDeps {
   hud: HudHost
   /** 平台的對話存檔（sdk.archive.*）；不給就是這裡沒有存檔，archive.* 回 HOST_DENIED。 */
@@ -54,6 +60,11 @@ export interface SandboxHostDeps {
   /** 握手時要給殼的設定（能力旗標與存檔由橋自己補）。 */
   hello(): Omit<SandboxHelloConfig, 'capabilities' | 'saves'>
   saves?: SandboxSavesStore | null
+  /**
+   * 分享情境（sdk.share.*）：read 回宿主現在的值（情境碼已驗格式、唯讀紀錄時是 null），qr 把字畫成 QR。
+   * 不給就是這裡沒有分享連結，link／qr 回 HOST_DENIED。
+   */
+  share?: SandboxShareHost | null
   /** 殼上的按鈕想開宿主的面板。 */
   onAction?(name: ShellAction): void
   /** 殼沒處理的返回（舞台沒開）：宿主自己導頁。 */
@@ -103,6 +114,8 @@ export interface SandboxHost {
   postViewport(height: number): void
   /** 背景變了（玩家換選項、作者換場景）。hello 之前不送：hello 會帶當下的值。 */
   postBackground(background: SandboxBackground): void
+  /** 分享情境可能變了（推薦碼晚到）：跟上次送的不同才送。hello 之前不送：hello 會帶當下的值。 */
+  postShare(): void
   /** 宿主的返回鍵：殼處理了（關舞台）回 true；否則回 false 由宿主導頁。 */
   requestBack(): Promise<boolean>
   ready(): boolean
@@ -133,6 +146,8 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   let lastOutcomeKey: string | null = null
   let lastInputPosted: string | null = null
   let backWaiter: ((handled: boolean) => void) | null = null
+  // 上次送給殼的分享情境；hello 送出之前是 null（那時不補送，hello 會帶當下的值）。
+  let lastShareKey: string | null = null
   let handshakeTimer: ReturnType<typeof setTimeout> | null = null
 
   let lastHistoryKey = ''
@@ -420,6 +435,8 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     const storageScope = await cardStorageScope(getAuthorRuleStorageScope(), deps.roleId)
     if (destroyed) return
     const base = deps.hello()
+    const share = deps.share ? deps.share.read() : null
+    lastShareKey = JSON.stringify(share)
     // 殼一開始的草稿是空的；宿主此刻的草稿若非空，第一次 sync 會送過去，空的就不必。
     lastInputPosted = ''
     const helloSnapshot = hud.read()
@@ -428,7 +445,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     lastViewport = base.viewportHeight ?? viewportHeight()
     post({
       type: 'hello',
-      config: { ...base, ...(storageScope ? { storageScope } : {}), viewportHeight: lastViewport, capabilities: { saves: savesOk, edit: !helloSnapshot.readOnly, send: !helloSnapshot.readOnly, archive: !!deps.archive && !helloSnapshot.readOnly }, saves, chromeState: chrome ? (JSON.parse(lastChromeKey) as ChromeState) : undefined },
+      config: { ...base, ...(storageScope ? { storageScope } : {}), viewportHeight: lastViewport, capabilities: { saves: savesOk, edit: !helloSnapshot.readOnly, send: !helloSnapshot.readOnly, archive: !!deps.archive && !helloSnapshot.readOnly, share: !!deps.share }, saves, ...(share ? { share } : {}), chromeState: chrome ? (JSON.parse(lastChromeKey) as ChromeState) : undefined },
     })
     // 殼建好之後才有東西可畫：歷史一到就送全量訊息，殼跑完冷啟動再喊 ready。
     armColdStart()
@@ -500,6 +517,10 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
           if (!deps.onMessageAction) return reply(reqId, false, undefined, { code: 'HOST_DENIED' })
           deps.onMessageAction(o.messageId, entry.key)
           return reply(reqId, true)
+        }
+        case 'share.qr': {
+          if (!deps.share?.qr) return reply(reqId, false, undefined, { code: 'HOST_DENIED' })
+          return reply(reqId, true, await deps.share.qr(String(args[0] ?? '')))
         }
         default:
           return reply(reqId, false, undefined, { code: 'UNKNOWN_CAPABILITY' })
@@ -651,6 +672,14 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     postTheme: (theme, vars) => post({ type: 'theme', theme, vars }),
     postViewport: (height) => post({ type: 'viewport', height }),
     postBackground: (background) => { if (helloSent) post({ type: 'background', background }) },
+    postShare: () => {
+      if (lastShareKey === null || destroyed || !deps.share) return
+      const share = deps.share.read()
+      const key = JSON.stringify(share)
+      if (key === lastShareKey || !share) return
+      lastShareKey = key
+      post({ type: 'share', share })
+    },
     requestBack() {
       if (!helloSent || destroyed) return Promise.resolve(false)
       return new Promise<boolean>((resolve) => {

@@ -230,3 +230,32 @@ describe('luna intent api', () => {
     })
   })
 })
+
+describe('share（分享情境，與沙箱 sdk.share 同語意）', () => {
+  const state = { enabled: true, context: 'p1-4.b', url: 'https://sukisuki.ai/cards/1?ref=AB', audience: 'public' }
+
+  it('宿主沒接：context／audience 是 null、enabled=false；link 回 null；qr 以 not_supported 拒絕', async () => {
+    const { api } = makeApi()
+    expect(api.share.enabled).toBe(false)
+    expect(api.share.context).toBeNull()
+    expect(api.share.audience).toBeNull()
+    expect(api.share.link('p1')).toBeNull()
+    await expect(api.share.qr('x')).rejects.toEqual({ code: ERR_UNSUPPORTED })
+  })
+
+  it('讀宿主現值；link 交宿主組（壞碼、給不出連結回 null）；qr 交宿主畫', async () => {
+    const links = []
+    const { api } = makeApi({ host: {
+      shareState: () => state,
+      shareLink: (c) => { links.push(c); return c === 'bad one' ? null : `${state.url}&share=${c}` },
+      shareQr: async (t) => ({ size: 21, path: t }),
+    } })
+    expect(api.share.enabled).toBe(true)
+    expect(api.share.context).toBe('p1-4.b')
+    expect(api.share.audience).toBe('public')
+    expect(api.share.link('p1-1.c')).toBe('https://sukisuki.ai/cards/1?ref=AB&share=p1-1.c')
+    expect(api.share.link('bad one')).toBeNull()
+    expect(links).toEqual(['p1-1.c', 'bad one'])
+    expect(await api.share.qr('abc')).toEqual({ size: 21, path: 'abc' })
+  })
+})

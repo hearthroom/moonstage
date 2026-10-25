@@ -8,6 +8,7 @@
  * 每則訊息包成 `{ ms: SANDBOX_PROTOCOL_VERSION, ...訊息 }`；`ms` 對不上一律丟掉。
  * 改契約＝改版本號＋兩端測試。
  */
+import type { ShareState } from '../common/share-context'
 
 export const SANDBOX_PROTOCOL_VERSION = 1
 
@@ -76,6 +77,8 @@ export interface SandboxCapabilities {
   send: boolean
   /** 宿主接了平台的對話存檔（sdk.archive.*）。沒接時 archive.* 回 HOST_DENIED。 */
   archive?: boolean
+  /** 宿主接了分享情境（sdk.share.*）。沒接時 link／qr 回 HOST_DENIED。 */
+  share?: boolean
 }
 
 export interface SandboxHelloConfig {
@@ -106,6 +109,8 @@ export interface SandboxHelloConfig {
   themeVars?: Record<string, string>
   /** 預載的存檔；沒接存檔時省略。 */
   saves?: Record<string, unknown>
+  /** 分享情境（情境碼、這張卡的分享連結、誰打得開）；沒接時省略。之後由 share 訊息更新。 */
+  share?: ShareState
   /** 打開殼內除錯面板。 */
   debug?: boolean
   /** 整頁背景圖（可省略）。 */
@@ -313,6 +318,8 @@ export type HostToShell =
   // 開場選項（MMD「你可以选择开场」）：空清單＝拿掉。玩家點一條回 ui prologue，key 是第幾條。
   | { type: 'prologue'; title: string; items: string[] }
   | { type: 'conversation.switch'; conversationId?: string }
+  /** 分享情境變了（例如推薦碼晚到、連結補上）：殼換掉現值並發 share:change。 */
+  | { type: 'share'; share: ShareState }
   /** 宿主登出：殼刪掉作者規則的持久層、之後只用記憶體。 */
   | { type: 'storage.clear' }
   | { type: 'back' }
@@ -320,7 +327,7 @@ export type HostToShell =
 
 export type RequestOp = 'message.send' | 'message.edit' | 'save.set' | 'save.remove'
   | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove'
-  | 'generation.act'
+  | 'generation.act' | 'share.qr'
 
 /** 殼上的按鈕想請宿主開的面板／做的事。 */
 export type ShellAction = 'back' | 'open-model' | 'open-persona' | 'open-archives' | 'stop' | 'regenerate' | 'more'

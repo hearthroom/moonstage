@@ -440,6 +440,43 @@ describe('沙箱宿主橋', () => {
     none.destroy()
   })
 
+  it('分享情境：握手帶上現值與能力；share.qr 交宿主畫；之後的變化用 share 訊息補送；沒接就 HOST_DENIED', async () => {
+    const { hud } = fakeHud({ current: makeState() })
+    let current = { enabled: true, context: 'p1-4.b', url: 'https://sukisuki.ai/cards/1', audience: 'public' as const }
+    const share = { read: vi.fn(() => current), qr: vi.fn(async (text: string) => ({ size: 21, path: `M0 0h${text.length}` })) }
+    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '7', hello, share })
+    host.postShare()
+    expect(h.posted).toEqual([])
+    host.start()
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    expect(h.posted[0]).toMatchObject({ type: 'hello', config: { capabilities: { share: true }, share: current } })
+    h.posted.length = 0
+    h.fromShell({ type: 'request', reqId: 50, op: 'share.qr', args: ['abc'] })
+    await flush()
+    expect(h.posted[0]).toMatchObject({ type: 'reply', reqId: 50, ok: true, value: { size: 21, path: 'M0 0h3' } })
+    h.posted.length = 0
+    host.postShare()
+    expect(h.posted).toEqual([])
+    current = { ...current, url: 'https://sukisuki.ai/cards/1?ref=ABCD' }
+    host.postShare()
+    expect(h.posted).toEqual([{ ms: SANDBOX_PROTOCOL_VERSION, type: 'share', share: current }])
+    host.destroy()
+    h.posted.length = 0
+    const none = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '7', hello })
+    none.start()
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    const greeting = h.posted.find((p) => p.type === 'hello') as { config: Record<string, unknown> }
+    expect(greeting.config).toMatchObject({ capabilities: { share: false } })
+    expect(greeting.config.share).toBeUndefined()
+    h.posted.length = 0
+    h.fromShell({ type: 'request', reqId: 51, op: 'share.qr', args: ['abc'] })
+    await flush()
+    expect(h.posted[0]).toMatchObject({ type: 'reply', reqId: 51, ok: false, error: { code: 'HOST_DENIED' } })
+    none.destroy()
+  })
+
   it('殼的舞台與輸入區狀態轉給宿主：stage → onStage、composer → onComposer', async () => {
     const state = { current: makeState({ messages: [msg({ id: '10', text: '你好', opening: true })] }) }
     const { hud } = fakeHud(state)

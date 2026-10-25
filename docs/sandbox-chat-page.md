@@ -67,6 +67,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 | `history` | `{ more, loading }` 更早的歷史還有沒有、正在載嗎 | 狀態變了就送；殼捲到頂附近且 `more` 才會要 |
 | `prologue` | `{ title, items }` 開場選項（MMD「你可以选择开场」）；`items` 空＝拿掉 | 跟全量 `messages` 一起到，之後變了才送（玩家說出第一句後送空清單） |
 | `conversation.switch` | — | 切存檔：殼清氣泡、關舞台、清補發記錄，之後宿主再送 `messages` |
+| `share` | `{ share: {enabled, context, url, audience} }` | 分享情境變了（推薦碼晚到）：殼換掉現值並發 `share:change`；hello 之前不送 |
 | `back` | — | 宿主的返回：舞台開著殼先關舞台並回 `back-handled: true`；否則回 false 由宿主導頁 |
 | `dispose` | — | 離開頁面 |
 
@@ -76,7 +77,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 |---|---|
 | `ready-shell` | 殼載好，要 `hello` |
 | `ready` | 作者腳本已跑、`ready` 事件已發 |
-| `request` | `{ reqId, op, args }`，op ∈ `message.send`／`message.edit`／`save.set`／`save.remove`／`archive.list`／`archive.save`／`archive.fork`／`archive.open`／`archive.new`／`archive.rename`／`archive.remove`（`save.get`／`keys` 讀殼內預載的副本，不經宿主） |
+| `request` | `{ reqId, op, args }`，op ∈ `message.send`／`message.edit`／`save.set`／`save.remove`／`archive.list`／`archive.save`／`archive.fork`／`archive.open`／`archive.new`／`archive.rename`／`archive.remove`／`share.qr`（`save.get`／`keys` 讀殼內預載的副本，不經宿主） |
 | `input` | `{ value }` 殼內輸入框變了（宿主鏡射，讓草稿跨頁保留） |
 | `action` | `{ name }`：`back`／`more`／`open-model`／`open-persona`／`open-archives`／`stop`／`regenerate` |
 | `open-url` | `{ url }` 作者 HTML 裡的頁面外連結被點（殼已擋下導頁），宿主開新分頁 |
@@ -97,7 +98,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 
 ## 3. `sdk` 契約（殼內作者看到的）
 
-15 個鍵、42 個能力（`text`、`model`、`archive`、`generation` 是後來加的；完整清單由 `contract/sandbox-contract.json` 生成），全部**從第一版就存在**（作者腳本在頂層探測它們），每個能力有實作狀態：
+16 個鍵、44 個能力（`text`、`model`、`archive`、`generation`、`share` 是後來加的；完整清單由 `contract/sandbox-contract.json` 生成），全部**從第一版就存在**（作者腳本在頂層探測它們），每個能力有實作狀態：
 
 | 能力 | 狀態 | 備註 |
 |---|---|---|
@@ -114,17 +115,18 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 | `generation.get()` | 實作 | `{phase, since}`：這一輪在等什麼——`idle`、`preparing`（剛送出，什麼都還沒回來）、`summarizing`（平台在整理劇情：伺服器壓縮記憶，擋在第一個字前，可能幾十秒）、`thinking`（模型在推理、正文還沒來；不推理的模型沒有這段）、`writing`（正文串流中）；`since` 是進入這個階段的時間（毫秒）。宿主從 `isCompacting`、推理串流與正文串流推得，跟 `generation` 訊息一起送（`phase`），只送階段、不送推理內容；殼發 `generation:phase`。`outcome`：上一輪沒正常結束時，最新那一列底下那張卡（系統訊息卡或 Agent 中斷卡）的 `{kind, label, sub, actions:[{action, label}]}`；正常結束或生成中是 `null`，變了殼發 `generation:outcome`。`kind` 是卡的樣式：`model-error`、`network-error`、`server-error`、`rate-limit`、`quota`、`filtered`、`length-cap`、`stopped`、`compact-retryable`、`outcome-unconfirmed`（結果還在路上，沒有鍵，有結果自己會換）、`interrupted`（Agent 這一輪還沒跑完）。`label`／`sub` 是那張卡上同一句玩家語系的字（宿主用 `systemNoticeFor()` 與中斷卡同一組運算式算）。`actions` 只會是 `retry`、`continue`、`switch-model`、`model-settings`、`capacity`、`refresh`、`retry-stream-off`、`edit-message`、`switch-lane`、`resend-traditional`；後四個只出現在內容限制卡（`filtered`）：`retry-stream-off` 是原因未提供、流式輸出開著時的「關閉流式輸出並重試」（宿主先把這個對話的流式偏好存成關閉，存成功才重試），`edit-message` 是前置被擋時打開被擋那則訊息的編輯（改好送出時取代它），`switch-lane` 是前置被擋、這顆模型還有別條線路時打開模型選單並停在它的線路，`resend-traditional` 是前置被擋、被擋那則含簡體時把它整句轉成繁體、直接取代它送出（同一則只給一次） |
 | `generation.act(action)` | 實作 | 按那張卡上的一顆鍵（`outcome.actions` 裡的動作名），走玩家點那張卡同一條路：重試沿用同一句、不多一則；容量與模型設定打開平台的面板。只在玩家手勢裡（不在手勢裡回 `UNAUTHORIZED`，不問——作者沒有理由替玩家自動重試）；結局裡沒有這個動作 `INVALID_ARGS`；生成中 `BUSY`；沒有送出能力 `NOT_SUPPORTED`；3／分。殼送 `request generation.act`，宿主照當下的結局核一次再交給 `onMessageAction`（`sys:<動作>`、`resume-agent`、`switch-model`） |
 | `archive.list/save/fork/open/start/rename/remove` | 實作 | 平台的對話存檔（每張卡最多 20 段，含目前這段；伺服器記的，跨裝置）。每段就是一段對話：`open(id)` 讀檔＝切過去，原本的進度原樣留著；`save(title?)` 把目前進度留一份（從最新一則分叉、留下的那份取名 title，回 `{id: 留下的那份, current: 接著玩的那份}`）；`fork(messageId)` 從某一則（氣泡的 `serverId`）另開一段並切過去；`start(opening?)` 另開新檔（目前這段留在清單裡，0＝主開場、1..＝替代開場）；`list()` 回 `{items:[{id,title,isCurrent,messageCount,lastMessage,createTime,lastUpdateTime}],count,limit}`（新的在前）。會改變存檔的操作在玩家手勢裡直接做（卡片用自己的確認畫面），不在手勢裡殼先問「允許這張卡變更你的存檔？」；生成中 `BUSY`；滿了 `LIMIT_REACHED`（`err.data = {count, limit}`）。宿主沒接（握手 `capabilities.archive` 為假）回 `HOST_DENIED`。切換後殼清空訊息、重載那一段並發 `conversation:switch` |
+| `share.enabled/context/audience`、`share.link(context?)`、`share.qr(text)` | 實作 | 分享情境。`context`：從帶 `?share=<碼>` 的連結開卡時那個碼，否則 `null`（平台開關關著、看自己的紀錄時也是 `null`；有沒有存檔不管，由卡片決定）。碼只許 `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`（`~` 開頭留給平台短碼），宿主驗過才給。`audience`：這張卡現在誰打得開（`author`／`link`／`public`，宿主不知道是 `null`）。`link(context?)` **同步**回這張卡的分享連結（宿主站的卡片頁，帶玩家的推薦碼），給了情境就加 `share=`——點擊裡直接拿去 `navigator.share`；碼不合規則 `SHARE_CONTEXT_INVALID`；平台開關關著不丟錯、回不帶情境的一般連結；宿主沒接（`capabilities.share` 為假）或給不出連結 `HOST_DENIED`。`qr(text)` 回 `{size, path}`（`size`×`size` 格的 SVG path），1–1024 字，否則 `INVALID_ARGS`；殼送 `request share.qr` 由宿主畫。值來自 `hello.config.share`，之後 `share` 訊息更新並發 `share:change`。情境碼從不進模型 |
 | `on(event, fn)` | 實作 | 見事件表 |
 | `debug.log(...)` | 實作 | 殼內面板 + 轉宿主 console |
 | `version` | `'1'` | |
 
-錯誤碼：`UNAUTHORIZED`、`RATE_LIMITED`、`INVALID_ARGS`、`HOST_DENIED`、`NETWORK`、`NOT_SUPPORTED`、`BUSY`、`LIMIT_REACHED`（帶 `err.data`）
+錯誤碼：`UNAUTHORIZED`、`RATE_LIMITED`、`INVALID_ARGS`、`HOST_DENIED`、`NETWORK`、`NOT_SUPPORTED`、`BUSY`、`LIMIT_REACHED`（帶 `err.data`）、`SHARE_CONTEXT_INVALID`
 （另有 `UNKNOWN_CAPABILITY` 備用）。非同步能力回 Promise；同步能力直接 throw `SdkError`——
 `save.get/keys` 在存檔尚未載入時同步丟 `HOST_DENIED`（跟原站一致，作者會用 try）。
 限頻（60 秒窗）：`save.set` 20、`message.send` 手勢 3／自動 3、`message.edit` 10、`archive.*` 的變更合計 10、`generation.act` 3 → `RATE_LIMITED`。
 
-事件（15）：`ready`、`message:new`、`message:done`、`message:stream`、`message:mount`、`message:unmount`、
-`input:change`、`conversation:switch`（載荷 `{conversationId}`，宿主有給才帶）、`theme:change`、`back`、`stage:close`、`dispose`、`model:change`（載荷同 `model.get()`，模型名或點數變了才發）、`generation:phase`（載荷 `{phase, since}`，階段變了才發；不補發，晚到的腳本用 `generation.get()`）、`generation:outcome`（載荷同 `generation.get().outcome`，可能是 `null`；結局變了才發，例如失敗卡出現、玩家重試後收掉；不補發）。
+事件（16）：`ready`、`message:new`、`message:done`、`message:stream`、`message:mount`、`message:unmount`、
+`input:change`、`conversation:switch`（載荷 `{conversationId}`，宿主有給才帶）、`theme:change`、`back`、`stage:close`、`dispose`、`model:change`（載荷同 `model.get()`，模型名或點數變了才發）、`generation:phase`（載荷 `{phase, since}`，階段變了才發；不補發，晚到的腳本用 `generation.get()`）、`generation:outcome`（載荷同 `generation.get().outcome`，可能是 `null`；結局變了才發，例如失敗卡出現、玩家重試後收掉；不補發）、`share:change`（無載荷，分享情境變了才發，重讀 `sdk.share`）。
 
 順序與補發規則（作者腳本依賴這些）：
 

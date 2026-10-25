@@ -47,17 +47,18 @@ const expectCode = async (p: Promise<unknown> | (() => unknown), code: string) =
 }
 
 describe('sdk 的形狀', () => {
-  it('恰好 15 個鍵、42 個能力、version 是值 "1"、沒有 once/off', () => {
+  it('恰好 16 個鍵、44 個能力、version 是值 "1"、沒有 once/off', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
-    expect(Object.keys(sdk).sort()).toEqual(['archive', 'cache', 'composer', 'debug', 'generation', 'input', 'message', 'model', 'on', 'role', 'save', 'stage', 'text', 'user', 'version'])
+    expect(Object.keys(sdk).sort()).toEqual(['archive', 'cache', 'composer', 'debug', 'generation', 'input', 'message', 'model', 'on', 'role', 'save', 'share', 'stage', 'text', 'user', 'version'])
     const caps = [
       ...Object.keys(sdk.input).map((k) => `input.${k}`), ...Object.keys(sdk.composer).map((k) => `composer.${k}`),
       ...Object.keys(sdk.message).map((k) => `message.${k}`), ...Object.keys(sdk.cache).map((k) => `cache.${k}`),
       ...Object.keys(sdk.save).map((k) => `save.${k}`), ...Object.keys(sdk.stage).map((k) => `stage.${k}`),
       ...Object.keys(sdk.text).map((k) => `text.${k}`), ...Object.keys(sdk.archive).map((k) => `archive.${k}`),
+      'share.link', 'share.qr',
       'role.get', 'user.get', 'model.get', 'generation.get', 'generation.act', 'on', 'debug.log', 'version',
     ]
-    expect(caps.length).toBe(42)
+    expect(caps.length).toBe(44)
     expect(sdk.version).toBe('1')
     expect((sdk as unknown as { once?: unknown }).once).toBeUndefined()
     expect((sdk as unknown as { off?: unknown }).off).toBeUndefined()
@@ -309,5 +310,60 @@ describe('sdk.archive（平台的對話存檔）', () => {
     expect(await codeOf(sdk.archive.rename('c', 'over'))).toBe('RATE_LIMITED')
     a.host.tick(60_000)
     expect(await codeOf(sdk.archive.rename('c', 'again'))).toBe('ok')
+  })
+})
+
+describe('share（分享情境）', () => {
+  const state = { enabled: true, context: 'p1-4.b', url: 'https://sukisuki.ai/cards/100271?ref=ABCD', audience: 'link' as const }
+
+  it('宿主沒接：enabled=false、context／audience 是 null；link 同步丟 HOST_DENIED、qr 回 HOST_DENIED', async () => {
+    const { sdk } = createSdk(fakeHost(), createEventBus())
+    expect(sdk.share.enabled).toBe(false)
+    expect(sdk.share.context).toBeNull()
+    expect(sdk.share.audience).toBeNull()
+    await expectCode(() => sdk.share.link('p1-4.b'), 'HOST_DENIED')
+    await expectCode(sdk.share.qr('https://sukisuki.ai/cards/1'), 'HOST_DENIED')
+  })
+
+  it('讀得到宿主給的情境碼與誰打得開；link 同步回帶情境的連結、保留推薦碼', () => {
+    const { sdk } = createSdk(fakeHost({ capabilities: { saves: true, edit: true, send: true, share: true }, share: () => state }), createEventBus())
+    expect(sdk.share.enabled).toBe(true)
+    expect(sdk.share.context).toBe('p1-4.b')
+    expect(sdk.share.audience).toBe('link')
+    expect(sdk.share.link('p1-1.c')).toBe('https://sukisuki.ai/cards/100271?ref=ABCD&share=p1-1.c')
+    expect(sdk.share.link()).toBe('https://sukisuki.ai/cards/100271?ref=ABCD')
+  })
+
+  it('壞的情境碼同步丟 SHARE_CONTEXT_INVALID', async () => {
+    const { sdk } = createSdk(fakeHost({ capabilities: { saves: true, edit: true, send: true, share: true }, share: () => state }), createEventBus())
+    for (const bad of ['a b', '~K7Q2M9XA', '<b>', 'x'.repeat(65), 3]) await expectCode(() => sdk.share.link(bad as string), 'SHARE_CONTEXT_INVALID')
+  })
+
+  it('平台開關關著：context 是 null，link 不丟錯、回不帶情境的一般連結', () => {
+    const off = { ...state, enabled: false }
+    const { sdk } = createSdk(fakeHost({ capabilities: { saves: true, edit: true, send: true, share: true }, share: () => off }), createEventBus())
+    expect(sdk.share.enabled).toBe(false)
+    expect(sdk.share.context).toBeNull()
+    expect(sdk.share.link('p1-1.c')).toBe('https://sukisuki.ai/cards/100271?ref=ABCD')
+  })
+
+  it('宿主之後補上推薦碼：每次讀都是宿主現在的值', () => {
+    let now = { ...state, url: 'https://sukisuki.ai/cards/100271' }
+    const { sdk } = createSdk(fakeHost({ capabilities: { saves: true, edit: true, send: true, share: true }, share: () => now }), createEventBus())
+    expect(sdk.share.link('a')).toBe('https://sukisuki.ai/cards/100271?share=a')
+    now = state
+    expect(sdk.share.link('a')).toBe('https://sukisuki.ai/cards/100271?ref=ABCD&share=a')
+  })
+
+  it('qr 交給宿主畫（share.qr）；不是字串或太長 → INVALID_ARGS', async () => {
+    const requests: Array<{ op: string; args: unknown[] }> = []
+    const host = fakeHost({ capabilities: { saves: true, edit: true, send: true, share: true }, share: () => state, requests })
+    host.request = async (op, args) => { requests.push({ op, args }); return { size: 21, path: 'M0 0h1v1h-1z' } }
+    const { sdk } = createSdk(host, createEventBus())
+    expect(await sdk.share.qr('https://sukisuki.ai/cards/1')).toEqual({ size: 21, path: 'M0 0h1v1h-1z' })
+    expect(requests).toEqual([{ op: 'share.qr', args: ['https://sukisuki.ai/cards/1'] }])
+    await expectCode(sdk.share.qr(5 as unknown as string), 'INVALID_ARGS')
+    await expectCode(sdk.share.qr('x'.repeat(1025)), 'INVALID_ARGS')
+    await expectCode(sdk.share.qr(''), 'INVALID_ARGS')
   })
 })

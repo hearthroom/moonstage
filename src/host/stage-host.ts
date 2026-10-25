@@ -76,6 +76,18 @@ export interface StageHost {
    * 這張卡在宿主站上的收藏與留言（頁首那兩顆）。卡片的社群資料在宿主站，舞台只認得 roleId，
    * 所以查、改、開留言區全交給宿主。不實作，或 social() 回 null（沒上架、預覽、審核中），兩顆都不畫。
    */
+  /**
+   * 分享情境（卡片腳本的 sdk.share／stage.share）：這次開卡帶進來的情境碼、這張卡在宿主站上的分享連結
+   * （帶玩家的推薦碼）、現在誰打得開。舞台不讀網址列，都由宿主給；情境碼先驗過格式（common/share-context），
+   * 不是從分享連結開的一般遊玩（審核預覽之類）給 null。不實作＝這裡沒有分享連結。
+   */
+  share?: {
+    read(roleId: string): import('../common/share-context').ShareState | null
+    /** 值變了（推薦碼晚到）叫 fn；回傳取消訂閱。 */
+    onChange?(fn: () => void): () => void
+    /** 把一段字畫成 QR（跟宿主站分享面板同一套）。 */
+    qr?(text: string): Promise<import('../common/share-context').ShareQr>
+  }
   card?: {
     social(roleId: string): Promise<{ favorite: boolean; favorited: boolean; comments: boolean } | null>
     /** 回收藏後的實際狀態；失敗就丟，舞台還原並提示。 */

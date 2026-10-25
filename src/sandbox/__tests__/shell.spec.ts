@@ -652,3 +652,29 @@ describe('功能欄掛載檔案的格式字元', () => {
     expect(Array.from(slot.childNodes).some(n=>n.nodeType===3&&n.textContent===' ')).toBe(true)
   })
 })
+
+describe('殼：分享情境', () => {
+  const share = { enabled: true, context: 'p1-4.b', url: 'https://sukisuki.ai/cards/1', audience: 'link' as const }
+
+  it('腳本頂層就讀得到 hello 帶的情境碼；share 訊息換掉現值並發 share:change', () => {
+    const s = boot(config({
+      capabilities: { saves: false, edit: false, send: true, share: true },
+      share,
+      card: { rules: [SCRIPT_RULE(`window.__top = { context: sdk.share.context, link: sdk.share.link('p1-1.c') };`)], statusbar: '' },
+    }))
+    expect((window as unknown as { __top: unknown }).__top).toEqual({ context: 'p1-4.b', link: 'https://sukisuki.ai/cards/1?share=p1-1.c' })
+    let changed = 0
+    s.sdk.on('share:change', () => { changed++ })
+    s.handle({ type: 'share', share: { ...share, url: 'https://sukisuki.ai/cards/1?ref=ABCD' } })
+    expect(changed).toBe(1)
+    expect(s.sdk.share.link('p1-1.c')).toBe('https://sukisuki.ai/cards/1?ref=ABCD&share=p1-1.c')
+    expect(s.sdk.share.context).toBe('p1-4.b')
+  })
+
+  it('舊宿主（沒給 share）：context 是 null，link 丟 HOST_DENIED', () => {
+    const s = boot(config())
+    expect(s.sdk.share.context).toBeNull()
+    expect(s.sdk.share.enabled).toBe(false)
+    expect(() => s.sdk.share.link('a')).toThrow(expect.objectContaining({ code: 'HOST_DENIED' }))
+  })
+})
