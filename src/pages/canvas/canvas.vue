@@ -7506,6 +7506,7 @@ function setPageScrollTo(selector) {
   if (selector) {
     let view = uni.createSelectorQuery().in(_this).select(selector);
     view.boundingClientRect((res) => {
+      if (!res || !Number.isFinite(res.top)) return;
       uni.pageScrollTo({
         scrollTop: res.top - 30, // -30 为多显示出大半个消息的高度，示意上面还有信息。
         duration: 0
