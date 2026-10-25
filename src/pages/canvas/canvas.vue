@@ -3174,7 +3174,7 @@ function mountSandbox(asset: any) {
       roleId: targetRoleId,
       saves: resolved.saves,
       share: canvasShare.sandbox(),
-      shared: stageHost.shared ? { run: canvasShared.run } : null,
+      shared: stageHost.shared ? canvasShared.forRole(targetRoleId) : null,
       history: canvasHistory,
       hello: () => {
         const info: any = unref(userInfo) || {};
@@ -3332,7 +3332,8 @@ let stageIntent = null;
 // send() 不能再改一次。onActionBtnClick → send() 是同步的，所以旗標判定是準的。
 let authorSubmitInFlight = false;
 
-function buildAuthorAssetHost() {
+function buildAuthorAssetHost(targetRoleId: string) {
+  const shared = canvasShared.forRole(targetRoleId);
   const inputEl = () => document.querySelector('textarea#send_textarea');
   const writeDraft = (text) => {
     if (!canGenerate.value) return false;
@@ -3378,8 +3379,8 @@ function buildAuthorAssetHost() {
     // 用既有的 IME 旗標：組字期間改草稿會跟拼音打架。
     isComposing: () => imeComposing.value === true,
     ...canvasShare.intentHost(),
-    shared: canvasShared.api.shared,
-    shareTally: canvasShared.api.tally,
+    shared: shared.api.shared,
+    shareTally: shared.api.tally,
     history: {capabilities:canvasHistory.capabilities,list:canvasHistory.list,onChange:canvasHistory.onChange},
   };
 }
@@ -3393,7 +3394,10 @@ function hostOutsideAuthorScope(host, scope) {
     const outside = (fn) => function () { return scope.suspend(fn, this, arguments); };
     wrapped[key] = key === 'history' && value ? bindHistoryAuthorScope(value, scope)
       // 共用狀態與分享回流是一組方法的物件：每個方法一樣在作者範圍外執行
-      : (key === 'shared' || key === 'shareTally') && value ? Object.fromEntries(Object.entries(value).map(([name, fn]) => [name, typeof fn === 'function' ? outside(fn.bind(value)) : fn]))
+      // 作者範圍收掉之後（離場）不再叫宿主
+      : (key === 'shared' || key === 'shareTally') && value ? Object.fromEntries(Object.entries(value).map(([name, fn]) => [name, typeof fn === 'function'
+        ? function () { return scope.isDisposed() ? Promise.reject({ code: 'HOST_DENIED' }) : scope.suspend(fn, value, arguments); }
+        : fn]))
       : typeof value === 'function' ? outside(value)
       : value;
   });
@@ -3898,7 +3902,7 @@ function applyAuthorAsset(asset) {
     stageIntent = createStageIntentApi({
       // 宿主替作者做的事（送出、改背景、捲動……）退出作者範圍跑：那些是宿主的副作用，
       // 離場時不能跟著作者的東西一起被清掉。
-      host: hostOutsideAuthorScope(buildAuthorAssetHost(), scope),
+      host: hostOutsideAuthorScope(buildAuthorAssetHost(String(targetRoleId)), scope),
       runtime: authorAssetRuntime,
     });
     window.stage = stageIntent.api;

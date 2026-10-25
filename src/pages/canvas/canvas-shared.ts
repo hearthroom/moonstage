@@ -2,6 +2,7 @@
  * 畫布的共用狀態與分享回流（common/shared-state.ts）：沙箱宿主橋與一般卡的 window.stage 都從這裡進宿主。
  * 這裡是信任邊界——沙箱殼裡的作者腳本能自己 postMessage，所以參數在這裡再驗一次，roleId 由畫布補上。
  * 看自己的紀錄時能讀數字、看排行與結果，但不能投票、加數、產生或回答分享連結：那不是一局正在玩的對話。
+ * 每個入口綁住掛載時的卡（forRole）：畫布換了卡，舊卡片晚到的請求一律 HOST_DENIED，不會改用新卡的 roleId。
  */
 import type { StageHost } from '@/host/stage-host'
 import { createSharedApi, sharedArgs, sharedError, sharedResult, SHARED_ERROR_CODES, SHARED_OPS, SHARED_WRITE_OPS, type SharedErrorCode, type SharedOp } from '@/common/shared-state'
@@ -13,22 +14,26 @@ export interface CanvasSharedDeps {
   writable(): boolean
 }
 
-export interface CanvasShared {
+export interface CanvasSharedEntry {
   /** 沙箱橋用：op 與殼送來的原始參數；回整理過的值，或丟 { code, data? }。 */
   run(op: SharedOp, args: unknown[]): Promise<unknown>
   /** 一般卡用：跟 sdk.shared／sdk.share 同一組方法。 */
   api: ReturnType<typeof createSharedApi>
 }
 
+export interface CanvasShared {
+  /** 掛載這張卡（沙箱或作者腳本）時取一個入口；之後畫布的卡不是它就拒絕。 */
+  forRole(roleId: string): CanvasSharedEntry
+}
+
 const known = (code: unknown): code is SharedErrorCode => (SHARED_ERROR_CODES as readonly string[]).includes(String(code))
 
 export function createCanvasShared(deps: CanvasSharedDeps): CanvasShared {
-  const call = async (op: SharedOp, args: unknown[]): Promise<unknown> => {
+  const call = async (roleId: string, op: SharedOp, args: unknown[]): Promise<unknown> => {
     if (!SHARED_OPS.includes(op)) throw sharedError('INVALID_ARGS', 'unknown operation')
     const clean = sharedArgs(op, args)
     const host = deps.host
-    const roleId = deps.roleId()
-    if (!host || !roleId) throw sharedError('HOST_DENIED', 'shared state is not available here')
+    if (!host || !roleId || deps.roleId() !== roleId) throw sharedError('HOST_DENIED', 'shared state is not available here')
     if (SHARED_WRITE_OPS.includes(op) && !deps.writable()) throw sharedError('HOST_DENIED', 'this conversation is read-only')
     try {
       switch (op) {
@@ -47,8 +52,10 @@ export function createCanvasShared(deps: CanvasSharedDeps): CanvasShared {
     }
   }
   return {
-    run: async (op, args) => sharedResult(op, await call(op, args)),
-    // call 已經驗過參數；createSharedApi 再驗一次是同一份規則，沒有副作用
-    api: createSharedApi(call, sharedError),
+    forRole: (roleId) => ({
+      run: async (op, args) => sharedResult(op, await call(roleId, op, args)),
+      // call 已經驗過參數；createSharedApi 再驗一次是同一份規則，沒有副作用
+      api: createSharedApi((op, args) => call(roleId, op, args), sharedError),
+    }),
   }
 }

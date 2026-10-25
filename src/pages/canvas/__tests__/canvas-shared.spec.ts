@@ -17,14 +17,14 @@ function fakeHost() {
 
 describe('畫布的共用狀態（沙箱橋與 window.stage 同一個入口）', () => {
   it('宿主沒接：全部 HOST_DENIED', async () => {
-    const shared = createCanvasShared({ host: undefined, roleId: () => '7', writable: () => true })
+    const shared = createCanvasShared({ host: undefined, roleId: () => '7', writable: () => true }).forRole('7')
     expect(await codeOf(shared.run('shared.read', ['boss']))).toBe('HOST_DENIED')
     expect(await codeOf(shared.api.shared.vote('p1-4', 'b'))).toBe('HOST_DENIED')
   })
 
   it('照這張卡問宿主，參數是驗過整理過的', async () => {
     const host = fakeHost()
-    const shared = createCanvasShared({ host, roleId: () => '7', writable: () => true })
+    const shared = createCanvasShared({ host, roleId: () => '7', writable: () => true }).forRole('7')
     expect(await shared.run('shared.read', [['boss', 'boss']])).toEqual({ boss: { kind: 'counter', total: 3 } })
     expect(host.read).toHaveBeenCalledWith('7', ['boss'])
     await shared.run('shared.add', ['boss', 1])
@@ -41,7 +41,7 @@ describe('畫布的共用狀態（沙箱橋與 window.stage 同一個入口）',
 
   it('看紀錄（唯讀）時能讀、能看排行與結果，寫入一律 HOST_DENIED', async () => {
     const host = fakeHost()
-    const shared = createCanvasShared({ host, roleId: () => '7', writable: () => false })
+    const shared = createCanvasShared({ host, roleId: () => '7', writable: () => false }).forRole('7')
     expect(await codeOf(shared.run('shared.read', ['boss']))).toBe('ok')
     expect(await codeOf(shared.run('shared.leaderboard', ['boss']))).toBe('ok')
     expect(await codeOf(shared.run('share.results', []))).toBe('ok')
@@ -56,7 +56,7 @@ describe('畫布的共用狀態（沙箱橋與 window.stage 同一個入口）',
     host.add.mockRejectedValueOnce(Object.assign(new Error('x'), { code: 'LIMIT_REACHED', data: { reason: 'goal' } }))
     host.vote.mockRejectedValueOnce(new TypeError('Failed to fetch'))
     host.read.mockRejectedValueOnce({ code: 'rate_limited' })
-    const shared = createCanvasShared({ host, roleId: () => '7', writable: () => true })
+    const shared = createCanvasShared({ host, roleId: () => '7', writable: () => true }).forRole('7')
     await expect(shared.run('shared.add', ['boss', 1])).rejects.toMatchObject({ code: 'LIMIT_REACHED', data: { reason: 'goal' } })
     expect(await codeOf(shared.run('shared.vote', ['p1-4', 'b']))).toBe('NETWORK')
     expect(await codeOf(shared.run('shared.read', ['boss']))).toBe('NETWORK')
@@ -64,8 +64,25 @@ describe('畫布的共用狀態（沙箱橋與 window.stage 同一個入口）',
 
   it('沒有 roleId（預覽）：HOST_DENIED，不問宿主', async () => {
     const host = fakeHost()
-    const shared = createCanvasShared({ host, roleId: () => '', writable: () => true })
+    const shared = createCanvasShared({ host, roleId: () => '', writable: () => true }).forRole('')
     expect(await codeOf(shared.run('shared.read', ['boss']))).toBe('HOST_DENIED')
     expect(host.read).not.toHaveBeenCalled()
+  })
+})
+
+describe('綁住掛載時的卡', () => {
+  it('畫布換了卡，舊卡片的請求（沙箱與一般卡）一律 HOST_DENIED，不會落到新卡', async () => {
+    const host = fakeHost()
+    let current = '7'
+    const shared = createCanvasShared({ host, roleId: () => current, writable: () => true })
+    const old = shared.forRole('7')
+    expect(await codeOf(old.run('shared.read', ['boss']))).toBe('ok')
+    current = '8'
+    expect(await codeOf(old.run('shared.vote', ['p1-4', 'b']))).toBe('HOST_DENIED')
+    expect(await codeOf(old.api.shared.add('boss', 1))).toBe('HOST_DENIED')
+    expect(host.vote).not.toHaveBeenCalled()
+    expect(host.add).not.toHaveBeenCalled()
+    expect(await codeOf(shared.forRole('8').run('shared.read', ['boss']))).toBe('ok')
+    expect(host.read).toHaveBeenLastCalledWith('8', ['boss'])
   })
 })
