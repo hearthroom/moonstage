@@ -1,4 +1,4 @@
-import { createApp, h } from 'vue'
+import { createApp, h, ref } from 'vue'
 import { createShell } from '../../src/sandbox/shell'
 import { bindBubbleFit } from '../../src/pages/canvas/canvas-bubble-fit'
 import { bindAuthorSideDock, collectFixedRoots } from '../../src/pages/canvas/canvas-author-side-dock'
@@ -7,6 +7,7 @@ import type { SandboxMessage } from '../../src/sandbox/protocol'
 import CanvasStage from '../../src/pages/canvas/components/canvas-stage.vue'
 import CanvasHeader from '../../src/pages/canvas/components/canvas-header.vue'
 import CanvasMessage from '../../src/pages/canvas/components/canvas-message.vue'
+import CanvasComposer from '../../src/pages/canvas/components/canvas-composer.vue'
 import '../../src/common/canvas-theme-vars.css'
 import '../../src/pages/canvas/canvas.css'
 import '../../src/sandbox/shell.css'
@@ -15,6 +16,7 @@ import '../../src/sandbox/shell.css'
 // CSS run in both modes. No author width override is applied to platform bubbles.
 const params = new URLSearchParams(location.search)
 const header = { roleName: 'Chat layout regression', avatar: '', badge: '', backLabel: 'Back' }
+const inputValue = ref('')
 
 const ordinaryPanel = '<div class="opening-panel"><h3>Journey panel</h3><p>Choose the first scene.</p></div>'
 const panel = params.has('frontend') ? '<pre class="lt-frontend"><code>&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;body&gt;&lt;h3&gt;Journey panel&lt;/h3&gt;&lt;p&gt;Choose the first scene.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</code></pre>' : ordinaryPanel
@@ -39,6 +41,7 @@ style.textContent = `
   .legacy-dock { position:fixed; top:160px; width:16px; height:100px; background:#8cb1c9; color:#111; writing-mode:vertical-rl; }
   ${params.get('dock-z') === '10' ? '.legacy-dock { z-index:10; }' : ''}
   .legacy-dock.left { left:0; } .legacy-dock.right { right:0; }
+  ${params.has('clip') ? '.chat-input-scope textarea { background:#d5a34a!important;background-clip:text!important;-webkit-background-clip:text!important;-webkit-text-fill-color:transparent!important;color:transparent!important; }' : ''}
 
 `
 document.head.append(style)
@@ -58,6 +61,10 @@ if (params.get('mode') === 'traditional') {
   createApp({ render: () => h('div', { class:'canvas-root chat lt-format-mmd' }, [
     h(CanvasHeader, header),
     h(CanvasStage, {}, () => messages.map(m => h(CanvasMessage, { message:m.view, menuLabel:'Menu' }))),
+    ...(params.has('composer') ? [h(CanvasComposer, {
+      value:inputValue.value, 'onUpdate:value':(value:string) => { inputValue.value = value },
+      placeholder:'Message', sendState:'send', generating:false, enterSends:false,
+    })] : []),
   ]) }).mount('#app')
   const chat = document.querySelector('#chat') as HTMLElement
   const scroll = document.querySelector('#scrollview') as HTMLElement
@@ -69,7 +76,7 @@ if (params.get('mode') === 'traditional') {
     doc:document, win:window, mount:document.querySelector('#app')!,
     config: {
       theme:params.get('theme') === 'light' ? 'light' : 'dark', locale:'en', role:{ name:'Example', avatarUrl:avatarOf('#6a8fd8') }, user:{ nickname:'Player', avatarUrl:avatarOf('#d98a5a') },
-      card:{ rules:[], statusbar:params.has('bom') ? 'mount' : '', statusbarHtml:params.has('bom') ? '\n\ufeff<div style="position:fixed;left:0;top:160px"></div>' : undefined }, capabilities:{ saves:false, edit:false, send:false }, composer:false,
+      card:{ rules:[], statusbar:params.has('bom') ? 'mount' : '', statusbarHtml:params.has('bom') ? '\n\ufeff<div style="position:fixed;left:0;top:160px"></div>' : undefined }, capabilities:{ saves:false, edit:false, send:false }, composer:params.has('composer'),
       chromeState: {
         header,
         composer: { placeholder:'Message', sendState:'send', generating:false, enterSends:true, shortcuts:[], moreOpen:false, moreItems:[], modelScore:'', assistBusy:false, assistCost:'', labels:{ stop:'Stop', more:'More', send:'Send', paste:'Paste', clear:'Clear', model:'Model', assist:'Assist', perTurn:'Per turn' } },

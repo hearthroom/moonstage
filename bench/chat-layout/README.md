@@ -32,6 +32,11 @@ Options can be combined:
 - `frontend=1`: opening uses the platform frontend-block iframe.
 - `wide=1`: author opening panel deliberately sets min-width:100vw; this is an
   author-requested exception and is kept, subject to existing viewport safety.
+- `composer=1`: show the actual shared composer in either mode. Enter a long
+  synthetic draft, swipe inside it, then return to the caret and type. Add `clip=1`
+  for solid background-clipped text: scrolling must move the visible lines while
+  retaining their color. Check both modes at phone and desktop sizes. This fixture
+  does not emulate a physical keyboard or establish Android/iOS device acceptance.
 
 Read `window.legacyStageSnapshot()` after scrolling `#scrollview` to the start,
 middle and end. Without docks, AI near-side margin is 10px on phones and its

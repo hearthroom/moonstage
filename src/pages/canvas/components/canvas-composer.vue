@@ -367,6 +367,7 @@
 import { panelIconMarkup } from '../canvas-panel-icons'
 import { attachDragScroll } from '../canvas-drag-scroll'
 import { syncChromeTone } from '../canvas-chrome-tone'
+import { fixSolidClippedText } from '../canvas-composer-text-paint'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CanvasTextarea from './canvas-textarea'
 import CanvasSendIcon from './canvas-send-icon.vue'
@@ -461,6 +462,8 @@ onBeforeUnmount(() => leaveTopLayer(stopEl.value))
 
 const textareaEl = ref<any>(null)
 const composing = ref(false)
+let restoreTextPaint = () => {}
+onBeforeUnmount(() => restoreTextPaint())
 
 // 繼續狀態這顆鍵做的是把暫停的那一輪接著跑：念「繼續」（先前念成「更多」，那是＋面板的名字）。
 const sendAriaLabel = computed(() => (props.sendState === 'continue' ? (props.labels.continue || props.labels.send) : props.labels.send))
@@ -500,6 +503,9 @@ function expand() {
 }
 
 function onFocus() {
+  restoreTextPaint()
+  const el = textareaNode()
+  restoreTextPaint = el ? fixSolidClippedText(el) : () => {}
   expanded.value = true
   emit('focus')
 }
@@ -515,6 +521,8 @@ function collapseIfIdle() {
   const el = textareaNode()
   const active = typeof document !== 'undefined' ? document.activeElement : null
   if (holdOpen || (el && active === el)) return
+  restoreTextPaint()
+  restoreTextPaint = () => {}
   expanded.value = false
 }
 
