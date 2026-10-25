@@ -13,6 +13,7 @@
  * 安全：只認 `event.source === iframe.contentWindow` 且 origin 相符的訊息；送出去也只送給
  * 那個 origin（不透明 origin 'null' 只能用 '*'，此時靠 source 核）。
  */
+import type { HistoryApi } from '../../common/history'
 import type { HudHost, HudHostMessage, HudHostState } from './canvas-hud-bridge'
 import {
   envelope, isSandboxEnvelope, targetOriginFor,
@@ -65,6 +66,7 @@ export interface SandboxHostDeps {
    * 不給就是這裡沒有分享連結，link／qr 回 HOST_DENIED。
    */
   share?: SandboxShareHost | null
+  history?: HistoryApi | null
   /** 殼上的按鈕想開宿主的面板。 */
   onAction?(name: ShellAction): void
   /** 殼沒處理的返回（舞台沒開）：宿主自己導頁。 */
@@ -135,6 +137,9 @@ const BACK_TIMEOUT_MS = 400
 export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   const { hud, iframe, win } = deps
   const tracked = new Map<string, Tracked>()
+  let protocolVersion: 1 | 2 = 1
+  let historyCapabilitiesKey = ''
+  const historySubscriptions = new Map<number,()=>void>()
   let helloSent = false
   let handshakeTimedOut = false
   let shellReady = false
@@ -154,7 +159,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   const post = (message: HostToShell) => {
     const target = iframe.contentWindow
     if (!target || destroyed) return
-    target.postMessage(envelope(message), targetOriginFor(deps.origin))
+    target.postMessage(envelope(message, protocolVersion), targetOriginFor(deps.origin))
   }
 
   // 系統列（失敗、點數不足、停止…那張卡）也送：一般卡畫在列表裡的東西，沙箱卡一樣要看得到。
@@ -445,7 +450,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     lastViewport = base.viewportHeight ?? viewportHeight()
     post({
       type: 'hello',
-      config: { ...base, ...(storageScope ? { storageScope } : {}), viewportHeight: lastViewport, capabilities: { saves: savesOk, edit: !helloSnapshot.readOnly, send: !helloSnapshot.readOnly, archive: !!deps.archive && !helloSnapshot.readOnly, share: !!deps.share }, saves, ...(share ? { share } : {}), chromeState: chrome ? (JSON.parse(lastChromeKey) as ChromeState) : undefined },
+      config: { ...base, ...(storageScope ? { storageScope } : {}), viewportHeight: lastViewport, history: protocolVersion === 2 ? deps.history?.capabilities() : undefined, capabilities: { ...(protocolVersion === 2 && deps.history ? {history: 1 as const} : {}), saves: savesOk, edit: !helloSnapshot.readOnly, send: !helloSnapshot.readOnly, archive: !!deps.archive && !helloSnapshot.readOnly, share: !!deps.share }, saves, ...(share ? { share } : {}), chromeState: chrome ? (JSON.parse(lastChromeKey) as ChromeState) : undefined },
     })
     // 殼建好之後才有東西可畫：歷史一到就送全量訊息，殼跑完冷啟動再喊 ready。
     armColdStart()
@@ -459,6 +464,23 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
 
   const handleRequest = async (reqId: number, op: string, args: unknown[]) => {
     try {
+      if (op.startsWith('history.')) {
+        if (protocolVersion !== 2 || !deps.history) return reply(reqId,false,undefined,{code:'HOST_DENIED'})
+        if(op==='history.list') return reply(reqId,true,await deps.history.list(args[0] as any))
+        const id=args[0]
+        if(!Number.isSafeInteger(id)||Number(id)<1) return reply(reqId,false,undefined,{code:'HISTORY_CURSOR_INVALID'})
+        if(op==='history.subscribe') {
+          if(historySubscriptions.has(Number(id))) return reply(reqId,false,undefined,{code:'HISTORY_CURSOR_INVALID'})
+          const off=deps.history.onChange(event=>{
+            post({type:'history.capabilities',capabilities:deps.history!.capabilities()})
+            post({type:'history.change',subscriptionId:Number(id),event})
+          })
+          historySubscriptions.set(Number(id),off)
+          return reply(reqId,true)
+        }
+        if(op==='history.unsubscribe') {historySubscriptions.get(Number(id))?.();historySubscriptions.delete(Number(id));return reply(reqId,true)}
+        return reply(reqId,false,undefined,{code:'HOST_DENIED'})
+      }
       switch (op) {
         case 'message.send': {
           const text = String(args[0] ?? '')
@@ -529,6 +551,11 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
           return reply(reqId, false, undefined, { code: 'UNKNOWN_CAPABILITY' })
       }
     } catch (e) {
+      if(op.startsWith('history.')) {
+        const code=String((e as any)?.code||'NETWORK')
+        if(deps.history) post({type:'history.capabilities',capabilities:deps.history.capabilities()})
+        return reply(reqId,false,undefined,{code:['HISTORY_STALE','HISTORY_CURSOR_INVALID','HISTORY_LIMIT','HISTORY_UNAVAILABLE','HOST_DENIED'].includes(code)?code:'NETWORK'})
+      }
       reply(reqId, false, undefined, { code: 'NETWORK', message: String((e as Error)?.message || e) })
     }
   }
@@ -556,7 +583,9 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     if (destroyed) return
     if (event.source !== iframe.contentWindow) return
     if (event.origin !== deps.origin) return
-    if (!isSandboxEnvelope(event.data)) return
+    if(!helloSent && isSandboxEnvelope(event.data,1) && event.data.type==='ready-shell') {
+      protocolVersion=Array.isArray((event.data as any).protocols)&&(event.data as any).protocols.includes(2)?2:1
+    } else if (!isSandboxEnvelope(event.data,protocolVersion)) return
     const message = event.data as unknown as ShellToHost
     switch (message.type) {
       case 'ready-shell':
@@ -648,6 +677,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       // 握手前就空手而回，effect 什麼都沒追蹤到，之後狀態再變也不會再被叫——殼就永遠停在冷啟動那一包。
       const snapshot = hud.read()
       if (!helloSent) return
+      if(protocolVersion===2&&deps.history){const caps=deps.history.capabilities();const next=JSON.stringify(caps);if(next!==historyCapabilitiesKey){historyCapabilitiesKey=next;post({type:'history.capabilities',capabilities:caps})}}
       if (awaitingColdStart) {
         syncChrome(snapshot)
         syncPanels(snapshot)
@@ -697,6 +727,8 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       if (handshakeTimer) clearTimeout(handshakeTimer)
       if (coldStartTimer) { clearTimeout(coldStartTimer); coldStartTimer = null }
       if (helloSent) { try { post({ type: 'dispose' }) } catch { /* iframe 可能已經拆了 */ } }
+      for(const off of historySubscriptions.values()) off()
+      historySubscriptions.clear()
       destroyed = true
       win.removeEventListener('message', onMessage)
       stopViewport?.()

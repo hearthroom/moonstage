@@ -111,6 +111,7 @@ function createStageIntentApi(options) {
   }
 
   const api = {
+    ...(host.history ? {history:host.history} : {}),
     input: {
       get: function () {
         const r = call('getInput')

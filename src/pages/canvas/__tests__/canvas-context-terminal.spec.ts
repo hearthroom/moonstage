@@ -25,6 +25,7 @@ function harness() {
   const getHistoryMsg = vi.fn(() => new Promise(() => {}))
   const clearStreamState = vi.fn()
   const bindings: Record<string, any> = {
+    canvasHistory: {check:vi.fn()},
     pendingChatTurn: { aiBubbleId: 'pending-ai', operationId: 'op-1', operationState: 'generating', operationVersion: 1 },
     conversationId: ref('conv-1'), talkList: ref([row.value]), unref,
     backwardHistorySnapshot: ref({ conversationId: 'conv-1', historyEpoch: 1, nextSeq: 1 }),

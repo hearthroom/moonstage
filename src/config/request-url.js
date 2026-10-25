@@ -16,6 +16,8 @@ export const requestUrl = {
 	chatOperationStatus: `${V1}/conversation/operations`,
 	getReplay: `${V1}/conversation/replay`,
 	historyMessageList: `${V1}/conversation/messages`,
+ historyIndex: `${V1}/chat/history-index`,
+ historyChanges: `${V1}/chat/history-changes`,
 	chatList: `${V1}/conversation/list`,
 	deleteConversation: `${V1}/conversation/delete`,
 	chatDelete: `${V1}/conversation/delete-message`,

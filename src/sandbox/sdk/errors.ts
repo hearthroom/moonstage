@@ -14,6 +14,10 @@ export const SDK_ERROR_CODES = [
   'LIMIT_REACHED',
   // sdk.share.link 的情境碼不合規則（1–64 個英數與 . _ -，開頭英數）。
   'SHARE_CONTEXT_INVALID',
+  'HISTORY_UNAVAILABLE',
+  'HISTORY_STALE',
+  'HISTORY_CURSOR_INVALID',
+  'HISTORY_LIMIT',
 ] as const
 
 export type SdkErrorCode = (typeof SDK_ERROR_CODES)[number]

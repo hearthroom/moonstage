@@ -1,5 +1,5 @@
 /**
- * 作者看到的 `sdk`：16 個鍵、44 個能力（後來加了 text、model、archive、generation、share），全部從第一版就存在——作者腳本在頂層探測它們，
+ * 作者看到的 `sdk`：17 個鍵、47 個能力（後來加了 text、model、archive、generation、share），全部從第一版就存在——作者腳本在頂層探測它們，
  * 少一個就是「按鈕全不響應」而沒有任何報錯。每個能力有實作狀態：實作／宿主沒接（HOST_DENIED）。
  *
  * 錯誤慣例（作者的程式碼依賴）：
@@ -17,6 +17,8 @@
  *   - share.link 同步：情境碼不合規則 → SHARE_CONTEXT_INVALID；宿主沒接或給不出連結 → HOST_DENIED。
  *     平台開關關著不丟錯，回不帶情境的一般連結。share.qr 非同步、交宿主畫。
  */
+import type { HistoryApi } from '../../common/history'
+import { createRemoteHistory } from './history'
 import { SdkError } from './errors'
 import type { EventBus } from './events'
 import type { GenerationOutcome } from '../protocol'
@@ -63,6 +65,7 @@ export interface SdkStageHost {
 }
 
 export interface SdkHost {
+  history?: HistoryApi
   input: SdkInputHost
   composer: SdkComposerHost
   stage: SdkStageHost
@@ -78,7 +81,7 @@ export interface SdkHost {
   /** 分享情境的現值（握手給、之後宿主可更新，例如推薦碼晚到）；每次讀都問。 */
   share?: () => ShareState | null
   /** 宿主代辦：送出、改寫、存檔寫入。 */
-  request(op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove' | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove' | 'generation.act' | 'share.qr', args: unknown[]): Promise<unknown>
+  request(op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove' | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove' | 'generation.act' | 'share.qr' | 'history.list' | 'history.subscribe' | 'history.unsubscribe', args: unknown[]): Promise<unknown>
   /** 現在是不是在使用者手勢裡（點擊當下）。 */
   inGesture(): boolean
   /** 非手勢送出前問使用者；回 true 表示允許。 */
@@ -92,6 +95,7 @@ export interface SdkHost {
 }
 
 export interface Sdk {
+  history: HistoryApi
   input: {
     get(): string; set(t: string): void; add(t: string): void; insert(t: string): void; clear(): void
     focus(): void; blur(): void; getCursor(): number; setCursor(n: number): void
@@ -185,6 +189,7 @@ function bytesOf(value: unknown): number {
 }
 
 export function createSdk(host: SdkHost, bus: EventBus): SdkController {
+  const history = host.history || createRemoteHistory(false,undefined,host.request).api
   const now = host.now || (() => Date.now())
   const stamps = new Map<RateLimitKey, number[]>()
   const takeSlot = (key: RateLimitKey) => {
@@ -243,6 +248,7 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
   }
 
   const sdk: Sdk = {
+    history,
     input: {
       get: () => host.input.get(),
       set: (t) => { requireString(t, 'text'); editDraft(() => t) },

@@ -7,7 +7,7 @@
  *     一律丟掉，殼送出去的訊息也只送給這個 origin。
  *   - 這裡不 import 任何宿主模組（請求層、oauth、store…）；build 後由 check-sandbox-boundary 掃。
  */
-import { envelope, isSandboxEnvelope, targetOriginFor, type HostToShell, type ShellToHost } from './protocol'
+import { envelope, isSandboxEnvelope, targetOriginFor, type HostToShell, type ShellToHost, type SandboxProtocolVersion, SANDBOX_SUPPORTED_PROTOCOLS } from './protocol'
 import { createShell, type Shell } from './shell'
 import './shell.css'
 
@@ -16,18 +16,21 @@ export function bootSandbox(win: Window & typeof globalThis = window) {
   const mount = doc.getElementById('app') || doc.body
   let hostOrigin: string | null = null
   let shell: Shell | null = null
+  let selectedVersion: SandboxProtocolVersion = 1
 
   const post = (message: ShellToHost) => {
     if (win.parent === win) return
-    win.parent.postMessage(envelope(message), targetOriginFor(hostOrigin || ''))
+    win.parent.postMessage(envelope(message, shell ? selectedVersion : 1), targetOriginFor(hostOrigin || ''))
   }
 
   win.addEventListener('message', (event: MessageEvent) => {
     if (event.source !== win.parent) return
-    if (!isSandboxEnvelope(event.data)) return
+    if (!isSandboxEnvelope(event.data, shell ? selectedVersion : 1) && (shell || !isSandboxEnvelope(event.data, 2))) return
     const message = event.data as unknown as HostToShell
     if (!shell) {
       if (message.type !== 'hello') return
+      selectedVersion = event.data.ms === 2 ? 2 : 1
+      if(selectedVersion===1){message.config={...message.config,history:undefined,capabilities:{...message.config.capabilities,history:undefined}}}
       hostOrigin = event.origin
       shell = createShell({
         doc,
@@ -55,12 +58,12 @@ export function bootSandbox(win: Window & typeof globalThis = window) {
 
   // 握手：殼喊 ready-shell，宿主回 hello。殼可能比宿主的 load 監聽先跑完（快取命中時常見），
   // 一喊就沒了會白白等到宿主逾時，所以每 500ms 重喊一次直到 hello 到，最多 10 秒。
-  post({ type: 'ready-shell' })
+  post({ type: 'ready-shell', protocols: SANDBOX_SUPPORTED_PROTOCOLS })
   mount.setAttribute('data-sandbox', 'waiting-for-host')
   const startedAt = Date.now()
   const retry = win.setInterval(() => {
     if (shell || Date.now() - startedAt > 10_000) { win.clearInterval(retry); return }
-    post({ type: 'ready-shell' })
+    post({ type: 'ready-shell', protocols: SANDBOX_SUPPORTED_PROTOCOLS })
   }, 500)
 }
 

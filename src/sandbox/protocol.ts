@@ -8,9 +8,14 @@
  * 每則訊息包成 `{ ms: SANDBOX_PROTOCOL_VERSION, ...訊息 }`；`ms` 對不上一律丟掉。
  * 改契約＝改版本號＋兩端測試。
  */
+import type { HistoryCapabilities, HistoryChange } from '../common/history'
 import type { ShareState } from '../common/share-context'
 
+// v1 remains the bootstrap/legacy default; every live transport passes the
+// negotiated version explicitly. v2 adds authoritative author history.
 export const SANDBOX_PROTOCOL_VERSION = 1
+export type SandboxProtocolVersion = 1 | 2
+export const SANDBOX_SUPPORTED_PROTOCOLS = [1, 2] as const
 
 export type SandboxRole = 'user' | 'ai'
 /**
@@ -79,9 +84,11 @@ export interface SandboxCapabilities {
   archive?: boolean
   /** 宿主接了分享情境（sdk.share.*）。沒接時 link／qr 回 HOST_DENIED。 */
   share?: boolean
+  history?: 1
 }
 
 export interface SandboxHelloConfig {
+  history?: HistoryCapabilities
   theme: SandboxTheme
   locale: string
   /** 卡片的語言（zh-Hant／zh-Hans…）。跟玩家同一種字形就不做簡繁轉換；沒給就只看 locale。 */
@@ -294,6 +301,8 @@ export interface SandboxBackground {
 /** 宿主 → 殼 */
 export type HostToShell =
   | { type: 'hello'; config: SandboxHelloConfig }
+  | { type: 'history.change'; subscriptionId: number; event: HistoryChange }
+  | { type: 'history.capabilities'; capabilities: HistoryCapabilities }
   | { type: 'messages'; messages: SandboxMessage[] }
   /** 一則新氣泡。`before`＝插在那個 id 之前（載入更早的歷史，殼不捲到底、畫面不動）；沒給就接在最後。 */
   | { type: 'message.new'; message: SandboxMessage; before?: string }
@@ -327,14 +336,14 @@ export type HostToShell =
 
 export type RequestOp = 'message.send' | 'message.edit' | 'save.set' | 'save.remove'
   | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove'
-  | 'generation.act' | 'share.qr'
+  | 'generation.act' | 'share.qr' | 'history.list' | 'history.subscribe' | 'history.unsubscribe'
 
 /** 殼上的按鈕想請宿主開的面板／做的事。 */
 export type ShellAction = 'back' | 'open-model' | 'open-persona' | 'open-archives' | 'stop' | 'regenerate' | 'more'
 
 /** 殼 → 宿主 */
 export type ShellToHost =
-  | { type: 'ready-shell' }
+  | { type: 'ready-shell'; protocols?: readonly number[] }
   | { type: 'ready' }
   | { type: 'request'; reqId: number; op: RequestOp; args: unknown[] }
   | { type: 'input'; value: string }
@@ -363,16 +372,16 @@ export type ShellToHost =
   | { type: 'back-handled'; handled: boolean }
   | { type: 'debug'; level: 'log' | 'warn' | 'error'; args: unknown[] }
 
-export type SandboxEnvelope<T> = T & { ms: typeof SANDBOX_PROTOCOL_VERSION }
+export type SandboxEnvelope<T> = T & { ms: SandboxProtocolVersion }
 
-export function envelope<T extends { type: string }>(message: T): SandboxEnvelope<T> {
-  return { ms: SANDBOX_PROTOCOL_VERSION, ...message }
+export function envelope<T extends { type: string }>(message: T, version: SandboxProtocolVersion = SANDBOX_PROTOCOL_VERSION): SandboxEnvelope<T> {
+  return { ...message, ms: version }
 }
 
 /** 收到的東西是不是這個版本的協議訊息。不是就當雜訊（第三方腳本也會 postMessage）。 */
-export function isSandboxEnvelope(data: unknown): data is SandboxEnvelope<{ type: string }> {
+export function isSandboxEnvelope(data: unknown, version: SandboxProtocolVersion = SANDBOX_PROTOCOL_VERSION): data is SandboxEnvelope<{ type: string }> {
   return !!data && typeof data === 'object'
-    && (data as { ms?: unknown }).ms === SANDBOX_PROTOCOL_VERSION
+    && (data as { ms?: unknown }).ms === version
     && typeof (data as { type?: unknown }).type === 'string'
 }
 

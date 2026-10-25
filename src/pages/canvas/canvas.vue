@@ -471,6 +471,8 @@ import { bindAuthorSideDock, collectFixedRoots } from './canvas-author-side-dock
 import { bindBubbleFit } from './canvas-bubble-fit'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
 import { createCanvasShare } from './canvas-share'
+import { createHistoryAdapter } from './canvas-history'
+import { getAuthorRuleStorageScope, onStorageScopeChange } from '@/common/author-rules/storage-scope'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
 import { clearPendingReplyPhase, insertBeforePendingReply, markPendingReplyPhase, pendingReplyLabel } from './canvas-pending-reply'
 import { createWaitClock } from '@/utils/wait-clock'
@@ -2693,6 +2695,25 @@ const sandboxStage = ref<'closed' | 'content' | 'full'>('closed');
 const sandboxComposerHidden = ref(false);
 let sandboxThemeObserver: MutationObserver | null = null;
 // 分享情境（sdk.share／stage.share）：兩種 pageMode 讀同一份宿主給的值；看自己的紀錄時不帶朋友的情境碼。
+const canvasHistory = createHistoryAdapter({
+  doc: typeof document==='undefined' ? undefined : document,
+  scope: () => {
+    if(previewOnly.value||!unref(hasLogin)||!unref(roleId)||!unref(conversationId)) return null;
+    const info:any=unref(userInfo)||{};
+    return {roleId:String(unref(roleId)),conversationId:String(unref(conversationId)),identity:getAuthorRuleStorageScope()||String(info.id||info.userId||'signed-in')};
+  },
+  reason:()=>previewOnly.value?'preview':!unref(hasLogin)?'not_authenticated':'no_conversation',
+  request:async(op,args)=>{
+    try {
+      const response=await _this.http.get(op==='index'?_this.requestUrl.historyIndex:_this.requestUrl.historyChanges,{showLoading:false,quietErrors:true,quietTransport:true,data:args});
+      if(response.statusCode!==200) throw {status:response.statusCode,code:response.data?.code};
+      return response.data;
+    }catch(error:any){throw {status:error?.statusCode||error?.status,code:error?.data?.code||error?.code};}
+  },
+});
+const stopHistoryScopeWatch=onStorageScopeChange(()=>canvasHistory.reset());
+watch(()=>[String(unref(roleId)||''),String(unref(conversationId)||''),!!unref(hasLogin),previewOnly.value],()=>canvasHistory.reset(),{flush:'sync'});
+watch(()=>talkList.value.map((m:any)=>String(m.chatId||m.id||'')+':'+String(m.chatFinish)).join('|'),()=>{void canvasHistory.check();},{flush:'post'});
 const canvasShare = createCanvasShare({ host: stageHost.share, roleId: () => String(unref(roleId) || ''), historyMode: () => ownedHistoryMode.value });
 // 值變了（推薦碼晚到）兩種 pageMode 都要知道：沙箱殼收 share 訊息後發 share:change，一般卡直接發 share:change。
 // 卡片可能在載入時就備好了連結與 QR，沒這個通知就會一直送出不帶推薦碼的連結。
@@ -3150,6 +3171,7 @@ function mountSandbox(asset: any) {
       roleId: targetRoleId,
       saves: resolved.saves,
       share: canvasShare.sandbox(),
+      history: canvasHistory,
       hello: () => {
         const info: any = unref(userInfo) || {};
         const view: any = roleView.value || {};
@@ -3352,6 +3374,7 @@ function buildAuthorAssetHost() {
     // 用既有的 IME 旗標：組字期間改草稿會跟拼音打架。
     isComposing: () => imeComposing.value === true,
     ...canvasShare.intentHost(),
+    history: {capabilities:canvasHistory.capabilities,list:canvasHistory.list,onChange:canvasHistory.onChange},
   };
 }
 
@@ -4188,6 +4211,8 @@ function disposeAuthorAsset() {
     if (hud && typeof hud.destroy === 'function') { try { hud.destroy(); } catch (e) { /* 收尾不得拋錯 */ } }
   }
   // 範圍最後收：執行期 dispose 時作者的 dispose 回呼還可能開計時器、動節點，要一起算進去
+  stopHistoryScopeWatch();
+  canvasHistory.dispose();
   authorScopeClosed = true;
   if (authorScope) {
     try { authorScope.dispose(); } catch (e) { /* 收尾不得拋錯 */ }
@@ -5383,6 +5408,7 @@ function onSystemMsgCta(action, item, index) {
 
 function applyBackwardHistorySnapshot(payload:any, expectedConversationId=String(unref(conversationId)||''),authoritative=false) {
  if (expectedConversationId!==String(unref(conversationId)||'')) return;
+ void canvasHistory.check();
  backwardHistorySnapshot.value=nextBackwardHistorySnapshot(backwardHistorySnapshot.value,payload,expectedConversationId,authoritative);
 }
 

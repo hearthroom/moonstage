@@ -21,7 +21,7 @@ import { SDK_ERROR_CODES } from '../sdk/errors'
 import { ALLOWED_TAGS, UNWRAP_TAGS, DROP_TAGS, URL_ATTRS } from '../sanitize'
 import { buildShell } from '../render/shell-dom'
 import { shellStrings } from '../strings'
-import { SANDBOX_PROTOCOL_VERSION } from '../protocol'
+import { SANDBOX_PROTOCOL_VERSION, SANDBOX_SUPPORTED_PROTOCOLS } from '../protocol'
 import { MESSAGE_SCOPE, stylePolicyFor } from '@/common/author-style-policy'
 import { STANDARD_HTML_TAGS } from '@/pages/canvas/canvas-platform-defaults'
 import {
@@ -64,7 +64,7 @@ function capabilitiesOf(sdk: Record<string, unknown>): { keys: string[]; capabil
     capabilities.push(key)
   }
   // 非同步的四個：回 Promise；其餘同步、錯誤直接 throw。
-  const async = ['message.send', 'message.edit', 'save.set', 'save.remove', 'text.ready', 'archive.list', 'archive.save', 'archive.fork', 'archive.open', 'archive.start', 'archive.rename', 'archive.remove', 'generation.act', 'share.qr']
+  const async = ['message.send', 'message.edit', 'save.set', 'save.remove', 'text.ready', 'archive.list', 'archive.save', 'archive.fork', 'archive.open', 'archive.start', 'archive.rename', 'archive.remove', 'generation.act', 'share.qr', 'history.list']
   return { keys, capabilities: capabilities.sort(), async }
 }
 
@@ -216,6 +216,7 @@ function buildContract() {
     sdkVersion: sdk.version,
     generatedBy: 'src/sandbox/__tests__/contract.spec.ts (UPDATE_CONTRACT=1)',
     sources: ['src/sandbox/sdk/create-sdk.ts', 'src/sandbox/sdk/events.ts', 'src/sandbox/sdk/errors.ts', 'src/common/share-context.ts', 'src/sandbox/sanitize.ts', 'src/sandbox/render/shell-dom.ts', 'src/sandbox/shell.css', 'src/sandbox/shell.ts', 'src/sandbox/author-scripts.ts', 'src/sandbox/rules.ts', 'src/utils/display-rule-engine.js', 'src/common/author-style-policy.ts', 'src/pages/canvas/canvas-platform-defaults.ts', 'docs/sandbox-chat-page.md'],
+    supportedProtocols: [...SANDBOX_SUPPORTED_PROTOCOLS],
     sdk: {
       keys: caps.keys,
       capabilities: caps.capabilities,
@@ -235,6 +236,17 @@ function buildContract() {
         act: { gestureOnly: 'UNAUTHORIZED outside a trusted click (no dialog)', unknownAction: 'INVALID_ARGS', whileGenerating: 'BUSY', withoutSend: 'NOT_SUPPORTED', rateLimit: 'generation.act 3/min' },
       },
       archive: { item: ['id', 'title', 'isCurrent', 'messageCount', 'lastMessage', 'createTime', 'lastUpdateTime'], list: ['items', 'count', 'limit'], limitError: { code: 'LIMIT_REACHED', data: ['count', 'limit'] }, gesture: 'save/fork/open/start/rename/remove run directly inside a user gesture; outside one the shell asks first', rateLimit: 'archive.write 10/min' },
+      history: {
+        featureVersion: 1, requiresProtocol: 2, classic: 'stage.history',
+        capabilities: ['version','available','reason'],
+        page: ['conversationKey','revision','items','complete','cursor'],
+        item: ['id','order','role','kind','state','complete','contentVersion','content?'],
+        changes: ['conversationKey','previousRevision','revision','kind','changes','part','final'],
+        streamContent: false, rawIdentities: false, subscribeReturnsUnsubscribe: true,
+        pageLimit: 200, contentPageBytes: 524288, foregroundPollMs: 15000,
+        revisions: 'decimal strings; stale continuation rejects; only the final page is complete',
+        lifecycle: 'independent of mount/unmount; switch/dispose fences old responses',
+      },
       share: {
         properties: ['enabled', 'context', 'audience'],
         contextPattern: SHARE_CONTEXT_RE.source,
@@ -333,12 +345,12 @@ describe('沙箱作者契約', () => {
     expect(current).toBe(text)
   })
 
-  it('能力數與 sdk.spec 對得上：16 鍵、44 能力、14 個非同步', () => {
+  it('能力數與 sdk.spec 對得上：17 鍵、47 能力、15 個非同步', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
     const caps = capabilitiesOf(sdk as unknown as Record<string, unknown>)
-    expect(caps.keys.length).toBe(16)
-    expect(caps.capabilities.length).toBe(44)
-    expect(caps.async.length).toBe(14)
+    expect(caps.keys.length).toBe(17)
+    expect(caps.capabilities.length).toBe(47)
+    expect(caps.async.length).toBe(15)
     for (const a of caps.async) expect(caps.capabilities).toContain(a)
   })
 

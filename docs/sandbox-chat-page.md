@@ -310,3 +310,40 @@ JSON、WASM 等檔案（含 `WebAssembly.instantiateStreaming`），別的外站
 - 宿主算好的訊息（`view.html`）與功能欄（`statusbarHtml`）由宿主轉。
 - 殼自己渲染的內容（沒有 `view` 時）由殼轉：字典在 `sandbox-zh.js`，需要轉時才載入；載好之前照原文畫，載好後整個列表經虛擬化同一條路拆掉重建（重發 `message:unmount`／`message:mount`）。
 - 卡片腳本自己畫的字用 `sdk.text.convert()`；要在字典載好後重畫，等 `sdk.text.ready()`。
+
+## 可靠歷史：`sdk.history`／`stage.history`
+
+新殼先送 v1 `ready-shell` 並宣告 `protocols:[1,2]`；宿主以選定版本回 `hello`，之後兩端只接受該版本。v2 才提供 history；新舊任一端不支援 v2 時繼續 v1，分享功能不變、history 明確 unavailable。`ready` 仍是訊息冷載後的畫面完成訊號，不是協商入口。`SANDBOX_PROTOCOL_VERSION=1` 保留為 bootstrap／legacy 預設值，實際 transport 明傳共同版。
+
+`history.capabilities()` 回 `{version:1,available,reason}`。`list({cursor?,revision?,limit?,content?})` 讀目前玩家、目前卡、目前會話的已提交訊息，最多 200 則一頁，依 `order` 舊到新；回 `{conversationKey,revision,items,complete,cursor}`。ID 是此會話內穩定的不透明鍵，與既有 `lN/h…/serverId` 不同，不能拼接或作玩家身分。revision/order/contentVersion 都是十進位字串，不轉成 Number。每列的 `role` 是 user/ai，`kind` 是 opening/message，`state` 是 streaming/complete/partial/failed，`complete` 只有完整 user 或成功 AI 才 true。`content:true` 可讀已終止列的可見原文，不回 thinking、生成中文字或被 moderation 隱藏的內容；字形轉換仍是呈現工作。
+
+第一頁不必傳 revision；續頁沿用首包 revision 與 cursor。只有最後頁 complete=true，cursor=null；空的完整會話也帶會話鍵與 revision。HISTORY_STALE 表示歷史在讀取中變了，必須丟掉已累積頁再讀，不得把不同版本拼成完整。錯誤不是空歷史。
+
+`history.onChange(callback)` 回取消訂閱函式。每位新訂閱者先收到 reset，之後收到同會話 revision 的 append/update/remove/truncate/replace；訊息從未 mount、已 hollow 都會有真歷史變更，viewport unmount 不會。每個 revision 可分多包，part 從 0 連號、final=true 才完整。事件到第一包就應使衍生狀態失效，再用完整 list 重算；不要把事件當作對話寫入或重複結算依據。reset 是斷鏈／保留期不足／換會話，unavailable 是無權限／登出等，兩者都不能解讀為「刪光」。同頁提交後檢查；其他裝置在前景每 15 秒與回前景時檢查，不承諾秒級跨端廣播。切會話與 dispose 會丟棄舊成功／失敗。
+
+一般卡的頁級作者入口是 `window.stage.history`，與 sandbox 的 `sdk.history` 相同；訊息內 frontend-block iframe 不因此多出一份 SDK。預覽和舊宿主必須先探測能力；不得把預覽注入的 30 則清單當真實全歷史。此能力不收任意 roleId/conversationId，不授予生成、改寫、讀其他玩家或其他存檔的權限，不消耗生成 credits。
+
+```js
+const history = window.sdk?.history || window.stage?.history;
+let epoch = 0, timer;
+async function rebuild() {
+  const mine = ++epoch;
+  if (!history?.capabilities().available) return showUnknown();
+  try {
+    let cursor, revision; const rows = [];
+    do {
+      const page = await history.list({cursor, revision, content: true});
+      if (mine !== epoch) return;
+      revision = page.revision; rows.push(...page.items);
+      cursor = page.complete ? null : page.cursor;
+    } while (cursor);
+    renderState(rows.filter(row => row.role === 'ai' && row.complete));
+  } catch { if (mine === epoch) showUnknown(); }
+}
+const off = history?.onChange(() => {
+  ++epoch; showUnknown(); clearTimeout(timer);
+  timer = setTimeout(rebuild, 100);
+});
+void rebuild();
+// 作者作用域結束時：++epoch; clearTimeout(timer); off?.();
+```

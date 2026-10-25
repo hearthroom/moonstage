@@ -47,18 +47,18 @@ const expectCode = async (p: Promise<unknown> | (() => unknown), code: string) =
 }
 
 describe('sdk 的形狀', () => {
-  it('恰好 16 個鍵、44 個能力、version 是值 "1"、沒有 once/off', () => {
+  it('恰好 17 個鍵、47 個能力、version 是值 "1"、沒有 once/off', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
-    expect(Object.keys(sdk).sort()).toEqual(['archive', 'cache', 'composer', 'debug', 'generation', 'input', 'message', 'model', 'on', 'role', 'save', 'share', 'stage', 'text', 'user', 'version'])
+    expect(Object.keys(sdk).sort()).toEqual(['archive', 'cache', 'composer', 'debug', 'generation', 'history', 'input', 'message', 'model', 'on', 'role', 'save', 'share', 'stage', 'text', 'user', 'version'])
     const caps = [
       ...Object.keys(sdk.input).map((k) => `input.${k}`), ...Object.keys(sdk.composer).map((k) => `composer.${k}`),
       ...Object.keys(sdk.message).map((k) => `message.${k}`), ...Object.keys(sdk.cache).map((k) => `cache.${k}`),
       ...Object.keys(sdk.save).map((k) => `save.${k}`), ...Object.keys(sdk.stage).map((k) => `stage.${k}`),
       ...Object.keys(sdk.text).map((k) => `text.${k}`), ...Object.keys(sdk.archive).map((k) => `archive.${k}`),
-      'share.link', 'share.qr',
+      'share.link', 'share.qr', 'history.capabilities', 'history.list', 'history.onChange',
       'role.get', 'user.get', 'model.get', 'generation.get', 'generation.act', 'on', 'debug.log', 'version',
     ]
-    expect(caps.length).toBe(44)
+    expect(caps.length).toBe(47)
     expect(sdk.version).toBe('1')
     expect((sdk as unknown as { once?: unknown }).once).toBeUndefined()
     expect((sdk as unknown as { off?: unknown }).off).toBeUndefined()

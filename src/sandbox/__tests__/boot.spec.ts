@@ -70,3 +70,20 @@ describe('bootSandbox 握手', () => {
     expect(document.querySelector('[data-chat=root]')).toBeNull()
   })
 })
+
+describe('protocol v2 negotiation', () => {
+ it('advertises v2 on legacy ready-shell and accepts the selected v2 hello', () => {
+  const {win,parent,dispatch}=fakeWindow()
+  bootSandbox(win)
+  expect(parent.postMessage.mock.calls[0][0]).toMatchObject({ms:1,type:'ready-shell',protocols:[1,2]})
+  dispatch({ms:2,type:'hello',config:{...config,capabilities:{...config.capabilities,history:1}}})
+  expect(document.querySelector('[data-sandbox="ready"]')).not.toBeNull()
+  dispatch({ms:2,type:'messages',messages:[]})
+  expect(parent.postMessage.mock.calls.some(([m])=>m.ms===2&&m.type==='ready')).toBe(true)
+ })
+ it('keeps v1 when an old host replies with v1 hello', () => {
+  const {win,parent,dispatch}=fakeWindow()
+  bootSandbox(win);dispatch({ms:1,type:'hello',config});dispatch({ms:1,type:'messages',messages:[]})
+  expect(parent.postMessage.mock.calls.some(([m])=>m.ms===1&&m.type==='ready')).toBe(true)
+ })
+})

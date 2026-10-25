@@ -8,6 +8,7 @@
  */
 import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, RequestOp, SandboxBackground, SandboxHelloConfig, SandboxMessage, ShellToHost, StageState } from './protocol'
 import { createEventBus } from './sdk/events'
+import { createRemoteHistory } from './sdk/history'
 import { createSdk, type Sdk, type SdkHost } from './sdk/create-sdk'
 import type { ShareState } from '../common/share-context'
 import { SdkError, sdkErrorFromHost } from './sdk/errors'
@@ -243,7 +244,9 @@ export function createShell(options: CreateShellOptions): Shell {
 
   // 分享情境：握手給一次，之後宿主送 share 訊息換掉（推薦碼晚到）。
   let shareState: ShareState | null = config.share ?? null
+  const historyRemote = createRemoteHistory(config.capabilities.history === 1, config.history, request)
   const sdkHost: SdkHost = {
+    history: historyRemote.api,
     input: {
       get: () => input.get(),
       set: (t) => { input.set(t); emitInput() },
@@ -669,6 +672,8 @@ export function createShell(options: CreateShellOptions): Shell {
 
   const handle = (message: HostToShell) => {
     switch (message.type) {
+      case 'history.change': historyRemote.receive(message.subscriptionId,message.event); return
+      case 'history.capabilities': historyRemote.capabilities(message.capabilities); return
       case 'hello':
         // 已經建好；重複的 hello 忽略（宿主重送握手時）。
         return
@@ -784,6 +789,7 @@ export function createShell(options: CreateShellOptions): Shell {
     refs,
     sdk: controller.sdk,
     dispose() {
+      historyRemote.dispose()
       disposed = true
       offRuleSettled()
       bus.emit('dispose')

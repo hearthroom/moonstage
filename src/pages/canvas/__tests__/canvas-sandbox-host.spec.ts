@@ -850,3 +850,30 @@ describe('沙箱宿主橋：作者規則持久層的帳號範圍', () => {
     expect(h.posted.map((p) => p.type)).not.toContain('storage.clear')
   })
 })
+
+describe('history v2 host bridge',()=>{
+ it('negotiates v2 before hello and scopes history to the host adapter',async()=>{
+  const h=harness(),state={current:makeState({messages:[msg({id:'opening',opening:true,text:'Hello'})]})}
+  const {hud}=fakeHud(state)
+  const stop=vi.fn(),list=vi.fn(async()=>({conversationKey:'opaque',revision:'1',items:[],complete:true,cursor:null}))
+  const host=createSandboxHost({hud,iframe:h.iframe,win:window,origin:ORIGIN,roleId:'1',hello,history:{capabilities:()=>({version:1,available:true,reason:'ready'}),list,onChange:()=>stop}})
+  host.start();h.fromShell({type:'ready-shell',protocols:[1,2]});await flush()
+  const greeting=h.posted.find(m=>m.type==='hello') as any
+  expect(greeting.ms).toBe(2);expect(greeting.config.capabilities.history).toBe(1)
+  const send=(message:any)=>window.dispatchEvent(new MessageEvent('message',{data:{...message,ms:2},origin:ORIGIN,source:h.iframe.contentWindow}))
+  send({type:'request',reqId:91,op:'history.list',args:[{limit:1}]});await flush()
+  expect(list).toHaveBeenCalledWith({limit:1})
+  expect(h.posted.find(m=>m.type==='reply'&&m.reqId===91)).toMatchObject({ms:2,ok:true,value:{conversationKey:'opaque'}})
+  send({type:'request',reqId:92,op:'history.subscribe',args:[1]});await flush()
+  host.destroy();expect(stop).toHaveBeenCalledTimes(1);h.iframe.remove()
+ })
+ it('does not expose history to a legacy v1 shell',async()=>{
+  const h=harness(),state={current:makeState({messages:[msg({id:'opening',opening:true,text:'Hello'})]})}
+  const {hud}=fakeHud(state);const list=vi.fn()
+  const host=createSandboxHost({hud,iframe:h.iframe,win:window,origin:ORIGIN,roleId:'1',hello,history:{capabilities:()=>({version:1,available:true,reason:'ready'}),list,onChange:()=>()=>{}}})
+  host.start();h.fromShell({type:'ready-shell'});await flush()
+  h.fromShell({type:'request',reqId:93,op:'history.list',args:[{}]});await flush()
+  expect(h.posted.find(m=>m.type==='reply'&&m.reqId===93)).toMatchObject({ms:1,ok:false,error:{code:'HOST_DENIED'}})
+  expect(list).not.toHaveBeenCalled();host.destroy();h.iframe.remove()
+ })
+})
