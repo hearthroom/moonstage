@@ -38,3 +38,34 @@ describe('author history adapter',()=>{
   a.dispose()
  })
 })
+
+describe('history review regressions',()=>{
+ const scope=()=>({roleId:'card',conversationId:'conversation',identity:'owner'})
+ const page=(revision:string)=>({conversationKey:'opaque',revision,items:[],complete:true,cursor:null})
+ it('rejects a delayed snapshot older than an already observed same-conversation head',async()=>{
+  let resolve:any
+  const a=createHistoryAdapter({scope,request:(_op,args)=>args.limit===1?new Promise(r=>{resolve=r}):Promise.resolve(page('2'))})
+  const old=a.list({limit:1});await flush();await a.list({limit:2})
+  const rejected=expect(old).rejects.toMatchObject({code:'HISTORY_STALE'});resolve(page('1'));await rejected;a.dispose()
+ })
+ it('revocation fences every in-flight success even when the visible scope has not changed',async()=>{
+  let resolve:any,reject:any
+  const a=createHistoryAdapter({scope,request:(_op,args)=>new Promise((yes,no)=>{if(args.limit===1)resolve=yes;else reject=no})})
+  const slow=a.list({limit:1}),fast=a.list({limit:2});const fastDone=fast.catch(()=>{});await flush()
+  reject({status:403});await fastDone
+  const rejected=expect(slow).rejects.toMatchObject({code:'HISTORY_UNAVAILABLE'});resolve({...page('1'),items:[{content:'synthetic old body'}]});await rejected
+  expect(a.capabilities()).toMatchObject({available:false,reason:'revoked'});a.dispose()
+ })
+ it('retries a newly subscribed listener after its first head request fails',async()=>{
+  vi.useFakeTimers();let revision='1',fail=false
+  const request=vi.fn(async(op:string,args:any)=>{
+   if(op==='index'){if(fail){fail=false;throw{status:503}};return page(revision)}
+   return {...page(revision),reset:false,events:args.afterRevision===revision?[]:[{conversationKey:'opaque',previousRevision:args.afterRevision,revision,kind:'remove',changes:[{op:'remove',id:'opaque-item'}],part:0,final:true}]}
+  })
+  const a=createHistoryAdapter({scope,request})
+  const old=vi.fn(),later=vi.fn();a.onChange(old);await flush();fail=true;a.onChange(later);await flush()
+  revision='2';await a.check();await flush();revision='3';await a.check();await flush()
+  expect(later.mock.calls.some(([e])=>e.kind==='reset'&&e.revision==='2')).toBe(true)
+  expect(later.mock.calls.some(([e])=>e.kind==='remove'&&e.revision==='3')).toBe(true);a.dispose()
+ })
+})

@@ -471,7 +471,7 @@ import { bindAuthorSideDock, collectFixedRoots } from './canvas-author-side-dock
 import { bindBubbleFit } from './canvas-bubble-fit'
 import { createStageIntentApi } from '@/utils/stage-intent-api.js'
 import { createCanvasShare } from './canvas-share'
-import { createHistoryAdapter } from './canvas-history'
+import { createHistoryAdapter, bindHistoryAuthorScope } from './canvas-history'
 import { getAuthorRuleStorageScope, onStorageScopeChange } from '@/common/author-rules/storage-scope'
 import { createHudBridge, type HudBridge, type HudHost, type HudMoreKind } from './canvas-hud-bridge'
 import { clearPendingReplyPhase, insertBeforePendingReply, markPendingReplyPhase, pendingReplyLabel } from './canvas-pending-reply'
@@ -3384,7 +3384,7 @@ function hostOutsideAuthorScope(host, scope) {
   const wrapped = {};
   Object.keys(host).forEach((key) => {
     const value = host[key];
-    wrapped[key] = typeof value === 'function'
+    wrapped[key] = key === 'history' && value ? bindHistoryAuthorScope(value, scope) : typeof value === 'function'
       ? function () { return scope.suspend(value, this, arguments); }
       : value;
   });

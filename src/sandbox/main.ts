@@ -20,7 +20,7 @@ export function bootSandbox(win: Window & typeof globalThis = window) {
 
   const post = (message: ShellToHost) => {
     if (win.parent === win) return
-    win.parent.postMessage(envelope(message, shell ? selectedVersion : 1), targetOriginFor(hostOrigin || ''))
+    win.parent.postMessage(envelope(message, selectedVersion), targetOriginFor(hostOrigin || ''))
   }
 
   win.addEventListener('message', (event: MessageEvent) => {

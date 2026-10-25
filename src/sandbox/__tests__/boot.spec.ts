@@ -87,3 +87,22 @@ describe('protocol v2 negotiation', () => {
   expect(parent.postMessage.mock.calls.some(([m])=>m.ms===1&&m.type==='ready')).toBe(true)
  })
 })
+
+it('uses selected v2 while synchronous top-level author code runs inside hello',async()=>{
+ const {JSDOM}=await import('jsdom')
+ const dom=new JSDOM('<div id="app"></div>',{url:'https://shell.fixture.test',runScripts:'dangerously'})
+ const win=dom.window as any,sent:any[]=[];const parent={postMessage:(m:any)=>sent.push(m)}
+ Object.defineProperty(win,'parent',{value:parent})
+ win.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}})
+ win.ResizeObserver=class{observe(){}disconnect(){}}
+ const computed=win.getComputedStyle.bind(win);win.getComputedStyle=(el:any)=>computed(el)
+ try{
+  bootSandbox(win)
+  const cfg={...config,capabilities:{...config.capabilities,history:1},history:{version:1,available:true,reason:'ready'},card:{rules:[{find:'not-matched',replace:'<script>sdk.history.onChange(function(){});sdk.history.list().catch(function(){});<\/script>'}],statusbar:''}}
+  win.dispatchEvent(new win.MessageEvent('message',{source:parent,origin:'https://host.fixture.test',data:{ms:2,type:'hello',config:cfg}}))
+  const requests=sent.filter(m=>m.type==='request'&&m.op.startsWith('history.'))
+  expect(requests.map(m=>m.op).sort()).toEqual(['history.list','history.subscribe'])
+  expect(requests.every(m=>m.ms===2)).toBe(true)
+  win.dispatchEvent(new win.MessageEvent('message',{source:parent,origin:'https://host.fixture.test',data:{ms:2,type:'dispose'}}))
+ }finally{dom.window.close()}
+})

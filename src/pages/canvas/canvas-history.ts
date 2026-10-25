@@ -7,7 +7,7 @@ interface Deps {
  request(op: 'index'|'changes', args: Record<string, unknown>): Promise<unknown>
  doc?: Document
 }
-interface Listener { callback: (event:HistoryChange)=>void; start: string|null; active: boolean }
+interface Listener { callback: (event:HistoryChange)=>void; start: string|null; active: boolean; initializing?: Promise<void> }
 const copy = <T>(value:T):T => JSON.parse(JSON.stringify(value))
 const newer = (a:string,b:string) => a.length>b.length||(a.length===b.length&&a>b)
 
@@ -43,14 +43,16 @@ export function createHistoryAdapter(deps:Deps): HistoryApi & { reset():void; ch
    if(disposed||mine!==generation||owner!==identity())throw historyError('HISTORY_UNAVAILABLE')
    if(e?.status===401||e?.status===403||e?.status===404){
     denied=e.status===401?'not_authenticated':e.status===404&&!e.code?'unsupported':'revoked'
+    generation++;inFlight.clear();checking=undefined;checkAgain=false
     key=null;watermark=null;knownHead=null;stopTimer()
     for(const l of listeners)deliver(l,empty('unavailable'))
    }
    throw historyError(['HISTORY_STALE','HISTORY_CURSOR_INVALID','HISTORY_LIMIT','HOST_DENIED','HISTORY_UNAVAILABLE'].includes(e?.code)?e.code:'NETWORK')
   }
-  if(disposed||mine!==generation||owner!==identity())throw historyError('HISTORY_UNAVAILABLE')
+  if(disposed||denied||mine!==generation||owner!==identity())throw historyError('HISTORY_UNAVAILABLE')
   if(!value||!historyRevision(value.revision)||typeof value.conversationKey!=='string')throw historyError('NETWORK')
   if(key&&key!==value.conversationKey){reset();throw historyError('HISTORY_UNAVAILABLE')}
+  if(op==='index'&&knownHead&&newer(knownHead,value.revision))throw historyError('HISTORY_STALE')
   key=value.conversationKey
   if(!knownHead||newer(value.revision,knownHead))knownHead=value.revision
   return copy(value)
@@ -60,27 +62,32 @@ export function createHistoryAdapter(deps:Deps): HistoryApi & { reset():void; ch
   if(!Array.isArray(page.items)||typeof page.complete!=='boolean'||(page.complete?page.cursor!==null:typeof page.cursor!=='string'||!page.cursor))throw historyError('NETWORK')
   return page
  }
- async function initialize(l:Listener){
+ function initialize(l:Listener):Promise<void>{
+  if(l.initializing)return l.initializing
   const mine=generation
-  try{
+  const pending=(async()=>{try{
    const page=await list({limit:1})
    if(disposed||mine!==generation||!l.active)return
    if(watermark===null)watermark=knownHead||page.revision
    l.start=knownHead||page.revision
    deliver(l,empty('reset',l.start));schedule()
-  }catch{if(mine===generation&&l.active){deliver(l,empty(denied||!deps.scope()?'unavailable':'reset'));schedule()}}
+  }catch{if(mine===generation&&l.active){deliver(l,empty(denied||!deps.scope()?'unavailable':'reset'));schedule()}}})()
+  l.initializing=pending
+  void pending.finally(()=>{if(l.initializing===pending)l.initializing=undefined})
+  return pending
  }
  async function runCheck(){
   const mine=generation
   if(!listeners.size||!deps.scope()||!visible()||denied)return
-  if(watermark===null){for(const l of listeners)if(l.start===null)void initialize(l);return}
+  await Promise.all([...listeners].filter(l=>l.start===null).map(initialize))
+  if(mine!==generation||!listeners.size||denied||watermark===null)return
   const after=watermark
   let cursor:string|null=null
   let target:string|null=null
   let partial:{revision:string;part:number}|null=null
   do{
    const page=await read('changes',{afterRevision:after,...(cursor?{cursor}:{})}) as HistoryChangesPage
-   if(mine!==generation)return
+   if(mine!==generation||!listeners.size)return
    if(target!==null&&page.revision!==target)throw historyError('NETWORK')
    target=page.revision
    if(page.reset){
@@ -93,7 +100,7 @@ export function createHistoryAdapter(deps:Deps): HistoryApi & { reset():void; ch
     if(!historyRevision(event.revision)||!historyRevision(event.previousRevision)||!Array.isArray(event.changes)||event.changes.length>200||event.conversationKey!==key)throw historyError('NETWORK')
     if(partial ? event.revision!==partial.revision||event.part!==partial.part+1 : event.previousRevision!==watermark||event.part!==0)throw historyError('NETWORK')
     for(const l of listeners)if(l.start!==null&&newer(event.revision,l.start))deliver(l,event)
-    if(mine!==generation)return
+    if(mine!==generation||!listeners.size)return
     if(event.final){watermark=event.revision;partial=null}else partial={revision:event.revision,part:event.part}
    }
    if(page.complete){if(page.cursor!==null||partial||watermark!==target)throw historyError('NETWORK');break}
@@ -114,7 +121,7 @@ export function createHistoryAdapter(deps:Deps): HistoryApi & { reset():void; ch
  }
  function reset(){
   generation++;stopTimer();inFlight.clear();checking=undefined;checkAgain=false;watermark=null;knownHead=null;key=null;denied=''
-  for(const l of listeners){l.start=null;deliver(l,empty(deps.scope()?'reset':'unavailable'));void initialize(l)}
+  for(const l of listeners){l.start=null;l.initializing=undefined;deliver(l,empty(deps.scope()?'reset':'unavailable'));void initialize(l)}
  }
  const onVisibility=()=>{if(visible())void check();else stopTimer()}
  deps.doc?.addEventListener('visibilitychange',onVisibility)
@@ -127,5 +134,26 @@ export function createHistoryAdapter(deps:Deps): HistoryApi & { reset():void; ch
    return ()=>{l.active=false;listeners.delete(l);if(!listeners.size)stopTimer()}
   },reset,check,
   dispose(){disposed=true;generation++;stopTimer();listeners.clear();inFlight.clear();deps.doc?.removeEventListener('visibilitychange',onVisibility);deps.doc?.defaultView?.removeEventListener('online',onVisibility)},
+ }
+}
+
+interface AuthorScope {
+ suspend(fn:Function, thisArg?:unknown, args?:unknown[]):any
+ wrap(fn:Function):Function
+ isDisposed():boolean
+}
+
+/** Keep host transport outside the author scope, but attribute async card work. */
+export function bindHistoryAuthorScope(history:HistoryApi, scope:AuthorScope):HistoryApi {
+ const active=()=>{if(scope.isDisposed())throw historyError('HISTORY_UNAVAILABLE')}
+ return {
+  capabilities(){active();return scope.suspend(history.capabilities,history,[])},
+  list(options){active();return scope.suspend(history.list,history,[options])},
+  onChange(callback){
+   active()
+   if(typeof callback!=='function')throw historyError('HISTORY_CURSOR_INVALID')
+   const wrapped=scope.wrap(callback)
+   return scope.suspend(history.onChange,history,[(event:HistoryChange)=>{if(!scope.isDisposed())wrapped(event)}])
+  },
  }
 }
