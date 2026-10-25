@@ -87,3 +87,21 @@ describe('createSharedApi：卡片看到的 shared 與 share 的回流方法', (
     expect(await codeOf(tally.tallyLink('p1-4.b', 'p1-4'))).toBe('HOST_DENIED')
   })
 })
+
+describe('QA F2：參數整理要冪等（殼驗一次、畫布入口再驗一次）', () => {
+  const cases: Array<[Parameters<typeof sharedArgs>[0], unknown[]]> = [
+    ['shared.read', ['boss']], ['shared.read', [['boss', 'p1-4']]], ['shared.vote', ['p1-4', 'b']], ['shared.add', ['boss', 3]],
+    ['shared.leaderboard', ['boss']], ['shared.leaderboard', ['boss', { limit: 10 }]], ['shared.leaderboard', ['boss', { limit: 50 }]],
+    ['share.tally', ['p1-4.b', 'p1-4']], ['share.respond', ['a']], ['share.results', []],
+  ]
+  it('整理過的參數再整理一次結果不變', () => {
+    for (const [op, args] of cases) {
+      const once = sharedArgs(op, args)
+      expect(sharedArgs(op, once), op).toEqual(once)
+    }
+  })
+  it('整理後的形式（limit 直接是數字）也收，範圍照樣檢查', () => {
+    expect(() => sharedArgs('shared.leaderboard', ['boss', 5])).not.toThrow()
+    expect(() => sharedArgs('shared.leaderboard', ['boss', 51])).toThrow(expect.objectContaining({ code: 'INVALID_ARGS' }))
+  })
+})

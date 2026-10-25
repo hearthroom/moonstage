@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { createCanvasShared } from '../canvas-shared'
 
 const codeOf = async (p: Promise<unknown>) => { try { await p; return 'ok' } catch (e) { return (e as { code?: string }).code } }
@@ -84,5 +86,46 @@ describe('綁住掛載時的卡', () => {
     expect(host.add).not.toHaveBeenCalled()
     expect(await codeOf(shared.forRole('8').run('shared.read', ['boss']))).toBe('ok')
     expect(host.read).toHaveBeenLastCalledWith('8', ['boss'])
+  })
+})
+
+describe('canvas.vue 的接線（QA F1：一般卡的作者宿主用了沒定義的變數，window.stage 整個沒建起來）', () => {
+  const source = readFileSync(join(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
+  const body = (anchor: string) => {
+    const start = source.indexOf(anchor)
+    expect(start, anchor).toBeGreaterThan(-1)
+    let depth = 0, i = source.indexOf('{', start)
+    for (; i < source.length; i++) { if (source[i] === '{') depth++; else if (source[i] === '}' && --depth === 0) break }
+    return source.slice(start, i + 1)
+  }
+  it('一般卡的作者宿主在建立當下綁住畫布的卡；呼叫端不必（也不能）自己帶變數', () => {
+    expect(body('function buildAuthorAssetHost(')).toContain("canvasShared.forRole(String(unref(roleId) || ''))")
+    expect(body('function applyAuthorAsset(')).toContain('hostOutsideAuthorScope(buildAuthorAssetHost(), scope)')
+  })
+  it('沙箱宿主綁住它掛載的那張卡', () => {
+    expect(source).toContain('shared: stageHost.shared ? canvasShared.forRole(targetRoleId) : null')
+  })
+})
+
+describe('QA F2：卡片 → 殼（或一般卡）→ 畫布入口 → 宿主，整條串起來', () => {
+  it('排行榜預設與帶 limit 都送到宿主（沙箱與一般卡）', async () => {
+    const { createSharedApi } = await import('@/common/shared-state')
+    const { SdkError } = await import('@/sandbox/sdk/errors')
+    const host = fakeHost()
+    const entry = createCanvasShared({ host, roleId: () => '7', writable: () => true }).forRole('7')
+    // 沙箱：殼這一層的 createSharedApi 把整理過的參數送進畫布入口的 run
+    const shell = createSharedApi((op, args) => entry.run(op, args), (c, m, d) => new SdkError(c, m, d))
+    await shell.shared.leaderboard('boss')
+    await shell.shared.leaderboard('boss', { limit: 25 })
+    // 一般卡：window.stage.shared 直接是畫布入口的 api
+    await entry.api.shared.leaderboard('boss', { limit: 5 })
+    expect(host.leaderboard.mock.calls).toEqual([['7', 'boss', 10], ['7', 'boss', 25], ['7', 'boss', 5]])
+    await shell.shared.read(['boss'])
+    await shell.shared.vote('p1-4', 'a')
+    await shell.shared.add('boss', 2)
+    await shell.tally.tallyLink('p1-4.b', 'p1-4')
+    await shell.tally.respond('a')
+    await shell.tally.results()
+    expect([host.read, host.vote, host.add, host.tallyLink, host.respond, host.results].map((f) => f.mock.calls.length)).toEqual([1, 1, 1, 1, 1, 1])
   })
 })

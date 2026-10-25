@@ -3332,8 +3332,9 @@ let stageIntent = null;
 // send() 不能再改一次。onActionBtnClick → send() 是同步的，所以旗標判定是準的。
 let authorSubmitInFlight = false;
 
-function buildAuthorAssetHost(targetRoleId: string) {
-  const shared = canvasShared.forRole(targetRoleId);
+function buildAuthorAssetHost() {
+  // 共用狀態綁住建立當下（掛上作者腳本那一刻）畫布的卡：之後換了卡，舊腳本的請求會被拒
+  const shared = canvasShared.forRole(String(unref(roleId) || ''));
   const inputEl = () => document.querySelector('textarea#send_textarea');
   const writeDraft = (text) => {
     if (!canGenerate.value) return false;
@@ -3902,7 +3903,7 @@ function applyAuthorAsset(asset) {
     stageIntent = createStageIntentApi({
       // 宿主替作者做的事（送出、改背景、捲動……）退出作者範圍跑：那些是宿主的副作用，
       // 離場時不能跟著作者的東西一起被清掉。
-      host: hostOutsideAuthorScope(buildAuthorAssetHost(String(targetRoleId)), scope),
+      host: hostOutsideAuthorScope(buildAuthorAssetHost(), scope),
       runtime: authorAssetRuntime,
     });
     window.stage = stageIntent.api;

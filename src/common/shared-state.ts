@@ -96,8 +96,9 @@ export function sharedArgs(op: SharedOp, args: unknown[], fail: SharedErrorFacto
       const key = keyOf(args[0], fail)
       const o = args[1]
       if (o === undefined) return [key, SHARED_LEADERBOARD_DEFAULT]
-      if (!o || typeof o !== 'object') throw fail('INVALID_ARGS', 'options must be an object')
-      const limit = (o as { limit?: unknown }).limit
+      // 整理後送出去的是 [key, limit]：殼與畫布入口各驗一次，同一份規則要收得下自己整理過的結果
+      if (typeof o !== 'number' && (!o || typeof o !== 'object')) throw fail('INVALID_ARGS', 'options must be an object')
+      const limit = typeof o === 'number' ? o : (o as { limit?: unknown }).limit
       if (limit === undefined) return [key, SHARED_LEADERBOARD_DEFAULT]
       if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > SHARED_LEADERBOARD_MAX) throw fail('INVALID_ARGS', `limit must be a whole number from 1 to ${SHARED_LEADERBOARD_MAX}`)
       return [key, limit]
