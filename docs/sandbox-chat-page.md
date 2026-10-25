@@ -98,7 +98,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 
 ## 3. `sdk` 契約（殼內作者看到的）
 
-16 個鍵、44 個能力（`text`、`model`、`archive`、`generation`、`share` 是後來加的；完整清單由 `contract/sandbox-contract.json` 生成），全部**從第一版就存在**（作者腳本在頂層探測它們），每個能力有實作狀態：
+SDK 有 17 個鍵、47 個能力，其中 15 個為非同步；完整清單由 `contract/sandbox-contract.json` 產生。不同宿主支援的能力可能不同，使用前應依各能力的說明探測。`history` 需要協商至 transport v2；舊宿主可能沒有此入口，或回報 `available:false`。
 
 | 能力 | 狀態 | 備註 |
 |---|---|---|
@@ -116,11 +116,12 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 | `generation.act(action)` | 實作 | 按那張卡上的一顆鍵（`outcome.actions` 裡的動作名），走玩家點那張卡同一條路：重試沿用同一句、不多一則；容量與模型設定打開平台的面板。只在玩家手勢裡（不在手勢裡回 `UNAUTHORIZED`，不問——作者沒有理由替玩家自動重試）；結局裡沒有這個動作 `INVALID_ARGS`；生成中 `BUSY`；沒有送出能力 `NOT_SUPPORTED`；3／分。殼送 `request generation.act`，宿主照當下的結局核一次再交給 `onMessageAction`（`sys:<動作>`、`resume-agent`、`switch-model`） |
 | `archive.list/save/fork/open/start/rename/remove` | 實作 | 平台的對話存檔（每張卡最多 20 段，含目前這段；伺服器記的，跨裝置）。每段就是一段對話：`open(id)` 讀檔＝切過去，原本的進度原樣留著；`save(title?)` 把目前進度留一份（從最新一則分叉、留下的那份取名 title，回 `{id: 留下的那份, current: 接著玩的那份}`）；`fork(messageId)` 從某一則（氣泡的 `serverId`）另開一段並切過去；`start(opening?)` 另開新檔（目前這段留在清單裡，0＝主開場、1..＝替代開場）；`list()` 回 `{items:[{id,title,isCurrent,messageCount,lastMessage,createTime,lastUpdateTime}],count,limit}`（新的在前）。會改變存檔的操作在玩家手勢裡直接做（卡片用自己的確認畫面），不在手勢裡殼先問「允許這張卡變更你的存檔？」；生成中 `BUSY`；滿了 `LIMIT_REACHED`（`err.data = {count, limit}`）。宿主沒接（握手 `capabilities.archive` 為假）回 `HOST_DENIED`。切換後殼清空訊息、重載那一段並發 `conversation:switch` |
 | `share.enabled/context/audience`、`share.link(context?)`、`share.qr(text)` | 實作 | 分享情境。`context`：從帶 `?share=<碼>` 的連結開卡時那個碼，否則 `null`（平台開關關著、看自己的紀錄時也是 `null`；有沒有存檔不管，由卡片決定）。碼只許 `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`（`~` 開頭留給平台短碼），宿主驗過才給。`audience`：這張卡現在誰打得開（`author`／`link`／`public`，宿主不知道是 `null`）。`link(context?)` **同步**回這張卡的分享連結（宿主站的卡片頁，帶玩家的推薦碼），給了情境就加 `share=`——點擊裡直接拿去 `navigator.share`；碼不合規則 `SHARE_CONTEXT_INVALID`；平台開關關著不丟錯、回不帶情境的一般連結；宿主沒接（`capabilities.share` 為假）或給不出連結 `HOST_DENIED`。`qr(text)` 回 `{size, path}`（`size`×`size` 格的 SVG path），1–1024 字，否則 `INVALID_ARGS`；殼送 `request share.qr` 由宿主畫。值來自 `hello.config.share`，之後 `share` 訊息更新並發 `share:change`。情境碼從不進模型 |
+| `history.capabilities/list/onChange` | 需 transport v2 | 只讀目前使用者、目前卡片、目前會話的完整有效訊息；先探測能力，按同一 revision 讀完分頁。`onChange` 回傳取消訂閱函式；詳見「可靠歷史」。 |
 | `on(event, fn)` | 實作 | 見事件表 |
 | `debug.log(...)` | 實作 | 殼內面板 + 轉宿主 console |
 | `version` | `'1'` | |
 
-錯誤碼：`UNAUTHORIZED`、`RATE_LIMITED`、`INVALID_ARGS`、`HOST_DENIED`、`NETWORK`、`NOT_SUPPORTED`、`BUSY`、`LIMIT_REACHED`（帶 `err.data`）、`SHARE_CONTEXT_INVALID`
+錯誤碼：`UNAUTHORIZED`、`RATE_LIMITED`、`INVALID_ARGS`、`HOST_DENIED`、`NETWORK`、`NOT_SUPPORTED`、`BUSY`、`LIMIT_REACHED`（帶 `err.data`）、`SHARE_CONTEXT_INVALID`、`HISTORY_UNAVAILABLE`、`HISTORY_STALE`、`HISTORY_CURSOR_INVALID`、`HISTORY_LIMIT`（處理方式見「可靠歷史」）；`NETWORK`、`HOST_DENIED` 等通用錯誤仍可能出現。
 （另有 `UNKNOWN_CAPABILITY` 備用）。非同步能力回 Promise；同步能力直接 throw `SdkError`——
 `save.get/keys` 在存檔尚未載入時同步丟 `HOST_DENIED`（跟原站一致，作者會用 try）。
 限頻（60 秒窗）：`save.set` 20、`message.send` 手勢 3／自動 3、`message.edit` 10、`archive.*` 的變更合計 10、`generation.act` 3 → `RATE_LIMITED`。
@@ -345,5 +346,7 @@ const off = history?.onChange(() => {
   timer = setTimeout(rebuild, 100);
 });
 void rebuild();
-// 作者作用域結束時：++epoch; clearTimeout(timer); off?.();
+// 此為最小示例：HISTORY_STALE 後須由作者安排有界重讀；未知狀態不能當作空歷史。
+// 作者須把 cleanup() 接到自己的離場／dispose 生命週期。
+function cleanup() { ++epoch; clearTimeout(timer); off?.(); }
 ```
