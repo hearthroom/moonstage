@@ -10347,8 +10347,9 @@ const shortcutItems = computed(() => previewOnly.value ? [] : [
 // 自訂指令、用戶人設、設定補充、劇情總結、遊玩教程都不在 v1 裡，
 // 放一顆按下去沒反應的鍵比沒有那顆鍵更糟。
 const panel = ref<CanvasPanelState>(createPanelState())
-// The shell traps focus inside its document; the host isolates everything outside the iframe.
-useCanvasModalFocus(sandboxFrame, () => !!sandboxCard.value && (menuOpen.value || !!panel.value.sheet), { backgroundOnly: true })
+// Only shell-rendered overlays isolate the host around the iframe. Model and response
+// settings live in host popups and manage their own focus/background isolation.
+useCanvasModalFocus(sandboxFrame, () => !!sandboxCard.value && !['model', 'response-settings'].includes(panel.value.sheet) && (menuOpen.value || !!panel.value.sheet), { backgroundOnly: true })
 
 
 // 模型選單這次要停在哪裡：'lanes' ＝目前這顆模型的線路清單。選單關掉就歸零，下次照一般方式開。
