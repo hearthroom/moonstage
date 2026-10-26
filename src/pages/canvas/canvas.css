@@ -338,14 +338,14 @@
   }
   /*
     藥丸排成等寬格線，換行時最後一顆不會被拉成整排：四個代寫選項與四種視角字比較長，
-    排成兩欄；篇幅四個、節奏三個短字一排放得下；文風五個按字寬換行。
+    排成兩欄；篇幅按可用寬度換行，讓長語言標籤完整留在按鈕裡；節奏三個一排；文風按字寬換行。
   */
   .role-setting.response-settings .radio-group {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .role-setting.response-settings .response-axis[data-axis="length"] .radio-group {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 112px), 1fr));
   }
   .role-setting.response-settings .response-axis[data-axis="pace"] .radio-group {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4929,6 +4929,7 @@
 
   .np-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
   }
 
