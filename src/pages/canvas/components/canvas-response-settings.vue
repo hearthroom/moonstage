@@ -36,7 +36,7 @@
     </div>
     <div v-if="hint(axis)" class="mode-hint" :data-hint="axis">{{ hint(axis) }}</div>
     <div v-if="axis === 'style' && selected('style') === 'custom'" class="textarea-wrapper response-custom">
-     <textarea v-model="draft.customStyle" class="textarea-dark response-custom-input" rows="3" :aria-label="t('responseSettings.customLabel')"
+     <textarea autocomplete="off" v-model="draft.customStyle" class="textarea-dark response-custom-input" rows="3" :aria-label="t('responseSettings.customLabel')"
       :placeholder="customPlaceholder" :aria-invalid="customTooLong" />
      <div class="char-count" :class="{ 'response-error': customTooLong }">{{ t('responseSettings.customCount', { count: [...(draft.customStyle || '')].length }) }}</div>
     </div>
@@ -62,7 +62,7 @@
      <template v-for="axis in noteAxes" :key="axis">
       <label class="textarea-wrapper response-note">
        <span class="label">{{ t(`responseSettings.axes.${axis}`) }}</span>
-       <textarea v-model="draft[responseNoteKeys[axis]]" class="textarea-dark response-note-input" :data-axis="axis" rows="2"
+       <textarea autocomplete="off" v-model="draft[responseNoteKeys[axis]]" class="textarea-dark response-note-input" :data-axis="axis" rows="2"
         :placeholder="notePlaceholder(axis)" :aria-invalid="noteTooLong(axis)" />
        <span class="char-count" :class="{ 'response-error': noteTooLong(axis) }">{{ t('responseSettings.noteCount', { count: [...(draft[responseNoteKeys[axis]] || '')].length }) }}</span>
       </label>

@@ -49,6 +49,8 @@ export const CanvasTextField = defineComponent({
   setup(props, { emit }) {
     return () =>
       h('textarea', {
+        // 自由文字不使用聯絡人或表單歷史填入。
+        autocomplete: 'off',
         class: props.elClass,
         value: props.value,
         placeholder: props.placeholder || undefined,

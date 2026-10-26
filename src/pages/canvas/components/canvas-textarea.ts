@@ -29,6 +29,8 @@ export default defineComponent({
     expose({ el })
     return () =>
       h('textarea', {
+        // 自由文字不使用聯絡人或表單歷史填入。
+        autocomplete: 'off',
         id: props.elId || undefined,
         class: props.elClass,
         rows: 1,
