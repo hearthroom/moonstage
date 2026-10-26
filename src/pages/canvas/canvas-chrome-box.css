@@ -420,6 +420,9 @@
 .np-copy-btn {
     padding: 0 16px
 }
+.np-actions > [role="button"] {
+    padding-block: 8px
+}
 .np-template-btn,
   .np-save-template-btn,
   .np-save-btn {

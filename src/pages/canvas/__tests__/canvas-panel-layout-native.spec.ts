@@ -23,10 +23,10 @@ it('keeps length labels and notebook actions inside real panels at phone and des
     import Response from './src/pages/canvas/components/canvas-response-settings.vue'
     import Notebook from './src/pages/canvas/components/canvas-notepad.vue'
     const dictionaries=${JSON.stringify(dictionaries)},labelKeys=${JSON.stringify(labelKeys)}
-    const state=ref({locale:'en',kind:'response',mode:'dark',templates:false}),version=ref(0)
+    const state=ref({locale:'en',kind:'response',mode:'dark',templates:false,font:'system-ui'}),version=ref(0)
     const t=key=>dictionaries[state.value.locale][key]||key
     createApp({render(){const s=state.value
-      return h('div',{class:'canvas-root chat'},[h(Popup,{key:version.value,open:true},{default:()=>s.kind==='response'
+      return h('div',{class:'canvas-root chat',style:{'--lt-canvas-font':s.font}},[h(Popup,{key:version.value,open:true},{default:()=>s.kind==='response'
         ?h(Response,{conversationId:'layout',t,load:async()=>({conversationId:'layout',scope:'conversation',schemaVersion:1,revision:0,overrides:{},effective:{agency:'coauthor',style:'card',perspective:'card',length:'auto',pace:'natural'}}),save:async()=>({})})
         :h(Notebook,{hasConversation:true,templatesOpen:s.templates,labels:Object.fromEntries(Object.entries(labelKeys).map(([name,key])=>[name,t(key)]))})})])
     }}).mount('#app')
@@ -40,11 +40,15 @@ it('keeps length labels and notebook actions inside real panels at phone and des
       const items=[...group.children].filter(e=>e.getBoundingClientRect().height>0)
       for(const item of items){
         const box=item.getBoundingClientRect(),range=document.createRange();range.selectNodeContents(item)
-        const text=[...range.getClientRects()]
-        if(box.left<area.left-1||box.right>area.right+1||box.right>innerWidth+1||item.scrollWidth>item.clientWidth+1||text.some(r=>r.left<box.left-1||r.right>box.right+1))
-          issues.push({label:item.textContent.trim(),left:box.left,right:box.right,areaRight:area.right,scrollWidth:item.scrollWidth,clientWidth:item.clientWidth})
+        const text=[...range.getClientRects()],style=getComputedStyle(item)
+        const contentLeft=box.left+parseFloat(style.borderLeftWidth)+parseFloat(style.paddingLeft)
+        const contentRight=box.right-parseFloat(style.borderRightWidth)-parseFloat(style.paddingRight)
+        const contentTop=box.top+parseFloat(style.borderTopWidth)+parseFloat(style.paddingTop)
+        const contentBottom=box.bottom-parseFloat(style.borderBottomWidth)-parseFloat(style.paddingBottom)
+        if(box.left<area.left-1||box.right>area.right+1||box.right>innerWidth+1||item.scrollWidth>item.clientWidth+1||text.some(r=>r.left<contentLeft-1||r.right>contentRight+1||r.top<contentTop-1||r.bottom>contentBottom+1))
+          issues.push({label:item.textContent.trim(),left:box.left,right:box.right,contentLeft,contentRight,contentTop,contentBottom,textLines:text.length,areaRight:area.right,scrollWidth:item.scrollWidth,clientWidth:item.clientWidth})
       }
-      return {width:innerWidth,items:items.length,issues}
+      return {width:innerWidth,font:getComputedStyle(group).fontFamily,items:items.length,issues}
     }
   `, loader: 'ts', resolveDir: process.cwd() }, plugins: [{ name: 'real-panel-components', setup(builder) {
     builder.onLoad({ filter: /\.vue$/ }, args => {
@@ -80,11 +84,13 @@ it('keeps length labels and notebook actions inside real panels at phone and des
       await send('Emulation.setDeviceMetricsOverride', { width, height: width < 700 ? 844 : 900, deviceScaleFactor: width < 700 ? 3 : 1, mobile: width < 700 }, sessionId)
       await send('Page.navigate', { url: pathToFileURL(file).href }, sessionId)
       for (let count = 0; !await evaluate('typeof window.measurePanel==="function"') && count < 100; count++) await pause(50)
-      for (const locale of locales) for (const mode of ['dark', 'light']) for (const [kind, templates] of [['response', false], ['notepad', false], ['notepad', true]]) {
-        const measured = await evaluate(`window.measurePanel(${JSON.stringify({ locale, mode, kind, templates })})`)
+      // Wider glyphs reproduce the CI Linux overflow on macOS too; author font variables must remain safe.
+      for (const font of ['system-ui', 'monospace']) for (const locale of locales) for (const mode of ['dark', 'light']) for (const [kind, templates] of [['response', false], ['notepad', false], ['notepad', true]]) {
+        const measured = await evaluate(`window.measurePanel(${JSON.stringify({ locale, mode, kind, templates, font })})`)
         expect(measured.width, 'CDP must emulate the actual CSS viewport').toBe(width)
+        expect(measured.font).toContain(font)
         expect(measured.items).toBeGreaterThanOrEqual(3)
-        if (measured.issues.length) failures.push({ width, locale, mode, kind, templates, issues: measured.issues })
+        if (measured.issues.length) failures.push({ width, locale, mode, kind, templates, font, issues: measured.issues })
       }
     }
     expect(failures, JSON.stringify(failures, null, 2)).toEqual([])

@@ -4933,6 +4933,16 @@
     gap: 8px;
   }
 
+  /* 長語言或較寬字型的單顆按鈕也要留在列內，文字才能在按鈕裡折行。 */
+  .np-actions > [role="button"] {
+    box-sizing: border-box;
+    flex-basis: auto;
+    max-width: 100%;
+    padding-block: 8px;
+    white-space: normal;
+    text-align: center;
+  }
+
   .np-template-btn,
   .np-save-template-btn,
   .np-save-btn {
