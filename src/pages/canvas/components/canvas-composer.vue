@@ -32,7 +32,7 @@
       <!-- 快捷功能欄。卡片實際寫的是 `.shortcut-button-scope .item`（舊名），
            MMD 現在的 DOM 是 `.shortcut-bar > .shortcut-btn`——兩套都要在，
            否則作者手上那張卡的規則會落空。 -->
-      <div ref="shortcutBarEl" class="shortcut-bar-wrapper shortcut-button-scope" data-lt="function-bar">
+      <div ref="shortcutBarEl" class="shortcut-bar-wrapper shortcut-button-scope toolbar" data-lt="function-bar">
         <div class="shortcut-bar">
           <div
             v-for="item in shortcuts"
@@ -341,7 +341,7 @@
         節點常駐：作者的卡對 `.chat .chat-bottom .more-scope .item .item-icon`
         寫了圖示外觀，v-if 拿掉節點等於那套外觀從沒存在過。
       -->
-      <div class="more-scope" :data-open="moreOpen ? 'on' : 'off'" :hidden="!moreOpen">
+      <div class="more-scope expand-area" :data-open="moreOpen ? 'on' : 'off'" :hidden="!moreOpen">
         <div
           v-for="item in moreItems"
           :key="item.key"

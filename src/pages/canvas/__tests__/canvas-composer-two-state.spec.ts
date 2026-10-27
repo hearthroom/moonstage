@@ -30,6 +30,23 @@ afterEach(() => {
 })
 
 describe('輸入區兩態', () => {
+  it('applies author toolbar and expanded-area colors together with bottom text colors', () => {
+    const style = document.createElement('style')
+    style.textContent = '.chat-bottom * { color: rgb(44, 62, 80) !important } .chat-bottom .toolbar, .chat-bottom .expand-area { background: rgb(210, 220, 235) !important }'
+    document.head.appendChild(style)
+    const wrapper = mountComposer()
+    try {
+      for (const selector of ['.shortcut-bar-wrapper', '.more-scope']) {
+        const surface = wrapper.get(selector).element
+        expect(getComputedStyle(surface).backgroundColor).toBe('rgb(210, 220, 235)')
+        expect(getComputedStyle(surface).color).toBe('rgb(44, 62, 80)')
+      }
+    } finally {
+      wrapper.unmount()
+      style.remove()
+    }
+  })
+
   it('measures the balance hint after it appears and again when its content changes', async () => {
     const wrapper = mountComposer()
     try {
