@@ -28,6 +28,23 @@ describe('author asset mount', () => {
   })
 
   describe('容器', () => {
+    it('常駐美化先於訊息樣式，訊息與之後的回覆保留覆寫權', () => {
+      const root = document.createElement('main')
+      root.innerHTML = '<section class="messages"><style id="message-theme">:root{--card-bg:blue}</style></section>'
+      document.body.appendChild(root)
+      const rt = createAuthorAssetRuntime({ doc: document, root })
+      const el = rt.mount({ html: '<style id="mount-theme">:root{--card-bg:tan}</style><button>Theme</button>' })
+      const messages = root.querySelector('.messages')
+      messages.insertAdjacentHTML('beforeend', '<style id="next-theme">:root{--card-bg:green}</style>')
+
+      expect([...root.querySelectorAll('style')].map((style) => style.id))
+        .toEqual(['mount-theme', 'message-theme', 'next-theme'])
+      expect(el.parentNode).toBe(root)
+      rt.dispose()
+      expect(root.querySelector('#mount-theme')).toBeNull()
+      expect(root.querySelector('#message-theme')).not.toBeNull()
+    })
+
     VALID_LAYERS.forEach((layer) => {
       it(`${layer} 容器建立時帶 isolation 與該端的層級`, () => {
         const rt = makeRuntime('desktop')

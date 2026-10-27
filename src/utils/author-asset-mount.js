@@ -121,7 +121,9 @@ function createAuthorAssetRuntime(options) {
     }, true)
 
     applyColumnVars(el)
-    root.appendChild(el)
+    // 常駐美化是訊息的基底，和 sandbox 的 statusbar 一樣先於訊息落地。
+    // 放在訊息後面會讓它的 :root 變數蓋回訊息主題，兩種模式因此配色不同。
+    root.insertBefore(el, root.firstChild)
     containers[layer] = el
     return el
   }
