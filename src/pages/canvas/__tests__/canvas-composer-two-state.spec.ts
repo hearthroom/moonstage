@@ -69,7 +69,10 @@ describe('輸入區兩態', () => {
     expect(scope.classList.contains('is-expanded')).toBe(false)
     expect(visible(scope.querySelector('.chat-input-collapsed-row'))).toBe(true)
     expect(visible(scope.querySelector('.chat-input-toolbar'))).toBe(false)
-    expect(visible(scope.querySelector('.chatMsgTextarea'))).toBe(false)
+    // 真輸入框保留佈局供舊卡腳本找到，但折疊時不進鍵盤或讀屏導覽。
+    const textarea = scope.querySelector('textarea')!
+    expect(textarea.getAttribute('aria-hidden')).toBe('true')
+    expect(textarea.tabIndex).toBe(-1)
     expect(visible(scope.querySelector('.chat-input-bottom-row'))).toBe(false)
     // 折疊態的預覽露的是 placeholder
     expect(scope.querySelector('.chat-input-collapsed-placeholder')!.textContent).toBe('說點什麼')

@@ -164,7 +164,7 @@
                 </div>
               </div>
 
-              <div v-show="expanded" class="chatMsgTextarea">
+              <div class="chatMsgTextarea" :style="expanded ? undefined : collapsedInputStyle">
                 <div class="uni-textarea-wrapper">
                   <div v-show="!value" class="uni-textarea-placeholder input-placeholder">{{ placeholder }}</div>
                   <CanvasTextarea
@@ -173,6 +173,8 @@
                     el-class="uni-textarea-textarea"
                     :value="value"
                     :read-only="readOnly"
+                    :tabindex="expanded ? 0 : -1"
+                    :aria-hidden="expanded ? undefined : 'true'"
                     @input="onInput"
                     @keydown="onKeydown"
                     @compositionstart="composing = true"
@@ -473,6 +475,12 @@ const sendAriaLabel = computed(() => (props.sendState === 'continue' ? (props.la
 // 展開＝輸入框有焦點。折疊態只畫一行預覽，點它就把焦點交給真的輸入框。
 // 「多行」看內容不看狀態：MMD 一段長文折行也算多行，這裡以換行或長度判。
 const expanded = ref(false)
+// 舊卡的分支按鈕用 offsetParent 篩選輸入框。折疊時仍保留可聚焦的佈局節點，
+// 讓它們寫進真正的草稿；focus 會沿 onFocus 展開，畫面仍只露原本的預覽列。
+const collapsedInputStyle = {
+  position: 'absolute' as const, width: '1px', height: '1px',
+  overflow: 'hidden', clipPath: 'inset(50%)', pointerEvents: 'none' as const,
+}
 const multiline = computed(() => props.value.includes('\n') || props.value.length > 60)
 const stateClass = computed(() => ({ 'is-expanded': expanded.value, 'is-multiline': multiline.value }))
 
