@@ -21,7 +21,7 @@
     <div class="u-popup__content" style="isolation: isolate" role="dialog" aria-modal="true" :aria-label="title || undefined">
       <!-- 平台面板的實底獨立於作者的頁面背景；不改作者內容或公開配色 token。 -->
       <div class="lt-dialog-backplate" aria-hidden="true"
-           style="position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background-image: inherit"></div>
+           style="position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: inherit"></div>
       <div
         class="u-popup__content__close u-popup__content__close--top-right"
         role="button"

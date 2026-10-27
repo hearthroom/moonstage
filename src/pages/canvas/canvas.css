@@ -7,7 +7,11 @@
  * 靠的就是這一層。這也是為什麼這份檔案裡一個 !important 都不能有：我們一寫，
  * 作者就得跟著寫，而他手上那張卡在原平台不需要寫。
  *
- * ── layer 外面只有三種東西 ──
+ * ── layer 外面的基本可用性保護 ──
+ * 平台彈層的實底由 canvas-popup.vue 的獨立背板守住（定位與隔離使用 inline style）。
+ * 作者仍可決定殼的顏色、背景圖與幾何；透明底會疊在既有表面 token 上轉成實底，
+ * 避免編輯指令、手帳與人設時正文透過來。這個例外不套到作者訊息內容。
+ *
  * 殼的 margin／padding 副本（canvas-chrome-box.css，由 scripts/gen-canvas-chrome-box.mjs
  * 從這份檔案產生，不要手改）。MMD 美化卡常以一條 `* { margin: 0; padding: 0 }` 開頭，
  * 它在 MMD 只清作者自己的內容——MMD 的殼樣式不分層，靠特異性守住；到我們這裡卻把
