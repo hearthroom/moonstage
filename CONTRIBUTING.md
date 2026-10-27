@@ -51,6 +51,20 @@ Security problems go through [SECURITY.md](./SECURITY.md), not the issue tracker
 Continuous integration runs the same checks. A pull request needs a green build and one
 maintainer review to merge. Reviews happen in batches, so expect a few days.
 
+## Maintainer Git identity
+
+Maintainers use `Suki <suki@sukisuki.ai>` for both the author and committer. Set this
+repository's local configuration; leave your global identity unchanged:
+
+```sh
+git config --local user.name 'Suki'
+git config --local user.email 'suki@sukisuki.ai'
+git var GIT_AUTHOR_IDENT
+git var GIT_COMMITTER_IDENT
+```
+
+External contributors may use their own public identity or pseudonym.
+
 ## What we will not merge
 
 - Changes that make Moonstage depend on private or undocumented endpoints. The client speaks
