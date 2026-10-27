@@ -1,4 +1,4 @@
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 /**
  * 設定面板裡那幾個真正的 <input> / <textarea>。
@@ -44,11 +44,37 @@ export const CanvasTextField = defineComponent({
     placeholder: { type: String, default: '' },
     maxlength: { type: Number, default: 0 },
     disabled: { type: Boolean, default: false },
+    autoGrow: { type: Boolean, default: false },
   },
   emits: ['input'],
   setup(props, { emit }) {
+    const field = ref<HTMLTextAreaElement | null>(null)
+    let observer: ResizeObserver | undefined
+    let lastWidth = 0
+    const grow = () => {
+      if (!props.autoGrow || !field.value) return
+      const el = field.value
+      el.style.height = 'auto'
+      // border-box：scrollHeight 不含邊框；CSS 的 max-height 仍限制面板內的捲動高度。
+      el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`
+    }
+    onMounted(() => {
+      if (!props.autoGrow) return
+      grow()
+      if (typeof ResizeObserver !== 'undefined') {
+        observer = new ResizeObserver(([entry]) => {
+          if (entry.contentRect.width === lastWidth) return
+          lastWidth = entry.contentRect.width
+          grow()
+        })
+        if (field.value) observer.observe(field.value)
+      }
+    })
+    watch(() => props.value, () => { if (props.autoGrow) nextTick(grow) })
+    onBeforeUnmount(() => observer?.disconnect())
     return () =>
       h('textarea', {
+        ref: field,
         // 自由文字不使用聯絡人或表單歷史填入。
         autocomplete: 'off',
         class: props.elClass,
@@ -56,7 +82,7 @@ export const CanvasTextField = defineComponent({
         placeholder: props.placeholder || undefined,
         maxlength: props.maxlength > 0 ? props.maxlength : undefined,
         disabled: props.disabled || undefined,
-        onInput: (e: Event) => emit('input', (e.target as HTMLTextAreaElement).value),
+        onInput: (e: Event) => { grow(); emit('input', (e.target as HTMLTextAreaElement).value) },
       })
   },
 })

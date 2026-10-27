@@ -33,13 +33,14 @@
                 @click="$emit('retry')"
                 @keydown.enter.prevent="$emit('retry')">{{ labels.retry }}</span>
         </div>
-        <div v-for="item in list" :key="item.sourceId" class="item">
+        <div v-for="item in list" :key="item.sourceId" class="item" :class="{ 'is-editing': editingSourceId === item.sourceId }">
           <div class="left">
             <template v-if="editingSourceId === item.sourceId">
               <CanvasTextField
-                el-class="custom-textarea-box"
+                el-class="custom-textarea-box ci-edit-textarea"
                 :value="editingText"
                 :maxlength="maxLength"
+                auto-grow
                 @input="$emit('update:editing-text', $event)"
               />
             </template>
@@ -93,6 +94,7 @@
               el-class="custom-textarea"
               :value="draft"
               :maxlength="maxLength"
+              auto-grow
               :placeholder="addPlaceholder"
               :disabled="!hasConversation"
               @input="$emit('update:draft', $event)"

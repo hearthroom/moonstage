@@ -4500,6 +4500,27 @@
     min-width: 0;
   }
 
+  .custom-instruction-scope .item.is-editing {
+    flex-direction: column;
+  }
+
+  .custom-instruction-scope .item.is-editing .left {
+    width: 100%;
+  }
+
+  .custom-instruction-scope .item.is-editing .right {
+    align-self: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .custom-instruction-scope .item.is-editing .ci-btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
   .custom-instruction-scope .item-text {
     font-size: 13px;
     line-height: 1.5;
@@ -4552,14 +4573,17 @@
   }
 
   .custom-instruction-scope .custom-textarea,
+  .custom-instruction-scope .ci-edit-textarea,
   .custom-instruction-scope .custom-textarea-box textarea {
     width: 100%;
-    min-height: 64px;
+    min-height: 120px;
+    max-height: 40vh;
     padding: 10px 12px;
     border: 0;
     background: transparent;
     color: inherit;
     font: inherit;
+    line-height: 1.5;
     resize: vertical;
     box-sizing: border-box;
   }

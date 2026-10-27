@@ -110,6 +110,12 @@ export function effectiveBackground(el: Element, fallback: RGBA = DEFAULT_PAGE_B
     const layer = layerBackground(view, el, pseudo)
     if (layer) acc = blendOver(layer, acc)
   }
+  // 平台彈層的實底位於背景與內容之間，作者將殼設透明時仍以這層判斷字色。
+  const surface = el.querySelector(':scope > .lt-dialog-backplate')
+  if (surface) {
+    const layer = layerBackground(view, surface)
+    if (layer) acc = blendOver(layer, acc)
+  }
   return acc
 }
 
@@ -124,11 +130,33 @@ export function chromeTopColor(scope: ParentNode | null | undefined = typeof doc
   return `rgb(${c.r}, ${c.g}, ${c.b})`
 }
 
+
+/** 保留作者配色，將半透明底疊在平台表面上；面板後方不能透出對話正文。 */
+export function solidPopupBackground(panel: HTMLElement): string {
+  const view = panel.ownerDocument.defaultView
+  if (!view) return 'rgb(24, 27, 33)'
+  const cs = view.getComputedStyle(panel)
+  const mode = panel.closest('[data-mode], [data-theme="light"], [data-theme="dark"], .lt-theme-dark')
+  const light = !mode?.classList.contains('lt-theme-dark') && (mode?.getAttribute('data-mode') === 'light' || mode?.getAttribute('data-theme') === 'light')
+  const fallback: RGBA = light ? { r: 255, g: 255, b: 255, a: 1 } : { r: 24, g: 27, b: 33, a: 1 }
+  const sheet = parseComputedColor(cs.getPropertyValue('--lt-canvas-sheet-bg'))
+    || parseComputedColor(cs.getPropertyValue('--chat-modal-bg'))
+  const base = sheet ? blendOver(sheet, fallback) : fallback
+  const color = parseComputedColor(cs.backgroundColor)
+  const solid = color ? blendOver(color, base) : base
+  return `rgb(${solid.r}, ${solid.g}, ${solid.b})`
+}
+
 /** 量所有殼，把色調寫在 data-lt-tone 上。沒有那個節點就略過。 */
 export function syncChromeTone(scope: ParentNode | null | undefined = typeof document === 'undefined' ? null : document): void {
   if (!scope) return
   for (const selector of CHROME_TONE_SELECTORS) {
     for (const el of scope.querySelectorAll(selector)) {
+      const surface = el.querySelector<HTMLElement>(':scope > .lt-dialog-backplate')
+      if (surface) {
+        const solid = solidPopupBackground(el as HTMLElement)
+        if (surface.style.backgroundColor !== solid) surface.style.backgroundColor = solid
+      }
       const bg = effectiveBackground(el)
       let tone = toneForBackground(bg)
       // Platform panels need readable text even when only an author panel color changes.

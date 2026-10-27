@@ -365,6 +365,7 @@
     padding: 4px 10px
 }
 .custom-instruction-scope .custom-textarea,
+  .custom-instruction-scope .ci-edit-textarea,
   .custom-instruction-scope .custom-textarea-box textarea {
     padding: 10px 12px
 }
