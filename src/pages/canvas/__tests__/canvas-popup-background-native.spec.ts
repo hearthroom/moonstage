@@ -26,3 +26,26 @@ it('keeps author background sizing, positioning and repetition on the opaque pop
     expect(surface.color).toMatch(/^rgb\(/)
   } finally { rmSync(dir, { recursive: true, force: true }) }
 }, 30000)
+
+it('keeps enabled popup primary labels readable with inherited host foreground and author accent colors', () => {
+  const chrome = process.env.CHROME_BIN || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].find(existsSync)
+  expect(chrome).toBeTruthy()
+  const css = readFileSync('src/pages/canvas/canvas.css', 'utf8')
+  const vars = readFileSync('src/common/canvas-theme-vars.css', 'utf8')
+  const tone = buildSync({ entryPoints: ['src/pages/canvas/canvas-chrome-tone.ts'], bundle: true, write: false, format: 'iife', globalName: 'chromeTone', platform: 'browser', target: 'es2022' }).outputFiles[0].text
+  const dir = mkdtempSync(join(tmpdir(), 'stage-popup-action-contrast-'))
+  try {
+    const buttons = '<div class="custom-instruction-scope"><div class="add-btn">Add</div></div><div class="notepad-scope"><div class="np-save-btn">Save</div></div><div class="role-setting"><div class="complete-btn">Save</div></div><div class="confirm-bottom"><div class="ok-btn">OK</div></div>'
+    // The host's white on-accent foreground can survive while MMD replaces its accent with gold.
+    const panels = ['#f5c542', '#cf6a42', '#b0512c', '#96621e', '#e6153f'].map(accent => `<section class="canvas-root lt-theme-dark" style="--lt-canvas-accent:${accent};--lt-canvas-accent-fg:#fff"><div class="u-popup__content">${buttons}</div></section>`).join('')
+    const file = join(dir, 'fixture.html')
+    writeFileSync(file, `<style>${vars}\n${css}</style>${panels}<pre id="result"></pre><script>${tone};chromeTone.syncChromeTone(document);document.querySelector('#result').textContent=JSON.stringify(Array.from(document.querySelectorAll('.add-btn,.np-save-btn,.complete-btn,.ok-btn')).map(el=>{const fg=chromeTone.parseComputedColor(getComputedStyle(el).color),bg=chromeTone.effectiveBackground(el),a=chromeTone.relativeLuminance(fg),b=chromeTone.relativeLuminance(bg);return {className:el.className,fg,bg,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)}}))</script>`)
+    const run = spawnSync(chrome!, ['--headless=new', '--no-sandbox', '--no-first-run', '--no-default-browser-check', `--user-data-dir=${join(dir, 'profile')}`, '--dump-dom', '--virtual-time-budget=1000', `file://${file}`], { encoding: 'utf8', timeout: 20000, maxBuffer: 2 * 1024 * 1024 })
+    expect(run.error, run.stderr).toBeUndefined(); expect(run.status, run.stderr).toBe(0)
+    const json = run.stdout.match(/<pre id="result">([^<]+)<\/pre>/)?.[1]
+    expect(json, run.stdout + run.stderr).toBeTruthy()
+    const rows = JSON.parse(json!)
+    expect(rows).toHaveLength(20)
+    for (const row of rows) expect(row.ratio, JSON.stringify(row)).toBeGreaterThanOrEqual(4.5)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+}, 30000)

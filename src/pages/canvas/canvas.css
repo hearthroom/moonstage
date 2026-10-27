@@ -126,6 +126,20 @@
   color: #f2f2f5;
 }
 
+/* 作者換了強調色時，主行動不能沿用宿主的白字；跟殼的 tone 保護同樣讓位給作者明示的 color。 */
+:where(.u-popup__content :is(.confirm-bottom .ok-btn, .bottom .btn, .role-setting .complete-btn, .np-save-btn, .custom-instruction-scope .add-btn)[data-lt-tone="light"]) {
+  color: #17171c;
+}
+:where(.u-popup__content :is(.confirm-bottom .ok-btn, .bottom .btn, .role-setting .complete-btn, .np-save-btn, .custom-instruction-scope .add-btn)[data-lt-tone="dark"]) {
+  color: #e8eaed;
+}
+:where(.u-popup__content :is(.confirm-bottom .ok-btn, .bottom .btn, .role-setting .complete-btn, .np-save-btn, .custom-instruction-scope .add-btn)[data-lt-contrast="high"][data-lt-tone="light"]) {
+  color: #000;
+}
+:where(.u-popup__content :is(.confirm-bottom .ok-btn, .bottom .btn, .role-setting .complete-btn, .np-save-btn, .custom-instruction-scope .add-btn)[data-lt-contrast="high"][data-lt-tone="dark"]) {
+  color: #fff;
+}
+
 .u-popup__content {
   /* 「一般的字」就是這一片現在的文字顏色。彈層裡的每一處都走這個名字，
      所以作者換掉彈層的 color，整片的字就跟著換。 */

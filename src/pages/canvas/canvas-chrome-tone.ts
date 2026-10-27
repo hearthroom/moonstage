@@ -17,8 +17,11 @@ export type ChromeTone = 'light' | 'dark'
 
 export interface RGBA { r: number; g: number; b: number; a: number }
 
-/** 有這些節點就量：頂欄、彈層。輸入區作者通常不漆，等真的碰到再加。 */
-export const CHROME_TONE_SELECTORS = ['.topTabbar', '.u-popup__content', '.sys-msg-card', '.agent-resume-card', '.sys-link', '.sys-cta-primary', '.agent-resume-card__btn', '.chat-balance-hint'] as const
+/** 與 canvas.css 的實心主行動相同；各自量底色，不能沿用整片彈層的深淺。 */
+const POPUP_PRIMARY_ACTIONS = '.u-popup__content .confirm-bottom .ok-btn, .u-popup__content .bottom .btn, .u-popup__content .role-setting .complete-btn, .u-popup__content .np-save-btn, .u-popup__content .custom-instruction-scope .add-btn'
+
+/** 有這些節點就量：頂欄、彈層、需要獨立對比的主行動。 */
+export const CHROME_TONE_SELECTORS = ['.topTabbar', '.u-popup__content', '.sys-msg-card', '.agent-resume-card', '.sys-link', '.sys-cta-primary', '.agent-resume-card__btn', '.chat-balance-hint', POPUP_PRIMARY_ACTIONS] as const
 
 /** 頁面預設底：量不到任何底色時當作深色（舞台的預設主題）。 */
 const DEFAULT_PAGE_BG: RGBA = { r: 15, g: 18, b: 23, a: 1 }
@@ -160,7 +163,7 @@ export function syncChromeTone(scope: ParentNode | null | undefined = typeof doc
       const bg = effectiveBackground(el)
       let tone = toneForBackground(bg)
       // Platform panels need readable text even when only an author panel color changes.
-      if (el.matches('.sys-msg-card, .agent-resume-card, .sys-link, .sys-cta-primary, .agent-resume-card__btn, .chat-balance-hint')) {
+      if (el.matches('.sys-msg-card, .agent-resume-card, .sys-link, .sys-cta-primary, .agent-resume-card__btn, .chat-balance-hint') || el.matches(POPUP_PRIMARY_ACTIONS)) {
         const light = {r:23,g:23,b:28,a:1}, dark = {r:232,g:234,b:237,a:1}
         const contrast = (fg: RGBA) => { const a = relativeLuminance(fg), b = relativeLuminance(bg); return (Math.max(a,b)+.05)/(Math.min(a,b)+.05) }
         const lightRatio = contrast(light), darkRatio = contrast(dark)
