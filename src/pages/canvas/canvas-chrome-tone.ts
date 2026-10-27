@@ -106,17 +106,18 @@ export function effectiveBackground(el: Element, fallback: RGBA = DEFAULT_PAGE_B
   const view = el.ownerDocument?.defaultView
   if (!view) return acc
   for (let i = chain.length - 1; i >= 0; i -= 1) {
-    const layer = layerBackground(view, chain[i])
+    const node = chain[i]
+    const layer = layerBackground(view, node)
     if (layer) acc = blendOver(layer, acc)
+    // 背板先於後代內容繪製；半透明按鈕也必須疊在祖先彈層的實底上量色。
+    const surface = node.querySelector(':scope > .lt-dialog-backplate')
+    if (surface) {
+      const backing = layerBackground(view, surface)
+      if (backing) acc = blendOver(backing, acc)
+    }
   }
   for (const pseudo of ['::before', '::after']) {
     const layer = layerBackground(view, el, pseudo)
-    if (layer) acc = blendOver(layer, acc)
-  }
-  // 平台彈層的實底位於背景與內容之間，作者將殼設透明時仍以這層判斷字色。
-  const surface = el.querySelector(':scope > .lt-dialog-backplate')
-  if (surface) {
-    const layer = layerBackground(view, surface)
     if (layer) acc = blendOver(layer, acc)
   }
   return acc

@@ -38,6 +38,7 @@ it('keeps enabled popup primary labels readable with inherited host foreground a
     const buttons = '<div class="custom-instruction-scope"><div class="add-btn">Add</div></div><div class="notepad-scope"><div class="np-save-btn">Save</div></div><div class="role-setting"><div class="complete-btn">Save</div></div><div class="confirm-bottom"><div class="ok-btn">OK</div></div>'
     // The host's white on-accent foreground can survive while MMD replaces its accent with gold.
     const panels = ['#f5c542', '#cf6a42', '#b0512c', '#96621e', '#e6153f'].map(accent => `<section class="canvas-root lt-theme-dark" style="--lt-canvas-accent:${accent};--lt-canvas-accent-fg:#fff"><div class="u-popup__content">${buttons}</div></section>`).join('')
+      + `<section class="canvas-root lt-theme-dark" style="--lt-canvas-accent:rgba(0,0,0,.4);--lt-canvas-accent-fg:#fff"><div class="u-popup__content" style="background:transparent!important;--lt-canvas-sheet-bg:#fff"><div class="lt-dialog-backplate" style="position:absolute;inset:0;z-index:-1;background:inherit"></div>${buttons}</div></section>`
     const file = join(dir, 'fixture.html')
     writeFileSync(file, `<style>${vars}\n${css}</style>${panels}<pre id="result"></pre><script>${tone};chromeTone.syncChromeTone(document);document.querySelector('#result').textContent=JSON.stringify(Array.from(document.querySelectorAll('.add-btn,.np-save-btn,.complete-btn,.ok-btn')).map(el=>{const fg=chromeTone.parseComputedColor(getComputedStyle(el).color),bg=chromeTone.effectiveBackground(el),a=chromeTone.relativeLuminance(fg),b=chromeTone.relativeLuminance(bg);return {className:el.className,fg,bg,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)}}))</script>`)
     const run = spawnSync(chrome!, ['--headless=new', '--no-sandbox', '--no-first-run', '--no-default-browser-check', `--user-data-dir=${join(dir, 'profile')}`, '--dump-dom', '--virtual-time-budget=1000', `file://${file}`], { encoding: 'utf8', timeout: 20000, maxBuffer: 2 * 1024 * 1024 })
@@ -45,7 +46,8 @@ it('keeps enabled popup primary labels readable with inherited host foreground a
     const json = run.stdout.match(/<pre id="result">([^<]+)<\/pre>/)?.[1]
     expect(json, run.stdout + run.stderr).toBeTruthy()
     const rows = JSON.parse(json!)
-    expect(rows).toHaveLength(20)
+    expect(rows).toHaveLength(24)
+    for (const row of rows.slice(20)) expect(row.bg).toEqual({ r: 153, g: 153, b: 153, a: 1 })
     for (const row of rows) expect(row.ratio, JSON.stringify(row)).toBeGreaterThanOrEqual(4.5)
   } finally { rmSync(dir, { recursive: true, force: true }) }
 }, 30000)
