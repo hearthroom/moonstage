@@ -673,15 +673,11 @@
     display: none;
   }
 
-  /*
-     角色那列兩格都空了，但 grid-template-rows 是顯式的兩軌——空軌會收成 0，
-     兩軌之間那 4px 的 row-gap 卻還留著，於是每一則 AI 訊息上面多一條死空間，
-     跟玩家那列不對稱。收成單排，空軌與它的 gap 一起消失。
-     （瀏覽器實測：block 的 top offset 從 4px 變 0，列高正好等於氣泡高。）
-  */
+  /* 預設隱藏的頭像與名字列收成 0 時，也收掉列間距。
+     保留 avatar/name 區域：作者用 display 恢復名字或頭像後仍排在正文上方；
+     移除區域會讓這些節點建立隱含 grid 欄，反而把正文擠窄。 */
   .mes.Ai {
-    grid-template-rows: auto;
-    grid-template-areas: "block block";
+    row-gap: 0;
   }
 
   .ch_name {
