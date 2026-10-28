@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onUpdated, ref, watch } from 'vue'
 import { leaveTopLayer, raiseStopAboveDialogs, raiseToTopLayer } from '../canvas-top-layer'
 import { useCanvasModalFocus } from '../canvas-modal-focus'
 import { syncChromeTone } from '../canvas-chrome-tone'
@@ -97,6 +97,12 @@ watch(() => props.open, (open) => {
     if (open) syncChromeTone(root.value?.ownerDocument || document)
   })
 }, { immediate: true })
+
+// sandbox 共用同一個開著的殼換面板；例如存檔清單轉確認框時 open 不變，
+// 新掛上的按鈕仍要量色，但不重開 popover、重綁事件或改動焦點。
+onUpdated(() => {
+  if (props.open) syncChromeTone(root.value)
+})
 
 useCanvasModalFocus(root, () => props.open, { initial: () => '.confirm-scope .cancel-btn' })
 
