@@ -9,7 +9,7 @@
  *   UPDATE_CONTRACT=1 npx vitest run src/sandbox/__tests__/contract.spec.ts
  *
  * 下游（hearthroom/skills 的驗證器與寫卡指南、CLI 的本機檢查）只讀這份 JSON，不再各自手抄一份表。
- * 伺服器端的上限（單條替換 128 KiB、整份 32 MiB）不在這個 repo，寫在 `provider` 節並標明出處。
+ * 伺服器端的上限（單條替換 256 KiB、整份 32 MiB）不在這個 repo，寫在 `provider` 節並標明出處。
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
@@ -337,7 +337,7 @@ function buildContract() {
     scripts: scriptFacts(),
     provider: {
       source: 'hand-maintained from HarperHarbor/server provider/internal/service/role/author_asset.go and display/scan.go',
-      replaceMaxBytes: 128 * 1024,
+      replaceMaxBytes: 256 * 1024,
       totalMaxBytes: 32 * 1024 * 1024,
       bytesAre: 'UTF-8 (find + replace + name per rule)',
       findMustNotBeBlank: true,
