@@ -1232,7 +1232,7 @@
 
   /* 新版沙箱卡：整個聊天區是一個 iframe（作者的殼），吃掉頂欄以下的全部空間。 */
   .canvas-sandbox-frame {
-    padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px));
+    padding-bottom: var(--lt-viewport-safe-area-bottom, env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px)));
     position: relative;
     flex: 1 1 auto;
     min-height: 0;
@@ -1288,7 +1288,7 @@
     （owner 2026-09-16 截圖）。所以底色搬到兩塊上面。
   */
   .chat-bottom {
-    padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px));
+    padding-bottom: var(--lt-viewport-safe-area-bottom, env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
 
   .shortcut-bar-wrapper,

@@ -28,6 +28,8 @@ html, body { margin: 0; padding: 0; height: 100%; }
 }
 
 [data-chat="root"] {
+  /* The host iframe wrapper owns the device safe area; do not reserve it twice. */
+  --lt-viewport-safe-area-bottom: 0px;
   --rpx: calc(100vw / 750);
   position: relative;
   display: flex;

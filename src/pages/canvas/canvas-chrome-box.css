@@ -29,14 +29,14 @@
     margin-left: auto
 }
 .canvas-sandbox-frame {
-    padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px))
+    padding-bottom: var(--lt-viewport-safe-area-bottom, env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px)))
 }
 .canvas-sandbox-notice {
     margin: 8px 16px 12px;
     padding: 10px 14px
 }
 .chat-bottom {
-    padding-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px))
+    padding-bottom: var(--lt-viewport-safe-area-bottom, env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px)))
 }
 .chat-bottom-wapper {
     padding-top: 8px

@@ -222,3 +222,31 @@ it('從後台切回來：重新量、把焦點移開，60ms 後再量一次', ()
     dispose(); ta.remove()
   } finally { vi.useRealTimers() }
 })
+
+it('does not reserve the home-indicator inset above an occluding keyboard, then restores it', () => {
+  const { win, vv } = browser(), root = document.createElement('div')
+  root.style.setProperty('--lt-viewport-safe-area-bottom', '7px')
+  const dispose = bindCanvasViewport(win, root)
+  const normal = root.style.getPropertyValue('--lt-viewport-safe-area-bottom')
+  expect(normal).toContain('env(safe-area-max-inset-bottom')
+  vv.height = 460; vv.dispatchEvent(new Event('resize'))
+  expect(root.style.getPropertyValue('--lt-viewport-safe-area-bottom')).toBe('0px')
+  vv.height = 800; vv.dispatchEvent(new Event('resize'))
+  expect(root.style.getPropertyValue('--lt-viewport-safe-area-bottom')).toBe(normal)
+  // Pinch zoom alone must not be classified as a keyboard.
+  vv.scale = 2; vv.height = 400; vv.dispatchEvent(new Event('resize'))
+  expect(root.style.getPropertyValue('--lt-viewport-safe-area-bottom')).toBe(normal)
+  dispose()
+  expect(root.style.getPropertyValue('--lt-viewport-safe-area-bottom')).toBe('7px')
+})
+
+it('uses the same effective bottom inset for classic and sandbox, with only the host reserving it', () => {
+  const css = readFileSync(resolve(process.cwd(), 'src/pages/canvas/canvas.css'), 'utf8')
+  for (const selector of ['canvas-sandbox-frame', 'chat-bottom']) {
+    const rule = css.match(new RegExp('\\.' + selector + ' \\{[^}]*\\}'))?.[0] || ''
+    expect(rule).toContain('var(--lt-viewport-safe-area-bottom, env(safe-area-max-inset-bottom')
+  }
+  const shell = readFileSync(resolve(process.cwd(), 'src/sandbox/shell.css'), 'utf8')
+  const rule = shell.match(/\[data-chat="root"\] \{[^}]*\}/)?.[0] || ''
+  expect(rule).toContain('--lt-viewport-safe-area-bottom: 0px')
+})

@@ -62,15 +62,20 @@ export const restoreAfterKeyboard = settleVisualViewport
 export function bindCanvasViewport(win: Window, root: HTMLElement) {
   const keyboard = keyboardOf(win)
   const previousOverlay = keyboard?.overlaysContent
-  const names = ['--lt-viewport-top', '--lt-viewport-height', '--lt-viewport-bottom']
+  const names = ['--lt-viewport-top', '--lt-viewport-height', '--lt-viewport-bottom', '--lt-viewport-safe-area-bottom']
   const previous = names.map(name => root.style.getPropertyValue(name))
   const settleTimers: number[] = []
   let lastVisibility: DocumentVisibilityState = win.document.visibilityState
   const remeasure = () => {
     const { top, bottom, height } = visibleViewport(win)
     if (height <= 0) return
-    const values = [top, height, Math.max(0, win.innerHeight - bottom)]
-    names.forEach((name, index) => root.style.setProperty(name, `${Math.round(values[index])}px`))
+    // The visible bottom is already above the device edge while the keyboard occludes it.
+    // Safari can retain safe-area-inset-bottom, and the max inset never shrinks.
+    // Keeping that home-indicator padding here leaves a second gap above the keyboard.
+    const safeBottom = bottom < win.innerHeight - 1 ? '0px' : 'env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px))'
+    const values = [top, height, Math.max(0, win.innerHeight - bottom)].map(value => `${Math.round(value)}px`)
+    values.push(safeBottom)
+    names.forEach((name, index) => root.style.setProperty(name, values[index]))
   }
   const update = () => {
     // 頁面剛從後台回來：鍵盤已被系統收掉，但焦點還在輸入框、鍵盤 API 的矩形可能還是舊值。
