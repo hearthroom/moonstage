@@ -1,4 +1,5 @@
 {
+	"canvas.modelPreferenceFallback": "你選的模型或線路目前無法使用，這張卡已改用預設模型。",
 	"canvas.historyAccess.closed": "作者目前不開放這張卡，你可以回顧記錄，但不能繼續。",
 	"canvas.historyAccess.back": "回我的對話",
 	"canvas.historyAccess.rejected": "作者剛把這張卡收起來了，這次沒有送出，你打的字還在。",

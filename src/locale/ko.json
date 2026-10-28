@@ -1,4 +1,5 @@
 {
+	"canvas.modelPreferenceFallback": "선택한 모델이나 회선을 지금 사용할 수 없어 이 카드에서는 기본 모델로 바꿨어요.",
 	"canvas.historyAccess.closed": "작성자가 지금은 이 카드를 열어 두지 않았어요. 기록은 다시 볼 수 있지만 이어서 할 수는 없어요.",
 	"canvas.historyAccess.back": "내 대화로 돌아가기",
 	"canvas.historyAccess.rejected": "작성자가 방금 이 카드를 닫아서 전송되지 않았어요. 입력한 내용은 그대로 있어요.",

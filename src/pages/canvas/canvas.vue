@@ -391,6 +391,7 @@
 </template>
 
 <script lang="ts" setup>
+import { syncStartedModelSettings } from './canvas-model-preference'
 import { cardPortrait } from './canvas-portrait'
 import { operationFailureSub, operationFailureTitle } from '@/utils/operation-failure-copy'
 import { cfImageDesktop } from "@/utils/image-transform.js"
@@ -5780,8 +5781,15 @@ function chatStart(greetingIndex?: number) {
       // 伺服器是在這一刻建立對話並落下開場白的，所以選到哪一條要在這裡講。
       // 舊版伺服器沒有這個欄位，只有真的有替代開場白時才帶。
       : { roleId: unref(roleId), greetingIndex, firstPageSize: ajax.value.rows },
-  }).then(res => {
+  }).then(async res => {
     if (res.statusCode == 200) {
+      await syncStartedModelSettings(res.data, roleSettingsInFlight, async () => {
+        roleSettingsReady.value = false;
+        formData.selectModel = '';
+        await loadRoleSettings();
+        loadModelCatalog();
+        loadMultiPassPreference();
+      }, () => uni.showToast({ title: t('canvas.modelPreferenceFallback'), icon: 'none', duration: 6000 }));
       responseSettingsVersion.value = res.data.responseSettingsVersion === 1 ? 1 : 0;
       pic.value = cardPortrait(res.data.roleInfo);
       historyConversation.value = res.data.historyConversation;

@@ -1,4 +1,5 @@
 {
+	"canvas.modelPreferenceFallback": "選んだモデルまたは回線が現在使えないため、このカードではデフォルトのモデルに切り替えました。",
 	"canvas.historyAccess.closed": "作者は今このカードを開放していません。履歴は見返せますが、続きはできません。",
 	"canvas.historyAccess.back": "会話一覧に戻る",
 	"canvas.historyAccess.rejected": "作者がこのカードを閉じたため、送信されませんでした。入力した内容は残っています。",

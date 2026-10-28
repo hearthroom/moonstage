@@ -1,4 +1,5 @@
 {
+	"canvas.modelPreferenceFallback": "Your chosen model or lane is unavailable, so this card is using the default model.",
 	"canvas.historyAccess.closed": "The author has closed this card for now. You can read back the history but can't continue.",
 	"canvas.historyAccess.back": "Back to my conversations",
 	"canvas.historyAccess.rejected": "The author just closed this card, so your message wasn't sent. Your text is still here.",
