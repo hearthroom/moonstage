@@ -7,6 +7,7 @@
  *   author-css、腳本跑一次）→ 等宿主的 `messages` → 冷啟動每則 new→mount→done → `ready`。
  */
 import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, RequestOp, SandboxBackground, SandboxHelloConfig, SandboxMessage, ShellToHost, StageState } from './protocol'
+import { createThemeBridge } from './theme-bridge'
 import { createEventBus } from './sdk/events'
 import { createRemoteHistory } from './sdk/history'
 import { createSdk, type Sdk, type SdkHost } from './sdk/create-sdk'
@@ -122,10 +123,8 @@ export function createShell(options: CreateShellOptions): Shell {
   refs.root.setAttribute('data-chrome', config.chrome === 'host' ? 'host' : (standardChrome ? 'standard' : 'shell'))
   // 殼的根同時是標準畫布的根（.canvas-root.chat）：canvas.css 的變數與訊息區規則才套得上。
   refs.root.classList.add('canvas-root', 'chat', 'lt-format-mmd')
-  const applyThemeVars = (vars?: Record<string, string>) => {
-    if (!vars) return
-    for (const [k, v] of Object.entries(vars)) if (/^--lt-canvas-[\w-]+$/.test(k)) refs.root.style.setProperty(k, v)
-  }
+  const themeBridge = createThemeBridge(refs.root, win, refs.authorCss)
+  const applyThemeVars = themeBridge.update
   applyThemeVars(config.themeVars)
   // 訊息區的容器用標準的舞台元件（#scrollview／#chat／#msglistview 這些作者打得到的名字都在）。
   const stageApp = createApp({ render: () => h(CanvasStage, { background: stageBackground.value }) })
@@ -789,6 +788,7 @@ export function createShell(options: CreateShellOptions): Shell {
     refs,
     sdk: controller.sdk,
     dispose() {
+      themeBridge.dispose()
       historyRemote.dispose()
       disposed = true
       offRuleSettled()
