@@ -7,6 +7,7 @@ import { dirname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawn } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
+import { observeNativeBrowser } from '../../../test-support/native-browser'
 
 it('keeps length labels and notebook actions inside real panels at phone and desktop widths', async () => {
   const chrome = process.env.CHROME_BIN || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].find(existsSync)
@@ -63,7 +64,10 @@ it('keeps length labels and notebook actions inside real panels at phone and des
   const css = styles.join('\n').replace(/(-?\d*\.?\d+)rpx/g, 'calc($1 * var(--ms-rpx))')
   writeFileSync(file, `<meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{--ms-rpx:.5px}body{margin:0;font-family:system-ui}*,*::before,*::after{animation:none!important;transition:none!important}${css}</style><div id="app"></div><script>${result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script')}</script>`)
   const proc = spawn(chrome!, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(dir, 'profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore' })
+  const shutdown = observeNativeBrowser(proc)
   let ws: WebSocket | undefined
+  let closeBrowser: (() => Promise<unknown>) | undefined
+  let primaryError: unknown
   const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
   try {
     const portFile = join(dir, 'profile', 'DevToolsActivePort')
@@ -75,6 +79,8 @@ it('keeps length labels and notebook actions inside real panels at phone and des
     const pending = new Map<number, { resolve: (result: any) => void; reject: (error: Error) => void }>()
     ws.onmessage = event => { const message = JSON.parse(String(event.data)); const request = pending.get(message.id); if (!request) return; pending.delete(message.id); message.error ? request.reject(new Error(message.error.message)) : request.resolve(message.result) }
     const send = (method: string, params = {}, sessionId?: string): Promise<any> => new Promise((resolve, reject) => { const id = ++seq; pending.set(id, { resolve, reject }); ws!.send(JSON.stringify({ id, method, params, sessionId })) })
+    ws.onclose = () => { for (const request of pending.values()) request.reject(new Error('Chrome CDP connection closed')); pending.clear() }
+    closeBrowser = () => send('Browser.close')
     const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
     const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
     await send('Page.enable', {}, sessionId)
@@ -94,12 +100,21 @@ it('keeps length labels and notebook actions inside real panels at phone and des
       }
     }
     expect(failures, JSON.stringify(failures, null, 2)).toEqual([])
+  } catch (error) {
+    primaryError = error
+    throw error
   } finally {
-    ws?.close()
-    const exited = new Promise(resolve => proc.once('exit', resolve))
-    proc.kill('SIGTERM')
-    await Promise.race([exited, pause(5000)])
-    if (proc.exitCode === null && proc.signalCode === null) { proc.kill('SIGKILL'); await exited }
-    rmSync(dir, { recursive: true, force: true })
+    try {
+      await shutdown(async () => {
+        if (!closeBrowser) throw new Error('Chrome did not reach CDP setup')
+        await closeBrowser()
+      })
+      rmSync(dir, { recursive: true, force: true })
+    } catch (error) {
+      const cleanupError = new Error(`Chrome cleanup failed; retained fixture at ${dir}`, { cause: error })
+      throw primaryError ? new AggregateError([primaryError, cleanupError], 'Panel test and Chrome cleanup failed') : cleanupError
+    } finally {
+      ws?.close()
+    }
   }
 }, 120000)
