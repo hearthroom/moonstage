@@ -68,11 +68,10 @@ html, body { margin: 0; padding: 0; height: 100%; }
 [data-chat="root"][data-chrome="shell"] [data-chat="header-title"] span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 [data-chat="root"][data-chrome="shell"] [data-chat="header-actions"], [data-chat="root"][data-chrome="shell"] [data-slot="header-extra"] { display: flex; align-items: center; gap: 8px; }
 
-/* 功能欄是作者資產的掛載點，不參與訊息區的 flex 高度分配。跟一般畫布的作者容器相同：
-   裁掉流內副本（開場訊息裡仍可捲動操作），作者自行定位的 fixed 面板照常顯示、接收點擊。
-   不建立 transform/contain，否則 fixed 後代會被這個零尺寸容器裁掉；不覆寫 pointer-events，
-   讓作者的透明 Shadow DOM host 保留自己宣告的穿透行為。 */
-[data-slot="statusbar"] { position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: hidden; }
+/* 流內 HUD 依內容取得尺寸；過長的功能欄在自己的區域捲動，保留大部分高度給訊息。
+   只有 fixed 控件時不佔高度。不建立 transform/contain 或覆寫 pointer-events，
+   保留 fixed 後代的視窗定位及作者 Shadow DOM host 宣告的穿透行為。 */
+[data-slot="statusbar"] { flex: 0 0 auto; min-height: 0; max-height: 30%; overflow: auto; }
 
 /* 訊息區裝的是標準舞台（.chat-scope-box 撐滿、.scroll-view 在裡面捲），所以這一層自己不捲、只給高度。 */
 [data-chat="messages"] { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
@@ -89,7 +88,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
 [data-slot="right"] { right: 0; }
 
 [data-chat="author-stage"] { display: none; background: var(--chat-bg); overflow: auto; }
-[data-chat="author-stage"][data-stage="content"] { display: block; position: absolute; left: 0; right: 0; top: var(--shell-header-h, 45px); bottom: var(--shell-composer-h, 0px); z-index: 2000; }
+[data-chat="author-stage"][data-stage="content"] { display: block; position: absolute; left: 0; right: 0; top: calc(var(--shell-header-h, 45px) + var(--shell-statusbar-h, 0px)); bottom: var(--shell-composer-h, 0px); z-index: 2000; }
 [data-chat="author-stage"][data-stage="full"] { display: block; position: absolute; inset: 0; z-index: 3000; }
 
 [data-chat="root"][data-chrome="shell"] [data-chat="composer"] { flex-shrink: 0; background: var(--chat-composer-bg); color: var(--chat-composer-text); border-top: 1px solid var(--chat-border); padding: calc(12 * var(--rpx)) calc(20 * var(--rpx)) calc(12 * var(--rpx) + env(safe-area-inset-bottom)); }

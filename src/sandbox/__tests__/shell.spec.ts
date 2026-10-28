@@ -127,6 +127,25 @@ describe('殼：冷啟動與事件順序', () => {
     s.dispose()
   })
 
+  it('standard chrome keeps the author header slot connected across header updates', async () => {
+    const header = { roleName: 'Example', avatar: '', badge: '', backLabel: 'Back' }
+    const s = boot(config({ chromeState: { header }, card: { rules: [SCRIPT_RULE(`
+      sdk.on('ready', function () {
+        var slot = document.querySelector('[data-slot="header-extra"]');
+        if (slot) { var button = document.createElement('button'); button.id = 'author-pages'; button.textContent = 'Pages'; slot.appendChild(button); }
+      });
+    `)], statusbar: '' } }))
+    s.handle({ type: 'messages', messages: [] })
+    expect(s.refs.headerExtra.isConnected).toBe(true)
+    const button = s.refs.root.querySelector('#author-pages')
+    expect(button).not.toBeNull()
+    s.handle({ type: 'chrome', state: { header: { ...header, roleName: 'Updated' } } })
+    await nextTick()
+    expect(s.refs.headerExtra.isConnected).toBe(true)
+    expect(s.refs.root.querySelector('#author-pages')).toBe(button)
+    expect(s.refs.header.textContent).toContain('Updated')
+  })
+
   it('sdk.model.get() reports the current model and next-turn cost; model:change fires when either changes', async () => {
     const header = { roleName: 'Example', avatar: '', badge: '', backLabel: 'Back' }
     const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '127–251', modelName: 'Claude Sonnet 4.5 · Ripple', assistBusy: false, assistCost: '', labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Assist', perTurn: 'Per turn' } }
@@ -374,6 +393,29 @@ describe('殼：功能欄、樣式、主題、輸入區、舞台與返回', () =
     s.refs.composer.hidden = true
     s.sdk.stage.open('content')
     expect(s.refs.root.style.getPropertyValue('--shell-composer-h')).toBe('0px')
+  })
+
+  it('content stage tracks the flow statusbar height when the HUD expands', () => {
+    const observers: Array<{ targets: Element[]; callback: () => void }> = []
+    vi.stubGlobal('ResizeObserver', class {
+      targets: Element[] = []
+      constructor(readonly callback: () => void) { observers.push(this) }
+      observe(target: Element) { this.targets.push(target) }
+      unobserve() {}
+      disconnect() {}
+    })
+    try {
+      const s = boot(config({ card: { rules: [], statusbar: 'HUD' } }))
+      let barHeight = 44
+      Object.defineProperty(s.refs.statusbar!, 'offsetHeight', { get: () => barHeight })
+      s.sdk.stage.open('content')
+      expect(s.refs.root.style.getPropertyValue('--shell-statusbar-h')).toBe('44px')
+      const observer = observers.find(o => o.targets.includes(s.refs.statusbar!))
+      expect(observer).toBeDefined()
+      barHeight = 88
+      observer!.callback()
+      expect(s.refs.root.style.getPropertyValue('--shell-statusbar-h')).toBe('88px')
+    } finally { vi.unstubAllGlobals() }
   })
 
   it('切會話：清氣泡（unmount）、關舞台、清補發記錄、發 conversation:switch；訂閱不清', () => {

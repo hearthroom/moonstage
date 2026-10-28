@@ -484,13 +484,18 @@ export function createShell(options: CreateShellOptions): Shell {
   // 舞台 content 只蓋訊息區：上緣讓出頁首、下緣讓出輸入區（含作者把輸入區往上推的量），輸入區藏起來就貼底。
   function syncChromeInsets() {
     refs.root.style.setProperty('--shell-header-h', `${refs.header.offsetHeight}px`)
+    refs.root.style.setProperty('--shell-statusbar-h', `${refs.statusbar?.offsetHeight || 0}px`)
     const c = refs.composer.hidden ? null : refs.composer.getBoundingClientRect()
     const inset = c && c.height > 0 ? Math.max(0, Math.round(refs.root.getBoundingClientRect().bottom - c.top)) : 0
     refs.root.style.setProperty('--shell-composer-h', `${inset}px`)
   }
   const headerResize = typeof ResizeObserver === 'function' ? new ResizeObserver(syncChromeInsets) : null
   if (standardChrome) {
-    refs.header.innerHTML = ''
+    // Vue owns only the standard header; the author slot must stay in the live DOM
+    // when standard chrome mounts or updates.
+    const headerMount = doc.createElement('div')
+    headerMount.style.display = 'contents'
+    refs.header.replaceChildren(headerMount, refs.headerExtra)
     refs.composer.innerHTML = ''
     const headerApp = createApp({
       render: () => h(CanvasHeader as unknown as Parameters<typeof h>[0], {
@@ -502,7 +507,7 @@ export function createShell(options: CreateShellOptions): Shell {
       } as Record<string, unknown>),
     })
     headerApp.config.warnHandler = () => {}
-    headerApp.mount(refs.header)
+    headerApp.mount(headerMount)
     const composerApp = createApp({
       render: () => h(CanvasComposer as unknown as Parameters<typeof h>[0], {
         ref: composerVm,
@@ -526,12 +531,17 @@ export function createShell(options: CreateShellOptions): Shell {
     composerApp.config.warnHandler = () => {}
     composerApp.mount(refs.composer)
     chromeApps = [headerApp, composerApp]
-    if (headerResize) { headerResize.observe(refs.header); headerResize.observe(refs.composer); headerResize.observe(refs.root) }
     // 作者腳本把輸入區往上推（給自己的底部工具列讓位）時，訊息區底部被蓋住的量要補成
     // 對話欄的底部內距——跟一般畫布同一套量法；殼在 iframe 裡，畫布那邊的觀察器看不到這裡。
     // 綁在殼的輸入區容器（[data-chat="composer"]）而不是裡面的 .composer-scope：作者腳本從
     // textarea 往上找「貼底的最後一個祖先」來推，在殼裡走得到這個容器；子樹量法連帶蓋住裡面的節點。
     disposeComposerOverhang = bindComposerOverhang({ doc, win, scroll: scrollView, composer: refs.composer, target: doc.documentElement })
+  }
+  if (headerResize) {
+    headerResize.observe(refs.header)
+    headerResize.observe(refs.composer)
+    headerResize.observe(refs.root)
+    if (refs.statusbar) headerResize.observe(refs.statusbar)
   }
 
   // ── 作者側欄貼著畫面左右、壓到氣泡時，對話欄讓出空間：跟一般畫布同一套量法（canvas-author-side-dock.ts）。

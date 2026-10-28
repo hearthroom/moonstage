@@ -16,7 +16,7 @@ const dirs: string[] = []
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }) })
 
 const css = readFileSync(join(process.cwd(), 'src/sandbox/shell.css'), 'utf8')
-function geometry(width: number, height: number) {
+function geometry(width: number, height: number, flowHud: boolean | 'fixed-only' = false) {
   expect(chrome, 'Install Chrome or set CHROME_BIN to run the real layout regression').toBeTruthy()
   document.body.innerHTML = '<div id="app"></div>'
   const refs = buildShell(document, document.querySelector('#app')!, {
@@ -25,6 +25,8 @@ function geometry(width: number, height: number) {
   })
   refs.root.setAttribute('data-chrome', 'shell')
   refs.statusbar!.innerHTML = '<div style="height:4000px">Mount form copy</div><button id="dock" style="position:fixed;z-index:1;right:0;top:100px;width:60px;height:44px">Dock</button>'
+  if (flowHud) refs.statusbar!.innerHTML = '<div style="height:44px">Status values</div><button id="dock" style="position:fixed;z-index:1;right:0;top:100px;width:60px;height:44px">Dock</button>'
+  if (flowHud === 'fixed-only') refs.statusbar!.firstElementChild!.remove()
   refs.list.innerHTML = '<article style="height:4000px">Opening form in the message</article>'
   const markup = `<!doctype html><style>${css}\n[data-chat="messages"]{overflow:auto}</style>${document.body.innerHTML}`
   const dir = mkdtempSync(join(tmpdir(), 'moonstage-statusbar-layout-')); dirs.push(dir)
@@ -48,6 +50,24 @@ function geometry(width: number, height: number) {
 }
 
 describe('mount content leaves the message viewport available', () => {
+  it.each([[390, 844], [1440, 900]])('fixed-only controls use no flow height at %i × %i', (width, height) => {
+    const result = geometry(width, height, 'fixed-only')
+    expect(result.statusbar.height).toBe(0)
+    expect(result.messages.height).toBeGreaterThan(height / 2)
+    expect(result.dockHit).toBe(true)
+    expect(result.shadowPointer).toBe('none')
+  }, 30000)
+
+  it.each([[390, 844], [1440, 900]])('gives a normal-flow HUD its full width and height at %i × %i', (width, height) => {
+    const result = geometry(width, height, true)
+    expect(result.statusbar.width).toBe(width)
+    expect(result.statusbar.height).toBe(44)
+    expect(result.messages.top).toBeGreaterThanOrEqual(result.statusbar.bottom)
+    expect(result.messages.height).toBeGreaterThan(height / 2)
+    expect(result.composer.bottom).toBeLessThanOrEqual(height)
+    expect(result.dockHit).toBe(true)
+  }, 30000)
+
   it.each([[390, 844], [1440, 900]])('keeps messages scrollable and fixed author controls clickable at %i × %i', (width, height) => {
     const result = geometry(width, height)
     expect(result.width).toBe(width)
