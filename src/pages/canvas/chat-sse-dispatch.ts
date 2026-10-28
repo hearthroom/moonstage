@@ -299,8 +299,8 @@ function handleAnswer(ev: SSEEvent, ctx: DispatchContext): void {
     if (answerData?.choices?.[0]?.delta?.content) {
       if (answerData.choices[0].delta.content.length > 0) {
         const rawDelta: string = answerData.choices[0].delta.content
-        const delta: string = ctx.getLocale() === 'zh-Hant' ? ctx.tify(rawDelta) : rawDelta
-        ctx.replyContent.value += delta
+        // 正文先保留原文給作者規則；可見字形由渲染管線最後轉換。
+        ctx.replyContent.value += rawDelta
 
         const data: any = {
           id: ctx.currentChatId.value,
@@ -322,9 +322,6 @@ function handleAnswer(ev: SSEEvent, ctx: DispatchContext): void {
   }
 
   // [DONE] branch
-  if (ctx.getLocale() === 'zh-Hant') {
-    ctx.replyContent.value = ctx.tify(ctx.replyContent.value)
-  }
   const data: any = {
     id: ctx.currentChatId.value,
     content: ctx.replyContent.value,
@@ -376,9 +373,6 @@ function handleAnswer(ev: SSEEvent, ctx: DispatchContext): void {
 function handleLegacyMessage(ev: SSEEvent, ctx: DispatchContext): void {
   // v1 protocol's turn-end marker. Same shape as answer/[DONE].
   if (ev.raw !== '[DONE]') return
-  if (ctx.getLocale() === 'zh-Hant') {
-    ctx.replyContent.value = ctx.tify(ctx.replyContent.value)
-  }
   const data: any = {
     id: ctx.currentChatId.value,
     content: ctx.replyContent.value,

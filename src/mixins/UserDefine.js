@@ -1,5 +1,4 @@
 import { useStageHost } from '@/host/stage-host'
-import { directionFor } from '@/common/display-script-walk'
 import {
 	computed,
 	ref,
@@ -315,20 +314,8 @@ export const useUserDefine = () => {
 			}
 		}).then(res => {
 			if (res.statusCode == 200) {
-				var role = {};
-				// 繁體介面才轉；卡片本身就是繁體就不轉（同字形不轉）。
-				if (uni.getLocale() == 'zh-Hant' && directionFor(res.data.language, 'zh-Hant') === 's2t') {
-					role = {
-						...res.data,
-						// 转换属性格式
-						roleDesc:_this.fui.tify(res.data.roleDesc),
-						roleName:_this.fui.tify(res.data.roleName),
-						roleWelcome:_this.fui.tify(res.data.roleWelcome),
-						roleDetailDesc:_this.fui.tify(res.data.roleDetailDesc)
-					};
-				} else {
-					role = res.data;
-				}
+				// 保留作者原文；開場白先套正則，渲染時才轉可見文字的字形。
+				const role = res.data;
 				setCurrentRole(role);
 				if (callback) {
 					callback(null, role);

@@ -57,10 +57,10 @@ describe('接線位置', () => {
     expect(page).toMatch(/whenRoleDetail\(currentRole, \(\) => unref\(currentRole\), target\)[\s\S]{0,200}mountSandbox\(res\.data\)/)
     expect(page).not.toContain('directionForLocale(')
 
-    // 串流舊路徑與角色資料的簡轉繁，同字形時也不轉
+    // 思考段落的舊轉換仍尊重來源字形；角色資料與正文保留原文，交由渲染層轉。
     expect(page).toContain("tify: (s: string) => (displayScriptDirection.value === 'none' ? s : _this.fui.tify(s)),")
     const mixin = readFileSync(resolve(__dirname, '../../../mixins/UserDefine.js'), 'utf8')
-    expect(mixin).toContain("uni.getLocale() == 'zh-Hant' && directionFor(res.data.language, 'zh-Hant') === 's2t'")
+    expect(mixin).not.toContain('_this.fui.tify(')
   })
 })
 
