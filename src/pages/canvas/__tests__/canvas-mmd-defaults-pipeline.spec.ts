@@ -1,3 +1,4 @@
+import { renderAuthorMarkdown } from '@/common/author-html-markdown'
 // highlightText 現在也綁這兩支（圍欄保護與前端區塊標記），跟頁面裡一樣是真實函式。
 import { withFencesProtected } from '../../../common/markdown-fences'
 import { tagFrontendBlocks } from '../../../common/frontend-block'
@@ -48,6 +49,7 @@ function extractBraced(source: string, anchor: string): string {
 function buildHighlightText(format: 'mmd' | 'tavern', rules: any[] = []) {
   const fnSource = extractBraced(fs.readFileSync(CANVAS_VUE, 'utf8'), 'const highlightText = (content, type, cacheKey, streaming) => {')
   const context = vm.createContext({
+    renderAuthorMarkdown,
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines,
     findStableBoundary, getStreamCacheEntry, setStreamCacheEntry, unwrapSingleHtmlFence,

@@ -1,3 +1,4 @@
+import { renderAuthorMarkdown } from '@/common/author-html-markdown'
 import { applyTavernRules } from '../canvas-rule-engine'
 import { installCard, renderContent } from '../../../sandbox/rules'
 // highlightText 現在也綁這兩支（圍欄保護與前端區塊標記），跟頁面裡一樣是真實函式。
@@ -55,6 +56,7 @@ function extractHighlightTextSource(): string {
 function buildHighlightText(): (content: string, type?: number, cacheKey?: string | null) => string {
   const wrapped = `(function () {\n${extractHighlightTextSource()}\nreturn highlightText;\n})()`
   const context = vm.createContext({
+    renderAuthorMarkdown,
     applyTavernRules, authorRuleOptions: () => ({ macros: { user: '小明', char: '星' } }),
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines,

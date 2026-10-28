@@ -1,3 +1,4 @@
+import { renderAuthorMarkdown } from '@/common/author-html-markdown'
 /**
  * 畫布的訊息渲染接上 worker 版的作者規則（一般卡與沙箱卡的宿主都走這條：沙箱殼的 html 也是這裡算的）。
  *
@@ -70,6 +71,7 @@ function makeAuthorRules(executor: RuleExecutor | null, rules: any[]) {
 function buildHighlightText(rules: any[], authorRules: unknown, crossLine = false) {
   const fnSource = extractBraced(SOURCE, 'const highlightText = (content, type, cacheKey, streaming) => {')
   const context = vm.createContext({
+    renderAuthorMarkdown,
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines,
     findStableBoundary, getStreamCacheEntry, setStreamCacheEntry, unwrapSingleHtmlFence,
@@ -161,6 +163,7 @@ function buildRenderMessage(authorRules: unknown, renderMarkdown: (item: any) =>
   const activated: string[] = []
   const epoch = { value: 0 }
   const context = vm.createContext({
+    renderAuthorMarkdown,
     authorRules,
     authorRuleEpoch: epoch,
     renderMemo: new WeakMap(),

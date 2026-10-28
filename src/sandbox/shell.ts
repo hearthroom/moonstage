@@ -301,7 +301,7 @@ export function createShell(options: CreateShellOptions): Shell {
       { engine: 'display', text: content, rules: card.rules, options: { variants: config.variants || null, seed: opts.seed } },
       { streaming: !!opts.streaming },
     )
-    const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, macros, fencedDocument: stylePolicy.fencedDocument, convert, nativeBlocks: opts.role === 'ai' }), stylePolicy)
+    const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, macros, fencedDocument: stylePolicy.fencedDocument, convert, nativeBlocks: opts.role === 'ai', preserveAuthorHtml: card.scripts.length > 0 }), stylePolicy)
     return out.provisional ? { html, provisional: true } : html
   }
   const htmlOf = (out: string | { html: string }) => (typeof out === 'string' ? out : out.html)

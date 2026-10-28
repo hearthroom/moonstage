@@ -1,3 +1,4 @@
+import { renderAuthorMarkdown } from '@/common/author-html-markdown'
 import { applyTavernRules } from '../canvas-rule-engine'
 // highlightText 現在也綁這兩支（圍欄保護與前端區塊標記），跟頁面裡一樣是真實函式。
 import { withFencesProtected } from '../../../common/markdown-fences'
@@ -97,6 +98,7 @@ function buildHighlightText(chatVueSource: string) {
   const fnSource = extractHighlightTextSource(chatVueSource)
   const wrapped = `(function () {\n${fnSource}\nreturn highlightText;\n})()`
   const context = vm.createContext({
+    renderAuthorMarkdown,
     applyTavernRules, authorRuleOptions: () => ({ macros: { user: '小明', char: '星' } }),
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml,
@@ -129,6 +131,7 @@ function buildRenderMarkdown(chatVueSource: string) {
   const fnSource = extractRenderMarkdownSource(chatVueSource)
   const wrapped = `(function () {\n${fnSource}\nreturn renderMarkdown;\n})()`
   const context = vm.createContext({
+    renderAuthorMarkdown,
     applyTavernRules, authorRuleOptions: () => ({ macros: { user: '小明', char: '星' } }),
     highlightText,
     renderSummary,

@@ -513,6 +513,7 @@ import { archiveRequestQuery, buildArchiveRows, isArchiveFull, nextArchiveAfterD
 import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
 import type { ArchiveRow } from './canvas-archives'
 import { convertVisibleHtml, convertPlainText, createDisplayScriptConverter, directionFor } from './canvas-display-script'
+import { renderAuthorMarkdown } from '@/common/author-html-markdown'
 import { roleLoadFailureIsOurs, whenRoleDetail } from './canvas-role-ready'
 import { guestDraftStorage, saveGuestDraft, takeGuestDraft } from './canvas-guest'
 import CanvasPrologue from './components/canvas-prologue.vue'
@@ -4437,7 +4438,7 @@ const highlightText = (content, type, cacheKey, streaming) => {
   */
   try {
     const _md = getMarkdownIt();
-    processedContent = renderTaskLists(_md.render(dedentHtmlBlockLines(processedContent))).trim();
+    processedContent = renderTaskLists(renderAuthorMarkdown(_md, dedentHtmlBlockLines(processedContent), activeAuthorAsset.value.rules.some((r) => r.enabled !== false && /<script\b/i.test(String(r.replace || ''))))).trim();
   } catch (e) {
     // MD parse 失敗 fallback：原樣保留
   }

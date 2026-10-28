@@ -10,6 +10,7 @@
  * 這裡只作用在玩家看到的內容，送給模型的原文不經過這裡。
  */
 import { convertTextNodes } from '@/common/display-script-walk'
+import { renderAuthorMarkdown } from '@/common/author-html-markdown'
 import MarkdownIt from 'markdown-it'
 import { substituteMacros } from '@/pages/canvas/canvas-rule-engine-core'
 import { applyDisplayRules } from '@/utils/display-rule-engine.js'
@@ -79,6 +80,7 @@ export interface RenderMacros {
 
 export interface RenderOptions {
   macros: RenderMacros
+  preserveAuthorHtml?: boolean
   variants?: Record<string, string> | null
   doc?: Document
   /** 圍欄裡的整份 HTML 文件怎麼畫（格式政策的 fencedDocument）；沒給＝inline，原樣留成程式碼區塊。 */
@@ -126,14 +128,14 @@ export function renderContent(content: string, rules: SandboxRule[], options: Re
  * （common/author-rules，引擎 'display'、輸入是原始全文，巨集在結果回來後展開），拿回產物——或結果還沒回來時的
  * 「上次套完的產物＋之後到的原文」——再走這一段，跟 renderContent 同一條管線。
  */
-export function renderAppliedContent(applied: string, options: Pick<RenderOptions, 'doc' | 'fencedDocument'> & { macros?: RenderMacros; convert?: ((text: string) => string) | null; nativeBlocks?: boolean }): string {
+export function renderAppliedContent(applied: string, options: Pick<RenderOptions, 'doc' | 'fencedDocument'> & { macros?: RenderMacros; convert?: ((text: string) => string) | null; nativeBlocks?: boolean; preserveAuthorHtml?: boolean }): string {
   const doc = options.doc || document
   if (options.macros) applied = expandMacros(applied, options.macros)
   // 原生區塊：規則沒吃掉的 [status]／[choices] 由平台畫（只對 AI 訊息，呼叫端決定）。排在規則之後、剝殼與 Markdown 之前。
   if (options.nativeBlocks) applied = drawNativeBlocks(applied)
   // 不在白名單的標籤（含中文尖括號那種）在進 markdown 之前就剝殼：markdown 會把它們跳脫成文字，
   // 之後的淨化就看不到、玩家會看到「<状态>」原樣印出來。反引號裡的原樣保留（stripUnknownTags 自己護）。
-  const html = md.render(stripUnknownTags(applied))
+  const html = renderAuthorMarkdown(md, stripUnknownTags(applied), options.preserveAuthorHtml)
   const clean = sanitizeAuthorHtml(html, doc)
   const holder = doc.createElement('div')
   holder.innerHTML = clean

@@ -1,3 +1,4 @@
+import { renderAuthorMarkdown } from '@/common/author-html-markdown'
 import { applyTavernRules } from '../canvas-rule-engine'
 // @vitest-environment jsdom
 /**
@@ -52,6 +53,7 @@ function extractHighlightTextSource(): string {
 function buildHighlightText(format: string): (content: string, type?: number, cacheKey?: string | null) => string {
   const wrapped = `(function () {\n${extractHighlightTextSource()}\nreturn highlightText;\n})()`
   const context = vm.createContext({
+    renderAuthorMarkdown,
     applyTavernRules, authorRuleOptions: () => ({ macros: { user: '小明', char: '星' } }),
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines,
