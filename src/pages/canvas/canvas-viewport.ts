@@ -69,10 +69,11 @@ export function bindCanvasViewport(win: Window, root: HTMLElement) {
   const remeasure = () => {
     const { top, bottom, height } = visibleViewport(win)
     if (height <= 0) return
-    // The visible bottom is already above the device edge while the keyboard occludes it.
+    // The visible height shrinks while the keyboard occludes the device edge, even if
+    // Safari pans offsetTop so that the visible bottom still equals innerHeight.
     // Safari can retain safe-area-inset-bottom, and the max inset never shrinks.
     // Keeping that home-indicator padding here leaves a second gap above the keyboard.
-    const safeBottom = bottom < win.innerHeight - 1 ? '0px' : 'env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px))'
+    const safeBottom = height < win.innerHeight - 1 ? '0px' : 'env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px))'
     const values = [top, height, Math.max(0, win.innerHeight - bottom)].map(value => `${Math.round(value)}px`)
     values.push(safeBottom)
     names.forEach((name, index) => root.style.setProperty(name, values[index]))

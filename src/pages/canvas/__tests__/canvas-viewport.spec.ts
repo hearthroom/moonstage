@@ -231,6 +231,10 @@ it('does not reserve the home-indicator inset above an occluding keyboard, then 
   expect(normal).toContain('env(safe-area-max-inset-bottom')
   vv.height = 460; vv.dispatchEvent(new Event('resize'))
   expect(root.style.getPropertyValue('--lt-viewport-safe-area-bottom')).toBe('0px')
+  // Safari may pan by the keyboard height, making top + height equal innerHeight.
+  vv.offsetTop = 340; vv.dispatchEvent(new Event('scroll'))
+  expect(root.style.getPropertyValue('--lt-viewport-safe-area-bottom')).toBe('0px')
+  vv.offsetTop = 0
   vv.height = 800; vv.dispatchEvent(new Event('resize'))
   expect(root.style.getPropertyValue('--lt-viewport-safe-area-bottom')).toBe(normal)
   // Pinch zoom alone must not be classified as a keyboard.
