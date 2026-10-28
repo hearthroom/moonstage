@@ -115,7 +115,7 @@ export function createUniShim(host: StageHost, env: { win?: Window; doc?: Docume
   const offs = new Map<string, Map<Callback, () => void>>()
   const uni: Record<string, any> = {
     // 提示
-    showToast: (o: { title?: string; icon?: string } = {}) => host.ui.toast(String(o.title || ''), o.icon === 'error' ? 'error' : o.icon === 'success' ? 'success' : 'info'),
+    showToast: (o: { title?: string; icon?: string; duration?: number } = {}) => host.ui.toast(String(o.title || ''), o.icon === 'error' ? 'error' : o.icon === 'success' ? 'success' : 'info', o.duration),
     hideToast: () => {},
     showModal: (o: { title?: string; content?: string; showCancel?: boolean; confirmText?: string; cancelText?: string; success?: Callback; fail?: Callback; complete?: Callback } = {}) => {
       host.ui.confirm({ title: o.title, content: String(o.content || ''), confirmText: o.confirmText, cancelText: o.cancelText })

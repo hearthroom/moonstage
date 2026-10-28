@@ -17,7 +17,7 @@ export interface StageHost {
   apiBase?: string
   capabilities?: import("./capabilities").StageCapabilities
   ui: {
-    toast(text: string, kind?: ToastKind): void
+    toast(text: string, kind?: ToastKind, durationMs?: number): void
     confirm(options: { title?: string; content: string; confirmText?: string; cancelText?: string }): Promise<boolean>
     loading(on: boolean): void
     /**
@@ -176,7 +176,7 @@ export function uniHost(): StageHost {
   const u = () => uniGlobal() || ({} as UniLike)
   return browserHost({
     ui: {
-      toast: (text) => { if (text) u().showToast?.({ title: String(text), icon: 'none' }) },
+      toast: (text, _kind, durationMs) => { if (text) u().showToast?.({ title: String(text), icon: 'none', ...(durationMs === undefined ? {} : {duration:durationMs}) }) },
       confirm: (o) => new Promise((resolve) => {
         u().showModal?.({ title: o.title || '', content: o.content, confirmText: o.confirmText, cancelText: o.cancelText, success: (r: any) => resolve(!!r?.confirm), fail: () => resolve(false) })
       }),
