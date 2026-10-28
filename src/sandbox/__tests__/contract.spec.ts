@@ -337,7 +337,7 @@ function buildContract() {
     scripts: scriptFacts(),
     provider: {
       source: 'hand-maintained from HarperHarbor/server provider/internal/service/role/author_asset.go and display/scan.go',
-      replaceMaxBytes: 256 * 1024,
+      replaceMaxBytes: 512 * 1024,
       totalMaxBytes: 32 * 1024 * 1024,
       bytesAre: 'UTF-8 (find + replace + name per rule)',
       findMustNotBeBlank: true,
