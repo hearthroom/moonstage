@@ -82,6 +82,13 @@ export function createThemeBridge(root: HTMLElement, win: Window & typeof global
     // Do not observe our own aliases: theme changes are infrequent, message
     // rendering must not cause a perpetual style/observer loop.
     observer.disconnect()
+    // The standard composer renders its own placeholder elements. Only opt
+    // them into an author color when that token is actually supplied, so cards
+    // without an MMD input skin keep their existing placeholder appearance.
+    root.toggleAttribute('data-author-placeholder', authored.has('input-placeholder') &&
+      !!computed.getPropertyValue('--chat-input-placeholder').trim())
+    root.toggleAttribute('data-author-shortcut-color', authored.has('shortcut-text') &&
+      !!computed.getPropertyValue('--chat-shortcut-text').trim())
     for (const key of targets) {
       const value = values.get(key) || ''
       const current = root.style.getPropertyValue(key)

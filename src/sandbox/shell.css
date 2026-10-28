@@ -117,6 +117,27 @@ html, body { margin: 0; padding: 0; height: 100%; }
 [data-chat="sdk-debug"] [data-level="warn"] { color: #fd6; }
 [data-chat="sdk-debug"] [data-level="error"] { color: #f88; }
 
+/* Standard composer placeholders must use the author's paired input color,
+   rather than a translucent currentColor on the author's bright input surface. */
+[data-chat="root"][data-author-placeholder] .uni-textarea-placeholder,
+[data-chat="root"][data-author-placeholder] .chat-input-collapsed-placeholder {
+  color: var(--lt-canvas-placeholder-color);
+}
+
+/* Legacy icons remain image-backed for author filters. When an MMD skin
+   supplies a shortcut color, use the same SVG shape as a currentColor mask. */
+[data-chat="root"][data-author-shortcut-color] .shortcut-btn {
+  color: var(--lt-canvas-pill-fg);
+}
+[data-chat="root"][data-author-shortcut-color] .shortcut-btn .sb-icon {
+  background-color: currentColor;
+  -webkit-mask: var(--ms-panel-icon-image) center / contain no-repeat;
+  mask: var(--ms-panel-icon-image) center / contain no-repeat;
+}
+[data-chat="root"][data-author-shortcut-color] .shortcut-btn .sb-icon uni-image {
+  visibility: hidden;
+}
+
 /* 宿主接管頁首與輸入區（hello.config.chrome = 'host'）：殼只剩訊息區、狀態欄與舞台，舞台與側槽從頂端算起。 */
 [data-chat="root"][data-chrome="host"] [data-chat="header"] { display: none; }
 [data-chat="root"][data-chrome="host"] [data-chat="composer"] { display: none; }

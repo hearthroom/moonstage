@@ -57,6 +57,11 @@ export function panelIconSvg(key: string): string {
 */
 const INK = '#e8eaed'
 
+/** CSS image for a theme-colored mask; the legacy image markup stays intact. */
+export function panelIconImage(key: string): string {
+  return `url("data:image/svg+xml,${encodeURIComponent(panelIconSvg(key))}")`
+}
+
 export function panelIconMarkup(key: string): string {
   const svg = panelIconSvg(key)
   const uri = `data:image/svg+xml,${encodeURIComponent(svg)}`
