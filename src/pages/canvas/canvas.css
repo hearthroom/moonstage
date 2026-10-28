@@ -3150,6 +3150,7 @@
 
   .ms-opt-line1 {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     min-width: 0;
@@ -3171,15 +3172,14 @@
     opacity: 1;
   }
 
-  /* 名字不撐開：官方／實惠的標籤緊跟在名字後面——它說的是這條線路，不是價格。
-     撐開剩下空間的是價格欄，數字靠右對齊。 */
+  /* 線路名稱必須能辨認；空間不足時讓徽章與價格換行，不把不同線路截成同一個字。 */
   .ms-opt-name {
-    flex: 0 1 auto;
+    flex: 0 0 auto;
     min-width: 0;
+    max-width: calc(100% - 24px);
     font-size: 13px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .ms-opt-price {
