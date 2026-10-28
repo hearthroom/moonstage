@@ -39,6 +39,13 @@ it('observes a browser which exits before teardown starts', async () => {
   await shutdown(async () => { throw new Error('closed browser must not receive a command') })
 })
 
+it('retains failed browser evidence when it crashes before teardown starts', async () => {
+  const proc = spawn(process.execPath, ['-e', 'process.exit(17)'], { stdio: 'ignore' })
+  const shutdown = observeNativeBrowser(proc)
+  await once(proc, 'close')
+  await expect(shutdown(async () => {})).rejects.toThrow('profile must be retained')
+})
+
 it('rejects a protocol failure and terminates only its own browser', async () => {
   const proc = spawn(process.execPath, ['-e', 'process.stdin.resume(); process.stdout.write("ready")'], { stdio: ['pipe', 'pipe', 'pipe'] })
   const shutdown = observeNativeBrowser(proc)
