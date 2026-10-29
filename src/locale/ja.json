@@ -4312,7 +4312,7 @@
 	"responseSettings.preset.pick.title": "プリセットを選ぶ",
 	"responseSettings.preset.pick.scope": "適用範囲",
 	"responseSettings.preset.scope.conversation": "この会話",
-	"responseSettings.preset.scope.conversation.hint": "次の返信から有効になります。",
+	"responseSettings.preset.scope.conversation.hint": "次の返信から有効になります。新しい会話には引き継がれません。",
 	"responseSettings.preset.scope.card": "このカードの新しい会話",
 	"responseSettings.preset.scope.card.hint": "このカードで今後はじめる会話で使われます。すでにある会話は変わりません。",
 	"responseSettings.preset.pick.card": "プリセットを使わない",
@@ -4335,8 +4335,8 @@
 	"responseSettings.preset.conflict": "この会話の設定がたった今更新されました。再読み込みしてからもう一度選んでください。",
 	"responseSettings.preset.capacity": "このプリセットとこれまでの会話を合わせると長すぎて、今回のターンに収まりません。短いプリセットにするか、プリセットの使用をやめてください。",
 	"responseSettings.preset.unknown": "選択の結果を確認しています…",
-	"responseSettings.preset.pick.note": "プリセットが決めるのは書き方だけです。キャラクター、世界設定、会話履歴、記憶は引き続きHearthroomが扱います。",
+	"responseSettings.preset.pick.note": "プリセットが決めるのは書き方だけです。キャラクター、世界設定、会話履歴、記憶は変わりません。",
 	"responseSettings.preset.separator": "、",
-	"responseSettings.preset.modelSettingUnsupported": "この会話で使っているプリセットに、今のモデルでは使えない設定があります。モデルを変えるか、返信の設定でプリセットをオフにしてください。",
+	"responseSettings.preset.modelSettingUnsupported": "この会話で使っているプリセットに、今のモデルでは使えない設定があります。モデルを変えるか、返信の好みでプリセットの使用をやめてください。",
 	"responseSettings.preset.archived": "このプリセットはアーカイブ済みのため、選べません。すでに使っている会話はそのまま続きます。"
 }

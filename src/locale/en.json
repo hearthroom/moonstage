@@ -4312,7 +4312,7 @@
 	"responseSettings.preset.pick.title": "Pick a preset",
 	"responseSettings.preset.pick.scope": "Applies to",
 	"responseSettings.preset.scope.conversation": "This conversation",
-	"responseSettings.preset.scope.conversation.hint": "Takes effect from the next reply.",
+	"responseSettings.preset.scope.conversation.hint": "Takes effect from the next reply. New conversations won't use it.",
 	"responseSettings.preset.scope.card": "New conversations with this card",
 	"responseSettings.preset.scope.card.hint": "Used the next time you start a conversation with this card. Existing conversations stay as they are.",
 	"responseSettings.preset.pick.card": "No preset",
@@ -4335,8 +4335,8 @@
 	"responseSettings.preset.conflict": "This conversation's settings were just updated. Please reload, then pick again.",
 	"responseSettings.preset.capacity": "This preset plus the conversation so far is too long for this turn. Try a shorter preset, or stop using the preset.",
 	"responseSettings.preset.unknown": "Confirming your choice…",
-	"responseSettings.preset.pick.note": "A preset only sets how replies are written. Characters, Lorebook, conversation history and memory are still handled by Hearthroom.",
+	"responseSettings.preset.pick.note": "A preset only sets how replies are written. Characters, Lorebook, conversation history and memory are not changed by it.",
 	"responseSettings.preset.separator": ", ",
-	"responseSettings.preset.modelSettingUnsupported": "The preset this conversation uses has a setting the current model can't use. Switch models, or turn the preset off in reply preferences.",
+	"responseSettings.preset.modelSettingUnsupported": "The preset this conversation uses has a setting the current model can't use. Switch models, or stop using the preset in Response preferences.",
 	"responseSettings.preset.archived": "This preset is archived and can't be chosen anymore. Conversations already using it keep working."
 }

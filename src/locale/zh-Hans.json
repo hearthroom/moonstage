@@ -4312,7 +4312,7 @@
 	"responseSettings.preset.pick.title": "选用预设",
 	"responseSettings.preset.pick.scope": "应用范围",
 	"responseSettings.preset.scope.conversation": "这段对话",
-	"responseSettings.preset.scope.conversation.hint": "从下一条回复开始生效。",
+	"responseSettings.preset.scope.conversation.hint": "从下一次回复开始生效，新存档不会沿用。",
 	"responseSettings.preset.scope.card": "这张卡的新存档",
 	"responseSettings.preset.scope.card.hint": "之后为这张卡新开的对话会使用，已有的对话不变。",
 	"responseSettings.preset.pick.card": "不用预设",
@@ -4328,15 +4328,15 @@
 	"responseSettings.preset.applyCard": "停用预设",
 	"responseSettings.preset.applying": "应用中…",
 	"responseSettings.preset.busy": "这段对话正在回复。等回复结束，再选用预设。",
-	"responseSettings.preset.applied.conversation": "已选用「{name}」v{n}，下一条回复开始生效。",
+	"responseSettings.preset.applied.conversation": "已选用「{name}」v{n}，下一次回复开始生效。",
 	"responseSettings.preset.applied.card": "这张卡之后新开的对话会使用「{name}」v{n}。",
-	"responseSettings.preset.reverted.conversation": "已停用预设，文风恢复成你原本的选择，下一条回复开始生效。",
+	"responseSettings.preset.reverted.conversation": "已停用预设，文风恢复成你原本的选择，下一次回复开始生效。",
 	"responseSettings.preset.reverted.card": "这张卡之后新开的对话不使用预设。",
 	"responseSettings.preset.conflict": "这段对话的设置刚刚被更新。请重新读取后再选用。",
 	"responseSettings.preset.capacity": "这个预设加上目前的对话内容太长，这一轮放不下。换一个比较短的预设，或停用预设。",
 	"responseSettings.preset.unknown": "正在确认选用结果…",
 	"responseSettings.preset.pick.note": "预设只决定写法。角色、世界书、对话记录和记忆仍由绮梦社处理。",
 	"responseSettings.preset.separator": "、",
-	"responseSettings.preset.modelSettingUnsupported": "这段对话选用的预设里有参数，当前模型不能用。换一个模型，或在回复偏好里停用预设。",
-	"responseSettings.preset.archived": "这份预设已归档，不能再选用。已经在用它的对话照常。"
+	"responseSettings.preset.modelSettingUnsupported": "这段对话选用的预设有参数，当前模型不能用。换一个模型，或在回复偏好里停用预设。",
+	"responseSettings.preset.archived": "这份预设已归档，不能再选用。已经在用它的对话照常运行。"
 }
