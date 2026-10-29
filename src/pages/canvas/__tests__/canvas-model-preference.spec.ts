@@ -22,10 +22,26 @@ describe('new card model preference', () => {
     expect(read).toHaveBeenCalledOnce()
     expect(notify).not.toHaveBeenCalled()
   })
-  it('does not alter resumed cards or trust a fallback flag on them', async () => {
+  it('does not reload ordinary resumed cards without a fallback', async () => {
     const read = vi.fn(async () => {}), notify = vi.fn()
-    await syncStartedModelSettings({ historyConversation: true, modelPreferenceFallback: true }, null, read, notify)
+    await syncStartedModelSettings({ historyConversation: true }, null, read, notify)
     expect(read).not.toHaveBeenCalled()
     expect(notify).not.toHaveBeenCalled()
+  })
+  it('refreshes a resumed card after its retired model was replaced, then announces once', async () => {
+    let finish!: () => void
+    const pending = new Promise<void>(resolve => { finish = resolve })
+    const read = vi.fn(async () => {}), notify = vi.fn()
+    const sync = syncStartedModelSettings({ historyConversation: true, modelPreferenceFallback: true }, pending, read, notify)
+    await Promise.resolve()
+    expect(read).not.toHaveBeenCalled()
+    expect(notify).not.toHaveBeenCalled()
+    finish()
+    await sync
+    expect(read).toHaveBeenCalledOnce()
+    expect(notify).toHaveBeenCalledOnce()
+    await syncStartedModelSettings({ historyConversation: true, modelPreferenceFallback: false }, null, read, notify)
+    expect(read).toHaveBeenCalledOnce()
+    expect(notify).toHaveBeenCalledOnce()
   })
 })
