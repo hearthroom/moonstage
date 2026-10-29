@@ -121,3 +121,18 @@ it('a bound preset that was archived stays shown as current instead of being sil
  expect(wrapper.get('[data-action="preset-apply"]').attributes('disabled')).toBeDefined()
  wrapper.unmount()
 })
+
+it('when the result never comes back, re-reads the binding and reports what actually happened', async () => {
+ vi.useFakeTimers()
+ const conversation = vi.fn().mockResolvedValueOnce(bound({ revisionId: 'r2', version: 2 })).mockResolvedValue(cardDefault)
+ const apply = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+ const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => settings({ styleSource: 'preset', styleLocked: true }), save: vi.fn(), t, presets: api({ conversation, apply }) } })
+ await vi.runAllTimersAsync()
+ await wrapper.get('[data-action="preset-stop"]').trigger('click')
+ await vi.runAllTimersAsync(); await flushPromises()
+ expect(apply).toHaveBeenCalledTimes(4)
+ expect(new Set(apply.mock.calls.map((c) => c[4])).size).toBe(1)
+ expect(wrapper.text()).toContain('responseSettings.preset.reverted.conversation')
+ vi.useRealTimers()
+ wrapper.unmount()
+})

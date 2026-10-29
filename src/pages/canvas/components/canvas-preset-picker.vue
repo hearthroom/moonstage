@@ -86,10 +86,15 @@ async function pickScope(next: PresetScope) {
 
 function fail(err: unknown) {
  const kind = presetFailure(err)
- // 版本被別處改了：重讀現在的綁定，下一次就用新的版本號，不必關掉面板
- if (kind === 'conflict') { if (scope.value === 'card') { card.value = null; void loadCard() } else emit('stale') }
  failed.value = kind !== 'unknown'
  message.value = props.t(kind === 'failed' ? 'responseSettings.saveFailed' : kind === 'loadFailed' ? 'responseSettings.preset.loadFailed' : `responseSettings.preset.${kind}`)
+}
+
+/** 重讀這個範圍現在的綁定（版本被別處改了、或送出後一直沒收到回應）。對話範圍的同時通知面板重讀。 */
+async function reread(): Promise<PresetBinding | null> {
+ if (scope.value === 'card') { card.value = null; await loadCard(); return card.value }
+ emit('stale')
+ try { return readBinding(await props.api.conversation(props.conversationId)) } catch { return null }
 }
 
 async function apply() {
@@ -107,6 +112,16 @@ async function apply() {
   emit('applied', scope.value, done)
  } catch (err) {
   fail(err)
+  const kind = presetFailure(err)
+  if (kind === 'conflict' || kind === 'unknown') {
+   // 重讀完才放開按鈕：不讓玩家拿舊版本號再撞一次。一直沒收到回應的，看重讀結果判斷到底成了沒有
+   const after = await reread()
+   if (kind === 'unknown') {
+    const landed = after && (target ? after.revisionId === target.headRevisionId : after.mode === 'card_default')
+    if (landed) emit('applied', scope.value, target ? props.t(`responseSettings.preset.applied.${scope.value}`, { name: target.title, n: target.version }) : props.t(`responseSettings.preset.reverted.${scope.value}`))
+    else { failed.value = true; message.value = props.t('responseSettings.saveFailed') }
+   }
+  }
  } finally {
   busy.value = false
  }

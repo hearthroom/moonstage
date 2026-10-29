@@ -369,8 +369,19 @@ async function applyConversation(revisionId:string|null){
   if(!alive)return
   const kind=presetFailure(err)
   presetNotice.value=''
-  if(kind==='conflict')void loadPreset()
-  presetError.value=props.t(kind==='failed' ? 'responseSettings.saveFailed' : `responseSettings.preset.${kind}`)
+  const message=props.t(kind==='failed' ? 'responseSettings.saveFailed' : `responseSettings.preset.${kind}`)
+  // 重讀完才放開按鈕；一直沒收到回應的，看重讀結果判斷到底成了沒有
+  if(kind==='conflict' || kind==='unknown'){
+   presetNotice.value=kind==='unknown' ? message : ''
+   await loadPreset()
+   if(!alive)return
+   if(kind==='unknown'){
+    const landed=revisionId ? binding.value?.revisionId===revisionId : binding.value?.mode==='card_default'
+    if(landed){presetNotice.value=revisionId ? props.t('responseSettings.preset.applied.conversation',{name:head?.title || now.title,n:head?.version ?? now.version}) : props.t('responseSettings.preset.reverted.conversation');await refreshAfterPreset();return}
+    presetNotice.value='';presetError.value=props.t('responseSettings.saveFailed');return
+   }
+  }
+  presetError.value=message
  }finally{if(alive)presetBusy.value=false}
 }
 onMounted(()=>{void reload();void loadPreset()})
