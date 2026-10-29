@@ -47,13 +47,13 @@
        <span class="label">{{ t('responseSettings.preset.source') }}</span>
        <span class="response-preset-name" data-lt="preset-current">{{ t('responseSettings.preset.current', { name: binding.title, n: binding.version }) }}</span>
       </div>
-      <div v-if="binding.state === 'unavailable'" class="response-error" role="alert">
-       <span>{{ t('responseSettings.preset.loadFailed') }}</span>
-       <button type="button" class="advanced-reset" data-action="preset-reload" :disabled="presetBusy" @click="loadPreset">{{ t('responseSettings.preset.loadFailed.retry') }}</button>
+      <div v-if="binding.state === 'unavailable'" class="response-preset-note" role="alert">
+       <span class="response-error">{{ t('responseSettings.preset.loadFailed') }}</span>
+       <button type="button" class="mode-item" data-action="preset-reload" :disabled="presetBusy" @click="loadPreset">{{ t('responseSettings.preset.loadFailed.retry') }}</button>
       </div>
-      <div v-if="newer" class="mode-hint" data-lt="preset-newer">
-       {{ t('responseSettings.preset.newVersion', { name: binding.title, latest: newer.version, n: binding.version }) }}
-       <button type="button" class="advanced-reset" data-action="preset-upgrade" :disabled="presetBusy || saving" @click="applyConversation(newer.headRevisionId)">{{ t('responseSettings.preset.useNewVersion', { latest: newer.version }) }}</button>
+      <div v-if="newer" class="response-preset-note" data-lt="preset-newer">
+       <span class="mode-hint">{{ t('responseSettings.preset.newVersion', { name: binding.title, latest: newer.version, n: binding.version }) }}</span>
+       <button type="button" class="mode-item" data-action="preset-upgrade" :disabled="presetBusy || saving" @click="applyConversation(newer.headRevisionId)">{{ t('responseSettings.preset.useNewVersion', { latest: newer.version }) }}</button>
       </div>
       <div class="response-preset-actions">
        <button type="button" class="advanced-reset" data-action="preset-change" :disabled="presetBusy || saving" @click="openPicker">{{ t('responseSettings.preset.change') }}</button>
@@ -164,6 +164,7 @@ import MsSwitch from '../../../components/model-select/ms-switch.vue'
 import CanvasPopup from './canvas-popup.vue'
 import { CanvasTextField } from './canvas-field'
 import CanvasPresetPicker from './canvas-preset-picker.vue'
+import { syncChromeTone } from '../canvas-chrome-tone'
 import { applyOnce, lockedPatch, newerVersion, presetFailure, readBinding, readPresetChoices, type PresetApi, type PresetBinding, type PresetChoice, type PresetScope } from '../canvas-preset'
 import { lengthMode, lengthTargetLadder, lengthTargetOf, lengthZone, maxResponseNoteLength, readResponseSettings, responseAxes, responseBase, responseNoteKeys, responsePatch, type LengthZone, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
 const props=defineProps<{
@@ -386,6 +387,9 @@ async function applyConversation(revisionId:string|null){
   presetError.value=message
  }finally{if(alive)presetBusy.value=false}
 }
+// 彈層打開時量過主行動的底色；切到選預設、或回到偏好時換上來的按鈕是新節點，要再量一次，
+// 否則作者把主行動漆成亮色時會是白字亮底（QA Q03）
+watch(picking,()=>{void nextTick(()=>syncChromeTone(document))})
 onMounted(()=>{void reload();void loadPreset()})
 defineExpose({mayClose})
 </script>
@@ -412,6 +416,8 @@ defineExpose({mayClose})
 .response-preset-head .label{margin:0}
 .response-preset-name{font-weight:600;overflow-wrap:anywhere}
 .response-preset-actions{display:flex;flex-wrap:wrap;gap:8px}
+/* 原因一句、動作一顆，分開兩行，按鈕用面板既有的藥丸外觀 */
+.response-preset-note{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
 /* 這幾顆是文字鈕，點擊區撐到 44（手機觸控下限） */
 .response-preset .advanced-reset{min-height:44px;padding-inline:4px}
 .response-length-value{font-size:14px;font-weight:600}

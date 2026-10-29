@@ -36,15 +36,18 @@
    </button>
   </div>
 
-  <p v-if="message" class="mode-hint" :class="{ 'response-error': failed }" role="status" data-lt="preset-message">{{ message }}</p>
   <div class="mode-hint preset-note">{{ t('responseSettings.preset.pick.note') }}</div>
   <button v-if="api.manage && choices.length" type="button" class="advanced-reset preset-manage" data-action="preset-manage" @click="api.manage()">{{ t('responseSettings.preset.manage') }}</button>
 
+  <!-- 結果與錯誤放在貼底的動作列裡：列會蓋住捲動內容，訊息放在列上面才一直看得到 -->
+  <div class="preset-picker-bar">
+   <p v-if="message" class="mode-hint" :class="{ 'response-error': failed }" role="status" data-lt="preset-message">{{ message }}</p>
   <div class="role-setting__actions">
    <button type="button" class="icon-back" data-action="preset-back" :disabled="busy" @click="emit('back')">{{ t('main.back') }}</button>
    <button type="button" class="complete-btn" data-action="preset-apply" :disabled="busy || !changed" @click="apply">
     {{ t(busy ? 'responseSettings.preset.applying' : choice || !changed ? 'responseSettings.preset.apply' : 'responseSettings.preset.applyCard') }}
    </button>
+  </div>
   </div>
  </div>
 </template>
@@ -146,7 +149,8 @@ async function apply() {
  .preset-empty{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px}
  .preset-note,.preset-manage{align-self:flex-start}
  /* 選項很多時，返回與套用仍留在畫面上：貼著彈層的捲動容器底部 */
- .preset-picker > .role-setting__actions{position:sticky;bottom:0;z-index:1;padding-block:8px;background:var(--lt-canvas-sheet-bg)}
+ .preset-picker-bar{position:sticky;bottom:0;z-index:1;display:flex;flex-direction:column;gap:6px;padding-block:8px;background:var(--lt-canvas-sheet-bg)}
+ .preset-picker-bar > p{margin:0}
  .preset-manage,.preset-empty .advanced-reset{min-height:44px}
 }
 </style>
