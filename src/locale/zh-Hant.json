@@ -4338,5 +4338,8 @@
 	"responseSettings.preset.pick.note": "預設只決定寫法。角色、世界書、對話記錄和記憶仍由綺夢社處理。",
 	"responseSettings.preset.separator": "、",
 	"responseSettings.preset.modelSettingUnsupported": "這段對話選用的預設有參數，目前的模型不能用。換一個模型，或在回覆偏好裡停用預設。",
+	"responseSettings.preset.toolReply.active": "這個預設用工具回覆，所以流式輸出先關著，回覆會整段生成後才顯示。你原本的設定保留著，停用預設後恢復。",
+	"responseSettings.preset.toolReply.modelUnsupported": "目前的模型不支援用工具回覆，照你原本的設定回覆。換成支援的模型，才會用預設的工具回覆。",
+	"responseSettings.preset.toolReply.modeUnsupported": "Agent 模式和世界模式的對話照原本的方式回覆，不使用預設的工具回覆。",
 	"responseSettings.preset.archived": "這份預設已封存，不能再選用。已經在用它的對話照常運作。"
 }

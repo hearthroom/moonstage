@@ -63,6 +63,7 @@
      <button v-else type="button" class="advanced-reset" data-action="preset-pick" :disabled="presetBusy || saving" @click="openPicker">{{ t('responseSettings.preset.pick.title') }}</button>
     </div>
     <p v-if="axis === 'style' && presets && presetError" class="mode-hint response-error" role="alert" data-lt="preset-error">{{ presetError }}</p>
+    <p v-if="axis === 'style' && presets && toolReplyNote" class="mode-hint" data-lt="preset-tool-reply">{{ toolReplyNote }}</p>
     <div v-if="axis === 'style' && selected('style') === 'custom' && !styleLocked" class="textarea-wrapper response-custom">
      <textarea autocomplete="off" v-model="draft.customStyle" class="textarea-dark response-custom-input" rows="3" :aria-label="t('responseSettings.customLabel')"
       :placeholder="customPlaceholder" :aria-invalid="customTooLong" />
@@ -73,10 +74,10 @@
    <div v-if="!worldMode" class="card mode-box response-streaming">
     <div class="response-streaming-head">
      <div class="label" id="response-streaming-label">{{ t('responseSettings.streamingTitle') }}</div>
-     <MsSwitch data-lt="streaming-toggle" aria-labelledby="response-streaming-label" :aria-describedby="!streaming ? 'response-streaming-hint' : undefined"
-      :checked="streaming" :disabled="loading || saving" @change="setStreaming" />
+     <MsSwitch data-lt="streaming-toggle" aria-labelledby="response-streaming-label" :aria-describedby="!streaming || toolReplyActive ? 'response-streaming-hint' : undefined"
+      :checked="streaming && !toolReplyActive" :disabled="loading || saving || toolReplyActive" @change="setStreaming" />
     </div>
-    <div v-if="!streaming" id="response-streaming-hint" class="mode-hint" data-hint="streaming">{{ t('responseSettings.streamingOffHint') }}</div>
+    <div v-if="!streaming || toolReplyActive" id="response-streaming-hint" class="mode-hint" data-hint="streaming">{{ toolReplyActive ? t('responseSettings.preset.toolReply.active') : t('responseSettings.streamingOffHint') }}</div>
    </div>
 
    <div class="advanced-scope">
@@ -329,6 +330,12 @@ async function submit(){
 const binding=ref<PresetBinding|null>(null),choices=ref<PresetChoice[]>([]),picking=ref(false),presetBusy=ref(false),presetNotice=ref(''),presetError=ref('')
 // 文風由誰決定以伺服器為準（response-settings 的 styleLocked），不從綁定自己推。
 const styleLocked=computed(()=>(saved.value as {styleLocked?:boolean}|null)?.styleLocked===true)
+// 預設的「用工具回覆」也以伺服器為準：active 時這輪整段生成，串流顯示關但玩家自己的設定不動；
+// 讀不到版本（unavailable）不能猜開或關，什麼都不說。
+const toolReplyStatus=computed(()=>(saved.value as {toolReply?:{status?:string}}|null)?.toolReply?.status ?? 'off')
+const toolReplyActive=computed(()=>toolReplyStatus.value==='active')
+const toolReplyNote=computed(()=>toolReplyStatus.value==='model_unsupported' ? props.t('responseSettings.preset.toolReply.modelUnsupported')
+ : toolReplyStatus.value==='mode_unsupported' ? props.t('responseSettings.preset.toolReply.modeUnsupported') : '')
 const newer=computed(()=>newerVersion(binding.value,choices.value))
 async function loadPreset(){
  if(!props.presets)return

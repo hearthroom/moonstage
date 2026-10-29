@@ -4338,5 +4338,8 @@
 	"responseSettings.preset.pick.note": "预设只决定写法。角色、世界书、对话记录和记忆仍由绮梦社处理。",
 	"responseSettings.preset.separator": "、",
 	"responseSettings.preset.modelSettingUnsupported": "这段对话选用的预设有参数，当前模型不能用。换一个模型，或在回复偏好里停用预设。",
+	"responseSettings.preset.toolReply.active": "这个预设用工具回复，所以流式输出先关着，回复会整段生成后才显示。你原本的设置保留着，停用预设后恢复。",
+	"responseSettings.preset.toolReply.modelUnsupported": "当前的模型不支持用工具回复，照你原本的设置回复。换成支持的模型，才会用预设的工具回复。",
+	"responseSettings.preset.toolReply.modeUnsupported": "Agent 模式和世界模式的对话照原本的方式回复，不使用预设的工具回复。",
 	"responseSettings.preset.archived": "这份预设已归档，不能再选用。已经在用它的对话照常运行。"
 }

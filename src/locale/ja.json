@@ -4338,5 +4338,8 @@
 	"responseSettings.preset.pick.note": "プリセットが決めるのは書き方だけです。キャラクター、世界設定、会話履歴、記憶は変わりません。",
 	"responseSettings.preset.separator": "、",
 	"responseSettings.preset.modelSettingUnsupported": "この会話で使っているプリセットに、今のモデルでは使えない設定があります。モデルを変えるか、返信の好みでプリセットの使用をやめてください。",
+	"responseSettings.preset.toolReply.active": "このプリセットはツールで返信するため、ストリーミング出力はオフになり、返信は完成後にまとめて表示されます。元のストリーミング出力の設定は保持され、プリセットをやめると戻ります。",
+	"responseSettings.preset.toolReply.modelUnsupported": "今のモデルはツールでの返信に対応していないため、元の設定どおりに返信します。対応しているモデルに変えると、プリセットのツール返信が使われます。",
+	"responseSettings.preset.toolReply.modeUnsupported": "Agent モードとワールドモードの会話は、従来どおりの方法で返信し、プリセットのツール返信は使いません。",
 	"responseSettings.preset.archived": "このプリセットはアーカイブ済みのため、選べません。すでに使っている会話はそのまま続きます。"
 }

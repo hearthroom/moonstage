@@ -150,3 +150,41 @@ it('keeps the preset controls and shows the error when a re-read fails', async (
  vi.useRealTimers()
  wrapper.unmount()
 })
+
+// 用工具回覆（PM 2026-10-30）：只有伺服器說 active 時串流顯示關、不能切；玩家自己的串流設定不動
+it('while the preset replies through the tool, streaming shows off and locked, and the player setting is kept', async () => {
+ const save = vi.fn(async (_id: string, rev: number) => settings({ revision: rev + 1, styleLocked: true, overrides: { agency: 'protect', streaming: 'on' }, toolReply: { enabled: true, effective: true, status: 'active' } }))
+ const load = async () => settings({ styleSource: 'preset', styleLocked: true, overrides: { streaming: 'on' }, effective: { agency: 'coauthor', style: 'card', perspective: 'card', length: 'auto', pace: 'natural', streaming: 'off' }, toolReply: { enabled: true, effective: true, status: 'active' } })
+ const wrapper = mount(Panel, { props: { conversationId: 'c1', load, save, t, presets: api({ conversation: vi.fn(async () => bound()) }) } })
+ await flushPromises()
+ const sw = wrapper.get('[data-lt="streaming-toggle"]')
+ expect(sw.attributes('aria-checked')).toBe('false')
+ expect(sw.attributes('aria-disabled')).toBe('true')
+ expect(wrapper.get('[data-hint="streaming"]').text()).toBe(t('responseSettings.preset.toolReply.active'))
+ await wrapper.get('.mode-item[data-axis="agency"][data-value="protect"]').trigger('click')
+ await wrapper.get('[data-action="save"]').trigger('click'); await flushPromises()
+ // 存的是玩家自己的串流設定，不是這輪生效的「關」
+ expect((save.mock.calls[0]![2] as Record<string, unknown>).streaming ?? 'on').toBe('on')
+ wrapper.unmount()
+})
+
+it('says when the current model or conversation mode does not use the preset tool reply', async () => {
+ for (const [status, key] of [['model_unsupported', 'modelUnsupported'], ['mode_unsupported', 'modeUnsupported']] as const) {
+  const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => settings({ styleSource: 'preset', styleLocked: true, toolReply: { enabled: true, effective: false, status } }), save: vi.fn(), t, presets: api({ conversation: vi.fn(async () => bound()) }) } })
+  await flushPromises()
+  expect(wrapper.get('[data-lt="preset-tool-reply"]').text()).toBe(t(`responseSettings.preset.toolReply.${key}`))
+  expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-disabled')).toBe('false')
+  wrapper.unmount()
+ }
+})
+
+it('shows nothing about tool replies when the server says off, unavailable, or says nothing', async () => {
+ for (const toolReply of [undefined, { enabled: false, effective: false, status: 'off' }, { enabled: false, effective: false, status: 'unavailable' }]) {
+  const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => settings({ styleSource: 'preset', styleLocked: true, ...(toolReply ? { toolReply } : {}) }), save: vi.fn(), t, presets: api({ conversation: vi.fn(async () => bound()) }) } })
+  await flushPromises()
+  expect(wrapper.find('[data-lt="preset-tool-reply"]').exists()).toBe(false)
+  expect(wrapper.text()).not.toContain('responseSettings.preset.toolReply')
+  expect(wrapper.get('[data-lt="streaming-toggle"]').attributes('aria-disabled')).toBe('false')
+  wrapper.unmount()
+ }
+})

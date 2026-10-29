@@ -4338,5 +4338,8 @@
 	"responseSettings.preset.pick.note": "프리셋은 답변을 쓰는 방식만 정합니다. 캐릭터, 세계관, 대화 기록, 기억은 바뀌지 않습니다.",
 	"responseSettings.preset.separator": ", ",
 	"responseSettings.preset.modelSettingUnsupported": "이 대화에서 쓰는 프리셋에 지금 모델이 쓸 수 없는 설정이 있습니다. 모델을 바꾸거나 답변 취향에서 프리셋 사용을 중지하세요.",
+	"responseSettings.preset.toolReply.active": "이 프리셋은 도구로 답장하므로 스트리밍 출력이 꺼지고, 답장이 완성된 뒤 한 번에 표시됩니다. 원래 스트리밍 출력 설정은 보존되며, 프리셋 사용을 중지하면 되돌아옵니다.",
+	"responseSettings.preset.toolReply.modelUnsupported": "지금 모델은 도구로 답장하는 것을 지원하지 않아 원래 설정대로 답장합니다. 지원하는 모델로 바꾸면 프리셋의 도구 답장이 쓰입니다.",
+	"responseSettings.preset.toolReply.modeUnsupported": "Agent 모드와 월드 모드 대화는 기존 방식대로 답장하며, 프리셋의 도구 답장은 쓰이지 않습니다.",
 	"responseSettings.preset.archived": "이 프리셋은 보관되어 더 이상 선택할 수 없습니다. 이미 쓰고 있는 대화는 그대로 이어집니다."
 }

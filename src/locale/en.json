@@ -4338,5 +4338,8 @@
 	"responseSettings.preset.pick.note": "A preset only sets how replies are written. Characters, Lorebook, conversation history and memory are not changed by it.",
 	"responseSettings.preset.separator": ", ",
 	"responseSettings.preset.modelSettingUnsupported": "The preset this conversation uses has a setting the current model can't use. Switch models, or stop using the preset in Response preferences.",
+	"responseSettings.preset.toolReply.active": "This preset replies with tools, so streaming is off and the reply appears once it's complete. Your own streaming setting is kept and comes back when you stop using the preset.",
+	"responseSettings.preset.toolReply.modelUnsupported": "The current model doesn't support tool replies, so replies follow your own settings. Switch to a supported model to use the preset's tool replies.",
+	"responseSettings.preset.toolReply.modeUnsupported": "Conversations in Agent mode and world mode reply the usual way and don't use the preset's tool replies.",
 	"responseSettings.preset.archived": "This preset is archived and can't be chosen anymore. Conversations already using it keep working."
 }
