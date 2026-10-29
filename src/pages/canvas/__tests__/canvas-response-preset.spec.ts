@@ -136,3 +136,17 @@ it('when the result never comes back, re-reads the binding and reports what actu
  vi.useRealTimers()
  wrapper.unmount()
 })
+
+it('keeps the preset controls and shows the error when a re-read fails', async () => {
+ vi.useFakeTimers()
+ const conversation = vi.fn().mockResolvedValueOnce(bound({ revisionId: 'r2', version: 2 })).mockRejectedValue(new TypeError('offline'))
+ const apply = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+ const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => settings({ styleSource: 'preset', styleLocked: true }), save: vi.fn(), t, presets: api({ conversation, apply }) } })
+ await vi.runAllTimersAsync()
+ await wrapper.get('[data-action="preset-stop"]').trigger('click')
+ await vi.runAllTimersAsync(); await flushPromises()
+ expect(wrapper.find('[data-lt="preset-current"]').exists()).toBe(true)
+ expect(wrapper.get('[data-lt="preset-error"]').text()).toBe('responseSettings.saveFailed')
+ vi.useRealTimers()
+ wrapper.unmount()
+})

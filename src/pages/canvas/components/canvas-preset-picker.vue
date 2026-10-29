@@ -43,7 +43,7 @@
   <div class="role-setting__actions">
    <button type="button" class="icon-back" data-action="preset-back" :disabled="busy" @click="emit('back')">{{ t('main.back') }}</button>
    <button type="button" class="complete-btn" data-action="preset-apply" :disabled="busy || !changed" @click="apply">
-    {{ t(busy ? 'responseSettings.preset.applying' : choice ? 'responseSettings.preset.apply' : 'responseSettings.preset.applyCard') }}
+    {{ t(busy ? 'responseSettings.preset.applying' : choice || !changed ? 'responseSettings.preset.apply' : 'responseSettings.preset.applyCard') }}
    </button>
   </div>
  </div>
@@ -52,7 +52,7 @@
 <script setup lang="ts">
 // 選用預設：先選範圍（這段對話／這張卡的新存檔），再選「不用預設」或自己的某個預設。
 // 每次只改一個範圍。選了版本就固定在那個版本，作者之後存新版不會偷偷換掉。
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { applyOnce, presetFailure, readBinding, type PresetApi, type PresetBinding, type PresetChoice, type PresetScope } from '../canvas-preset'
 
 const props = defineProps<{ api: PresetApi; conversationId: string; binding: PresetBinding | null; choices: PresetChoice[]; t: (key: string, values?: Record<string, unknown>) => string }>()
@@ -61,7 +61,10 @@ const emit = defineEmits<{ (e: 'back'): void; (e: 'applied', scope: PresetScope,
 const scopes: PresetScope[] = ['conversation', 'card']
 const scope = ref<PresetScope>('conversation')
 const card = ref<PresetBinding | null>(null)
-const current = computed(() => (scope.value === 'conversation' ? props.binding : card.value))
+// 這段對話的綁定：自己重讀過就用重讀的（面板那邊的重讀可能還沒回來），面板給了新的就跟著換
+const conversation = ref<PresetBinding | null>(props.binding)
+watch(() => props.binding, (b) => { conversation.value = b })
+const current = computed(() => (scope.value === 'conversation' ? conversation.value : card.value))
 const startChoice = (b: PresetBinding | null) => b?.mode !== 'revision' ? '' : props.choices.some((p) => p.id === b.presetId) ? b.presetId ?? '' : 'current'
 const choice = ref(startChoice(props.binding))
 const orphan = computed(() => current.value?.mode === 'revision' && !props.choices.some((p) => p.id === current.value!.presetId))
@@ -94,7 +97,8 @@ function fail(err: unknown) {
 async function reread(): Promise<PresetBinding | null> {
  if (scope.value === 'card') { card.value = null; await loadCard(); return card.value }
  emit('stale')
- try { return readBinding(await props.api.conversation(props.conversationId)) } catch { return null }
+ try { conversation.value = readBinding(await props.api.conversation(props.conversationId)) } catch { /* 讀不到：留著原本的 */ }
+ return conversation.value
 }
 
 async function apply() {
@@ -141,5 +145,8 @@ async function apply() {
  .preset-option-version{font-weight:400;opacity:.7}
  .preset-empty{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px}
  .preset-note,.preset-manage{align-self:flex-start}
+ /* 選項很多時，返回與套用仍留在畫面上：貼著彈層的捲動容器底部 */
+ .preset-picker > .role-setting__actions{position:sticky;bottom:0;z-index:1;padding-block:8px;background:var(--lt-canvas-sheet-bg)}
+ .preset-manage,.preset-empty .advanced-reset{min-height:44px}
 }
 </style>

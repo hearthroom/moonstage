@@ -61,8 +61,8 @@
       </div>
      </template>
      <button v-else type="button" class="advanced-reset" data-action="preset-pick" :disabled="presetBusy || saving" @click="openPicker">{{ t('responseSettings.preset.pick.title') }}</button>
-     <p v-if="presetError" class="mode-hint response-error" role="alert">{{ presetError }}</p>
     </div>
+    <p v-if="axis === 'style' && presets && presetError" class="mode-hint response-error" role="alert" data-lt="preset-error">{{ presetError }}</p>
     <div v-if="axis === 'style' && selected('style') === 'custom' && !styleLocked" class="textarea-wrapper response-custom">
      <textarea autocomplete="off" v-model="draft.customStyle" class="textarea-dark response-custom-input" rows="3" :aria-label="t('responseSettings.customLabel')"
       :placeholder="customPlaceholder" :aria-invalid="customTooLong" />
@@ -335,7 +335,9 @@ async function loadPreset(){
  try{
   const [b,list]=await Promise.allSettled([props.presets.conversation(props.conversationId),props.presets.list()])
   if(!alive)return
-  binding.value=b.status==='fulfilled' ? readBinding(b.value) : null
+  // 重讀失敗就留著上一次讀到的：不讓預設那一區連同錯誤訊息一起消失
+  if(b.status==='fulfilled')binding.value=readBinding(b.value)
+  else if(!binding.value)presetError.value=props.t('responseSettings.preset.loadFailed')
   choices.value=list.status==='fulfilled' ? readPresetChoices(list.value) : []
  }catch{if(alive)binding.value=null}
  finally{if(alive)presetBusy.value=false}
@@ -410,6 +412,8 @@ defineExpose({mayClose})
 .response-preset-head .label{margin:0}
 .response-preset-name{font-weight:600;overflow-wrap:anywhere}
 .response-preset-actions{display:flex;flex-wrap:wrap;gap:8px}
+/* 這幾顆是文字鈕，點擊區撐到 44（手機觸控下限） */
+.response-preset .advanced-reset{min-height:44px;padding-inline:4px}
 .response-length-value{font-size:14px;font-weight:600}
 .response-length-slider{width:100%;margin:0;accent-color:var(--luna-gold, #F5C542)}
 .response-length-zones{display:flex;justify-content:space-between;font-size:12px;opacity:.6}
