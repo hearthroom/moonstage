@@ -7237,7 +7237,6 @@ function getHistoryMsg(preloadedFirstPage?: any) {
         if (stored?.operationId && settled) clearStreamState();
       }
       responseSettingsVersion.value = res.data.responseSettingsVersion === 1 ? 1 : 0;
-      presetSettingsVersion.value = res.data.presetSettingsVersion === 1 ? 1 : 0;
       const operationProjectionUnavailable = (
         res.data.schemaVersion === 'outcome_v1'
         && res.data.operationStatusAvailable === false
@@ -10389,9 +10388,11 @@ const responseSettingsSupported = computed(() => responseSettingsVersion.value =
 const responseSettingsOffered = computed(() => offersResponseSettings(responseSettingsSupported.value, pendingGreetingStart.value, previewOnly.value))
 const responseSettingsPanel = ref<InstanceType<typeof CanvasResponseSettings> | null>(null)
 // 預設：伺服器在這段對話能用時才說 presetSettingsVersion=1（帳號有權限、功能開著）；沒說就完全不出現。
+// 只有 /conversation/start 帶這一欄；讀歷史的回應不帶，不能拿它蓋掉。
 const presetSettingsVersion = ref(0)
 async function presetCall(method: 'get' | 'post', url: string, data: Record<string, unknown>, key?: string) {
-  const res = await _this.http[method](url, { data, showLoading: false, ...(key ? { header: { 'Idempotency-Key': key } } : {}) })
+  // quietTransport：逾時與斷線由面板自己講「正在確認」，不疊全域提示
+  const res = await _this.http[method](url, { data, showLoading: false, quietTransport: true, ...(key ? { header: { 'Idempotency-Key': key } } : {}) })
   if (res.statusCode < 200 || res.statusCode >= 300) throw { statusCode: res.statusCode, data: res.data }
   return res.data
 }

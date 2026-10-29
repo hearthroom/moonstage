@@ -99,3 +99,25 @@ it('choosing for this card loads the card binding first and saves only that scop
  expect(wrapper.get('[data-lt="preset-notice"]').text()).toBe(t('responseSettings.preset.applied.card', { name: '細膩', n: 2 }))
  wrapper.unmount()
 })
+
+it('a conflict re-reads the binding so the next try uses the new version', async () => {
+ const conversation = vi.fn().mockResolvedValueOnce(bound()).mockResolvedValue(bound({ bindingVersion: 7 }))
+ const apply = vi.fn().mockRejectedValueOnce({ statusCode: 409, data: { error: 'preset_conflict', reason: 'preset_revision_conflict' } }).mockResolvedValue(cardDefault)
+ const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => settings({ styleSource: 'preset', styleLocked: true }), save: vi.fn(), t, presets: api({ conversation, apply }) } })
+ await flushPromises()
+ await wrapper.get('[data-action="preset-stop"]').trigger('click'); await flushPromises()
+ expect(wrapper.text()).toContain('responseSettings.preset.conflict')
+ await wrapper.get('[data-action="preset-stop"]').trigger('click'); await flushPromises()
+ expect(apply.mock.calls[1]![3]).toBe(7)
+ wrapper.unmount()
+})
+
+it('a bound preset that was archived stays shown as current instead of being silently unbound', async () => {
+ const presets = api({ conversation: vi.fn(async () => bound({ presetId: 'p2', revisionId: 'r9', presetTitle: '封存的' })) })
+ const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => settings({ styleSource: 'preset', styleLocked: true }), save: vi.fn(), t, presets } })
+ await flushPromises()
+ await wrapper.get('[data-action="preset-change"]').trigger('click'); await flushPromises()
+ expect(wrapper.get('.preset-option[data-value="current"]').attributes('aria-checked')).toBe('true')
+ expect(wrapper.get('[data-action="preset-apply"]').attributes('disabled')).toBeDefined()
+ wrapper.unmount()
+})

@@ -36,6 +36,9 @@ it('classifies apply failures into what the player can do next', () => {
  expect(presetFailure({ statusCode: 409, data: { error: 'preset_revision_unavailable' } })).toBe('loadFailed')
  expect(presetFailure({ statusCode: 422, data: { error: 'context_capacity' } })).toBe('capacity')
  expect(presetFailure(new TypeError('Failed to fetch'))).toBe('unknown')
+ // 逾時：請求層回負的狀態碼，結果一樣是未知
+ expect(presetFailure({ statusCode: -9999, data: {} })).toBe('unknown')
+ expect(presetFailure({ statusCode: 409, data: { error: 'preset_conflict', reason: 'preset_archived' } })).toBe('archived')
  expect(presetFailure({ statusCode: 500, data: {} })).toBe('failed')
 })
 

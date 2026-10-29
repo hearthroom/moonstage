@@ -4337,5 +4337,6 @@
 	"responseSettings.preset.unknown": "선택 결과를 확인하는 중…",
 	"responseSettings.preset.pick.note": "프리셋은 답변을 쓰는 방식만 정합니다. 캐릭터, 세계관, 대화 기록, 기억은 계속 Hearthroom이 처리합니다.",
 	"responseSettings.preset.separator": ", ",
-	"responseSettings.preset.modelSettingUnsupported": "이 대화에서 쓰는 프리셋에 지금 모델이 쓸 수 없는 설정이 있습니다. 모델을 바꾸거나 답장 설정에서 프리셋을 끄세요."
+	"responseSettings.preset.modelSettingUnsupported": "이 대화에서 쓰는 프리셋에 지금 모델이 쓸 수 없는 설정이 있습니다. 모델을 바꾸거나 답장 설정에서 프리셋을 끄세요.",
+	"responseSettings.preset.archived": "이 프리셋은 보관되어 더 이상 선택할 수 없습니다. 이미 쓰고 있는 대화는 그대로 이어집니다."
 }

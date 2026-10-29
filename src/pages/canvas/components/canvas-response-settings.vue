@@ -10,7 +10,7 @@
    <div class="header-box"><div class="page-title">{{ t('responseSettings.title') }}</div></div>
   </div>
   <CanvasPresetPicker v-if="picking && presets" :api="presets" :conversation-id="conversationId" :binding="binding" :choices="choices" :t="t"
-   @back="picking = false" @applied="presetApplied" />
+   @back="picking = false" @applied="presetApplied" @stale="loadPreset" />
   <template v-else>
   <div class="mode-hint response-scope">{{ t('responseSettings.scope') }}</div>
   <p v-if="loading" class="mode-hint" role="status">{{ t('responseSettings.loading') }}</p>
@@ -369,6 +369,7 @@ async function applyConversation(revisionId:string|null){
   if(!alive)return
   const kind=presetFailure(err)
   presetNotice.value=''
+  if(kind==='conflict')void loadPreset()
   presetError.value=props.t(kind==='failed' ? 'responseSettings.saveFailed' : `responseSettings.preset.${kind}`)
  }finally{if(alive)presetBusy.value=false}
 }

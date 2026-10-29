@@ -4337,5 +4337,6 @@
 	"responseSettings.preset.unknown": "正在确认选用结果…",
 	"responseSettings.preset.pick.note": "预设只决定写法。角色、世界书、对话记录和记忆仍由绮梦社处理。",
 	"responseSettings.preset.separator": "、",
-	"responseSettings.preset.modelSettingUnsupported": "这段对话选用的预设里有参数，当前模型不能用。换一个模型，或在回复偏好里停用预设。"
+	"responseSettings.preset.modelSettingUnsupported": "这段对话选用的预设里有参数，当前模型不能用。换一个模型，或在回复偏好里停用预设。",
+	"responseSettings.preset.archived": "这份预设已归档，不能再选用。已经在用它的对话照常。"
 }

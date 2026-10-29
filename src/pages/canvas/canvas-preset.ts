@@ -61,14 +61,16 @@ export function newerVersion(binding: PresetBinding | null, list: PresetChoice[]
  return head && head.version > binding.version && head.headRevisionId !== binding.revisionId ? head : null
 }
 
-export type PresetFailure = 'busy' | 'conflict' | 'capacity' | 'loadFailed' | 'unknown' | 'failed'
+export type PresetFailure = 'busy' | 'conflict' | 'archived' | 'capacity' | 'loadFailed' | 'unknown' | 'failed'
 
 /** 套用失敗時玩家接下來能做什麼。送出後沒收到回應是「結果未知」，不是失敗。 */
 export function presetFailure(err: unknown): PresetFailure {
  const e = err as { statusCode?: number; data?: { error?: string; reason?: string } }
- if (!e || typeof e.statusCode !== 'number') return 'unknown'
+ // 沒有狀態碼（斷線）或請求層的負值（逾時 -9999）：送出去了沒有不知道
+ if (!e || typeof e.statusCode !== 'number' || e.statusCode <= 0) return 'unknown'
  const code = e.data?.error ?? '', reason = e.data?.reason ?? ''
  if (reason === 'operation_active') return 'busy'
+ if (reason === 'preset_archived') return 'archived'
  if (code === 'preset_revision_unavailable') return 'loadFailed'
  if (code === 'context_capacity' || reason === 'context_capacity') return 'capacity'
  if (e.statusCode === 409) return 'conflict'

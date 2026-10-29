@@ -4337,5 +4337,6 @@
 	"responseSettings.preset.unknown": "Confirming your choice…",
 	"responseSettings.preset.pick.note": "A preset only sets how replies are written. Characters, Lorebook, conversation history and memory are still handled by Hearthroom.",
 	"responseSettings.preset.separator": ", ",
-	"responseSettings.preset.modelSettingUnsupported": "The preset this conversation uses has a setting the current model can't use. Switch models, or turn the preset off in reply preferences."
+	"responseSettings.preset.modelSettingUnsupported": "The preset this conversation uses has a setting the current model can't use. Switch models, or turn the preset off in reply preferences.",
+	"responseSettings.preset.archived": "This preset is archived and can't be chosen anymore. Conversations already using it keep working."
 }

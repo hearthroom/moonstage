@@ -12,6 +12,10 @@
   </div>
 
   <div class="card mode-box" role="radiogroup" :aria-label="t('responseSettings.preset.pick.mine')">
+   <!-- 綁著的預設已經封存、不在可選清單裡：照樣標成目前這個，不讓按鈕變成悄悄解除 -->
+   <button v-if="orphan" type="button" class="preset-option" data-value="current" role="radio" :class="{ selected: choice === 'current' }" :aria-checked="choice === 'current' ? 'true' : 'false'" :disabled="busy" @click="choice = 'current'">
+    <span class="preset-option-name">{{ t('responseSettings.preset.current', { name: current!.title, n: current!.version }) }}</span>
+   </button>
    <button type="button" class="preset-option" data-value="" role="radio" :class="{ selected: choice === '' }" :aria-checked="choice === '' ? 'true' : 'false'" :disabled="busy" @click="choice = ''">
     <span class="preset-option-name">{{ t('responseSettings.preset.pick.card') }}</span>
     <span class="mode-hint">{{ t('responseSettings.preset.pick.card.hint') }}</span>
@@ -52,34 +56,38 @@ import { computed, ref } from 'vue'
 import { applyOnce, presetFailure, readBinding, type PresetApi, type PresetBinding, type PresetChoice, type PresetScope } from '../canvas-preset'
 
 const props = defineProps<{ api: PresetApi; conversationId: string; binding: PresetBinding | null; choices: PresetChoice[]; t: (key: string, values?: Record<string, unknown>) => string }>()
-const emit = defineEmits<{ (e: 'back'): void; (e: 'applied', scope: PresetScope, message: string): void }>()
+const emit = defineEmits<{ (e: 'back'): void; (e: 'applied', scope: PresetScope, message: string): void; (e: 'stale'): void }>()
 
 const scopes: PresetScope[] = ['conversation', 'card']
 const scope = ref<PresetScope>('conversation')
 const card = ref<PresetBinding | null>(null)
 const current = computed(() => (scope.value === 'conversation' ? props.binding : card.value))
-const choice = ref(props.binding?.mode === 'revision' ? props.binding.presetId ?? '' : '')
+const startChoice = (b: PresetBinding | null) => b?.mode !== 'revision' ? '' : props.choices.some((p) => p.id === b.presetId) ? b.presetId ?? '' : 'current'
+const choice = ref(startChoice(props.binding))
+const orphan = computed(() => current.value?.mode === 'revision' && !props.choices.some((p) => p.id === current.value!.presetId))
 const busy = ref(false)
 const message = ref('')
 const failed = ref(false)
 const modelName = (v: string) => props.api.modelName?.(v) || v
 const picked = computed(() => props.choices.find((p) => p.id === choice.value) ?? null)
 // 選的就是現在用的那一版：不必再按一次
-const changed = computed(() => !!current.value && (picked.value ? current.value.revisionId !== picked.value.headRevisionId : current.value.mode !== 'card_default'))
+const changed = computed(() => !!current.value && choice.value !== 'current' && (picked.value ? current.value.revisionId !== picked.value.headRevisionId : current.value.mode !== 'card_default'))
 
+async function loadCard() {
+ busy.value = true
+ try { card.value = readBinding(await props.api.card()) } catch (err) { fail(err) } finally { busy.value = false }
+}
 async function pickScope(next: PresetScope) {
  scope.value = next
  message.value = ''
- if (next === 'card' && !card.value) {
-  busy.value = true
-  try { card.value = readBinding(await props.api.card()) } catch (err) { fail(err) } finally { busy.value = false }
- }
- const now = current.value
- choice.value = now?.mode === 'revision' ? now.presetId ?? '' : ''
+ if (next === 'card' && !card.value) await loadCard()
+ choice.value = startChoice(current.value)
 }
 
 function fail(err: unknown) {
  const kind = presetFailure(err)
+ // 版本被別處改了：重讀現在的綁定，下一次就用新的版本號，不必關掉面板
+ if (kind === 'conflict') { if (scope.value === 'card') { card.value = null; void loadCard() } else emit('stale') }
  failed.value = kind !== 'unknown'
  message.value = props.t(kind === 'failed' ? 'responseSettings.saveFailed' : kind === 'loadFailed' ? 'responseSettings.preset.loadFailed' : `responseSettings.preset.${kind}`)
 }
