@@ -410,13 +410,6 @@ defineExpose({mayClose})
  .response-streaming :deep(.ms-switch){width:64px;height:44px;border:10px solid transparent;background-clip:padding-box;margin:-10px}
  .response-streaming :deep(.ms-switch:focus-visible){outline:2px solid var(--lt-canvas-accent);outline-offset:-8px}
 }
-/* 主行動的字色照畫布量出來的底色走（data-lt-tone）。canvas.css 那條包在 :where() 裡、特異性 0，
-   宿主站的 button { color: inherit } 會蓋過它，結果是深色彈層的淺字落在亮色主行動上（QA Q03：1.45:1）。
-   這裡只管回覆偏好面板裡的兩顆（儲存、選用預設）；其他彈層的同一個問題另案。 */
-.response-settings :deep(.complete-btn[data-lt-tone="light"]){color:#17171c}
-.response-settings :deep(.complete-btn[data-lt-tone="dark"]){color:#e8eaed}
-.response-settings :deep(.complete-btn[data-lt-contrast="high"][data-lt-tone="light"]){color:#000}
-.response-settings :deep(.complete-btn[data-lt-contrast="high"][data-lt-tone="dark"]){color:#fff}
 .response-length{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .response-preset{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--lt-canvas-sheet-line)}
 .response-preset-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
@@ -431,4 +424,18 @@ defineExpose({mayClose})
 .response-length-slider{width:100%;margin:0;accent-color:var(--luna-gold, #F5C542)}
 .response-length-zones{display:flex;justify-content:space-between;font-size:12px;opacity:.6}
 .response-length-zone.selected{opacity:1;font-weight:600}
+</style>
+
+<style>
+/*
+  主行動的字色照畫布量出來的底色走（data-lt-tone）。canvas.css 那條包在 :where() 裡、特異性 0，
+  宿主站的 button { color: inherit }（0,0,1）會蓋過它，深色彈層的淺字落在亮色主行動上（QA Q03：1.45:1）。
+  這裡只多一個屬性的權重：贏過宿主的 button 重設，但作者卡片指名 .complete-btn 的字色照舊優先
+  （同權重時作者的樣式表在後面載入），守住 canvas.css「作者明示 color 永遠贏」的約定。
+  只管回覆偏好面板裡的兩顆（儲存、選用預設）；其他彈層的同一個問題另案。
+*/
+:where(.response-settings .complete-btn)[data-lt-tone="light"]{color:#17171c}
+:where(.response-settings .complete-btn)[data-lt-tone="dark"]{color:#e8eaed}
+:where(.response-settings .complete-btn[data-lt-contrast="high"])[data-lt-tone="light"]{color:#000}
+:where(.response-settings .complete-btn[data-lt-contrast="high"])[data-lt-tone="dark"]{color:#fff}
 </style>
