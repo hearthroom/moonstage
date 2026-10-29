@@ -256,7 +256,8 @@
     <CanvasPopup v-if="responseSettingsSupported && panel.sheet === 'response-settings'" :open="true"
       :title="t('responseSettings.title')" :close-label="t('main.cancel')" @close="closeCanvasSheet">
       <CanvasResponseSettings :key="String(conversationId)" ref="responseSettingsPanel" :conversation-id="String(conversationId)" @close="closeCanvasSheet"
-        :world-mode="Boolean((roleView as any).world)" :load="loadResponseSettings" :save="saveResponseSettings" :t="t" :frame="responseFrame" :save-frame="saveResponseFrame" />
+        :world-mode="Boolean((roleView as any).world)" :load="loadResponseSettings" :save="saveResponseSettings" :t="t" :frame="responseFrame" :save-frame="saveResponseFrame"
+        :presets="presetApi" />
     </CanvasPopup>
 
     <CanvasPopup :open="panel.sheet === 'directives'" v-if="!sandboxCard" :title="t('directive.title')"
@@ -556,6 +557,7 @@ import { resolveStoredModel, composeModelDisplayName, isDeadLane } from './canva
 import { filterCardActions, isInputPolicyFilter, cardRetryTarget } from './canvas-filter-card'
 import { traditionalResendText } from './canvas-traditional-resend'
 import { readResponseSettings, responseBase, responsePatch } from './canvas-response-settings'
+import type { PresetApi } from './canvas-preset'
 import {
   BREAKDOWN_META,
   contextRingFromReport,
@@ -5791,6 +5793,7 @@ function chatStart(greetingIndex?: number) {
         loadMultiPassPreference();
       }, () => uni.showToast({ title: t('canvas.modelPreferenceFallback'), icon: 'none', duration: 6000 }));
       responseSettingsVersion.value = res.data.responseSettingsVersion === 1 ? 1 : 0;
+      presetSettingsVersion.value = res.data.presetSettingsVersion === 1 ? 1 : 0;
       pic.value = cardPortrait(res.data.roleInfo);
       historyConversation.value = res.data.historyConversation;
       conversationId.value = res.data.conversationId;
@@ -7234,6 +7237,7 @@ function getHistoryMsg(preloadedFirstPage?: any) {
         if (stored?.operationId && settled) clearStreamState();
       }
       responseSettingsVersion.value = res.data.responseSettingsVersion === 1 ? 1 : 0;
+      presetSettingsVersion.value = res.data.presetSettingsVersion === 1 ? 1 : 0;
       const operationProjectionUnavailable = (
         res.data.schemaVersion === 'outcome_v1'
         && res.data.operationStatusAvailable === false
@@ -10384,6 +10388,26 @@ const responseSettingsSupported = computed(() => responseSettingsVersion.value =
 // 點了先用畫面上這條開場白開對話，再打開設定（見 openResponseSettings）。
 const responseSettingsOffered = computed(() => offersResponseSettings(responseSettingsSupported.value, pendingGreetingStart.value, previewOnly.value))
 const responseSettingsPanel = ref<InstanceType<typeof CanvasResponseSettings> | null>(null)
+// 預設：伺服器在這段對話能用時才說 presetSettingsVersion=1（帳號有權限、功能開著）；沒說就完全不出現。
+const presetSettingsVersion = ref(0)
+async function presetCall(method: 'get' | 'post', url: string, data: Record<string, unknown>, key?: string) {
+  const res = await _this.http[method](url, { data, showLoading: false, ...(key ? { header: { 'Idempotency-Key': key } } : {}) })
+  if (res.statusCode < 200 || res.statusCode >= 300) throw { statusCode: res.statusCode, data: res.data }
+  return res.data
+}
+const presetApi = computed<PresetApi | undefined>(() => presetSettingsVersion.value !== 1 ? undefined : {
+  conversation: (id) => presetCall('get', _this.requestUrl.conversationPreset, { conversationId: id }),
+  card: () => presetCall('get', _this.requestUrl.playerPresetDefault, { roleId: String(unref(roleId) || '') }),
+  list: () => presetCall('get', _this.requestUrl.presetList, { limit: 50 }),
+  apply: (scope, id, revisionId, expectedVersion, key) => scope === 'conversation'
+    ? presetCall('post', _this.requestUrl.conversationPresetApply, { conversationId: id, mode: revisionId ? 'revision' : 'card_default', ...(revisionId ? { revisionId } : {}), expectedBindingVersion: expectedVersion, model: formData.selectModel || '', language: stageHost.locale.get() }, key)
+    : presetCall('post', _this.requestUrl.playerPresetDefaultSave, { roleId: String(unref(roleId) || ''), mode: revisionId ? 'revision' : 'card_default', ...(revisionId ? { revisionId } : {}), expectedVersion }, key),
+  modelName: (value) => {
+    for (const group of modelGroups.value) for (const family of group?.families ?? []) if ((family?.variants ?? []).some((v: any) => v?.value === value)) return String(family.family || value)
+    return value
+  },
+  ...(stageHost.nav.toPresets ? { manage: () => stageHost.nav.toPresets!() } : {}),
+})
 // quiet：背景讀取（內容限制卡的流式值）不跳網路錯誤提示，玩家沒做任何事；面板的讀取照舊。
 async function loadResponseSettings(id: string, quiet = false) {
   const res = await _this.http.get('/open/v1/conversation/response-settings', { data: { conversationId: id, model: formData.selectModel || '' }, showLoading: false, ...(quiet ? { quietTransport: true } : {}) })

@@ -368,6 +368,8 @@ const SCRIPT_RESIDUE_ALLOWED_VALUES = new Set([
   'png', 'jpg', 'gif', 'webp', 'mp3', 'wav', 'flac', 'mb', 'kb', 'gb',
   'claude', 'gpt', 'gemini', 'flux', 'deepseek', 'sora', 'midjourney',
   'instant', 'high', 'low', 'ultra', 'basebot', 'pro', 'plus', 'lite',
+  // 版本號前綴（v1、v2）：五語都照寫
+  'v',
 ]);
 
 /**

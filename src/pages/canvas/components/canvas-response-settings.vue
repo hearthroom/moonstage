@@ -9,19 +9,23 @@
   <div class="header-scope">
    <div class="header-box"><div class="page-title">{{ t('responseSettings.title') }}</div></div>
   </div>
+  <CanvasPresetPicker v-if="picking && presets" :api="presets" :conversation-id="conversationId" :binding="binding" :choices="choices" :t="t"
+   @back="picking = false" @applied="presetApplied" />
+  <template v-else>
   <div class="mode-hint response-scope">{{ t('responseSettings.scope') }}</div>
   <p v-if="loading" class="mode-hint" role="status">{{ t('responseSettings.loading') }}</p>
   <div v-if="error" role="alert" class="role-setting-error response-error">
    <span>{{ t(`responseSettings.${error}`) }}</span>
    <button type="button" class="advanced-reset" data-action="reload" :disabled="loading || saving" @click="reload">{{ t('responseSettings.reload') }}</button>
   </div>
+  <p v-if="presetNotice" class="mode-hint" role="status" data-lt="preset-notice">{{ presetNotice }}</p>
   <template v-if="saved">
    <div v-for="(options, axis) in responseAxes" :key="axis" class="card mode-box response-axis" :data-axis="axis">
     <div class="label">{{ t(`responseSettings.axes.${axis}`) }}</div>
     <div class="radio-group" role="radiogroup" :aria-label="t(`responseSettings.axes.${axis}`)">
      <button v-for="option in options" :key="option" type="button" class="mode-item" :data-axis="axis" :data-value="option"
       :class="{ selected: selected(axis) === option }" role="radio" :aria-checked="selected(axis) === option ? 'true' : 'false'"
-      :disabled="loading || saving" @click="choose(axis, option)">{{ t(`responseSettings.options.${axis}.${option}`) }}</button>
+      :disabled="loading || saving || (axis === 'style' && styleLocked)" @click="choose(axis, option)">{{ t(`responseSettings.options.${axis}.${option}`) }}</button>
     </div>
     <!-- 篇幅：指定字數時是一條停在刻度上的滑桿。拇指上方直接顯示字數，軌道下方標三個區，
          底下那句照目前落在哪個區解釋。 -->
@@ -35,7 +39,31 @@
      </div>
     </div>
     <div v-if="hint(axis)" class="mode-hint" :data-hint="axis">{{ hint(axis) }}</div>
-    <div v-if="axis === 'style' && selected('style') === 'custom'" class="textarea-wrapper response-custom">
+    <div v-if="axis === 'length' && styleLocked" class="mode-hint" data-hint="length-preset">{{ t('responseSettings.preset.lengthIndependent') }}</div>
+    <!-- 預設：文風的另一個來源，二擇一。綁了預設，上面的文風選項停用，玩家原本選的保留著。 -->
+    <div v-if="axis === 'style' && presets && binding" class="response-preset" data-lt="response-preset">
+     <template v-if="binding.mode === 'revision'">
+      <div class="response-preset-head">
+       <span class="label">{{ t('responseSettings.preset.source') }}</span>
+       <span class="response-preset-name" data-lt="preset-current">{{ t('responseSettings.preset.current', { name: binding.title, n: binding.version }) }}</span>
+      </div>
+      <div v-if="binding.state === 'unavailable'" class="response-error" role="alert">
+       <span>{{ t('responseSettings.preset.loadFailed') }}</span>
+       <button type="button" class="advanced-reset" data-action="preset-reload" :disabled="presetBusy" @click="loadPreset">{{ t('responseSettings.preset.loadFailed.retry') }}</button>
+      </div>
+      <div v-if="newer" class="mode-hint" data-lt="preset-newer">
+       {{ t('responseSettings.preset.newVersion', { name: binding.title, latest: newer.version, n: binding.version }) }}
+       <button type="button" class="advanced-reset" data-action="preset-upgrade" :disabled="presetBusy || saving" @click="applyConversation(newer.headRevisionId)">{{ t('responseSettings.preset.useNewVersion', { latest: newer.version }) }}</button>
+      </div>
+      <div class="response-preset-actions">
+       <button type="button" class="advanced-reset" data-action="preset-change" :disabled="presetBusy || saving" @click="openPicker">{{ t('responseSettings.preset.change') }}</button>
+       <button type="button" class="advanced-reset" data-action="preset-stop" :disabled="presetBusy || saving" @click="applyConversation(null)">{{ t('responseSettings.preset.useCard') }}</button>
+      </div>
+     </template>
+     <button v-else type="button" class="advanced-reset" data-action="preset-pick" :disabled="presetBusy || saving" @click="openPicker">{{ t('responseSettings.preset.pick.title') }}</button>
+     <p v-if="presetError" class="mode-hint response-error" role="alert">{{ presetError }}</p>
+    </div>
+    <div v-if="axis === 'style' && selected('style') === 'custom' && !styleLocked" class="textarea-wrapper response-custom">
      <textarea autocomplete="off" v-model="draft.customStyle" class="textarea-dark response-custom-input" rows="3" :aria-label="t('responseSettings.customLabel')"
       :placeholder="customPlaceholder" :aria-invalid="customTooLong" />
      <div class="char-count" :class="{ 'response-error': customTooLong }">{{ t('responseSettings.customCount', { count: [...(draft.customStyle || '')].length }) }}</div>
@@ -115,6 +143,7 @@
     {{ t(saving ? 'responseSettings.saving' : 'responseSettings.save') }}
    </button>
   </div>
+  </template>
  <!-- 另一個 top-layer 彈層：不跟偏好內容一起捲動，也不會落在父彈層底下。 -->
  <CanvasPopup class="response-discard" :open="discardAsked" :title="t('responseSettings.discard')" :close-label="t('responseSettings.keepEditing')"
   :style="discardViewport" @close="answerDiscard(false)">
@@ -134,6 +163,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import MsSwitch from '../../../components/model-select/ms-switch.vue'
 import CanvasPopup from './canvas-popup.vue'
 import { CanvasTextField } from './canvas-field'
+import CanvasPresetPicker from './canvas-preset-picker.vue'
+import { applyOnce, lockedPatch, newerVersion, presetFailure, readBinding, readPresetChoices, type PresetApi, type PresetBinding, type PresetChoice, type PresetScope } from '../canvas-preset'
 import { lengthMode, lengthTargetLadder, lengthTargetOf, lengthZone, maxResponseNoteLength, readResponseSettings, responseAxes, responseBase, responseNoteKeys, responsePatch, type LengthZone, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
 const props=defineProps<{
  conversationId:string
@@ -144,6 +175,8 @@ const props=defineProps<{
  // 這張卡的破甲強度與破限詞；沒給就不畫這一段（仍留在用戶人設裡）。
  frame?:{sandboxLevel:string,jailbreak:string,defaultJailbreak:string,options:Array<{value:string,label:string,hint?:string}>,maxLength:number}
  saveFrame?:(value:{sandboxLevel:string,jailbreak:string})=>Promise<boolean>
+ // 伺服器說這段對話能用預設時，頁面才給；沒給就完全照舊。
+ presets?:PresetApi
 }>()
 const emit=defineEmits<{ (e: 'close'): void }>()
 const saved=ref<ResponseSettings|null>(null),draft=ref<ResponseDraft>({}),loading=ref(false),saving=ref(false),error=ref('')
@@ -211,8 +244,8 @@ const frameHint=computed(()=>props.frame?.options.find(o=>o.value===frameLevel.v
 const frameDirty=computed(()=>!!props.frame && (frameDraft.sandboxLevel!==frameSaved.sandboxLevel || frameDraft.jailbreak!==frameSaved.jailbreak))
 const customTooLong=computed(()=>[...(draft.value.customStyle || '')].length>1000)
 const axes=Object.keys(responseAxes) as ResponseAxis[]
-// 文風選「自訂」時已經能整段寫，不再給文風補充。
-const noteAxes=computed(()=>axes.filter(axis=>!(axis==='style' && selected('style')==='custom')))
+// 文風選「自訂」時已經能整段寫，不再給文風補充；文風由預設決定時也不給。
+const noteAxes=computed(()=>axes.filter(axis=>!(axis==='style' && (selected('style')==='custom' || styleLocked.value))))
 const notesOpen=ref(false)
 const customized=computed(()=>Object.values(responsePatch(draft.value,base.value)).some(value=>value!==null))
 function current(axis:ResponseAxis){return draft.value[axis] ?? base.value[axis]}
@@ -231,6 +264,7 @@ function slide(event:Event){
 // 底下那句只解釋目前選的那一個；篇幅照落在哪個區解釋。文風四個選項名字看不出差別在哪
 //（預設與精簡指引都有平台指引，差在留給模型多少發揮），所以也要一句說明。
 function hint(axis:ResponseAxis){
+ if(axis==='style' && styleLocked.value) return props.t('responseSettings.preset.styleLocked',{name:binding.value?.title || ''})
  if(axis==='agency' || axis==='perspective' || axis==='pace' || axis==='style') return props.t(`responseSettings.${axis}Hints.${current(axis)}`)
  if(axis==='length') return props.t(`responseSettings.lengthHints.${selected('length')==='target' ? lengthZone(lengthTarget.value) : selected('length')}`)
  return ''
@@ -283,14 +317,62 @@ async function submit(){
    if(!await props.saveFrame(value)){if(alive)error.value='saveFailed';return}
    Object.assign(frameSaved,value)
   }
-  if(responseDirty.value && saved.value){const value=readResponseSettings(await props.save(props.conversationId,saved.value.revision,responsePatch(draft.value,base.value)),props.conversationId);if(!alive)return;saved.value=value;draft.value={...value.overrides}}
+  if(responseDirty.value && saved.value){const value=readResponseSettings(await props.save(props.conversationId,saved.value.revision,lockedPatch(responsePatch(draft.value,base.value),styleLocked.value)),props.conversationId);if(!alive)return;saved.value=value;draft.value={...value.overrides}}
   done=true
  }
  catch(e){if(alive)error.value=((e as {status?:number})?.status ?? (e as {statusCode?:number})?.statusCode)===409?'conflict':'saveFailed'}
  finally{if(alive)saving.value=false}
  if(done && alive)emit('close')
 }
-onMounted(reload)
+// ── 預設 ──────────────────────────────────────────────
+const binding=ref<PresetBinding|null>(null),choices=ref<PresetChoice[]>([]),picking=ref(false),presetBusy=ref(false),presetNotice=ref(''),presetError=ref('')
+// 文風由誰決定以伺服器為準（response-settings 的 styleLocked），不從綁定自己推。
+const styleLocked=computed(()=>(saved.value as {styleLocked?:boolean}|null)?.styleLocked===true)
+const newer=computed(()=>newerVersion(binding.value,choices.value))
+async function loadPreset(){
+ if(!props.presets)return
+ presetBusy.value=true;presetError.value=''
+ try{
+  const [b,list]=await Promise.allSettled([props.presets.conversation(props.conversationId),props.presets.list()])
+  if(!alive)return
+  binding.value=b.status==='fulfilled' ? readBinding(b.value) : null
+  choices.value=list.status==='fulfilled' ? readPresetChoices(list.value) : []
+ }catch{if(alive)binding.value=null}
+ finally{if(alive)presetBusy.value=false}
+}
+async function openPicker(){
+ if(responseDirty.value && !await askDiscard())return
+ presetNotice.value='';picking.value=true
+}
+async function presetApplied(_scope:PresetScope,message:string){
+ picking.value=false;presetNotice.value=message
+ await refreshAfterPreset()
+}
+async function refreshAfterPreset(){
+ try{const value=readResponseSettings(await props.load(props.conversationId),props.conversationId);if(alive){saved.value=value;draft.value={...value.overrides}}}catch{if(alive)error.value='loadFailed'}
+ await loadPreset()
+}
+// 停用預設、改用新版：直接套用到這段對話，從下一則回覆開始生效。
+async function applyConversation(revisionId:string|null){
+ const now=binding.value
+ if(!props.presets || !now || presetBusy.value)return
+ if(responseDirty.value && !await askDiscard())return
+ presetBusy.value=true;presetError.value='';presetNotice.value=''
+ const head=revisionId ? choices.value.find(p=>p.headRevisionId===revisionId) : null
+ try{
+  await applyOnce(key=>props.presets!.apply('conversation',props.conversationId,revisionId,now.bindingVersion,key),()=>{presetNotice.value=props.t('responseSettings.preset.unknown')})
+  if(!alive)return
+  presetNotice.value=revisionId ? props.t('responseSettings.preset.applied.conversation',{name:head?.title || now.title,n:head?.version ?? now.version}) : props.t('responseSettings.preset.reverted.conversation')
+  presetBusy.value=false
+  await refreshAfterPreset()
+ }catch(err){
+  if(!alive)return
+  const kind=presetFailure(err)
+  presetNotice.value=''
+  presetError.value=props.t(kind==='failed' ? 'responseSettings.saveFailed' : `responseSettings.preset.${kind}`)
+ }finally{if(alive)presetBusy.value=false}
+}
+onMounted(()=>{void reload();void loadPreset()})
 defineExpose({mayClose})
 </script>
 
@@ -311,6 +393,11 @@ defineExpose({mayClose})
  .response-streaming :deep(.ms-switch:focus-visible){outline:2px solid var(--lt-canvas-accent);outline-offset:-8px}
 }
 .response-length{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.response-preset{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--lt-canvas-sheet-line)}
+.response-preset-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+.response-preset-head .label{margin:0}
+.response-preset-name{font-weight:600;overflow-wrap:anywhere}
+.response-preset-actions{display:flex;flex-wrap:wrap;gap:8px}
 .response-length-value{font-size:14px;font-weight:600}
 .response-length-slider{width:100%;margin:0;accent-color:var(--luna-gold, #F5C542)}
 .response-length-zones{display:flex;justify-content:space-between;font-size:12px;opacity:.6}

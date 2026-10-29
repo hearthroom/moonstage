@@ -59,6 +59,8 @@ export interface StageHost {
      * 畫了也只是死路。不實作視同 true。頁首與沙箱殼的頁首都看它。
      */
     canBack?(): boolean
+    /** 到宿主站的「我的預設」（建立、匯入、編輯預設）。不實作就不畫那個連結。 */
+    toPresets?(): void
   }
   locale: {
     get(): string

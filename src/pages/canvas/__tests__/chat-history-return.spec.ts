@@ -39,7 +39,7 @@ function harness(responses: any[], pending = true) {
     pendingChatTurn: pending ? { operationId: 'op', accepted: true } : null,
     pendingResendPayload: ref(null), isResumeInitial: ref(true), userStopRequested: ref(false),
     talkList: ref(pending ? [{ id: 'live', type: 0, content: 'already visible', chatFinish: false }] : []),
-    pic: ref(''), userInfo: ref({ avatar: '' }), roleId: ref('card'), contextFootprint: ref(null), responseSettingsVersion: ref(0),
+    pic: ref(''), userInfo: ref({ avatar: '' }), roleId: ref('card'), contextFootprint: ref(null), responseSettingsVersion: ref(0), presetSettingsVersion: ref(0),
     knownOperations: ref([]), isStreamActive: ref(pending), socket: ref(pending ? {} : null),
     currentChatId: ref('live'), replyContent: ref('already visible'), thinkingContent: ref(''),
     autoScrollEnabled: ref(false), isUserAtBottom: ref(false),
