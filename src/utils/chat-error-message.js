@@ -26,6 +26,9 @@ const CHAT_ERROR_I18N_KEYS = Object.freeze({
   continue_target_invalid: 'error.replyNotGenerated',
   conversation_stale: 'error.replyNotGenerated',
   content_filter: 'error.contentFilter',
+  // 玩家選用的預設在送出時才被擋：講成預設的事（換模型或停用預設），不是伺服器壞了
+  preset_model_setting_unsupported: 'responseSettings.preset.modelSettingUnsupported',
+  preset_revision_unavailable: 'responseSettings.preset.loadFailed',
 })
 
 export function resolveChatErrorMessage(errorType, translate) {
@@ -40,6 +43,8 @@ export function resolveChatErrorTypeFromFailure(failure) {
     : (typeof data?.code === 'string'
       ? data.code
       : (typeof failure?.errorCode === 'string' ? failure.errorCode : ''))
+  // 預設的格式錯誤共用一個碼，細碼在 reason：只有「目前模型不能用這個參數」是玩家在對話裡能處理的
+  if (data.error === 'preset_invalid' && data.reason === 'preset_model_setting_unsupported') return 'preset_model_setting_unsupported'
   const controlledError = typeof data.error === 'string' && Object.prototype.hasOwnProperty.call(CHAT_ERROR_I18N_KEYS, data.error) ? data.error : ''
   const normalizedCode = (typedCode || controlledError).trim()
   if (normalizedCode) return normalizedCode

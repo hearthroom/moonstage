@@ -196,3 +196,17 @@ describe('resolveCreditsShortfall', () => {
     expect(resolveCreditsShortfall(null)).toBeNull()
   })
 })
+
+// 選用的預設在送出時才被擋：上游回 preset_invalid＋reason，或綁定版本讀不到。
+// 講成預設的事，不講成伺服器壞了；玩家可以換模型或在回覆偏好裡停用預設。
+it('names a preset failure at send time instead of calling it a server error', () => {
+ const translate = (k: string) => k
+ const unsupported = { statusCode: 422, data: { error: 'preset_invalid', reason: 'preset_model_setting_unsupported' } }
+ expect(resolveChatErrorTypeFromFailure(unsupported)).toBe('preset_model_setting_unsupported')
+ expect(resolveChatErrorMessage('preset_model_setting_unsupported', translate)).toBe('responseSettings.preset.modelSettingUnsupported')
+ const missing = { statusCode: 409, data: { error: 'preset_revision_unavailable' } }
+ expect(resolveChatErrorTypeFromFailure(missing)).toBe('preset_revision_unavailable')
+ expect(resolveChatErrorMessage('preset_revision_unavailable', translate)).toBe('responseSettings.preset.loadFailed')
+ // 其他 preset_invalid 細碼不冒充成這一句
+ expect(resolveChatErrorTypeFromFailure({ statusCode: 422, data: { error: 'preset_invalid', reason: 'preset_macro_invalid' } })).toBe('server_error')
+})

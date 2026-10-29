@@ -4336,5 +4336,6 @@
 	"responseSettings.preset.capacity": "이 프리셋과 지금까지의 대화를 합치면 너무 길어서 이번 턴에 들어가지 않습니다. 더 짧은 프리셋을 고르거나 프리셋 사용을 중지하세요.",
 	"responseSettings.preset.unknown": "선택 결과를 확인하는 중…",
 	"responseSettings.preset.pick.note": "프리셋은 답변을 쓰는 방식만 정합니다. 캐릭터, 세계관, 대화 기록, 기억은 계속 Hearthroom이 처리합니다.",
-	"responseSettings.preset.separator": ", "
+	"responseSettings.preset.separator": ", ",
+	"responseSettings.preset.modelSettingUnsupported": "이 대화에서 쓰는 프리셋에 지금 모델이 쓸 수 없는 설정이 있습니다. 모델을 바꾸거나 답장 설정에서 프리셋을 끄세요."
 }

@@ -4336,5 +4336,6 @@
 	"responseSettings.preset.capacity": "このプリセットとこれまでの会話を合わせると長すぎて、今回のターンに収まりません。短いプリセットにするか、プリセットの使用をやめてください。",
 	"responseSettings.preset.unknown": "選択の結果を確認しています…",
 	"responseSettings.preset.pick.note": "プリセットが決めるのは書き方だけです。キャラクター、世界設定、会話履歴、記憶は引き続きHearthroomが扱います。",
-	"responseSettings.preset.separator": "、"
+	"responseSettings.preset.separator": "、",
+	"responseSettings.preset.modelSettingUnsupported": "この会話で使っているプリセットに、今のモデルでは使えない設定があります。モデルを変えるか、返信の設定でプリセットをオフにしてください。"
 }
