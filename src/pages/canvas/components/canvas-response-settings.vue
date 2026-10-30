@@ -117,7 +117,7 @@
 
   <!-- 自訂預設直接列在最下面，不收折（owner 2026-10-30）。世界模式不開放。 -->
   <CanvasPresetSection v-if="presets && !worldMode && binding" :api="presets" :binding="binding" :choices="choices" :disabled="loading || saving"
-   :tool-note="toolReplyNote" :confirm-leave="confirmLeave" :t="t" @applied="refreshAfterPreset" @stale="loadPreset" />
+   :tool-note="toolReplyNote" :confirm-leave="confirmLeave" :t="t" @changed="refreshAfterPreset" @stale="loadPreset" />
   <p v-else-if="presets && !worldMode && presetError" class="mode-hint response-error" role="alert" data-lt="preset-error">{{ presetError }}</p>
 
   <div class="role-setting__actions">

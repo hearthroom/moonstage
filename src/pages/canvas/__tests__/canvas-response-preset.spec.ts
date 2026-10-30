@@ -132,6 +132,29 @@ it('a conflict (including the old per-conversation scope being retired) re-reads
  }
 })
 
+it('after a conflict the whole panel follows what the card switched to elsewhere: takeover name, and the settings it locks', async () => {
+ // 別處把這張卡換成另一份預設：說明要寫新的名字
+ let card = vi.fn().mockResolvedValueOnce(bound()).mockResolvedValue(bound({ presetId: 'p3', revisionId: 'r5', presetTitle: '清爽', bindingVersion: 7 }))
+ let apply = vi.fn().mockRejectedValue({ statusCode: 409, data: { error: 'preset_conflict', reason: 'preset_revision_conflict' } })
+ let wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => lockedSettings(), save: vi.fn(), t, presets: api({ card, apply }) } })
+ await flushPromises()
+ expect(wrapper.get('[data-lt="preset-takeover"]').text()).toContain('細膩')
+ await wrapper.get('[data-action="preset-stop"]').trigger('click'); await flushPromises()
+ expect(wrapper.get('[data-lt="preset-takeover"]').text()).toContain('清爽')
+ expect(wrapper.get('[data-lt="preset-message"]').text()).toBe('responseSettings.preset.conflict')
+ wrapper.unmount()
+ // 別處已經取消：被接管的偏好回來、接管說明消失
+ card = vi.fn().mockResolvedValueOnce(bound()).mockResolvedValue({ ...cardDefault, bindingVersion: 7 })
+ apply = vi.fn().mockRejectedValue({ statusCode: 409, data: { error: 'preset_conflict', reason: 'preset_revision_conflict' } })
+ const load = vi.fn().mockResolvedValueOnce(lockedSettings()).mockResolvedValue(settings())
+ wrapper = mount(Panel, { props: { conversationId: 'c1', load, save: vi.fn(), t, presets: api({ card, apply }) } })
+ await flushPromises()
+ await wrapper.get('[data-action="preset-stop"]').trigger('click'); await flushPromises()
+ expect(wrapper.find('[data-lt="preset-takeover"]').exists()).toBe(false)
+ expect(wrapper.findAll('.response-axis').map((e) => e.attributes('data-axis'))).toEqual(['agency', 'style', 'perspective', 'length', 'pace'])
+ wrapper.unmount()
+})
+
 it('an applied preset that was archived stays shown as current instead of being silently removed', async () => {
  const presets = api({ card: vi.fn(async () => bound({ presetId: 'p2', revisionId: 'r9', presetTitle: '封存的' })) })
  const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => lockedSettings(), save: vi.fn(), t, presets } })

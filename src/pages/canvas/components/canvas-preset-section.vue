@@ -70,7 +70,8 @@ const props = defineProps<{
  confirmLeave?: () => Promise<boolean>
  t: (key: string, values?: Record<string, unknown>) => string
 }>()
-const emit = defineEmits<{ (e: 'applied'): void; (e: 'stale'): void }>()
+// changed：這張卡套用的預設變了（自己套用成功，或衝突重讀發現別處改過）——外層要重讀偏好，接管說明與被鎖的項目才跟得上
+const emit = defineEmits<{ (e: 'changed'): void; (e: 'stale'): void }>()
 
 // 自己重讀過就用重讀的（面板那邊的重讀可能還沒回來），面板給了新的就跟著換
 const current = ref<PresetBinding | null>(props.binding)
@@ -110,7 +111,7 @@ async function apply(target: PresetChoice | null) {
  try {
   await applyOnce((key) => props.api.apply(target?.headRevisionId ?? null, now.bindingVersion, key), () => { message.value = props.t('responseSettings.preset.unknown') })
   message.value = done()
-  emit('applied')
+  emit('changed')
  } catch (err) {
   fail(err)
   const kind = presetFailure(err)
@@ -120,9 +121,9 @@ async function apply(target: PresetChoice | null) {
    const after = await reread()
    if (kind === 'unknown') {
     const landed = after && after !== before && (target ? after.revisionId === target.headRevisionId : after.mode === 'card_default')
-    if (landed) { failed.value = false; message.value = done(); emit('applied') }
+    if (landed) { failed.value = false; message.value = done(); emit('changed') }
     else { failed.value = true; message.value = props.t('responseSettings.saveFailed') }
-   }
+   } else if (after && before && after.bindingVersion !== before.bindingVersion) emit('changed')
   }
  } finally {
   busy.value = false
