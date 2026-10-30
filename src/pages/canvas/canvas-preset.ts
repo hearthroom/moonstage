@@ -5,23 +5,20 @@
 // 玩家原本的選擇不清掉，取消後恢復。篇幅照舊由滑桿決定，預設碰不到。
 //
 // 沒有「全部的卡都用這個」：預設是玩家主動為某張卡選的（owner 2026-10-29）。
-// 套用的版本讀不到時明說讀不到，不悄悄換回原本的設定。
+// 預設不留版本、跟著作者走（owner 2026-10-30）：卡綁的是預設本身，作者存檔後下一次回覆就用新內容，畫布不顯示版本。
+// 套用的預設讀不到時明說讀不到，不悄悄換回原本的設定。
 
 export interface PresetBinding {
- mode: 'card_default' | 'revision'
+ mode: 'card_default' | 'preset'
  presetId: string | null
- revisionId: string | null
  bindingVersion: number
  title: string
- version: number
  state: 'ready' | 'unavailable'
 }
 
 export interface PresetChoice {
  id: string
  title: string
- headRevisionId: string
- version: number
  recommendedModels: string[]
 }
 
@@ -29,39 +26,31 @@ const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
 export function readBinding(raw: unknown): PresetBinding {
  const r = (raw ?? {}) as Record<string, unknown>
- const mode = r.mode
- if (mode !== 'card_default' && mode !== 'revision') throw new Error('Unsupported preset binding')
+ // 'revision' 是跟著作者走之前的伺服器回的：同一個意思（綁著某份預設），換版期間兩種都收
+ const mode = r.mode === 'revision' ? 'preset' : r.mode
+ if (mode !== 'card_default' && mode !== 'preset') throw new Error('Unsupported preset binding')
  const bindingVersion = Number(r.bindingVersion)
  if (!Number.isSafeInteger(bindingVersion) || bindingVersion < 0) throw new Error('Invalid preset binding')
- const revisionId = mode === 'revision' ? str(r.revisionId) : ''
- if (mode === 'revision' && !revisionId) throw new Error('Invalid preset binding')
+ const presetId = mode === 'preset' ? str(r.presetId) : ''
+ if (mode === 'preset' && !presetId) throw new Error('Invalid preset binding')
  return {
   mode, bindingVersion,
-  presetId: mode === 'revision' ? str(r.presetId) || null : null,
-  revisionId: revisionId || null,
+  presetId: presetId || null,
   title: str(r.presetTitle),
-  version: Number(r.version) || 0,
   state: r.state === 'unavailable' ? 'unavailable' : 'ready',
  }
 }
 
-/** 可以套用的預設：封存的不再列出（已經套用它的卡照常運作）。 */
+/** 可以套用的預設（玩家自己的；刪除的伺服器不會列出）。 */
 export function readPresetChoices(raw: unknown): PresetChoice[] {
  const items = Array.isArray((raw as { items?: unknown })?.items) ? (raw as { items: Record<string, unknown>[] }).items : []
- return items.filter((p) => !p.archived && str(p.id) && str(p.headRevisionId)).map((p) => ({
-  id: str(p.id), title: str(p.title), headRevisionId: str(p.headRevisionId), version: Number(p.version) || 0,
+ return items.filter((p) => str(p.id)).map((p) => ({
+  id: str(p.id), title: str(p.title),
   recommendedModels: Array.isArray(p.recommendedModels) ? (p.recommendedModels as unknown[]).map(str).filter(Boolean) : [],
  }))
 }
 
-/** 作者存了更新的版本：卡不會自己跟著換，給玩家一顆鍵自己換。 */
-export function newerVersion(binding: PresetBinding | null, list: PresetChoice[]): PresetChoice | null {
- if (!binding || binding.mode !== 'revision' || !binding.presetId) return null
- const head = list.find((p) => p.id === binding.presetId)
- return head && head.version > binding.version && head.headRevisionId !== binding.revisionId ? head : null
-}
-
-export type PresetFailure = 'busy' | 'conflict' | 'archived' | 'capacity' | 'loadFailed' | 'modelSettingUnsupported' | 'unknown' | 'failed'
+export type PresetFailure = 'busy' | 'conflict' | 'gone' | 'capacity' | 'loadFailed' | 'modelSettingUnsupported' | 'unknown' | 'failed'
 
 /** 套用失敗時玩家接下來能做什麼。送出後沒收到回應是「結果未知」，不是失敗。 */
 export function presetFailure(err: unknown): PresetFailure {
@@ -70,7 +59,8 @@ export function presetFailure(err: unknown): PresetFailure {
  if (!e || typeof e.statusCode !== 'number' || e.statusCode <= 0) return 'unknown'
  const code = e.data?.error ?? '', reason = e.data?.reason ?? ''
  if (reason === 'operation_active') return 'busy'
- if (reason === 'preset_archived') return 'archived'
+ // 要套用的那份已經刪除（清單還沒更新時按到）：伺服器跟「不存在」一樣回 404
+ if (e.statusCode === 404 && code === 'not_found') return 'gone'
  if (reason === 'preset_model_setting_unsupported') return 'modelSettingUnsupported'
  if (code === 'preset_revision_unavailable') return 'loadFailed'
  if (code === 'context_capacity' || reason === 'context_capacity') return 'capacity'
@@ -102,8 +92,8 @@ export interface PresetApi {
  /** 這張卡現在套用的預設 */
  card(): Promise<unknown>
  list(): Promise<unknown>
- /** 套用到整張卡；revisionId 是 null 就是取消套用。expectedVersion 是讀到的綁定版本。 */
- apply(revisionId: string | null, expectedVersion: number, key: string): Promise<unknown>
+ /** 套用到整張卡；presetId 是 null 就是取消套用。expectedVersion 是讀到的綁定版本。 */
+ apply(presetId: string | null, expectedVersion: number, key: string): Promise<unknown>
  /** 模型代碼 → 站上公開的名稱；查不到就顯示代碼 */
  modelName?(value: string): string
  /** 到宿主站的「我的預設」；宿主沒給就不畫這個連結 */

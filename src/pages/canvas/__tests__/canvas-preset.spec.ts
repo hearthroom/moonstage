@@ -1,33 +1,31 @@
 import { expect, it } from 'vitest'
-import { lockedPatch, newerVersion, presetFailure, presetLockedOf, readBinding, readPresetChoices } from '../canvas-preset'
+import { lockedPatch, presetFailure, presetLockedOf, readBinding, readPresetChoices } from '../canvas-preset'
 
-const binding = (over: Record<string, unknown> = {}) => ({ mode: 'revision', presetId: 'p1', revisionId: 'r1', bindingVersion: 3, presetTitle: '細膩', version: 1, state: 'ready', cacheEffect: 'prefix_rebuild_once', ...over })
+// 跟著作者走（owner 2026-10-30）：卡綁的是預設本身，沒有版本
+const binding = (over: Record<string, unknown> = {}) => ({ scope: 'card', mode: 'preset', presetId: 'p1', presetTitle: '細膩', bindingVersion: 3, state: 'ready', cacheEffect: 'none', ...over })
 
-it('reads a bound revision and a card default without inventing a preset', () => {
- expect(readBinding(binding())).toMatchObject({ mode: 'revision', presetId: 'p1', revisionId: 'r1', bindingVersion: 3, title: '細膩', version: 1, state: 'ready' })
- expect(readBinding({ mode: 'card_default', presetId: null, revisionId: null, bindingVersion: 0, state: 'ready' })).toMatchObject({ mode: 'card_default', presetId: null, revisionId: null })
+it('reads a bound preset and a card default without inventing a preset', () => {
+ expect(readBinding(binding())).toEqual({ mode: 'preset', presetId: 'p1', bindingVersion: 3, title: '細膩', state: 'ready' })
+ expect(readBinding({ mode: 'card_default', presetId: null, bindingVersion: 0, state: 'ready' })).toMatchObject({ mode: 'card_default', presetId: null })
  expect(() => readBinding({ mode: 'global', bindingVersion: 0, state: 'ready' })).toThrow()
- expect(() => readBinding({ mode: 'revision', bindingVersion: 1, state: 'ready' })).toThrow()
+ expect(() => readBinding({ mode: 'preset', bindingVersion: 1, state: 'ready' })).toThrow()
+})
+
+it('still reads the shape the server sent before presets followed the author, so a release gap does not show an error', () => {
+ expect(readBinding({ mode: 'revision', presetId: 'p1', revisionId: 'r1', version: 2, bindingVersion: 3, presetTitle: '細膩', state: 'ready' })).toEqual({ mode: 'preset', presetId: 'p1', bindingVersion: 3, title: '細膩', state: 'ready' })
 })
 
 it('keeps an unavailable binding as unavailable instead of falling back', () => {
  expect(readBinding(binding({ state: 'unavailable' })).state).toBe('unavailable')
 })
 
-it('lists only presets that can still be chosen', () => {
+it('lists the presets the server returns, by id and name only', () => {
  const list = readPresetChoices({ items: [
-  { id: 'p1', title: 'A', headRevisionId: 'r2', version: 2, archived: false, recommendedModels: ['m1'] },
-  { id: 'p2', title: 'B', headRevisionId: 'r9', version: 1, archived: true, recommendedModels: [] },
+  { id: 'p1', title: 'A', recommendedModels: ['m1'] },
+  { id: '', title: 'broken' },
+  { id: 'p2', title: 'B' },
  ] })
- expect(list.map((p) => p.id)).toEqual(['p1'])
-})
-
-it('offers the newer version only for the same preset with a higher version', () => {
- const list = readPresetChoices({ items: [{ id: 'p1', title: 'A', headRevisionId: 'r2', version: 2, archived: false, recommendedModels: [] }] })
- expect(newerVersion(readBinding(binding()), list)?.headRevisionId).toBe('r2')
- expect(newerVersion(readBinding(binding({ version: 2, revisionId: 'r2' })), list)).toBeNull()
- expect(newerVersion(readBinding(binding({ presetId: 'other' })), list)).toBeNull()
- expect(newerVersion(readBinding({ mode: 'card_default', presetId: null, revisionId: null, bindingVersion: 0, state: 'ready' }), list)).toBeNull()
+ expect(list).toEqual([{ id: 'p1', title: 'A', recommendedModels: ['m1'] }, { id: 'p2', title: 'B', recommendedModels: [] }])
 })
 
 it('classifies apply failures into what the player can do next', () => {
@@ -37,10 +35,12 @@ it('classifies apply failures into what the player can do next', () => {
  expect(presetFailure({ statusCode: 422, data: { error: 'preset_invalid', reason: 'preset_model_setting_unsupported' } })).toBe('modelSettingUnsupported')
  expect(presetFailure({ statusCode: 409, data: { error: 'preset_revision_unavailable' } })).toBe('loadFailed')
  expect(presetFailure({ statusCode: 422, data: { error: 'context_capacity' } })).toBe('capacity')
+  // 要套用的那份已經刪除：伺服器跟不存在一樣回 404
+ expect(presetFailure({ statusCode: 404, data: { error: 'not_found' } })).toBe('gone')
+ expect(presetFailure({ statusCode: 409, data: { error: 'preset_conflict', reason: 'preset_binding_changed' } })).toBe('conflict')
  expect(presetFailure(new TypeError('Failed to fetch'))).toBe('unknown')
  // 逾時：請求層回負的狀態碼，結果一樣是未知
  expect(presetFailure({ statusCode: -9999, data: {} })).toBe('unknown')
- expect(presetFailure({ statusCode: 409, data: { error: 'preset_conflict', reason: 'preset_archived' } })).toBe('archived')
  expect(presetFailure({ statusCode: 500, data: {} })).toBe('failed')
 })
 

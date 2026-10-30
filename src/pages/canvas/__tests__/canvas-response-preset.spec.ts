@@ -6,14 +6,15 @@ import Panel from '../components/canvas-response-settings.vue'
 const LOCKED = ['agency', 'style', 'perspective', 'pace', 'sandboxLevel', 'jailbreak']
 const settings = (over: Record<string, unknown> = {}) => ({ conversationId: 'c1', scope: 'conversation', schemaVersion: 1, revision: 0, overrides: {}, effective: { agency: 'coauthor', style: 'card', perspective: 'card', length: 'auto', pace: 'natural' }, styleSource: 'card_default', styleLocked: false, presetLocked: [], ...over })
 const lockedSettings = (over: Record<string, unknown> = {}) => settings({ styleSource: 'preset', styleLocked: true, presetLocked: LOCKED, ...over })
-const cardDefault = { mode: 'card_default', presetId: null, revisionId: null, bindingVersion: 0, state: 'ready' }
-const bound = (over: Record<string, unknown> = {}) => ({ mode: 'revision', presetId: 'p1', revisionId: 'r1', bindingVersion: 2, presetTitle: '細膩', version: 1, state: 'ready', ...over })
-const list = { items: [{ id: 'p1', title: '細膩', headRevisionId: 'r2', version: 2, archived: false, recommendedModels: ['m-1'] }, { id: 'p2', title: '封存的', headRevisionId: 'r9', version: 1, archived: true, recommendedModels: [] }] }
+const cardDefault = { mode: 'card_default', presetId: null, bindingVersion: 0, state: 'ready' }
+// 跟著作者走（owner 2026-10-30）：卡綁的是預設本身，沒有版本
+const bound = (over: Record<string, unknown> = {}) => ({ scope: 'card', mode: 'preset', presetId: 'p1', bindingVersion: 2, presetTitle: '細膩', state: 'ready', ...over })
+const list = { items: [{ id: 'p1', title: '細膩', recommendedModels: ['m-1'] }] }
 const t = (k: string, v?: Record<string, unknown>) => (v ? `${k}${JSON.stringify(v)}` : k)
 const frame = { sandboxLevel: 'standard', jailbreak: '', defaultJailbreak: '', options: [{ value: 'light', label: '輕量' }, { value: 'standard', label: '標準' }], maxLength: 2000 }
 
 function api(over: Record<string, unknown> = {}) {
- return { card: vi.fn(async () => cardDefault), list: vi.fn(async () => list), apply: vi.fn(async () => bound({ revisionId: 'r2', version: 2 })), modelName: (v: string) => (v === 'm-1' ? 'Model One' : v), ...over }
+ return { card: vi.fn(async () => cardDefault), list: vi.fn(async () => list), apply: vi.fn(async () => bound()), modelName: (v: string) => (v === 'm-1' ? 'Model One' : v), ...over }
 }
 
 it('changes nothing when the page does not offer presets', async () => {
@@ -26,7 +27,7 @@ it('changes nothing when the page does not offer presets', async () => {
 
 it('lists my presets at the bottom and applies the picked one to the whole card', async () => {
  const load = vi.fn().mockResolvedValueOnce(settings()).mockResolvedValue(lockedSettings())
- const presets = api({ card: vi.fn().mockResolvedValueOnce(cardDefault).mockResolvedValue(bound({ revisionId: 'r2', version: 2 })) })
+ const presets = api({ card: vi.fn().mockResolvedValueOnce(cardDefault).mockResolvedValue(bound()) })
  const wrapper = mount(Panel, { props: { conversationId: 'c1', load, save: vi.fn(), t, presets, frame, saveFrame: vi.fn() } })
  await flushPromises()
  const section = wrapper.get('[data-lt="response-preset"]')
@@ -35,7 +36,7 @@ it('lists my presets at the bottom and applies the picked one to the whole card'
  expect(section.text()).toContain('responseSettings.preset.source')
  expect(section.text()).toContain('responseSettings.preset.hint.off')
  expect(section.text()).toContain('responseSettings.preset.hint.takeover')
- // 封存的不列；沒有範圍可選，也沒有「不用預設」那個選項
+ // 沒有範圍可選，也沒有「不用預設」那個選項；不顯示版本
  expect(section.findAll('.preset-option').map((o) => o.attributes('data-value'))).toEqual(['p1'])
  expect(section.find('[data-axis="preset-scope"]').exists()).toBe(false)
  expect(section.text()).toContain('Model One')
@@ -43,8 +44,9 @@ it('lists my presets at the bottom and applies the picked one to the whole card'
  expect(section.find('[data-action="preset-stop"]').exists()).toBe(false)
  await section.get('.preset-option[data-value="p1"]').trigger('click')
  await section.get('[data-action="preset-apply"]').trigger('click'); await flushPromises()
- expect(presets.apply).toHaveBeenCalledWith('r2', 0, expect.any(String))
- expect(wrapper.get('[data-lt="preset-message"]').text()).toBe(t('responseSettings.preset.applied', { name: '細膩', n: 2 }))
+ expect(presets.apply).toHaveBeenCalledWith('p1', 0, expect.any(String))
+ expect(wrapper.get('[data-lt="preset-message"]').text()).toBe(t('responseSettings.preset.applied', { name: '細膩' }))
+ expect(section.text()).not.toMatch(/v\d/)
  expect(load).toHaveBeenCalledTimes(2)
  expect(wrapper.find('[data-lt="preset-takeover"]').exists()).toBe(true)
  wrapper.unmount()
@@ -84,19 +86,32 @@ it('says the applied version cannot be read instead of quietly switching back', 
  wrapper.unmount()
 })
 
-it('offers the newer version and tells the player when a reply is still running', async () => {
- const presets = api({ card: vi.fn(async () => bound()), apply: vi.fn(async () => { throw { statusCode: 409, data: { error: 'preset_conflict', reason: 'operation_active' } } }) })
- const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => lockedSettings(), save: vi.fn(), t, presets } })
+it('tells the player when a reply is still running', async () => {
+ const presets = api({ apply: vi.fn(async () => { throw { statusCode: 409, data: { error: 'preset_conflict', reason: 'operation_active' } } }) })
+ const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => settings(), save: vi.fn(), t, presets } })
  await flushPromises()
- expect(wrapper.get('[data-lt="preset-newer"]').text()).toContain(t('responseSettings.preset.newVersion', { name: '細膩', latest: 2, n: 1 }))
- await wrapper.get('[data-action="preset-upgrade"]').trigger('click'); await flushPromises()
- expect(presets.apply).toHaveBeenCalledWith('r2', 2, expect.any(String))
+ await wrapper.get('.preset-option[data-value="p1"]').trigger('click')
+ await wrapper.get('[data-action="preset-apply"]').trigger('click'); await flushPromises()
+ expect(presets.apply).toHaveBeenCalledWith('p1', 0, expect.any(String))
  expect(wrapper.get('[data-lt="preset-message"]').text()).toBe('responseSettings.preset.busy')
  wrapper.unmount()
 })
 
+it('a preset deleted after the list loaded says so and the list is read again without it', async () => {
+ const listCall = vi.fn().mockResolvedValueOnce(list).mockResolvedValue({ items: [] })
+ const presets = api({ list: listCall, apply: vi.fn(async () => { throw { statusCode: 404, data: { error: 'not_found' } } }) })
+ const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => settings(), save: vi.fn(), t, presets } })
+ await flushPromises()
+ await wrapper.get('.preset-option[data-value="p1"]').trigger('click')
+ await wrapper.get('[data-action="preset-apply"]').trigger('click'); await flushPromises()
+ expect(listCall).toHaveBeenCalledTimes(2)
+ expect(wrapper.find('.preset-option[data-value="p1"]').exists()).toBe(false)
+ expect(wrapper.get('[data-lt="preset-message"]').text()).toBe('responseSettings.preset.gone')
+ wrapper.unmount()
+})
+
 it('removing the preset clears it for the whole card', async () => {
- const presets = api({ card: vi.fn().mockResolvedValueOnce(bound({ revisionId: 'r2', version: 2 })).mockResolvedValue(cardDefault), apply: vi.fn(async () => cardDefault) })
+ const presets = api({ card: vi.fn().mockResolvedValueOnce(bound()).mockResolvedValue(cardDefault), apply: vi.fn(async () => cardDefault) })
  const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => lockedSettings(), save: vi.fn(), t, presets } })
  await flushPromises()
  expect(wrapper.get('[data-lt="response-preset"]').text()).toContain('responseSettings.preset.hint.on')
@@ -155,8 +170,8 @@ it('after a conflict the whole panel follows what the card switched to elsewhere
  wrapper.unmount()
 })
 
-it('an applied preset that was archived stays shown as current instead of being silently removed', async () => {
- const presets = api({ card: vi.fn(async () => bound({ presetId: 'p2', revisionId: 'r9', presetTitle: '封存的' })) })
+it('an applied preset the author deleted stays shown as current instead of being silently removed', async () => {
+ const presets = api({ card: vi.fn(async () => bound({ presetId: 'p9', presetTitle: '刪掉的' })) })
  const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => lockedSettings(), save: vi.fn(), t, presets } })
  await flushPromises()
  expect(wrapper.get('.preset-option[data-value="current"]').attributes('aria-checked')).toBe('true')
@@ -166,7 +181,7 @@ it('an applied preset that was archived stays shown as current instead of being 
 
 it('when the result never comes back, re-reads the binding and reports what actually happened', async () => {
  vi.useFakeTimers()
- const card = vi.fn().mockResolvedValueOnce(bound({ revisionId: 'r2', version: 2 })).mockResolvedValue(cardDefault)
+ const card = vi.fn().mockResolvedValueOnce(bound()).mockResolvedValue(cardDefault)
  const apply = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
  const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => lockedSettings(), save: vi.fn(), t, presets: api({ card, apply }) } })
  await vi.runAllTimersAsync()
@@ -181,7 +196,7 @@ it('when the result never comes back, re-reads the binding and reports what actu
 
 it('keeps the preset controls and shows the error when a re-read fails', async () => {
  vi.useFakeTimers()
- const card = vi.fn().mockResolvedValueOnce(bound({ revisionId: 'r2', version: 2 })).mockRejectedValue(new TypeError('offline'))
+ const card = vi.fn().mockResolvedValueOnce(bound()).mockRejectedValue(new TypeError('offline'))
  const apply = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
  const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => lockedSettings(), save: vi.fn(), t, presets: api({ card, apply }) } })
  await vi.runAllTimersAsync()
