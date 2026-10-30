@@ -11484,9 +11484,12 @@ async function loadDirectiveSets() {
     if (outcome !== 'ok') throw new Error('unexpected status')
     const choice = readCardDirectiveChoice(res.data)
     const fresh = readDirectivePresetsResponse(res.data)
-    // 選中的那一組不在了（別處刪掉）就取消選取，主按鈕回到停用
-    const picked = fresh.list.some((row) => row.presetId === directiveSets.value.picked) ? directiveSets.value.picked : ''
-    directiveSets.value = { ...directiveSets.value, ...fresh, ...(choice || {}), picked, loading: false, loaded: true }
+    // 選中的那一組不在了（別處刪掉）：卡片範圍退回這張卡目前的選擇（主按鈕回到「已經是這一組」），
+    // 存檔範圍取消選取（主按鈕停用）
+    const next = { ...directiveSets.value, ...fresh, ...(choice || {}) }
+    const stale = next.picked && !fresh.list.some((row) => row.presetId === next.picked)
+    const picked = stale ? (next.scope === 'card' ? next.cardPresetId : '') : next.picked
+    directiveSets.value = { ...next, picked, loading: false, loaded: true }
   } catch (e) {
     directiveSets.value = { ...directiveSets.value, loading: false, loadFailed: true }
   }
