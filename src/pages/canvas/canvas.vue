@@ -9011,8 +9011,9 @@ function send() {
     帶出去的會是一個空的模型代號——伺服器查不到它，會落到未知模型的回退價，
     而畫面上完全看不出來。所以寧可誠實地說一句「再試一次」，並且立刻補讀一次：
     這不是死路，玩家按第二次就會過。
+    換到另一版卡、那一版的設定還在讀時也一樣：表單上留著的是上一版的模型，送出去就跑在錯的模型上。
   */
-  if (!formData.selectModel) {
+  if (!formData.selectModel || !roleSettingsReady.value) {
     ensureRoleSettings();
     uni.showToast({ title: t('canvas.panel.settingsNotReady'), icon: 'none' });
     return;
@@ -11164,6 +11165,8 @@ async function onSavePersona(value: any) {
   if (personaSaving.value) return
   personaSaving.value = true
   personaError.value = ''
+  // 設定還在讀（剛換到另一版卡）就先等它，不然晚到的那份會蓋掉這次填的人設。
+  await ensureRoleSettings()
   const before = {
     personaMode: formData.personaMode,
     userName: formData.userName, userSex: formData.userSex, userDefine: formData.userDefine,

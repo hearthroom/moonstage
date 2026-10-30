@@ -149,3 +149,19 @@ describe('switching onto another revision mid-session', () => {
     expect(fn(canvas, 'function onMultiPassPreferenceUpdated(')).toContain('unref(settingsRoleId)')
   })
 })
+
+describe('nothing goes out on the previous revision while its settings reload', () => {
+  it('a send waits for the settings of the revision it will run on, not just for some model', () => {
+    const canvas = read('src/pages/canvas/canvas.vue')
+    const send = fn(canvas, 'function send(')
+    const guard = send.slice(send.indexOf('canvas.panel.settingsNotReady') - 200, send.indexOf('canvas.panel.settingsNotReady'))
+    expect(guard).toContain('!roleSettingsReady.value')
+  })
+
+  it('a persona save waits for the reload, so the edit is not overwritten by the late read', () => {
+    const canvas = read('src/pages/canvas/canvas.vue')
+    const save = fn(canvas, 'async function onSavePersona(')
+    expect(save.indexOf('await ensureRoleSettings()')).toBeGreaterThan(-1)
+    expect(save.indexOf('await ensureRoleSettings()')).toBeLessThan(save.indexOf('const before'))
+  })
+})
