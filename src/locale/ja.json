@@ -4373,5 +4373,7 @@
 	"directive.set.retry": "再試行",
 	"directive.set.noConversation": "会話が始まってから、このセーブデータのセットを切り替えられます。",
 	"directive.set.error.network": "接続できませんでした。選んだ内容と入力は残っているので、再試行できます。",
-	"directive.set.streamingNote": "返信の作成中でも切り替えられます。次の返信から反映されます。"
+	"directive.set.streamingNote": "返信の作成中でも切り替えられます。次の返信から反映されます。",
+	"directive.set.card.applyNone": "自動で入れないようにする",
+	"directive.set.save.pickHint": "セットを選ぶと、このセーブデータの指示が何件置き換わるかが表示されます。"
 }

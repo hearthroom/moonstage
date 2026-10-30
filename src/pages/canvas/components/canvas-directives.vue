@@ -105,6 +105,9 @@
         </div>
         <div class="ci-upgrade-note">{{ setLabels.upgradeNote }}</div>
         <div class="ci-add-error" :hidden="!sets.upgrade.error">{{ sets.upgrade.error }}</div>
+        <span v-if="sets.upgrade.full && sets.source.canManage" class="ci-link" role="button" tabindex="0"
+              @click="$emit('sets-manage')"
+              @keydown.enter.prevent="$emit('sets-manage')">{{ setLabels.manage }}</span>
       </div>
 
       <!-- 指令組來源區：這張卡的新存檔帶哪一組、這個存檔換一組或存成一組。次要動作，用中性連結。 -->

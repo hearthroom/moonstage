@@ -157,6 +157,8 @@ export interface DirectiveSetsState {
   status: string
   upgradeBusy: boolean
   upgradeError: string
+  /** 升級失敗是因為指令組滿了：提示裡多給「管理指令組」出路 */
+  upgradeFull: boolean
   /** 「不再提示」：只記在這台裝置 */
   upgradeDismissed: boolean
 }
@@ -171,7 +173,7 @@ export function createDirectiveSetsState(): DirectiveSetsState {
     cardPresetId: '', cardChosen: false,
     view: 'list', scope: 'save', picked: '', name: '', bindCard: false,
     busy: false, error: '', status: '',
-    upgradeBusy: false, upgradeError: '', upgradeDismissed: false,
+    upgradeBusy: false, upgradeError: '', upgradeFull: false, upgradeDismissed: false,
   }
 }
 
@@ -262,7 +264,7 @@ export interface DirectiveSetsViewModel {
     canSaveAs: boolean
     canManage: boolean
   }
-  upgrade: { show: boolean; body: string; busy: boolean; error: string }
+  upgrade: { show: boolean; body: string; busy: boolean; error: string; full: boolean }
   status: string
   sets: {
     scope: DirectiveSetsScope
@@ -270,6 +272,7 @@ export interface DirectiveSetsViewModel {
     rows: Array<{ id: string; title: string; countText: string; preview: string[] }>
     picked: string
     summary: string
+    already: string
     keepHint: string
     note: string
     applyLabel: string
@@ -299,7 +302,6 @@ export function buildDirectiveSetsView(
     summary = picked
       ? t('directive.set.card.sum', { name: picked.title, n: picked.items.length }, picked.items.length)
       : t('directive.set.card.sumNone')
-    if (directiveSetAlready(sets)) summary = `${summary} ${t('directive.set.already')}`
   } else if (!ctx.hasConversation) {
     summary = t('directive.set.noConversation')
   } else if (picked) {
@@ -308,6 +310,8 @@ export function buildDirectiveSetsView(
     else if (m > 0) summary = t('directive.set.save.sumAi', { name: picked.title, n, m, k }, n)
     else summary = t('directive.set.save.sum', { name: picked.title, n, k }, n)
     if (n > 0) keepHint = t('directive.set.save.keepHint', { n }, n)
+  } else {
+    summary = t('directive.set.save.pickHint')
   }
 
   const rows = sets.list.map((row) => ({
@@ -335,6 +339,7 @@ export function buildDirectiveSetsView(
       body: t('directive.set.upgrade.body', { n }, n),
       busy: sets.upgradeBusy,
       error: sets.upgradeError,
+      full: Boolean(sets.upgradeError) && sets.upgradeFull,
     },
     status: sets.status,
     sets: {
@@ -343,9 +348,10 @@ export function buildDirectiveSetsView(
       rows,
       picked: sets.picked,
       summary,
+      already: directiveSetAlready(sets) ? t('directive.set.already') : '',
       keepHint,
       note: ctx.streaming ? t('directive.set.streamingNote') : '',
-      applyLabel: t(sets.scope === 'card' ? 'directive.set.card.apply' : 'directive.set.save.apply'),
+      applyLabel: t(sets.scope === 'save' ? 'directive.set.save.apply' : picked ? 'directive.set.card.apply' : 'directive.set.card.applyNone'),
       canApply: canApplyDirectiveSet(sets, ctx.hasConversation),
       busy: sets.busy,
       error: sets.error,

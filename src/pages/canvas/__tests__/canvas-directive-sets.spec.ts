@@ -85,7 +85,9 @@ describe('這張卡的新存檔', () => {
     const vm = buildDirectiveSetsView({ list: [] }, opened, ctx)
     expect(vm.sets.rows[0]).toMatchObject({ id: '', title: ctx.t('directive.set.none') })
     expect(vm.sets.canApply).toBe(false)
-    expect(vm.sets.summary).toContain(ctx.t('directive.set.already'))
+    // 「已經是這一組」自成一行，不接在摘要句尾
+    expect(vm.sets.already).toBe(ctx.t('directive.set.already'))
+    expect(vm.sets.summary).not.toContain(ctx.t('directive.set.already'))
     expect(vm.sets.applyLabel).toBe(ctx.t('directive.set.card.apply'))
   })
   it('選不自動帶上', () => {
@@ -135,5 +137,24 @@ describe('讀取與寫入失敗怎麼分', () => {
     expect(directiveSetsErrorKind({ statusCode: 400, data: { error: 'DIRECTIVE_PRESET_LIMIT_REACHED' } })).toBe('full')
     expect(directiveSetsErrorKind(new Error('timeout'))).toBe('network')
     expect(directiveSetsErrorKind({ statusCode: 503, data: {} })).toBe('other')
+  })
+})
+
+describe('升級提示失敗：指令組滿了要給出路', () => {
+  it('滿了才顯示管理連結', () => {
+    const full = buildDirectiveSetsView({ list: items('manual') }, sets({ upgradeError: 'x', upgradeFull: true }), ctx)
+    expect(full.upgrade.full).toBe(true)
+    expect(buildDirectiveSetsView({ list: items('manual') }, sets({ upgradeError: 'x' }), ctx).upgrade.full).toBe(false)
+  })
+})
+
+describe('主按鈕與摘要跟著選取', () => {
+  it('卡片範圍選「不自動帶上」：主按鈕寫改為不自動帶上', () => {
+    const vm = buildDirectiveSetsView({ list: [] }, { ...openDirectiveSets(sets({ cardPresetId: 'p1', cardChosen: true }), 'card'), picked: '' }, ctx)
+    expect(vm.sets.applyLabel).toBe(ctx.t('directive.set.card.applyNone'))
+  })
+  it('這個存檔還沒選組：摘要說選了會看到什麼，不留白', () => {
+    const vm = buildDirectiveSetsView({ list: items('manual') }, sets({ view: 'sets', scope: 'save' }), ctx)
+    expect(vm.sets.summary).toBe(ctx.t('directive.set.save.pickHint'))
   })
 })

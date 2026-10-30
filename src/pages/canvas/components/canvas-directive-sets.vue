@@ -8,28 +8,31 @@
     <div class="ci-sets-head">
       <div class="ci-sets-back" role="button" tabindex="0"
            @click="$emit('sets-back')"
-           @keydown.enter.prevent="$emit('sets-back')"
-           @keydown.esc.prevent="$emit('sets-back')">‹ {{ labels.back }}</div>
+           @keydown.enter.prevent="$emit('sets-back')">‹ {{ labels.back }}</div>
       <div class="ci-sets-title">{{ vm.view === 'save-as' ? labels.saveAs : labels.title }}</div>
     </div>
 
     <template v-if="vm.view === 'sets'">
-      <div class="ci-scope" role="radiogroup" :aria-label="labels.title">
-        <div v-for="s in scopes" :key="s.key" class="ci-scope-item" role="radio" tabindex="0"
+      <div class="ci-scope" role="radiogroup" :aria-label="`${labels.scopeSave} / ${labels.scopeCard}`">
+        <div v-for="s in scopes" :key="s.key" class="ci-scope-item" role="radio"
+             :tabindex="vm.sets.scope === s.key ? 0 : -1"
              :class="{ 'is-on': vm.sets.scope === s.key, 'is-disabled': s.key === 'save' && vm.sets.saveScopeDisabled }"
              :aria-checked="vm.sets.scope === s.key ? 'true' : 'false'"
              @click="$emit('sets-scope', s.key)"
              @keydown.enter.prevent="$emit('sets-scope', s.key)"
-             @keydown.space.prevent="$emit('sets-scope', s.key)">{{ s.label }}</div>
+             @keydown.space.prevent="$emit('sets-scope', s.key)"
+             @keydown="onArrow($event, scopes.map((x) => x.key), vm.sets.scope, 'sets-scope')">{{ s.label }}</div>
       </div>
 
       <div class="ci-set-list" role="radiogroup" :aria-label="labels.title">
-        <div v-for="row in vm.sets.rows" :key="row.id || 'none'" class="ci-set" role="radio" tabindex="0"
+        <div v-for="(row, i) in vm.sets.rows" :key="row.id || 'none'" class="ci-set" role="radio"
+             :tabindex="vm.sets.picked === row.id || (!pickedInRows && i === 0) ? 0 : -1"
              :class="{ 'is-on': vm.sets.picked === row.id && (row.id !== '' || vm.sets.scope === 'card') }"
              :aria-checked="vm.sets.picked === row.id ? 'true' : 'false'"
              @click="$emit('sets-pick', row.id)"
              @keydown.enter.prevent="$emit('sets-pick', row.id)"
-             @keydown.space.prevent="$emit('sets-pick', row.id)">
+             @keydown.space.prevent="$emit('sets-pick', row.id)"
+             @keydown="onArrow($event, vm.sets.rows.map((x) => x.id), vm.sets.picked, 'sets-pick')">
           <div class="ci-set-top">
             <span class="ci-set-name">{{ row.title }}</span>
             <span v-if="row.countText" class="ci-set-count">{{ row.countText }}</span>
@@ -40,6 +43,7 @@
 
       <div class="ci-sum" aria-live="polite">
         <div v-if="vm.sets.summary">{{ vm.sets.summary }}</div>
+        <div v-if="vm.sets.already">{{ vm.sets.already }}</div>
         <div v-if="vm.sets.keepHint">{{ vm.sets.keepHint }}</div>
         <div v-if="vm.sets.note">{{ vm.sets.note }}</div>
       </div>
@@ -96,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted } from 'vue'
 import type { DirectiveSetsViewModel } from '../canvas-directives'
 
 export interface DirectiveSetLabels {
@@ -112,7 +116,7 @@ export interface DirectiveSetLabels {
 }
 
 const props = defineProps<{ vm: DirectiveSetsViewModel; labels: DirectiveSetLabels; name: string }>()
-defineEmits<{
+const emit = defineEmits<{
   (e: 'sets-back'): void
   (e: 'sets-scope', scope: string): void
   (e: 'sets-pick', id: string): void
@@ -122,6 +126,34 @@ defineEmits<{
   (e: 'sets-bind'): void
   (e: 'sets-save-as'): void
 }>()
+
+/*
+  Esc 回到清單，不關整個面板：彈層與畫布的 Esc 在 document 上一律關最上層，
+  所以這裡在 capture 階段先攔下，否則「存成指令組」打到一半的名稱會跟著面板一起消失。
+*/
+function onEsc(event: KeyboardEvent) {
+  if (event.key !== 'Escape' && event.key !== 'Esc') return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  emit('sets-back')
+}
+onMounted(() => document.addEventListener('keydown', onEsc, true))
+onBeforeUnmount(() => document.removeEventListener('keydown', onEsc, true))
+
+const pickedInRows = computed(() => props.vm.sets.rows.some((r) => r.id === props.vm.sets.picked))
+
+/** 單選群組的方向鍵：移到上一個／下一個並選取，焦點跟著走。 */
+function onArrow(event: KeyboardEvent, ids: string[], current: string, name: 'sets-scope' | 'sets-pick') {
+  const step = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 0
+  if (!step || ids.length === 0) return
+  event.preventDefault()
+  const at = Math.max(0, ids.indexOf(current))
+  const next = ids[(at + step + ids.length) % ids.length]
+  if (name === 'sets-scope') emit('sets-scope', next)
+  else emit('sets-pick', next)
+  const group = (event.currentTarget as HTMLElement | null)?.parentElement
+  void nextTick(() => (group?.querySelector('[aria-checked="true"]') as HTMLElement | null)?.focus())
+}
 
 const scopes = computed(() => [
   { key: 'save', label: props.labels.scopeSave },

@@ -4373,5 +4373,7 @@
 	"directive.set.retry": "다시 시도",
 	"directive.set.noConversation": "대화가 시작된 뒤에 이 저장본의 세트를 바꿀 수 있습니다.",
 	"directive.set.error.network": "연결되지 않았습니다. 선택한 내용과 입력한 내용은 그대로 남아 있으니 다시 시도할 수 있습니다.",
-	"directive.set.streamingNote": "답변을 쓰는 중에도 바꿀 수 있습니다. 다음 답변부터 반영됩니다."
+	"directive.set.streamingNote": "답변을 쓰는 중에도 바꿀 수 있습니다. 다음 답변부터 반영됩니다.",
+	"directive.set.card.applyNone": "자동으로 넣지 않도록 변경",
+	"directive.set.save.pickHint": "세트를 고르면 이 저장본의 지시가 몇 개 바뀌는지 여기에 표시됩니다."
 }

@@ -4373,5 +4373,7 @@
 	"directive.set.retry": "重試",
 	"directive.set.noConversation": "對話開始後才能換這個存檔的指令組。",
 	"directive.set.error.network": "沒有連上。你選的與輸入的都還在，可以重試。",
-	"directive.set.streamingNote": "正在回覆中也可以換，從下一次回覆開始生效。"
+	"directive.set.streamingNote": "正在回覆中也可以換，從下一次回覆開始生效。",
+	"directive.set.card.applyNone": "改為不自動帶上",
+	"directive.set.save.pickHint": "選一組，這裡會告訴你這個存檔的指令會換掉幾條。"
 }

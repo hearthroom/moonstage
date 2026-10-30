@@ -4373,5 +4373,7 @@
 	"directive.set.retry": "Retry",
 	"directive.set.noConversation": "You can switch this save's set once the conversation starts.",
 	"directive.set.error.network": "Couldn't connect. What you chose and typed is still here, so you can retry.",
-	"directive.set.streamingNote": "You can switch while a reply is being written. It takes effect from the next reply."
+	"directive.set.streamingNote": "You can switch while a reply is being written. It takes effect from the next reply.",
+	"directive.set.card.applyNone": "Stop auto-adding",
+	"directive.set.save.pickHint": "Pick a set to see how many instructions in this save would be replaced."
 }

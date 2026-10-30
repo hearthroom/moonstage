@@ -11562,7 +11562,7 @@ async function onDirectiveSetsSaveAs() {
 async function onDirectiveSetsUpgrade() {
   const st = directiveSets.value
   if (st.upgradeBusy || !unref(conversationId)) return
-  directiveSets.value = { ...st, upgradeBusy: true, upgradeError: '' }
+  directiveSets.value = { ...st, upgradeBusy: true, upgradeError: '', upgradeFull: false }
   try {
     const out = await directiveSetsPost(_this.requestUrl.conversationDirectiveSaveAsPreset, {
       conversationId: String(unref(conversationId) || ''),
@@ -11573,7 +11573,7 @@ async function onDirectiveSetsUpgrade() {
     directiveSets.value = { ...directiveSets.value, upgradeBusy: false, cardPresetId: String(out?.preset?.presetId || ''), cardChosen: true, status: t('directive.set.done.upgrade', { name }) }
     loadDirectiveSets()
   } catch (e) {
-    directiveSets.value = { ...directiveSets.value, upgradeBusy: false, upgradeError: directiveSetsError(e) }
+    directiveSets.value = { ...directiveSets.value, upgradeBusy: false, upgradeError: directiveSetsError(e), upgradeFull: directiveSetsErrorKind(e) === 'full' }
   }
 }
 
