@@ -129,6 +129,7 @@ export function payloadOf(m: SandboxMessage): MessagePayload {
 }
 
 const SCRIPT_RE = /<script[^>]*>([\s\S]*?)<\/script>/gi
+const withoutScripts = (html: string) => String(html).replace(SCRIPT_RE, '')
 /** 最末這幾則永遠掛著（最新的 AI 回覆與玩家那句：作者的收尾邏輯、動作列都在這裡）。 */
 const TAIL_PINNED = 2
 /** 冷啟動時同步掛的最少則數（沒有版面資訊時，例如測試環境）。 */
@@ -178,14 +179,18 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     const hit = rendered.get(entry.message.id)
     return !!hit && hit.provisional
   }
+  // 正文的原樣 html（宿主算好的，或殼自己畫的），<script> 還在：腳本從這裡取，見 activate。
+  const sourceHtml = (m: SandboxMessage): string => (m.view ? String(m.view.html || '') : String(rendered.get(m.id)?.html || ''))
   const stateOf = (m: SandboxMessage): EntryState => {
     const generating = m.role === 'ai' && m.state !== 'done' && !m.content
-    const view: MessageView = m.view ? { ...m.view } : {
+    // 畫進氣泡的不帶 <script>：v-html 放進去的腳本不會執行，只會變成氣泡裡的文字節點，作者掃正文文字的
+    // 解析（選項、狀態）會讀到腳本原始碼。殼自己畫時規則裡的腳本裝卡就抽走了，宿主送來的也一樣處理。
+    const view: MessageView = m.view ? { ...m.view, html: m.view.html == null ? m.view.html : withoutScripts(m.view.html) } : {
       mesid: seq,
       role: m.role,
       name: m.role === 'user' ? deps.userName : deps.roleName,
       avatar: m.role === 'user' ? deps.userAvatar : deps.roleAvatar,
-      html: generating ? '' : renderCached(m),
+      html: generating ? '' : withoutScripts(renderCached(m)),
       loading: generating,
       loadingLabel: deps.strings.generating,
       finished: m.state === 'done',
@@ -203,7 +208,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     if (!deps.runScripts && !deps.mountFrontend) return
     // 暫時的畫面（規則還沒跑完）不啟動：腳本與前端區塊等完整套用的結果。
     if (pendingRules(entry)) return
-    const html = String((entry.state && entry.state.view.html) || '')
+    const html = entry.state ? sourceHtml(entry.message) : ''
     if (!html || entry.activatedHtml === html || entry.message.state !== 'done') return
     entry.activatedHtml = html
     if (deps.mountFrontend) deps.mountFrontend(entry.body)
