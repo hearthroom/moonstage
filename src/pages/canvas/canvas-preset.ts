@@ -61,7 +61,7 @@ export function newerVersion(binding: PresetBinding | null, list: PresetChoice[]
  return head && head.version > binding.version && head.headRevisionId !== binding.revisionId ? head : null
 }
 
-export type PresetFailure = 'busy' | 'conflict' | 'archived' | 'capacity' | 'loadFailed' | 'unknown' | 'failed'
+export type PresetFailure = 'busy' | 'conflict' | 'archived' | 'capacity' | 'loadFailed' | 'modelSettingUnsupported' | 'unknown' | 'failed'
 
 /** 套用失敗時玩家接下來能做什麼。送出後沒收到回應是「結果未知」，不是失敗。 */
 export function presetFailure(err: unknown): PresetFailure {
@@ -71,6 +71,7 @@ export function presetFailure(err: unknown): PresetFailure {
  const code = e.data?.error ?? '', reason = e.data?.reason ?? ''
  if (reason === 'operation_active') return 'busy'
  if (reason === 'preset_archived') return 'archived'
+ if (reason === 'preset_model_setting_unsupported') return 'modelSettingUnsupported'
  if (code === 'preset_revision_unavailable') return 'loadFailed'
  if (code === 'context_capacity' || reason === 'context_capacity') return 'capacity'
  if (e.statusCode === 409) return 'conflict'

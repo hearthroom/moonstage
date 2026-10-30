@@ -33,6 +33,8 @@ it('offers the newer version only for the same preset with a higher version', ()
 it('classifies apply failures into what the player can do next', () => {
  expect(presetFailure({ statusCode: 409, data: { error: 'preset_conflict', reason: 'operation_active' } })).toBe('busy')
  expect(presetFailure({ statusCode: 409, data: { error: 'preset_conflict', reason: 'preset_revision_conflict' } })).toBe('conflict')
+ // 預設的取樣參數目前的模型不能用：講清楚能怎麼辦（換模型或停用預設），不是一般的「沒有保存成功」
+ expect(presetFailure({ statusCode: 422, data: { error: 'preset_invalid', reason: 'preset_model_setting_unsupported' } })).toBe('modelSettingUnsupported')
  expect(presetFailure({ statusCode: 409, data: { error: 'preset_revision_unavailable' } })).toBe('loadFailed')
  expect(presetFailure({ statusCode: 422, data: { error: 'context_capacity' } })).toBe('capacity')
  expect(presetFailure(new TypeError('Failed to fetch'))).toBe('unknown')
