@@ -71,6 +71,7 @@
       -->
       <div class="mes_turn" data-lt="turn">
       <div
+        ref="bubbleEl"
         class="mes_text content"
         :class="bubbleClass"
         :id="'q-' + message.mesid"
@@ -116,7 +117,7 @@
           <!-- 伺服器說了為什麼慢就寫出來；等了多久在指示器旁邊。 -->
           <div v-if="message.waitingHint" class="lt-waiting-hint" data-lt="waiting-hint">{{ message.waitingHint }}</div>
         </template>
-        <div v-else class="lt-bubble-body" v-html="message.html"></div>
+        <div v-else ref="bodyEl" class="lt-bubble-body" v-html="message.html"></div>
       </div>
 
       <!--
@@ -213,7 +214,7 @@
     AI／使用者同時用 class（MMD 語彙）與屬性（酒館語彙）分辨：兩邊的卡各認一種。
 
 */
-import { computed, ref, watch, nextTick, onUnmounted } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onBeforeUpdate, onUpdated, onUnmounted } from 'vue'
 import { syncChromeTone } from '../canvas-chrome-tone'
 import { createLongPress, type LongPressPoint } from '../canvas-longpress'
 import ChatTypingIndicator from '@/components/chat-typing-indicator/chat-typing-indicator.vue'
@@ -300,6 +301,42 @@ watch(() => props.message.agentInterrupted, async (interrupted) => {
   }
 }, { immediate: true })
 onUnmounted(() => toneObserver?.disconnect())
+
+/*
+  作者腳本搬走氣泡內容之後，換內容前先把 Vue 自己的節點放回氣泡。
+
+  MMD 搬來的狀態欄常這樣啟動：`<img onerror>` 跑一段腳本，取 `closest('.content.left')`
+  （就是這個氣泡），把它所有子節點搬進自己蓋的殼、殼掛回氣泡；下一次執行先刪掉上一個殼。
+  MMD 每次整個重寫 `.content`，舊殼自然不見。我們的訊息本體是氣泡裡 Vue 管的
+  `.lt-bubble-body`：串流中下一幀作者刪舊殼時本體跟著離開文件，之後每一幀都寫進脫離的
+  節點，畫面只剩空殼，定稿換新節點才恢復（2026-10-31 作者回報：「輸出到後面時整個縮起來，
+  字完全看不到」）。
+
+  所以內容要換的那一次，若氣泡的直屬子節點已經不是 Vue 上次放的那一組，就照 MMD 的語意
+  整個重來：放回 Vue 的節點、丟掉作者上一次蓋的殼，再讓 Vue 寫新內容，腳本會自己再蓋一次。
+  內容沒變的重畫不動，作者已經蓋好、玩家可能正在用的殼留著；這種重畫之後也不重記
+  「Vue 的節點」，否則記下的是作者的殼，下一幀就放不回來了。
+*/
+const bubbleEl = ref<HTMLElement | null>(null)
+const bodyEl = ref<HTMLElement | null>(null)
+let ownNodes: Node[] = []
+let ownHtml: string | undefined
+function rememberOwnNodes() {
+  const bubble = bubbleEl.value
+  if (!bubble) return
+  if (bodyEl.value && bodyEl.value.parentNode !== bubble) return
+  ownNodes = Array.from(bubble.childNodes)
+  ownHtml = props.message.html
+}
+onMounted(rememberOwnNodes)
+onUpdated(rememberOwnNodes)
+onBeforeUpdate(() => {
+  const bubble = bubbleEl.value
+  if (!bubble || props.message.html === ownHtml) return
+  const current = bubble.childNodes
+  if (current.length === ownNodes.length && ownNodes.every((node, i) => current[i] === node)) return
+  bubble.replaceChildren(...ownNodes)
+})
 
 const hintEl = ref<HTMLElement | null>(null)
 
