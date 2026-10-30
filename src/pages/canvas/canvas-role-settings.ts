@@ -172,6 +172,25 @@ export function buildRoleSettingsSavePayload(
   return { roleId, ...changed }
 }
 
+/**
+ * 回應裡這段對話所屬那一版卡的 role id：開局與另開新檔回 `roleInfo.roleId`，
+ * 查單段對話回 `roleId`。沒帶就回空字串。
+ */
+export function conversationRoleId(res: any): string {
+  return asText(res?.roleInfo?.roleId ?? res?.roleId)
+}
+
+/**
+ * 卡片層設定（人設、指示、多步生成⋯）讀寫哪一版卡。
+ *
+ * 託管卡每次作者更新都是新的 role id；頁面可能停在舊版，伺服器開局時會接回玩家在
+ * 較新版本上的對話。生成照對話所屬那一版讀設定，面板就得讀寫同一版，否則玩家改的
+ * 人設存進生成不會讀的那一列。還不知道對話在哪一版時用頁面這張卡。
+ */
+export function settingsRoleFor(pageRoleId: string, conversationRole: string): string {
+  return conversationRole || pageRoleId
+}
+
 interface DepthVariantLike {
   thinkingDepthOptions?: Array<{ value?: unknown }> | null
   defaultThinkingDepth?: unknown

@@ -28,7 +28,7 @@ describe('owned read-only admission in actual canvas handlers',()=>{
   const history=vi.fn(),mark=vi.fn()
   const ctx:any={_this:{http:{get},requestUrl:{ownedConversation:'/owned'}}, roleId:ref(''),conversationId:ref(''),historyConversation:ref(false),historyTitle:ref(''),
    ownedHistoryMode:ref(false),authorAssetSettled:ref(false),conversationAccess:ref({canGenerate:true}),pendingGreetingStart:ref(false),formData:{},ajax:ref({flag:false,page:2}),
-   ROLE_SETTINGS_DEFAULTS:{},setCurrentRoleId:vi.fn(),getHistoryMsg:history,contentReady:{mark},unref:(r:any)=>r.value,uni:{$emit:vi.fn()},message:{error:vi.fn()},t:(s:string)=>s,
+   ROLE_SETTINGS_DEFAULTS:{},conversationRole:ref(''),setCurrentRoleId:vi.fn(),getHistoryMsg:history,contentReady:{mark},unref:(r:any)=>r.value,uni:{$emit:vi.fn()},message:{error:vi.fn()},t:(s:string)=>s,
    ensureRoleSettings:vi.fn(async()=>{}),loadModelCatalog:vi.fn(),loadMultiPassPreference:vi.fn(),content:ref('Kept draft'),
    hasLogin:ref(true),isTimelineMutationBlocked:()=>false,onCanvasSend:vi.fn(),archivesFull:ref(false),onConfirmStartNewConversation:vi.fn(),
    talkList:ref([]),actionBtnState:ref('send'),menuEditing:ref(false),menuIndex:ref(0),roleView:ref({}),modelGroups:ref([]),sandboxCard:ref(false),
@@ -38,7 +38,7 @@ describe('owned read-only admission in actual canvas handlers',()=>{
   ctx.canGenerate=actual('canGenerate',{computed,conversationAccess:ctx.conversationAccess})
   await actual('bootOwnedHistory',ctx)('old','conv')
   expect(get).toHaveBeenCalledTimes(1);expect(history).toHaveBeenCalledTimes(1)
-  expect(ctx.conversationId.value).toBe('conv');expect(ctx.roleId.value).toBe('old')
+  expect(ctx.conversationId.value).toBe('conv');expect(ctx.roleId.value).toBe('old');expect(ctx.conversationRole.value).toBe('old')
   expect(ctx.historyTitle.value).toBe('Saved title');expect(ctx.ownedHistoryMode.value).toBe(true);expect(ctx.authorAssetSettled.value).toBe(true)
   expect(ctx.conversationAccess.value).toEqual(access)
   expect(ctx.canGenerate.value).toBe(access.canGenerate)
@@ -64,7 +64,7 @@ describe('owned read-only admission in actual canvas handlers',()=>{
 
 describe('owned policy refresh after a failed admission',()=>{
  function harness(response:any){
-  const ctx:any={_this:{http:{get:vi.fn(async()=>response)},requestUrl:{ownedConversation:'/owned'}},conversationId:ref('conv'),roleId:ref('old'),
+  const ctx:any={_this:{http:{get:vi.fn(async()=>response)},requestUrl:{ownedConversation:'/owned'}},conversationId:ref('conv'),roleId:ref('old'),settingsRoleId:ref('old'),
    conversationAccess:ref({canGenerate:true,reason:''}),accessInterrupted:ref(false),accessRejected:ref(false),content:ref(''),unref:(r:any)=>r.value,
    normalizeConversationAccess:(v:any)=>({canGenerate:v.canGenerate===true,reason:v.reason})}
   return {ctx,run:actual('refreshConversationAccess',ctx)}

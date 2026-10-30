@@ -571,7 +571,7 @@ import {
   ROLE_SETTINGS_DEFAULTS, readRoleSettings, buildRoleSettingsSavePayload, thinkingDepthForVariant,
   type RoleSettings,
 } from './canvas-role-settings'
-import { asPersonaMode } from './canvas-role-settings'
+import { asPersonaMode, conversationRoleId, settingsRoleFor } from './canvas-role-settings'
 
 
 // V1.1: 引入 WebSocket 心跳管理和 SSE 解析工具
@@ -755,7 +755,7 @@ function isTransportFailure(e: any): boolean {
 
 async function loadMultiPassPreference(retryLeft = 1) {
   if (stageHost.capabilities?.agentMode === false) return
-  const id = String(unref(roleId) || formData.roleId || '')
+  const id = String(unref(settingsRoleId) || formData.roleId || '')
   if (!id) return
   try {
     const res = await _this.http.get(_this.requestUrl.playerAgentMode, {
@@ -764,7 +764,7 @@ async function loadMultiPassPreference(retryLeft = 1) {
       showLoading: false,
       quietTransport: true,
     })
-    if (String(unref(roleId) || '') !== id) return
+    if (String(unref(settingsRoleId) || '') !== id) return
     applyMultiPassPreference(normalizeMultiPassPreference(res))
   } catch (e) {
     if (retryLeft > 0 && isTransportFailure(e)) {
@@ -1735,6 +1735,7 @@ async function bootOwnedHistory(targetRoleId: string, id: string) {
     const response = await _this.http.get(_this.requestUrl.ownedConversation, {data:{conversationId:id},showLoading:false});
     if (response.statusCode !== 200 || response.data?.conversationId !== id || response.data?.roleId !== targetRoleId) throw new Error('owned_history_binding');
     roleId.value = targetRoleId;
+    conversationRole.value = targetRoleId;
     Object.assign(formData, ROLE_SETTINGS_DEFAULTS);
     formData.selectModelName = '';
     formData.roleId = targetRoleId;
@@ -1762,7 +1763,7 @@ async function refreshConversationAccess(draft = '', rejected = false) {
   if (!id) return;
   try {
     const response = await _this.http.get(_this.requestUrl.ownedConversation, {data:{conversationId:id},showLoading:false,quietTransport:true});
-    if (String(unref(conversationId)) !== id || response.statusCode !== 200 || response.data?.conversationId !== id || response.data?.roleId !== String(unref(roleId))) return;
+    if (String(unref(conversationId)) !== id || response.statusCode !== 200 || response.data?.conversationId !== id || response.data?.roleId !== String(unref(settingsRoleId))) return;
     const access = normalizeConversationAccess(response.data);
     // A failed read never turns a connection failure into an author decision.
     if (!access.canGenerate) {
@@ -1800,6 +1801,7 @@ async function bootFromDraft(draftId: string, targetRoleId: any) {
   startBackgroundChoice('', false);
   // 沒有卡：把角色識別清成空字串，免得下游把預設的 0 當成一張卡。
   roleId.value = '' as any;
+  conversationRole.value = '';
   // onLoad 在掛載之前；作者容器要掛在 body 上、量對話欄，等 DOM 在了再套。
   await nextTick();
   applyAuthorAsset(draftToAuthorAsset(draft));
@@ -1809,6 +1811,7 @@ async function bootFromDraft(draftId: string, targetRoleId: any) {
 function bootRole(targetRoleId: any, draft: AuthorDraft | null) {
   const options = { roleId: targetRoleId };
   roleId.value = options.roleId;
+  conversationRole.value = '';
   if (draft) {
     nextTick(() => applyAuthorAsset(draftToAuthorAsset(draft)));
   } else {
@@ -1880,6 +1883,10 @@ let keyboardHandler: ((e: KeyboardEvent) => void) | null = null;
 const from = ref('');
 const version = ref('');
 const roleId = ref(0);//角色ID
+// 目前這段對話所屬的那一版卡（託管卡每次更新是新的 role id，伺服器會把舊版頁面接到新版上的對話）。
+// 卡片層設定照它讀寫，見 settingsRoleFor。換卡時清空。
+const conversationRole = ref('');
+const settingsRoleId = computed(() => settingsRoleFor(String(unref(roleId) || ''), conversationRole.value));
 const pic = ref("");//角色头像
 const historyConversation = ref(false); //是否有历史对话
 const conversationId = ref(''); //历史对话ID
@@ -5738,6 +5745,7 @@ function saveAndStartNew() {
 function adoptStartedConversation(started: any) {
   teardownStreamForConversationSwitch({ invalidateHistory: true });
   conversationId.value = started.conversationId;
+  if (followConversationRole(conversationRoleId(started))) void reloadRoleSettings();
   // 通知 right-window 更新 conversationId
   uni.$emit('updateConversationId', { conversationId: started.conversationId });
   talkList.value = [];
@@ -5785,13 +5793,10 @@ function chatStart(greetingIndex?: number) {
       : { roleId: unref(roleId), greetingIndex, firstPageSize: ajax.value.rows },
   }).then(async res => {
     if (res.statusCode == 200) {
-      await syncStartedModelSettings(res.data, roleSettingsInFlight, async () => {
-        roleSettingsReady.value = false;
-        formData.selectModel = '';
-        await loadRoleSettings();
-        loadModelCatalog();
-        loadMultiPassPreference();
-      }, () => uni.showToast({ title: t('canvas.modelPreferenceFallback'), icon: 'none', duration: 6000 }));
+      // 頁面停在舊版卡時，伺服器會接回玩家在較新版本上的對話；設定改讀寫那一版。
+      const settingsMoved = followConversationRole(conversationRoleId(res.data));
+      await syncStartedModelSettings(res.data, roleSettingsInFlight, reloadRoleSettings,
+        () => uni.showToast({ title: t('canvas.modelPreferenceFallback'), icon: 'none', duration: 6000 }), settingsMoved);
       responseSettingsVersion.value = res.data.responseSettingsVersion === 1 ? 1 : 0;
       presetSettingsVersion.value = res.data.presetSettingsVersion === 1 ? 1 : 0;
       pic.value = cardPortrait(res.data.roleInfo);
@@ -10736,7 +10741,7 @@ onUnmounted(() => { if (catalogAfterTurn) clearTimeout(catalogAfterTurn) })
 async function loadModelCatalog(retryLeft = 1) {
   try {
     const res = await _this.http.get(_this.requestUrl.getModelListV2, {
-      data: { contextLevel: formData.context, roleId: unref(roleId) },
+      data: { contextLevel: formData.context, roleId: unref(settingsRoleId) },
       showLoading: false,
       quietTransport: true,
       timeout: 10000,
@@ -10876,7 +10881,7 @@ function currentRoleSettings(): RoleSettings {
 }
 
 async function loadRoleSettings() {
-  const targetRoleId = String(unref(roleId) || '')
+  const targetRoleId = String(unref(settingsRoleId) || '')
   if (!targetRoleId) return
   try {
     const requestConversationId = String(unref(conversationId) || '')
@@ -10886,6 +10891,8 @@ async function loadRoleSettings() {
       quietTransport: true,
       timeout: 10000,
     })
+    // 回來時設定已經換到另一版卡（接上了較新版本的對話），這份就不採用，換版那邊會再讀。
+    if (String(unref(settingsRoleId) || '') !== targetRoleId) return
     if (res.statusCode !== 200 || !res.data) return
     const settings = readRoleSettings(res.data)
     roleSettingsSnapshot = { ...settings }
@@ -10907,6 +10914,30 @@ async function loadRoleSettings() {
   }
 }
 
+/** 對話所屬的那一版卡跟目前讀寫設定的那一版不同時換過去；回傳有沒有換（換了要重讀設定）。 */
+function followConversationRole(next: string): boolean {
+  if (!next || next === String(unref(settingsRoleId) || '')) return false
+  conversationRole.value = next
+  return true
+}
+
+async function reloadRoleSettings() {
+  roleSettingsReady.value = false
+  formData.selectModel = ''
+  await loadRoleSettings()
+  loadModelCatalog()
+  loadMultiPassPreference()
+}
+
+// 切換、分叉回來的只有對話 id，不說它在哪一版卡上；問一次那段對話。
+async function syncConversationRole(id: string) {
+  try {
+    const res = await _this.http.get(_this.requestUrl.ownedConversation, { data: { conversationId: id }, showLoading: false, quietTransport: true })
+    if (String(unref(conversationId)) !== id || res.statusCode !== 200 || res.data?.conversationId !== id) return
+    if (followConversationRole(conversationRoleId(res.data))) await reloadRoleSettings()
+  } catch { /* 查不到就留在目前那一版，下一次開局會再對一次。 */ }
+}
+
 function ensureRoleSettings() {
   if (roleSettingsReady.value) return Promise.resolve()
   if (!roleSettingsInFlight) {
@@ -10924,7 +10955,7 @@ watch(hasLogin, (loggedIn) => {
 
 async function persistRoleSettings() {
   const payload = buildRoleSettingsSavePayload(
-    String(unref(roleId) || ''), roleSettingsSnapshot, currentRoleSettings(),
+    String(unref(settingsRoleId) || ''), roleSettingsSnapshot, currentRoleSettings(),
   )
   // 一個字都沒動就連請求都不發。
   if (!payload) return true
@@ -12074,6 +12105,7 @@ function postArchiveAction(url: string, data: Record<string, any>) {
 function adoptConversation(nextId: string) {
   teardownStreamForConversationSwitch({ invalidateHistory: true })
   conversationId.value = nextId
+  void syncConversationRole(nextId)
   uni.$emit('updateConversationId', { conversationId: nextId })
   talkList.value = []
   openMore.value = false
