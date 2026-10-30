@@ -315,7 +315,11 @@ onUnmounted(() => toneObserver?.disconnect())
   所以內容要換的那一次，若氣泡的直屬子節點已經不是 Vue 上次放的那一組，就照 MMD 的語意
   整個重來：放回 Vue 的節點、丟掉作者上一次蓋的殼，再讓 Vue 寫新內容，腳本會自己再蓋一次。
   內容沒變的重畫不動，作者已經蓋好、玩家可能正在用的殼留著；這種重畫之後也不重記
-  「Vue 的節點」，否則記下的是作者的殼，下一幀就放不回來了。
+  「Vue 的節點」，否則記下的是作者的殼，下一幀就放不回來了。Vue 一寫完本體就已經被
+  搬走（作者在寫入的同一刻同步包起來）時，記不到可信的一組，那一次就不放回，照舊畫。
+
+  沙箱殼（有 chat 契約）不做：那裡作者在 message:mount 掛在氣泡上的節點是契約允許的，
+  殼也在定稿時整個重掛。
 */
 const bubbleEl = ref<HTMLElement | null>(null)
 const bodyEl = ref<HTMLElement | null>(null)
@@ -323,8 +327,11 @@ let ownNodes: Node[] = []
 let ownHtml: string | undefined
 function rememberOwnNodes() {
   const bubble = bubbleEl.value
-  if (!bubble) return
-  if (bodyEl.value && bodyEl.value.parentNode !== bubble) return
+  if (!bubble || props.chat) return
+  if (bodyEl.value && bodyEl.value.parentNode !== bubble) {
+    if (props.message.html !== ownHtml) ownNodes = []
+    return
+  }
   ownNodes = Array.from(bubble.childNodes)
   ownHtml = props.message.html
 }
@@ -332,7 +339,7 @@ onMounted(rememberOwnNodes)
 onUpdated(rememberOwnNodes)
 onBeforeUpdate(() => {
   const bubble = bubbleEl.value
-  if (!bubble || props.message.html === ownHtml) return
+  if (!bubble || props.chat || !ownNodes.length || props.message.html === ownHtml) return
   const current = bubble.childNodes
   if (current.length === ownNodes.length && ownNodes.every((node, i) => current[i] === node)) return
   bubble.replaceChildren(...ownNodes)

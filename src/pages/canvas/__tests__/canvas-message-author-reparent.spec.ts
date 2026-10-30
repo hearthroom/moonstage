@@ -69,6 +69,45 @@ describe('作者腳本搬動氣泡內容之後的重畫', () => {
     w.unmount()
   })
 
+  it('Vue 寫入的同一刻就被搬走（沒記到自己的節點）時不動氣泡，照舊畫在作者的殼裡', async () => {
+    const w = mount(CanvasMessage, { props: { message: { ...BASE, loading: true, html: '' } }, attachTo: document.body })
+    const bubble = w.element.querySelector('.content.left')!
+    // 作者的自訂元素在 v-html 寫入時同步包起氣泡內容：Vue 更新完時本體已經不在氣泡直屬層。
+    const original = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML')!
+    Object.defineProperty(Element.prototype, 'innerHTML', {
+      configurable: true,
+      get: original.get,
+      set(this: Element, value: string) {
+        original.set!.call(this, value)
+        if (this.classList && this.classList.contains('lt-bubble-body') && this.parentElement === bubble) authorScriptRuns(bubble)
+      },
+    })
+    try {
+      await w.setProps({ message: { ...BASE, html: '<p>第一段</p>' } })
+      await w.setProps({ message: { ...BASE, html: '<p>第一段</p><p>第二段</p>' } })
+    } finally {
+      Object.defineProperty(Element.prototype, 'innerHTML', original)
+    }
+
+    expect(bubble.textContent).toContain('第二段')
+    expect(bubble.querySelector('.chat-typing-indicator')).toBeNull()
+    w.unmount()
+  })
+
+  it('沙箱殼（chat 契約）作者掛在氣泡上的節點不受影響', async () => {
+    const chat = { from: 'ai', state: 'streaming', msgId: 'm1', generating: true }
+    const w = mount(CanvasMessage, { props: { message: { ...BASE }, chat }, attachTo: document.body })
+    const bubble = w.element.querySelector('[data-chat="message-body"]')!
+    const deco = document.createElement('div')
+    deco.className = 'author-deco'
+    bubble.appendChild(deco)
+
+    await w.setProps({ message: { ...BASE, html: '<p>第一段</p><p>第二段</p>' }, chat })
+
+    expect(bubble.querySelector(':scope > .author-deco')).toBe(deco)
+    w.unmount()
+  })
+
   it('內容沒變的重畫不拆掉作者已經蓋好的殼', async () => {
     const w = mount(CanvasMessage, { props: { message: { ...BASE, finished: true } }, attachTo: document.body })
     const bubble = w.element.querySelector('.content.left')!
