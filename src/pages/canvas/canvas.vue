@@ -4474,12 +4474,13 @@ const highlightText = (content, type, cacheKey, streaming) => {
   try {
     const _md = getMarkdownIt();
     processedContent = renderTaskLists(renderAuthorMarkdown(_md, dedentHtmlBlockLines(processedContent), activeAuthorAsset.value.rules.some((r) => r.enabled !== false && /<script\b/i.test(String(r.replace || ''))))).trim();
-    // 整行 <style>／<script> 的行尾記號（見上面 stash）：拿掉 markdown 補的 <br>；整段只有這些元素的段落拆掉 <p>。
+    // 整行 <style>／<script> 的行尾記號（見上面 stash）：拿掉 markdown 補的 <br>；markdown 用這些行包出來、
+    // 裡面只有它們的段落拆掉 <p>。要帶記號、不跨行：作者自己寫的 <p><style>…</style></p> 不動。
     processedContent = processedContent
       .replace(/\x07<br>\n?/g, '')
-      .replace(/<p>((?:\x05\d+\x06|\x07|\s)+)<\/p>\n?/g, (m, inner) => {
+      .replace(/<p>((?:\x05\d+\x06|\x07|[ \t])+)<\/p>\n?/g, (m, inner) => {
         const ids = inner.match(/\x05(\d+)\x06/g);
-        return ids && ids.every((t) => __scriptStyleStash.has(parseInt(t.slice(1, -1), 10))) ? inner : m;
+        return inner.includes('\x07') && ids && ids.every((t) => __scriptStyleStash.has(parseInt(t.slice(1, -1), 10))) ? inner : m;
       });
   } catch (e) {
     // MD parse 失敗 fallback：原樣保留

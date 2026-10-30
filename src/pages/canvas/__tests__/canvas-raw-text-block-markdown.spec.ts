@@ -208,6 +208,15 @@ describe('整行只有 <script>／<style>：不產生換行', () => {
     expect(html).not.toContain('\x07')
   })
 
+  it('作者自己寫的 <p> 包著樣式：照原樣保留', () => {
+    const highlightText = buildHighlightText()
+    for (const content of ['敘事。\n\n<p class="k"><style>.k{color:red}</style></p>', '敘事。\n\n<p class="k">\n<style>.k{color:red}</style>\n</p>']) {
+      const container = document.createElement('div')
+      container.innerHTML = highlightText(content, 0, null)
+      expect(container.querySelector('p.k style')).not.toBeNull()
+    }
+  })
+
   it('腳本跟文字在同一行：那一行的換行照舊', () => {
     const highlightText = buildHighlightText()
     const html = highlightText('第一行<script>window.e=5</script>\n第二行', 0, null)
