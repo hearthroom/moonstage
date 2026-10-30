@@ -9,23 +9,24 @@
   <div class="header-scope">
    <div class="header-box"><div class="page-title">{{ t('responseSettings.title') }}</div></div>
   </div>
-  <CanvasPresetPicker v-if="picking && presets" :api="presets" :conversation-id="conversationId" :binding="binding" :choices="choices" :t="t"
-   @back="picking = false" @applied="presetApplied" @stale="loadPreset" />
-  <template v-else>
   <div class="mode-hint response-scope">{{ t('responseSettings.scope') }}</div>
   <p v-if="loading" class="mode-hint" role="status">{{ t('responseSettings.loading') }}</p>
   <div v-if="error" role="alert" class="role-setting-error response-error">
    <span>{{ t(`responseSettings.${error}`) }}</span>
    <button type="button" class="advanced-reset" data-action="reload" :disabled="loading || saving" @click="reload">{{ t('responseSettings.reload') }}</button>
   </div>
-  <p v-if="presetNotice" class="mode-hint" role="status" data-lt="preset-notice">{{ presetNotice }}</p>
   <template v-if="saved">
-   <div v-for="(options, axis) in responseAxes" :key="axis" class="card mode-box response-axis" :data-axis="axis">
+   <!-- 套用了自訂預設：它決定的那幾項收成一張，不是變灰——玩家才不會以為還能調（owner 2026-10-30） -->
+   <div v-if="locked.length && presets" class="card mode-box response-takeover" data-lt="preset-takeover">
+    <div class="label">{{ t('responseSettings.preset.takeover.title', { name: binding?.title || '' }) }}</div>
+    <div class="mode-hint">{{ t('responseSettings.preset.takeover.body') }}</div>
+   </div>
+   <div v-for="axis in shownAxes" :key="axis" class="card mode-box response-axis" :data-axis="axis">
     <div class="label">{{ t(`responseSettings.axes.${axis}`) }}</div>
     <div class="radio-group" role="radiogroup" :aria-label="t(`responseSettings.axes.${axis}`)">
-     <button v-for="option in options" :key="option" type="button" class="mode-item" :data-axis="axis" :data-value="option"
+     <button v-for="option in responseAxes[axis]" :key="option" type="button" class="mode-item" :data-axis="axis" :data-value="option"
       :class="{ selected: selected(axis) === option }" role="radio" :aria-checked="selected(axis) === option ? 'true' : 'false'"
-      :disabled="loading || saving || (axis === 'style' && styleLocked)" @click="choose(axis, option)">{{ t(`responseSettings.options.${axis}.${option}`) }}</button>
+      :disabled="loading || saving" @click="choose(axis, option)">{{ t(`responseSettings.options.${axis}.${option}`) }}</button>
     </div>
     <!-- 篇幅：指定字數時是一條停在刻度上的滑桿。拇指上方直接顯示字數，軌道下方標三個區，
          底下那句照目前落在哪個區解釋。 -->
@@ -39,32 +40,8 @@
      </div>
     </div>
     <div v-if="hint(axis)" class="mode-hint" :data-hint="axis">{{ hint(axis) }}</div>
-    <div v-if="axis === 'length' && styleLocked" class="mode-hint" data-hint="length-preset">{{ t('responseSettings.preset.lengthIndependent') }}</div>
-    <!-- 預設：文風的另一個來源，二擇一。綁了預設，上面的文風選項停用，玩家原本選的保留著。 -->
-    <div v-if="axis === 'style' && presets && binding" class="response-preset" data-lt="response-preset">
-     <template v-if="binding.mode === 'revision'">
-      <div class="response-preset-head">
-       <span class="label">{{ t('responseSettings.preset.source') }}</span>
-       <span class="response-preset-name" data-lt="preset-current">{{ t('responseSettings.preset.current', { name: binding.title, n: binding.version }) }}</span>
-      </div>
-      <div v-if="binding.state === 'unavailable'" class="response-preset-note" role="alert">
-       <span class="response-error">{{ t('responseSettings.preset.loadFailed') }}</span>
-       <button type="button" class="mode-item" data-action="preset-reload" :disabled="presetBusy" @click="loadPreset">{{ t('responseSettings.preset.loadFailed.retry') }}</button>
-      </div>
-      <div v-if="newer" class="response-preset-note" data-lt="preset-newer">
-       <span class="mode-hint">{{ t('responseSettings.preset.newVersion', { name: binding.title, latest: newer.version, n: binding.version }) }}</span>
-       <button type="button" class="mode-item" data-action="preset-upgrade" :disabled="presetBusy || saving" @click="applyConversation(newer.headRevisionId)">{{ t('responseSettings.preset.useNewVersion', { latest: newer.version }) }}</button>
-      </div>
-      <div class="response-preset-actions">
-       <button type="button" class="advanced-reset" data-action="preset-change" :disabled="presetBusy || saving" @click="openPicker">{{ t('responseSettings.preset.change') }}</button>
-       <button type="button" class="advanced-reset" data-action="preset-stop" :disabled="presetBusy || saving" @click="applyConversation(null)">{{ t('responseSettings.preset.useCard') }}</button>
-      </div>
-     </template>
-     <button v-else type="button" class="advanced-reset" data-action="preset-pick" :disabled="presetBusy || saving" @click="openPicker">{{ t('responseSettings.preset.pick.title') }}</button>
-    </div>
-    <p v-if="axis === 'style' && presets && presetError" class="mode-hint response-error" role="alert" data-lt="preset-error">{{ presetError }}</p>
-    <p v-if="axis === 'style' && presets && toolReplyNote" class="mode-hint" data-lt="preset-tool-reply">{{ toolReplyNote }}</p>
-    <div v-if="axis === 'style' && selected('style') === 'custom' && !styleLocked" class="textarea-wrapper response-custom">
+    <div v-if="axis === 'length' && locked.length" class="mode-hint" data-hint="length-preset">{{ t('responseSettings.preset.lengthIndependent') }}</div>
+    <div v-if="axis === 'style' && selected('style') === 'custom'" class="textarea-wrapper response-custom">
      <textarea autocomplete="off" v-model="draft.customStyle" class="textarea-dark response-custom-input" rows="3" :aria-label="t('responseSettings.customLabel')"
       :placeholder="customPlaceholder" :aria-invalid="customTooLong" />
      <div class="char-count" :class="{ 'response-error': customTooLong }">{{ t('responseSettings.customCount', { count: [...(draft.customStyle || '')].length }) }}</div>
@@ -108,7 +85,7 @@
     （owner 2026-10-17），存的地方沒變。上面幾項只管這個存檔，所以這一段另起一句範圍說明。
     讀不到存檔偏好時這一段照樣能改、能存。
   -->
-  <template v-if="frame">
+  <template v-if="frame && !frameLocked">
    <div class="mode-hint response-scope response-frame-scope">{{ t('responseSettings.frameScope') }}</div>
    <div class="card mode-box response-frame" data-lt="response-frame">
     <div class="label">{{ t('chat.sandboxLevel') }}</div>
@@ -138,13 +115,17 @@
    </div>
   </template>
 
+  <!-- 自訂預設直接列在最下面，不收折（owner 2026-10-30）。世界模式不開放。 -->
+  <CanvasPresetSection v-if="presets && !worldMode && binding" :api="presets" :binding="binding" :choices="choices" :disabled="loading || saving"
+   :tool-note="toolReplyNote" :confirm-leave="confirmLeave" :t="t" @applied="refreshAfterPreset" @stale="loadPreset" />
+  <p v-else-if="presets && !worldMode && presetError" class="mode-hint response-error" role="alert" data-lt="preset-error">{{ presetError }}</p>
+
   <div class="role-setting__actions">
    <button type="button" class="icon-back" data-action="cancel" :disabled="saving" @click="cancel">{{ t('main.cancel') }}</button>
    <button v-if="saved || frame" type="button" class="complete-btn" data-action="save" :disabled="!canSave" @click="submit">
     {{ t(saving ? 'responseSettings.saving' : 'responseSettings.save') }}
    </button>
   </div>
-  </template>
  <!-- 另一個 top-layer 彈層：不跟偏好內容一起捲動，也不會落在父彈層底下。 -->
  <CanvasPopup class="response-discard" :open="discardAsked" :title="t('responseSettings.discard')" :close-label="t('responseSettings.keepEditing')"
   :style="discardViewport" @close="answerDiscard(false)">
@@ -164,9 +145,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import MsSwitch from '../../../components/model-select/ms-switch.vue'
 import CanvasPopup from './canvas-popup.vue'
 import { CanvasTextField } from './canvas-field'
-import CanvasPresetPicker from './canvas-preset-picker.vue'
-import { syncChromeTone } from '../canvas-chrome-tone'
-import { applyOnce, lockedPatch, newerVersion, presetFailure, readBinding, readPresetChoices, type PresetApi, type PresetBinding, type PresetChoice, type PresetScope } from '../canvas-preset'
+import CanvasPresetSection from './canvas-preset-section.vue'
+import { lockedPatch, presetLockedOf, readBinding, readPresetChoices, type PresetApi, type PresetBinding, type PresetChoice } from '../canvas-preset'
 import { lengthMode, lengthTargetLadder, lengthTargetOf, lengthZone, maxResponseNoteLength, readResponseSettings, responseAxes, responseBase, responseNoteKeys, responsePatch, type LengthZone, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
 const props=defineProps<{
  conversationId:string
@@ -246,8 +226,9 @@ const frameHint=computed(()=>props.frame?.options.find(o=>o.value===frameLevel.v
 const frameDirty=computed(()=>!!props.frame && (frameDraft.sandboxLevel!==frameSaved.sandboxLevel || frameDraft.jailbreak!==frameSaved.jailbreak))
 const customTooLong=computed(()=>[...(draft.value.customStyle || '')].length>1000)
 const axes=Object.keys(responseAxes) as ResponseAxis[]
-// 文風選「自訂」時已經能整段寫，不再給文風補充；文風由預設決定時也不給。
-const noteAxes=computed(()=>axes.filter(axis=>!(axis==='style' && (selected('style')==='custom' || styleLocked.value))))
+// 自訂預設決定的那幾項整個收起來，連補充說明一起。文風選「自訂」時已經能整段寫，不再給文風補充。
+const shownAxes=computed(()=>axes.filter(axis=>!locked.value.includes(axis)))
+const noteAxes=computed(()=>shownAxes.value.filter(axis=>!(axis==='style' && selected('style')==='custom')))
 const notesOpen=ref(false)
 const customized=computed(()=>Object.values(responsePatch(draft.value,base.value)).some(value=>value!==null))
 function current(axis:ResponseAxis){return draft.value[axis] ?? base.value[axis]}
@@ -266,7 +247,6 @@ function slide(event:Event){
 // 底下那句只解釋目前選的那一個；篇幅照落在哪個區解釋。文風四個選項名字看不出差別在哪
 //（預設與精簡指引都有平台指引，差在留給模型多少發揮），所以也要一句說明。
 function hint(axis:ResponseAxis){
- if(axis==='style' && styleLocked.value) return props.t('responseSettings.preset.styleLocked',{name:binding.value?.title || ''})
  if(axis==='agency' || axis==='perspective' || axis==='pace' || axis==='style') return props.t(`responseSettings.${axis}Hints.${current(axis)}`)
  if(axis==='length') return props.t(`responseSettings.lengthHints.${selected('length')==='target' ? lengthZone(lengthTarget.value) : selected('length')}`)
  return ''
@@ -319,84 +299,41 @@ async function submit(){
    if(!await props.saveFrame(value)){if(alive)error.value='saveFailed';return}
    Object.assign(frameSaved,value)
   }
-  if(responseDirty.value && saved.value){const value=readResponseSettings(await props.save(props.conversationId,saved.value.revision,lockedPatch(responsePatch(draft.value,base.value),styleLocked.value)),props.conversationId);if(!alive)return;saved.value=value;draft.value={...value.overrides}}
+  if(responseDirty.value && saved.value){const value=readResponseSettings(await props.save(props.conversationId,saved.value.revision,lockedPatch(responsePatch(draft.value,base.value),locked.value)),props.conversationId);if(!alive)return;saved.value=value;draft.value={...value.overrides}}
   done=true
  }
  catch(e){if(alive)error.value=((e as {status?:number})?.status ?? (e as {statusCode?:number})?.statusCode)===409?'conflict':'saveFailed'}
  finally{if(alive)saving.value=false}
  if(done && alive)emit('close')
 }
-// ── 預設 ──────────────────────────────────────────────
-const binding=ref<PresetBinding|null>(null),choices=ref<PresetChoice[]>([]),picking=ref(false),presetBusy=ref(false),presetNotice=ref(''),presetError=ref('')
-// 文風由誰決定以伺服器為準（response-settings 的 styleLocked），不從綁定自己推。
-const styleLocked=computed(()=>(saved.value as {styleLocked?:boolean}|null)?.styleLocked===true)
+// ── 自訂預設 ──────────────────────────────────────────────
+const binding=ref<PresetBinding|null>(null),choices=ref<PresetChoice[]>([]),presetError=ref('')
+// 哪幾項由預設決定以伺服器為準（response-settings 的 presetLocked），不從綁定自己推。
+const locked=computed(()=>presetLockedOf(saved.value))
+// 破甲強度與破限詞也由預設決定時，整段收起；沒改就不會送，存卡設定時自然不帶這兩鍵
+const frameLocked=computed(()=>locked.value.includes('sandboxLevel') || locked.value.includes('jailbreak'))
 // 預設的「用工具回覆」也以伺服器為準：active 時這輪整段生成，串流顯示關但玩家自己的設定不動；
 // 讀不到版本（unavailable）不能猜開或關，什麼都不說。
 const toolReplyStatus=computed(()=>(saved.value as {toolReply?:{status?:string}}|null)?.toolReply?.status ?? 'off')
 const toolReplyActive=computed(()=>toolReplyStatus.value==='active')
 const toolReplyNote=computed(()=>toolReplyStatus.value==='model_unsupported' ? props.t('responseSettings.preset.toolReply.modelUnsupported')
  : toolReplyStatus.value==='mode_unsupported' ? props.t('responseSettings.preset.toolReply.modeUnsupported') : '')
-const newer=computed(()=>newerVersion(binding.value,choices.value))
 async function loadPreset(){
- if(!props.presets)return
- presetBusy.value=true;presetError.value=''
- try{
-  const [b,list]=await Promise.allSettled([props.presets.conversation(props.conversationId),props.presets.list()])
-  if(!alive)return
-  // 重讀失敗就留著上一次讀到的：不讓預設那一區連同錯誤訊息一起消失
-  if(b.status==='fulfilled')binding.value=readBinding(b.value)
-  else if(!binding.value)presetError.value=props.t('responseSettings.preset.loadFailed')
-  choices.value=list.status==='fulfilled' ? readPresetChoices(list.value) : []
- }catch{if(alive)binding.value=null}
- finally{if(alive)presetBusy.value=false}
+ if(!props.presets || props.worldMode)return
+ presetError.value=''
+ const [b,list]=await Promise.allSettled([props.presets.card(),props.presets.list()])
+ if(!alive)return
+ // 重讀失敗就留著上一次讀到的：不讓預設那一區連同錯誤訊息一起消失
+ if(b.status==='fulfilled'){try{binding.value=readBinding(b.value)}catch{if(!binding.value)presetError.value=props.t('responseSettings.preset.loadFailed')}}
+ else if(!binding.value)presetError.value=props.t('responseSettings.preset.loadFailed')
+ choices.value=list.status==='fulfilled' ? readPresetChoices(list.value) : []
 }
-async function openPicker(){
- if(responseDirty.value && !await askDiscard())return
- presetNotice.value='';picking.value=true
-}
-async function presetApplied(_scope:PresetScope,message:string){
- picking.value=false;presetNotice.value=message
- await refreshAfterPreset()
-}
+// 套用後面板會重讀偏好，沒存的修改會不見：先問
+const confirmLeave=async()=>!responseDirty.value || await askDiscard()
 async function refreshAfterPreset(){
  try{const value=readResponseSettings(await props.load(props.conversationId),props.conversationId);if(alive){saved.value=value;draft.value={...value.overrides}}}catch{if(alive)error.value='loadFailed'}
  await loadPreset()
 }
-// 停用預設、改用新版：直接套用到這段對話，從下一則回覆開始生效。
-async function applyConversation(revisionId:string|null){
- const now=binding.value
- if(!props.presets || !now || presetBusy.value)return
- if(responseDirty.value && !await askDiscard())return
- presetBusy.value=true;presetError.value='';presetNotice.value=''
- const head=revisionId ? choices.value.find(p=>p.headRevisionId===revisionId) : null
- try{
-  await applyOnce(key=>props.presets!.apply('conversation',props.conversationId,revisionId,now.bindingVersion,key),()=>{presetNotice.value=props.t('responseSettings.preset.unknown')})
-  if(!alive)return
-  presetNotice.value=revisionId ? props.t('responseSettings.preset.applied.conversation',{name:head?.title || now.title,n:head?.version ?? now.version}) : props.t('responseSettings.preset.reverted.conversation')
-  presetBusy.value=false
-  await refreshAfterPreset()
- }catch(err){
-  if(!alive)return
-  const kind=presetFailure(err)
-  presetNotice.value=''
-  const message=props.t(kind==='failed' ? 'responseSettings.saveFailed' : `responseSettings.preset.${kind}`)
-  // 重讀完才放開按鈕；一直沒收到回應的，看重讀結果判斷到底成了沒有
-  if(kind==='conflict' || kind==='unknown'){
-   presetNotice.value=kind==='unknown' ? message : ''
-   await loadPreset()
-   if(!alive)return
-   if(kind==='unknown'){
-    const landed=revisionId ? binding.value?.revisionId===revisionId : binding.value?.mode==='card_default'
-    if(landed){presetNotice.value=revisionId ? props.t('responseSettings.preset.applied.conversation',{name:head?.title || now.title,n:head?.version ?? now.version}) : props.t('responseSettings.preset.reverted.conversation');await refreshAfterPreset();return}
-    presetNotice.value='';presetError.value=props.t('responseSettings.saveFailed');return
-   }
-  }
-  presetError.value=message
- }finally{if(alive)presetBusy.value=false}
-}
-// 彈層打開時量過主行動的底色；切到選預設、或回到偏好時換上來的按鈕是新節點，要再量一次，
-// 否則作者把主行動漆成亮色時會是白字亮底（QA Q03）
-watch(picking,()=>{void nextTick(()=>syncChromeTone(document))})
 onMounted(()=>{void reload();void loadPreset()})
 defineExpose({mayClose})
 </script>

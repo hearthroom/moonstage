@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { lockedPatch, newerVersion, presetFailure, readBinding, readPresetChoices } from '../canvas-preset'
+import { lockedPatch, newerVersion, presetFailure, presetLockedOf, readBinding, readPresetChoices } from '../canvas-preset'
 
 const binding = (over: Record<string, unknown> = {}) => ({ mode: 'revision', presetId: 'p1', revisionId: 'r1', bindingVersion: 3, presetTitle: '細膩', version: 1, state: 'ready', cacheEffect: 'prefix_rebuild_once', ...over })
 
@@ -44,8 +44,19 @@ it('classifies apply failures into what the player can do next', () => {
  expect(presetFailure({ statusCode: 500, data: {} })).toBe('failed')
 })
 
-it('drops the style keys from a save while a preset owns the style, so other axes still save', () => {
- const patch = { agency: 'protect', style: null, customStyle: null, styleNote: null, length: null, lengthTarget: null }
- expect(lockedPatch(patch, true)).toEqual({ agency: 'protect', length: null, lengthTarget: null })
- expect(lockedPatch(patch, false)).toBe(patch)
+it('drops every key the preset decides from a save (with its note, and the custom style), so the rest still saves', () => {
+ const patch = { agency: 'protect', agencyNote: 'x', style: null, customStyle: null, styleNote: null, perspective: null, pace: 'linger', paceNote: null, length: null, lengthTarget: null, lengthNote: 'y', streaming: 'on' }
+ expect(lockedPatch(patch, ['agency', 'style', 'perspective', 'pace', 'sandboxLevel', 'jailbreak'])).toEqual({ length: null, lengthTarget: null, lengthNote: 'y', streaming: 'on' })
+ expect(lockedPatch(patch, [])).toBe(patch)
+})
+
+it('reads which settings the preset decides from the server, and falls back to the style flag of an older server', () => {
+ expect(presetLockedOf({ presetLocked: ['agency', 'style'] })).toEqual(['agency', 'style'])
+ expect(presetLockedOf({ styleLocked: true })).toEqual(['style'])
+ expect(presetLockedOf({ styleLocked: false })).toEqual([])
+ expect(presetLockedOf(null)).toEqual([])
+})
+
+it('treats the retired per-conversation scope as a version conflict: re-read and try again', () => {
+ expect(presetFailure({ statusCode: 409, data: { error: 'preset_conflict', reason: 'preset_scope_changed' } })).toBe('conflict')
 })

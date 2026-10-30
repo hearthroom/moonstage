@@ -10403,12 +10403,10 @@ async function presetCall(method: 'get' | 'post', url: string, data: Record<stri
   return res.data
 }
 const presetApi = computed<PresetApi | undefined>(() => presetSettingsVersion.value !== 1 ? undefined : {
-  conversation: (id) => presetCall('get', _this.requestUrl.conversationPreset, { conversationId: id }),
   card: () => presetCall('get', _this.requestUrl.playerPresetDefault, { roleId: String(unref(roleId) || '') }),
   list: () => presetCall('get', _this.requestUrl.presetList, { limit: 50 }),
-  apply: (scope, id, revisionId, expectedVersion, key) => scope === 'conversation'
-    ? presetCall('post', _this.requestUrl.conversationPresetApply, { conversationId: id, mode: revisionId ? 'revision' : 'card_default', ...(revisionId ? { revisionId } : {}), expectedBindingVersion: expectedVersion, model: formData.selectModel || '', language: stageHost.locale.get() }, key)
-    : presetCall('post', _this.requestUrl.playerPresetDefaultSave, { roleId: String(unref(roleId) || ''), mode: revisionId ? 'revision' : 'card_default', ...(revisionId ? { revisionId } : {}), expectedVersion }, key),
+  // 只有一種範圍：整張卡（owner 2026-10-30）。scope 要明說，伺服器才知道這是新的整張卡語意
+  apply: (revisionId, expectedVersion, key) => presetCall('post', _this.requestUrl.playerPresetDefaultSave, { roleId: String(unref(roleId) || ''), scope: 'card', mode: revisionId ? 'revision' : 'card_default', ...(revisionId ? { revisionId } : {}), expectedVersion }, key),
   modelName: (value) => {
     for (const group of modelGroups.value) for (const family of group?.families ?? []) if ((family?.variants ?? []).some((v: any) => v?.value === value)) return String(family.family || value)
     return value
