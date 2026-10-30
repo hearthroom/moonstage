@@ -81,7 +81,7 @@ describe('作者資產：mountTrigger 常駐部署跟訊息歷史脫鉤', () => 
 
     const runtime = createAuthorAssetRuntime({
       doc: document,
-      layerZIndex: { under: 12, over: 30, cover: 1000 },
+      layerZIndex: { under: 12, over: 31, cover: 1000 },
     })
 
     // 與 canvas.vue loadAuthorAsset() 內完全相同的序列：

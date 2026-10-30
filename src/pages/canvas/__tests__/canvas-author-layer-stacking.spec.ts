@@ -39,3 +39,30 @@ describe('作者層掛進畫布根節點', () => {
     expect(document.querySelectorAll(`[${CONTAINER_ATTR}]`).length).toBe(0)
   })
 })
+
+/**
+ * over 層要嚴格高於宿主頂欄。
+ *
+ * 作者容器和頂欄（.page-header-scope）是畫布根節點裡的兄弟。數字相同時由 DOM 順序決定：
+ * 容器原本 append 在最後、同分時贏；2026-10-27 為了讓常駐美化的 :root 變數先於訊息主題
+ * 落地，改成插到最前面，同分就輸了——作者畫在頁面頂端的導覽列整條被頂欄蓋住
+ * （2026-10-30 作者回報「上面的側邊欄沒出來」，手機與桌機都一樣）。
+ */
+describe('作者 over 層與宿主頂欄', () => {
+  const vue = fs.readFileSync(path.resolve(__dirname, '../canvas.vue'), 'utf8')
+  const css = fs.readFileSync(path.resolve(__dirname, '../canvas.css'), 'utf8')
+  const ruleZ = (selector: string): number => {
+    const idx = css.indexOf(`\n  ${selector} {`)
+    expect(idx, `canvas.css 缺 ${selector}`).toBeGreaterThan(-1)
+    const m = css.slice(idx, css.indexOf('}', idx)).match(/z-index:\s*(\d+)/)
+    expect(m, `${selector} 沒有 z-index`).toBeTruthy()
+    return Number(m![1])
+  }
+
+  it('canvas.vue 的 over 高於頂欄、under 低於輸入區', () => {
+    const m = vue.match(/const AUTHOR_LAYER_Z_INDEX = \{ under: (\d+), over: (\d+), cover: (\d+) \}/)
+    expect(m, 'canvas.vue 缺 AUTHOR_LAYER_Z_INDEX').toBeTruthy()
+    expect(Number(m![2])).toBeGreaterThan(ruleZ('.page-header-scope'))
+    expect(Number(m![1])).toBeLessThan(ruleZ('.composer-scope'))
+  })
+})
