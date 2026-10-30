@@ -362,3 +362,23 @@ export function buildDirectiveSetsView(
     },
   }
 }
+
+/**
+ * 讀指令組的結果怎麼處理。舊供應商沒有這條路徑（404 而且不是我們的錯誤信封）→ 整區不畫；
+ * 卡片玩不到時伺服器也回 404，但帶 `{ error: 'not_found' }`——那只是這次讀不到，
+ * 當成舊供應商的話整區會消失、而且之後不再試。
+ */
+export function directiveSetsLoadOutcome(statusCode: number, data: any): 'ok' | 'unsupported' | 'failed' {
+  if (statusCode === 200) return 'ok'
+  if (statusCode === 404 && !(data && typeof data === 'object' && data.error)) return 'unsupported'
+  return 'failed'
+}
+
+/** 寫入失敗的種類：沒連上、指令組滿了、那一組已經不在（別處刪掉）、其他。 */
+export function directiveSetsErrorKind(e: any): 'network' | 'full' | 'gone' | 'other' {
+  if (!e || !e.statusCode) return 'network'
+  const code = e.data && e.data.error
+  if (code === 'DIRECTIVE_PRESET_LIMIT_REACHED') return 'full'
+  if (code === 'DIRECTIVE_PRESET_NOT_FOUND') return 'gone'
+  return 'other'
+}

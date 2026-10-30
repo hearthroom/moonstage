@@ -120,3 +120,20 @@ describe('升級提示與存成指令組', () => {
     expect(clampSetTitle('短名', 40)).toBe('短名')
   })
 })
+
+describe('讀取與寫入失敗怎麼分', () => {
+  it('路徑不存在的 404 是舊供應商：整區不畫；卡玩不到的 404 只是這次讀不到，可以重試', async () => {
+    const { directiveSetsLoadOutcome } = await import('../canvas-directives')
+    expect(directiveSetsLoadOutcome(200, { list: [] })).toBe('ok')
+    expect(directiveSetsLoadOutcome(404, '404 page not found')).toBe('unsupported')
+    expect(directiveSetsLoadOutcome(404, { error: 'not_found' })).toBe('failed')
+    expect(directiveSetsLoadOutcome(500, { error: 'server_error' })).toBe('failed')
+  })
+  it('那一組已經被刪掉：要重讀清單，別讓它留在畫面上', async () => {
+    const { directiveSetsErrorKind } = await import('../canvas-directives')
+    expect(directiveSetsErrorKind({ statusCode: 400, data: { error: 'DIRECTIVE_PRESET_NOT_FOUND' } })).toBe('gone')
+    expect(directiveSetsErrorKind({ statusCode: 400, data: { error: 'DIRECTIVE_PRESET_LIMIT_REACHED' } })).toBe('full')
+    expect(directiveSetsErrorKind(new Error('timeout'))).toBe('network')
+    expect(directiveSetsErrorKind({ statusCode: 503, data: {} })).toBe('other')
+  })
+})

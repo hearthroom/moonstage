@@ -561,7 +561,7 @@ import {
   createDirectiveState, readDirectiveResponse, directiveCountText,
   createDirectiveSetsState, readDirectivePresetsResponse, readCardDirectiveChoice, buildDirectiveSetsView,
   openDirectiveSets, pickDirectiveScope, openDirectiveSaveAs, backToDirectiveList, clampSetTitle,
-  canApplyDirectiveSet, canSaveDirectiveSet,
+  canApplyDirectiveSet, canSaveDirectiveSet, directiveSetsLoadOutcome, directiveSetsErrorKind,
   canAddDirective, startEditDirective, cancelEditDirective, canSaveEdit,
   type DirectiveState,
 } from './canvas-directives'
@@ -11479,10 +11479,14 @@ async function loadDirectiveSets() {
       quietTransport: true,
       timeout: 8000,
     })
-    if (res.statusCode === 404) { directiveSetsSupported.value = false; return }
-    if (res.statusCode !== 200) throw new Error('unexpected status')
+    const outcome = directiveSetsLoadOutcome(res.statusCode, res.data)
+    if (outcome === 'unsupported') { directiveSetsSupported.value = false; return }
+    if (outcome !== 'ok') throw new Error('unexpected status')
     const choice = readCardDirectiveChoice(res.data)
-    directiveSets.value = { ...directiveSets.value, ...readDirectivePresetsResponse(res.data), ...(choice || {}), loading: false, loaded: true }
+    const fresh = readDirectivePresetsResponse(res.data)
+    // 選中的那一組不在了（別處刪掉）就取消選取，主按鈕回到停用
+    const picked = fresh.list.some((row) => row.presetId === directiveSets.value.picked) ? directiveSets.value.picked : ''
+    directiveSets.value = { ...directiveSets.value, ...fresh, ...(choice || {}), picked, loading: false, loaded: true }
   } catch (e) {
     directiveSets.value = { ...directiveSets.value, loading: false, loadFailed: true }
   }
@@ -11498,10 +11502,15 @@ async function directiveSetsPost(url: string, data: Record<string, unknown>) {
   return res.data
 }
 
-/* 伺服器回的是代號；沒有網路時說「你選的都還在」，其他失敗講存不了。 */
+/*
+  伺服器回的是代號；沒有網路時說「你選的都還在」，其他失敗講存不了。
+  那一組在別處被刪掉時重讀清單：不重讀的話它一直留在畫面上，玩家每按一次都拿到同一句失敗。
+*/
 function directiveSetsError(e: any) {
-  if (!e || !e.statusCode) return t('directive.set.error.network')
-  if (e.data && e.data.error === 'DIRECTIVE_PRESET_LIMIT_REACHED') return t('directive.set.error.full', { max: directiveSets.value.maxCount })
+  const kind = directiveSetsErrorKind(e)
+  if (kind === 'network') return t('directive.set.error.network')
+  if (kind === 'full') return t('directive.set.error.full', { max: directiveSets.value.maxCount })
+  if (kind === 'gone') loadDirectiveSets()
   return t('directive.saveFailed')
 }
 
