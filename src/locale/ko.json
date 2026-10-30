@@ -4328,7 +4328,7 @@
 	"responseSettings.preset.takeover.body": "AI가 내 역할을 쓰는 범위, 문체, 서술 시점, 이야기 속도, 돌파 강도는 프리셋대로 정해지며, 이 카드의 모든 대화에서 같습니다. 원래 고른 설정은 보존되며, 적용을 취소하면 되돌아옵니다.",
 	"responseSettings.preset.applied": "'{name}' v{n} 프리셋을 적용했습니다. 이 카드의 모든 대화에서 다음 답변부터 쓰입니다.",
 	"responseSettings.preset.reverted": "적용을 취소했습니다. 이 카드는 원래 고른 설정으로 돌아가며, 모든 대화에서 다음 답변부터 반영됩니다.",
-	"responseSettings.preset.hint.off": "적용하면 이 카드의 모든 대화에서 쓰이며, 다음 답변부터 반영됩니다.",
+	"responseSettings.preset.hint.off": "프리셋을 골라 이 카드에 적용하면 이 카드의 모든 대화에서 다음 답변부터 쓰입니다.",
 	"responseSettings.preset.hint.takeover": "AI가 내 역할을 쓰는 범위, 문체, 서술 시점, 이야기 속도, 돌파 강도는 프리셋이 정합니다. 분량은 그대로입니다.",
 	"responseSettings.preset.hint.on": "이 카드에 적용 중이며 모든 대화에서 쓰입니다. 바꾸거나 취소하는 것도 카드 전체에 반영됩니다.",
 	"responseSettings.preset.modelSettingUnsupported": "이 카드에 적용한 프리셋에 지금 모델이 쓸 수 없는 설정이 있습니다. 모델을 바꾸거나 답변 취향에서 적용을 취소하세요.",

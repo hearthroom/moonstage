@@ -4328,7 +4328,7 @@
 	"responseSettings.preset.takeover.body": "Writing for your character, style, perspective, story pace and bypass strength follow the preset, the same in every conversation with this card. Your own choices are kept and come back when you remove it.",
 	"responseSettings.preset.applied": "\"{name}\" v{n} is applied. Every conversation with this card uses it from the next reply.",
 	"responseSettings.preset.reverted": "Removed. This card goes back to your own choices, in every conversation from the next reply.",
-	"responseSettings.preset.hint.off": "Once applied, every conversation with this card uses it, starting from the next reply.",
+	"responseSettings.preset.hint.off": "Pick a preset and apply it to this card; every conversation with this card uses it from the next reply.",
 	"responseSettings.preset.hint.takeover": "Writing for your character, style, perspective, story pace and bypass strength are set by the preset instead. Length works as usual.",
 	"responseSettings.preset.hint.on": "Applied to this card, in every conversation. Switching or removing it also affects the whole card.",
 	"responseSettings.preset.modelSettingUnsupported": "The preset applied to this card has a setting the current model can't use. Switch models, or remove the preset in Response preferences.",

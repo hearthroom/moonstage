@@ -4328,7 +4328,7 @@
 	"responseSettings.preset.takeover.body": "AIに自分の役を任せる範囲、文体、語りの視点、物語のテンポ、突破強度はプリセットのとおりになり、このカードのどの会話でも同じです。元の選択は保持され、適用を取り消すと戻ります。",
 	"responseSettings.preset.applied": "「{name}」v{n} を適用しました。このカードのどの会話でも、次の返信から使われます。",
 	"responseSettings.preset.reverted": "適用を取り消しました。このカードは元の選択に戻り、どの会話でも次の返信から反映されます。",
-	"responseSettings.preset.hint.off": "適用すると、このカードのどの会話でも使われ、次の返信から反映されます。",
+	"responseSettings.preset.hint.off": "プリセットを選んでこのカードに適用すると、このカードのどの会話でも次の返信から使われます。",
 	"responseSettings.preset.hint.takeover": "AIに自分の役を任せる範囲、文体、語りの視点、物語のテンポ、突破強度はプリセットで決まります。文章量はこれまでどおりです。",
 	"responseSettings.preset.hint.on": "このカードに適用中で、どの会話でも使われます。切り替えや取り消しも、カード全体に反映されます。",
 	"responseSettings.preset.modelSettingUnsupported": "このカードに適用したプリセットに、今のモデルでは使えない設定があります。モデルを変えるか、返信の好みで適用を取り消してください。",

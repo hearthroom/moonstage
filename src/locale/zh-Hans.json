@@ -4328,7 +4328,7 @@
 	"responseSettings.preset.takeover.body": "抢话、文风、叙事视角、剧情节奏、破甲强度按预设来写，这张卡的所有存档都一样。你原本的选择保留着，取消应用后恢复。",
 	"responseSettings.preset.applied": "已应用「{name}」v{n}，这张卡的所有存档都用，下一次回复开始生效。",
 	"responseSettings.preset.reverted": "已取消应用，这张卡恢复成你原本的选择，所有存档从下一次回复开始生效。",
-	"responseSettings.preset.hint.off": "应用后，这张卡的所有存档都用它，下一次回复开始生效。",
+	"responseSettings.preset.hint.off": "选一个预设应用到这张卡，这张卡的所有存档都用它，下一次回复开始生效。",
 	"responseSettings.preset.hint.takeover": "抢话、文风、叙事视角、剧情节奏、破甲强度改由预设决定，篇幅照常。",
 	"responseSettings.preset.hint.on": "已应用到这张卡，所有存档都用。换一个或取消应用，也是整张卡一起。",
 	"responseSettings.preset.modelSettingUnsupported": "这张卡应用的预设有参数，当前的模型不能用。换一个模型，或在回复偏好里取消应用。",
