@@ -169,7 +169,7 @@
         mode="model"
         :open="panel.sheet === 'model'"
         :title="t('canvas.panel.model')"
-        :role-id="roleId"
+        :role-id="settingsRoleId"
         :selected-value="selectedVariantValue"
         :model-name="formData.selectModelName"
         :score-text="modelScoreText"
@@ -777,7 +777,7 @@ async function loadMultiPassPreference(retryLeft = 1) {
 }
 
 function onMultiPassPreferenceUpdated(payload: any) {
-  if (!payload || String(payload.roleId || '') !== String(unref(roleId) || '')) return
+  if (!payload || String(payload.roleId || '') !== String(unref(settingsRoleId) || '')) return
   applyMultiPassPreference(payload)
 }
 // 正文之前的準備階段（''＝沒有在準備）。伺服器送階段語意，文案在這裡選。
@@ -5745,7 +5745,7 @@ function saveAndStartNew() {
 function adoptStartedConversation(started: any) {
   teardownStreamForConversationSwitch({ invalidateHistory: true });
   conversationId.value = started.conversationId;
-  if (followConversationRole(conversationRoleId(started))) void reloadRoleSettings();
+  if (followConversationRole(conversationRoleId(started))) void reloadSettingsForRevision();
   // 通知 right-window 更新 conversationId
   uni.$emit('updateConversationId', { conversationId: started.conversationId });
   talkList.value = [];
@@ -10929,19 +10929,32 @@ async function reloadRoleSettings() {
   loadMultiPassPreference()
 }
 
+// 遊玩中換到另一版卡（另開新檔、切換、分叉）時重讀設定。表單上的模型不清空：重讀期間玩家存設定，
+// 送出去的只有他動過的欄位；清空的模型會被當成「改回預設」一起送出，把他選的模型洗掉。
+// 舊版那一趟還在路上就不等它（回來時會被丟掉），重讀這一趟算成新的在途讀取。
+function reloadSettingsForRevision() {
+  roleSettingsReady.value = false
+  roleSettingsInFlight = null
+  return ensureRoleSettings().then(() => {
+    loadModelCatalog()
+    loadMultiPassPreference()
+  })
+}
+
 // 切換、分叉回來的只有對話 id，不說它在哪一版卡上；問一次那段對話。
 async function syncConversationRole(id: string) {
   try {
-    const res = await _this.http.get(_this.requestUrl.ownedConversation, { data: { conversationId: id }, showLoading: false, quietTransport: true })
+    const res = await _this.http.get(_this.requestUrl.ownedConversation, { data: { conversationId: id }, showLoading: false, quietTransport: true, quietErrors: true })
     if (String(unref(conversationId)) !== id || res.statusCode !== 200 || res.data?.conversationId !== id) return
-    if (followConversationRole(conversationRoleId(res.data))) await reloadRoleSettings()
+    if (followConversationRole(conversationRoleId(res.data))) await reloadSettingsForRevision()
   } catch { /* 查不到就留在目前那一版，下一次開局會再對一次。 */ }
 }
 
 function ensureRoleSettings() {
   if (roleSettingsReady.value) return Promise.resolve()
   if (!roleSettingsInFlight) {
-    roleSettingsInFlight = loadRoleSettings().finally(() => { roleSettingsInFlight = null })
+    const load: Promise<void> = loadRoleSettings().finally(() => { if (roleSettingsInFlight === load) roleSettingsInFlight = null })
+    roleSettingsInFlight = load
   }
   return roleSettingsInFlight
 }

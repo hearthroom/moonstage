@@ -53,3 +53,99 @@ describe('card settings follow the conversation revision', () => {
     expect(fn(canvas, 'function adoptConversation(')).toContain('syncConversationRole(nextId)')
   })
 })
+
+// 跑 canvas.vue 裡真正的處理函式（同 owned-history.spec 的做法），驗證換版那段重讀期間的行為。
+import { runInNewContext } from 'node:vm'
+import ts from 'typescript'
+import { computed, ref } from 'vue'
+import * as roleSettings from '../canvas-role-settings'
+
+const canvasSource = fs.readFileSync('src/pages/canvas/canvas.vue', 'utf8')
+const setup = canvasSource.slice(canvasSource.indexOf('<script setup lang="ts">') + 24, canvasSource.indexOf('</script>'))
+const tree = ts.createSourceFile('canvas.ts', setup, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+function load(names: string[], ctx: any) {
+  const js = names.map((name) => {
+    const node = tree.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === name)
+    if (!node) throw Error(`Missing actual handler ${name}`)
+    return ts.transpileModule(node.getText(tree), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
+  }).join('\n')
+  runInNewContext(`${js}\n${names.map((n) => `this.${n} = ${n}`).join(';')}`, ctx)
+}
+
+function deferred<T>() {
+  let resolve!: (v: T) => void
+  const promise = new Promise<T>((r) => { resolve = r })
+  return { promise, resolve }
+}
+
+function harness() {
+  const settingsRead = deferred<any>()
+  const posts: any[] = []
+  const roleId = ref('rev-5'), conversationRole = ref(''), conversationId = ref('conv')
+  const ctx: any = {
+    ...roleSettings,
+    roleId, conversationRole, conversationId,
+    settingsRoleId: computed(() => roleSettings.settingsRoleFor(roleId.value, conversationRole.value)),
+    formData: { ...roleSettings.ROLE_SETTINGS_DEFAULTS, roleId: 'rev-5', selectModel: 'model-a', personaMode: 'custom', userName: 'Old name' },
+    roleSettingsSnapshot: { ...roleSettings.ROLE_SETTINGS_DEFAULTS, selectModel: 'model-a', personaMode: 'custom', userName: 'Old name' },
+    roleSettingsReady: ref(true), roleSettingsInFlight: null,
+    globalPersona: ref({}), conversationPersona: ref({}), playerNickName: ref(''), defaultJailbreak: ref(''),
+    readConversationPersona: (v: any) => v,
+    loadModelCatalog: vi.fn(), loadMultiPassPreference: vi.fn(),
+    unref: (r: any) => (r && typeof r === 'object' && 'value' in r ? r.value : r),
+    uni: { showToast: vi.fn() }, t: (s: string) => s, console,
+    _this: {
+      requestUrl: { ownedConversation: '/owned', playerRoleSettings: '/settings', playerRoleSettingsSave: '/settings/save' },
+      http: {
+        get: vi.fn(async (url: string, opts: any) => {
+          if (url === '/owned') return { statusCode: 200, data: { conversationId: opts.data.conversationId, roleId: 'rev-6' } }
+          return settingsRead.promise
+        }),
+        post: vi.fn(async (_url: string, opts: any) => { posts.push(opts.data); return { statusCode: 200 } }),
+      },
+    },
+  }
+  load(['currentRoleSettings', 'loadRoleSettings', 'ensureRoleSettings', 'followConversationRole', 'reloadSettingsForRevision', 'syncConversationRole', 'persistRoleSettings'], ctx)
+  return { ctx, posts, settingsRead }
+}
+
+describe('switching onto another revision mid-session', () => {
+  it('a save while the new revision is still loading carries only what the player changed, to that revision', async () => {
+    const { ctx, posts, settingsRead } = harness()
+    const sync = ctx.syncConversationRole('conv')
+    await vi.waitFor(() => expect(ctx._this.http.get).toHaveBeenCalledWith('/settings', expect.anything()))
+    expect(ctx.settingsRoleId.value).toBe('rev-6')
+
+    ctx.formData.userName = 'New name'
+    const saved = ctx.persistRoleSettings()
+    settingsRead.resolve({ statusCode: 200, data: { selectModel: 'model-b', personaMode: 'custom', userName: 'Old name' } })
+    await Promise.all([sync, saved])
+
+    expect(posts).toHaveLength(1)
+    expect(posts[0].roleId).toBe('rev-6')
+    expect(posts[0].userName).toBe('New name')
+    expect(posts[0]).not.toHaveProperty('selectModel')
+  })
+
+  it('tracks the revision reload as the in-flight settings read', async () => {
+    const { ctx, settingsRead } = harness()
+    const sync = ctx.syncConversationRole('conv')
+    await vi.waitFor(() => expect(ctx.roleSettingsInFlight).not.toBeNull())
+    expect(ctx.ensureRoleSettings()).toBe(ctx.roleSettingsInFlight)
+    settingsRead.resolve({ statusCode: 200, data: { selectModel: 'model-b' } })
+    await sync
+    expect(ctx.roleSettingsReady.value).toBe(true)
+    expect(ctx.formData.selectModel).toBe('model-b')
+  })
+
+  it('looks the conversation up quietly: a failed lookup keeps the current revision without a toast', () => {
+    expect(fn(read('src/pages/canvas/canvas.vue'), 'async function syncConversationRole(')).toContain('quietErrors: true')
+  })
+
+  it('the model sheet (agent mode toggle, catalog) targets the same revision as the settings', () => {
+    const canvas = read('src/pages/canvas/canvas.vue')
+    const sheet = canvas.slice(canvas.indexOf('<CanvasModelPanel\n        mode="model"'), canvas.indexOf('/>', canvas.indexOf('<CanvasModelPanel\n        mode="model"')))
+    expect(sheet).toContain(':role-id="settingsRoleId"')
+    expect(fn(canvas, 'function onMultiPassPreferenceUpdated(')).toContain('unref(settingsRoleId)')
+  })
+})
