@@ -137,3 +137,80 @@ describe('正文玩家名稱渲染', () => {
   macros.user = '小華'
   expect(render(content, 0, 'persona-cache')).toContain('小華在門口。')
  })
+
+/**
+ * 整行只有 <script>／<style> 的那幾行不換行。
+ *
+ * 2026-10-31 作者回報（Fate 卡）：開場白是一串規則名，每行換成一段 <script> 或 <style>，最後才是宣告文字。
+ * 這兩種元素在 markdown 之前就收成佔位字元，markdown 把佔位當一般文字、breaks:true 每行補一個 <br>，
+ * 開場上方空出一大塊。MMD 走 CommonMark：整行 <script>／<style> 是 HTML 區塊（第 1 型），不產生換行。
+ */
+describe('整行只有 <script>／<style>：不產生換行', () => {
+  const textBeforeFirstLine = (html: string, marker: string) => {
+    const container = document.createElement('div')
+    container.innerHTML = html
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT)
+    let brs = 0
+    let node = walker.nextNode()
+    while (node) {
+      if (node.nodeType === 3 && (node.nodeValue || '').includes(marker)) return brs
+      if (node.nodeType === 1 && (node as Element).tagName === 'BR') brs++
+      node = walker.nextNode()
+    }
+    return -1
+  }
+
+  it('開場白：一串腳本與樣式行之後的文字前面沒有 <br>，文字之間的換行照舊', () => {
+    const highlightText = buildHighlightText()
+    const content = [
+      '<script>window.a=1</script>',
+      '<script>window.b=2</script>',
+      '<style>.x{color:red}</style>',
+      '<style>.y{color:blue}</style><script>window.c=3</script>',
+      '宣告——',
+      '汝身听吾号令。',
+    ].join('\n')
+    const html = highlightText(content, 0, null)
+    expect(textBeforeFirstLine(html, '宣告——')).toBe(0)
+    const container = document.createElement('div')
+    container.innerHTML = html
+    expect(container.querySelectorAll('script').length).toBe(3)
+    expect(container.querySelectorAll('style').length).toBe(2)
+    expect(container.innerHTML).toMatch(/宣告——<br>\s*汝身听吾号令。/)
+  })
+
+  it('文字之間夾一整行腳本：上下兩行仍分開，但不多出一行空白', () => {
+    const highlightText = buildHighlightText()
+    const html = highlightText('第一行\n<script>window.d=4</script>\n第二行', 0, null)
+    expect(textBeforeFirstLine(html, '第二行')).toBe(1)
+  })
+
+  it('段落之間的空行照舊；整行腳本後面接標題，標題仍是標題', () => {
+    const highlightText = buildHighlightText()
+    const html = highlightText('<style>.a{color:red}</style>\n\n<style>.b{color:red}</style>\n# 標題\n\n正文', 0, null)
+    const container = document.createElement('div')
+    container.innerHTML = html
+    expect(container.querySelector('h1')?.textContent).toBe('標題')
+    expect(container.querySelectorAll('br').length).toBe(0)
+    expect(container.querySelectorAll('style').length).toBe(2)
+    expect(html).not.toContain('\x07')
+  })
+
+  it('作者 <div> 區塊裡的整行樣式：區塊照原樣，不被拆成段落', () => {
+    const highlightText = buildHighlightText()
+    const html = highlightText('敘事。\n\n<div class="hud">\n<style>.hud{color:red}</style>\n<span>體力 73</span>\n</div>', 0, null)
+    const container = document.createElement('div')
+    container.innerHTML = html
+    const hud = container.querySelector('.hud')!
+    expect(hud.querySelector('style')).not.toBeNull()
+    expect(hud.querySelector('p')).toBeNull()
+    expect(hud.textContent).toContain('體力 73')
+    expect(html).not.toContain('\x07')
+  })
+
+  it('腳本跟文字在同一行：那一行的換行照舊', () => {
+    const highlightText = buildHighlightText()
+    const html = highlightText('第一行<script>window.e=5</script>\n第二行', 0, null)
+    expect(textBeforeFirstLine(html, '第二行')).toBe(1)
+  })
+})

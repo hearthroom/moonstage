@@ -4363,9 +4363,24 @@ const highlightText = (content, type, cacheKey, streaming) => {
   // 鍵值」這個通用手法回傳機讀資料，都吃得到這個保護。
   const SHIELD_LT = '\x01', SHIELD_GT = '\x02';
   const __rawStash = [];  // 收 raw-text 元素 inner content / comment / 隱藏資料 span 整段
+  const __scriptStyleStash = new Set();  // 上面陣列裡哪幾格是 <style>／<script> 整個元素
   // HTML void element：規範上沒有結束標籤，掃描器遇到帶 display:none 的這類標籤
   // 不能去找配對的 </tagName>（永遠找不到）。
   const VOID_TAG_NAMES = new Set(['img', 'br', 'hr', 'input', 'source', 'track', 'wbr', 'area', 'base', 'col', 'embed', 'link', 'meta']);
+  // 目前輸出的這一行在佔位字元與空白之前就是行首（前面只有收起來的元素）。
+  const startsLine = (s) => {
+    let k = s.length;
+    while (k > 0) {
+      const c = s.charAt(k - 1);
+      if (c === '\n') return true;
+      if (c === ' ' || c === '\t' || c === '\x07') { k--; continue; }
+      if (c !== '\x06') return false;
+      const open = s.lastIndexOf('\x05', k - 1);
+      if (open < 0) return false;
+      k = open;
+    }
+    return true;
+  };
   // 程式碼圍欄裡的東西是字面文字（前端區塊協議：整份 HTML 文件放進自己的 iframe），
   // 這裡的 stash 不進去——進去了，圍欄裡的 <style> 會變成一個還原不回來的佔位符。
   processedContent = withFencesProtected(processedContent, (html) => {
@@ -4394,8 +4409,15 @@ const highlightText = (content, type, cacheKey, streaming) => {
         const cm = closeRe.exec(html);
         if (!cm) { out += html.charAt(i); i++; continue; }
         const endPos = cm.index + cm[0].length;
+        // 整行只有 <style>／<script>（可以好幾個）：行尾記一個 \x07。佔位字元在 markdown 眼裡是一般文字，
+        // breaks:true 會替每一行補一個 <br>；MMD 的 CommonMark 把這種行當 HTML 區塊，不換行。開場白是一串
+        // 規則名、每行換成一段腳本或樣式的卡（2026-10-31 Fate），開場上方因此空出一大塊。markdown 之後只拿掉
+        // 緊跟記號的那個 <br>（markdown 自己補的），文字本身不動——在這裡刪換行或補空行，會讓作者 <div> 起頭的
+        // HTML 區塊提早結束、裡面的字被包成段落。跟文字同一行的照舊換行。
+        const ownLine = /^[ \t]*\r?\n/.test(html.slice(endPos, endPos + 64)) && startsLine(out);
         __rawStash.push(html.substring(tagStart, endPos));
-        out += '\x05' + (__rawStash.length - 1) + '\x06';
+        __scriptStyleStash.add(__rawStash.length - 1);
+        out += '\x05' + (__rawStash.length - 1) + '\x06' + (ownLine ? '\x07' : '');
         i = endPos;
         continue;
       }
@@ -4452,9 +4474,17 @@ const highlightText = (content, type, cacheKey, streaming) => {
   try {
     const _md = getMarkdownIt();
     processedContent = renderTaskLists(renderAuthorMarkdown(_md, dedentHtmlBlockLines(processedContent), activeAuthorAsset.value.rules.some((r) => r.enabled !== false && /<script\b/i.test(String(r.replace || ''))))).trim();
+    // 整行 <style>／<script> 的行尾記號（見上面 stash）：拿掉 markdown 補的 <br>；整段只有這些元素的段落拆掉 <p>。
+    processedContent = processedContent
+      .replace(/\x07<br>\n?/g, '')
+      .replace(/<p>((?:\x05\d+\x06|\x07|\s)+)<\/p>\n?/g, (m, inner) => {
+        const ids = inner.match(/\x05(\d+)\x06/g);
+        return ids && ids.every((t) => __scriptStyleStash.has(parseInt(t.slice(1, -1), 10))) ? inner : m;
+      });
   } catch (e) {
     // MD parse 失敗 fallback：原樣保留
   }
+  processedContent = processedContent.replace(/\x07/g, '');
   if (heavy) {
     // 重 HTML：sanitize 危險 tag
     processedContent = sanitizeHtml(processedContent);
