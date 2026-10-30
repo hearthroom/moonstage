@@ -4319,7 +4319,7 @@
 	"responseSettings.preset.apply": "このカードに適用",
 	"responseSettings.preset.applying": "適用中…",
 	"responseSettings.preset.busy": "この会話は返信中です。返信が終わってからプリセットを適用してください。",
-	"responseSettings.preset.conflict": "このカードの設定がたった今更新されました。再読み込みしてからもう一度適用してください。",
+	"responseSettings.preset.conflict": "このカードのカスタムプリセットはたった今ほかの場所で変更され、画面は最新の状態になりました。確認してから、必要ならもう一度適用してください。",
 	"responseSettings.preset.capacity": "このプリセットとこれまでの会話を合わせると長すぎて、今回のターンに収まりません。短いプリセットにするか、適用を取り消してください。",
 	"responseSettings.preset.unknown": "適用の結果を確認しています…",
 	"responseSettings.preset.pick.note": "プリセットが決めるのは書き方だけです。キャラクター、世界設定、会話履歴、記憶は変わりません。",

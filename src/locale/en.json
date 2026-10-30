@@ -4319,7 +4319,7 @@
 	"responseSettings.preset.apply": "Apply to this card",
 	"responseSettings.preset.applying": "Applying…",
 	"responseSettings.preset.busy": "This conversation is replying. Apply a preset once the reply finishes.",
-	"responseSettings.preset.conflict": "This card's settings were just updated. Please reload, then apply again.",
+	"responseSettings.preset.conflict": "This card's custom preset was just changed elsewhere, and the screen is now up to date. Check it, then apply again if you still want to.",
 	"responseSettings.preset.capacity": "This preset plus the conversation so far is too long for this turn. Try a shorter preset, or remove it from this card.",
 	"responseSettings.preset.unknown": "Confirming the result…",
 	"responseSettings.preset.pick.note": "A preset only sets how replies are written. Characters, Lorebook, conversation history and memory are not changed by it.",

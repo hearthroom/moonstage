@@ -4319,7 +4319,7 @@
 	"responseSettings.preset.apply": "套用到這張卡",
 	"responseSettings.preset.applying": "套用中…",
 	"responseSettings.preset.busy": "這段對話正在回覆。等回覆結束，再套用預設。",
-	"responseSettings.preset.conflict": "這張卡的設定剛剛被更新。請重新讀取後再套用。",
+	"responseSettings.preset.conflict": "這張卡的自訂預設剛在別處改過，畫面已更新。確認後，需要的話再套用一次。",
 	"responseSettings.preset.capacity": "這個預設加上目前的對話內容太長，這一輪放不下。換一個比較短的預設，或取消套用。",
 	"responseSettings.preset.unknown": "正在確認套用結果…",
 	"responseSettings.preset.pick.note": "預設只決定寫法。角色、世界書、對話記錄和記憶仍由綺夢社處理。",

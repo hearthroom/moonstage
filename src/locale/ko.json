@@ -4319,7 +4319,7 @@
 	"responseSettings.preset.apply": "이 카드에 적용",
 	"responseSettings.preset.applying": "적용 중…",
 	"responseSettings.preset.busy": "이 대화는 답변 중입니다. 답변이 끝난 뒤에 프리셋을 적용하세요.",
-	"responseSettings.preset.conflict": "이 카드의 설정이 방금 업데이트되었습니다. 다시 불러온 뒤 적용해 주세요.",
+	"responseSettings.preset.conflict": "이 카드의 사용자 지정 프리셋이 방금 다른 곳에서 바뀌어 화면을 최신 상태로 갱신했습니다. 확인한 뒤 필요하면 다시 적용하세요.",
 	"responseSettings.preset.capacity": "이 프리셋과 지금까지의 대화를 합치면 너무 길어서 이번 턴에 들어가지 않습니다. 더 짧은 프리셋을 고르거나 적용을 취소하세요.",
 	"responseSettings.preset.unknown": "적용 결과를 확인하는 중…",
 	"responseSettings.preset.pick.note": "프리셋은 답변을 쓰는 방식만 정합니다. 캐릭터, 세계관, 대화 기록, 기억은 바뀌지 않습니다.",
