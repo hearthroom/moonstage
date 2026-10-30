@@ -4458,11 +4458,18 @@
     cursor: pointer;
   }
 
+  /*
+     淡強調底上的強調色字：直接用 --lt-canvas-accent 在淺色主題只有 3–4:1（coral 3.0）。
+     混 30% 前景色，淺色變深、深色變淺，七套主題深淺色都在 5:1 以上，也跟著卡片自己的強調色走。
+  */
+  .custom-instruction-scope :is(.add-btn, .ci-btn-primary, .ci-main-btn) {
+    color: color-mix(in srgb, var(--lt-canvas-accent) 70%, var(--lt-canvas-fg));
+  }
+
   .custom-instruction-scope .add-btn {
     padding: 6px 14px;
     border-radius: 9999px;
     background: var(--lt-canvas-accent-bg);
-    color: var(--lt-canvas-accent);
     font-size: 13px;
     cursor: pointer;
   }
@@ -4567,7 +4574,6 @@
   .custom-instruction-scope .ci-btn-primary {
     border-color: transparent;
     background: var(--lt-canvas-accent-bg);
-    color: var(--lt-canvas-accent);
   }
 
   .custom-instruction-scope .ci-btn-danger {
@@ -4744,7 +4750,6 @@
     padding: 6px 16px;
     border-radius: 9999px;
     background: var(--lt-canvas-accent-bg);
-    color: var(--lt-canvas-accent);
     font-size: 13px;
     white-space: nowrap;
     cursor: pointer;
@@ -4950,7 +4955,7 @@
   .custom-instruction-scope .ci-check-box.is-on {
     border-color: var(--lt-canvas-accent);
     background: var(--lt-canvas-accent-bg);
-    color: var(--lt-canvas-accent);
+    color: color-mix(in srgb, var(--lt-canvas-accent) 70%, var(--lt-canvas-fg));
   }
 
   :lang(ko) .custom-instruction-scope :is(.ci-source, .ci-upgrade, .ci-sets) {
