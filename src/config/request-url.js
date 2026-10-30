@@ -70,6 +70,10 @@ export const requestUrl = {
 	conversationDirectiveAdd: `${V1}/conversation/directive/add`,
 	conversationDirectiveUpdate: `${V1}/conversation/directive/update`,
 	conversationDirectiveDelete: `${V1}/conversation/directive/delete`,
+	conversationDirectiveApplyPreset: `${V1}/conversation/directive/apply-preset`,
+	conversationDirectiveSaveAsPreset: `${V1}/conversation/directive/save-as-preset`,
+	playerDirectivePresets: `${V1}/player/directive-presets`,
+	playerCardDirectiveSave: `${V1}/player/card-directive/save`,
 	// 手帳（只有玩家看得到的筆記）與它的範本
 	// 這則回覆的組成（支援每輪診斷的 Provider 接受 chatId；否則取最近完成回覆）
 	promptDiagnostics: `${V1}/conversation/prompt-diagnostics`,

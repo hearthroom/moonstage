@@ -276,6 +276,22 @@
         :pending-delete-id="directivePendingDeleteId"
         :error="directives.error"
         :labels="directiveLabels"
+        :sets="directiveSetsView"
+        :set-name="directiveSets.name"
+        :set-labels="directiveSetLabels"
+        @sets-open="onDirectiveSetsOpen"
+        @sets-save-as-open="directiveSets = openDirectiveSaveAs(directiveSets)"
+        @sets-upgrade="onDirectiveSetsUpgrade"
+        @sets-dismiss="onDirectiveSetsDismiss"
+        @sets-retry="loadDirectiveSets"
+        @sets-back="directiveSets = backToDirectiveList(directiveSets)"
+        @sets-scope="directiveSets = pickDirectiveScope(directiveSets, $event)"
+        @sets-pick="directiveSets = { ...directiveSets, picked: $event, error: '' }"
+        @sets-apply="onDirectiveSetsApply"
+        @sets-manage="onDirectiveSetsManage"
+        @update:set-name="directiveSets.name = $event"
+        @sets-bind="directiveSets = { ...directiveSets, bindCard: !directiveSets.bindCard }"
+        @sets-save-as="onDirectiveSetsSaveAs"
         @add="onAddDirective"
         @edit="onEditDirective"
         @save-edit="onSaveDirectiveEdit"
@@ -543,6 +559,9 @@ import CanvasMemory from './components/canvas-memory.vue'
 import { applyMemoryDeleteResponse, normalizeMemoryAtoms, type MemoryAtom } from './canvas-memory'
 import {
   createDirectiveState, readDirectiveResponse, directiveCountText,
+  createDirectiveSetsState, readDirectivePresetsResponse, readCardDirectiveChoice, buildDirectiveSetsView,
+  openDirectiveSets, pickDirectiveScope, openDirectiveSaveAs, backToDirectiveList, clampSetTitle,
+  canApplyDirectiveSet, canSaveDirectiveSet,
   canAddDirective, startEditDirective, cancelEditDirective, canSaveEdit,
   type DirectiveState,
 } from './canvas-directives'
@@ -2995,7 +3014,7 @@ function buildPanelsState() {
       break;
     case 'directives':
       title = t('directive.title');
-      props = { list: directives.value.list, countText: directiveCountText(directives.value), maxLength: directives.value.maxLength, loading: directives.value.loading, loadFailed: directives.value.loadFailed, hasConversation: Boolean(unref(conversationId)), canAdd: canAddDirective(directives.value, Boolean(unref(conversationId))), draft: directives.value.draft, editingSourceId: directives.value.editingSourceId, editingText: directives.value.editingText, pendingDeleteId: directivePendingDeleteId.value, error: directives.value.error, labels: directiveLabels.value };
+      props = { list: directives.value.list, countText: directiveCountText(directives.value), maxLength: directives.value.maxLength, loading: directives.value.loading, loadFailed: directives.value.loadFailed, hasConversation: Boolean(unref(conversationId)), canAdd: canAddDirective(directives.value, Boolean(unref(conversationId))), draft: directives.value.draft, editingSourceId: directives.value.editingSourceId, editingText: directives.value.editingText, pendingDeleteId: directivePendingDeleteId.value, error: directives.value.error, labels: directiveLabels.value, sets: directiveSetsView.value, setName: directiveSets.value.name, setLabels: directiveSetLabels.value };
       break;
     case 'notepad':
       title = t('notepad.title');
@@ -3082,6 +3101,19 @@ function onSandboxPanelUi(panelName: string, event: string, args: unknown[]) {
         case 'retry': loadDirectives(); return;
         case 'update:draft': directives.value.draft = str(); return;
         case 'update:editing-text': directives.value.editingText = str(); return;
+        case 'sets-open': onDirectiveSetsOpen(str()); return;
+        case 'sets-save-as-open': directiveSets.value = openDirectiveSaveAs(directiveSets.value); return;
+        case 'sets-upgrade': onDirectiveSetsUpgrade(); return;
+        case 'sets-dismiss': onDirectiveSetsDismiss(); return;
+        case 'sets-retry': loadDirectiveSets(); return;
+        case 'sets-back': directiveSets.value = backToDirectiveList(directiveSets.value); return;
+        case 'sets-scope': directiveSets.value = pickDirectiveScope(directiveSets.value, str() === 'card' ? 'card' : 'save'); return;
+        case 'sets-pick': directiveSets.value = { ...directiveSets.value, picked: str(), error: '' }; return;
+        case 'sets-apply': onDirectiveSetsApply(); return;
+        case 'sets-manage': onDirectiveSetsManage(); return;
+        case 'update:set-name': directiveSets.value.name = str(); return;
+        case 'sets-bind': directiveSets.value = { ...directiveSets.value, bindCard: !directiveSets.value.bindCard }; return;
+        case 'sets-save-as': onDirectiveSetsSaveAs(); return;
       }
       return;
     case 'notepad':
@@ -11277,8 +11309,10 @@ const directiveLabels = computed(() => ({
 
 function openDirectivesSheet() {
   directivePendingDeleteId.value = ''
+  directiveSets.value = backToDirectiveList({ ...directiveSets.value, status: '', upgradeError: '' })
   panel.value = openSheet(panel.value, 'directives')
   loadDirectives()
+  loadDirectiveSets()
 }
 
 async function loadDirectives() {
@@ -11299,6 +11333,8 @@ async function loadDirectives() {
       loading: false,
       loadFailed: false,
     }
+    const choice = readCardDirectiveChoice(res.data)
+    if (choice) directiveSets.value = { ...directiveSets.value, ...choice }
   } catch (e) {
     directives.value = { ...directives.value, loading: false, loadFailed: true }
   }
@@ -11390,6 +11426,152 @@ async function onDeleteDirective(sourceId: string) {
     { conversationId: id, sourceId },
     t('directive.saveFailed'),
   )
+}
+
+// ── 指令組（長期指令存成好幾組，這張卡的新存檔自動帶上一組）──────────────────
+//
+// 指令組掛在帳號上、卡片選擇掛在「玩家×卡」，所以對話還沒建立時也讀得到、設得了；
+// 只有「換這個存檔的指令」要等對話建立。舊供應商沒有這幾條路徑（404），整區不畫。
+const directiveSets = ref(createDirectiveSetsState())
+const directiveSetsSupported = ref(true)
+const directiveSetsDismissKey = () => `lt.directiveSets.dismiss.${String(unref(roleId) || '')}`
+
+const directiveSetsView = computed(() => directiveSetsSupported.value
+  ? buildDirectiveSetsView(directives.value, directiveSets.value, {
+      t: (key, named, plural) => (plural === undefined ? t(key, named || {}) : t(key, named || {}, plural)),
+      hasConversation: Boolean(unref(conversationId)),
+      streaming: Boolean(isGenerating.value),
+      canManage: Boolean(stageHost.nav.toInstructions),
+    })
+  : null)
+
+const directiveSetLabels = computed(() => ({
+  rowCard: t('directive.set.row.card'),
+  rowSave: t('directive.set.row.save'),
+  change: t('directive.set.change'),
+  switch: t('directive.set.switch'),
+  saveAs: t('directive.set.saveAs'),
+  emptyHint: t('directive.set.emptyHint'),
+  manage: t('directive.set.manage'),
+  upgradeConfirm: t('directive.set.upgrade.confirm'),
+  upgradeDismiss: t('directive.set.upgrade.dismiss'),
+  upgradeNote: t('directive.set.upgrade.note'),
+  loadFailed: t('directive.set.loadFailed'),
+  retry: t('directive.set.retry'),
+  back: t('directive.title'),
+  title: t('directive.set.title'),
+  scopeSave: t('directive.set.scope.save'),
+  scopeCard: t('directive.set.scope.card'),
+  nameLabel: t('directive.set.name.label'),
+  namePlaceholder: t('directive.set.name.placeholder'),
+  bindCard: t('directive.set.saveAs.bindCard'),
+}))
+
+async function loadDirectiveSets() {
+  if (!directiveSetsSupported.value) return
+  let dismissed = false
+  try { dismissed = stageHost.storage.get(directiveSetsDismissKey()) === '1' } catch (e) {}
+  directiveSets.value = { ...directiveSets.value, loading: true, loadFailed: false, upgradeDismissed: dismissed }
+  try {
+    const res = await _this.http.get(_this.requestUrl.playerDirectivePresets, {
+      data: { roleId: String(unref(roleId) || '') },
+      showLoading: false,
+      quietTransport: true,
+      timeout: 8000,
+    })
+    if (res.statusCode === 404) { directiveSetsSupported.value = false; return }
+    if (res.statusCode !== 200) throw new Error('unexpected status')
+    const choice = readCardDirectiveChoice(res.data)
+    directiveSets.value = { ...directiveSets.value, ...readDirectivePresetsResponse(res.data), ...(choice || {}), loading: false, loaded: true }
+  } catch (e) {
+    directiveSets.value = { ...directiveSets.value, loading: false, loadFailed: true }
+  }
+}
+
+function onDirectiveSetsOpen(scope: string) {
+  directiveSets.value = openDirectiveSets(directiveSets.value, scope === 'card' ? 'card' : 'save')
+}
+
+async function directiveSetsPost(url: string, data: Record<string, unknown>) {
+  const res = await _this.http.post(url, { header: { 'content-type': 'application/json' }, data, showLoading: false, quietTransport: true })
+  if (res.statusCode !== 200) throw { statusCode: res.statusCode, data: res.data }
+  return res.data
+}
+
+/* 伺服器回的是代號；沒有網路時說「你選的都還在」，其他失敗講存不了。 */
+function directiveSetsError(e: any) {
+  if (!e || !e.statusCode) return t('directive.set.error.network')
+  if (e.data && e.data.error === 'DIRECTIVE_PRESET_LIMIT_REACHED') return t('directive.set.error.full', { max: directiveSets.value.maxCount })
+  return t('directive.saveFailed')
+}
+
+async function onDirectiveSetsApply() {
+  const st = directiveSets.value
+  if (!canApplyDirectiveSet(st, Boolean(unref(conversationId)))) return
+  const picked = st.list.find((row) => row.presetId === st.picked)
+  directiveSets.value = { ...st, busy: true, error: '' }
+  try {
+    if (st.scope === 'card') {
+      const out = await directiveSetsPost(_this.requestUrl.playerCardDirectiveSave, { roleId: String(unref(roleId) || ''), presetId: st.picked })
+      const status = picked ? t('directive.set.done.card', { name: picked.title }) : t('directive.set.done.cardNone')
+      directiveSets.value = backToDirectiveList({ ...directiveSets.value, cardPresetId: String(out?.cardPresetId || ''), cardChosen: true, status })
+    } else {
+      const out = await directiveSetsPost(_this.requestUrl.conversationDirectiveApplyPreset, { conversationId: String(unref(conversationId) || ''), presetId: st.picked })
+      directives.value = { ...directives.value, ...readDirectiveResponse(out), error: '', editingSourceId: '', editingText: '' }
+      directiveSets.value = backToDirectiveList({ ...directiveSets.value, status: t('directive.set.done.save', { name: picked?.title || '' }) })
+    }
+    loadDirectiveSets()
+  } catch (e) {
+    directiveSets.value = { ...directiveSets.value, busy: false, error: directiveSetsError(e) }
+  }
+}
+
+async function onDirectiveSetsSaveAs() {
+  const st = directiveSets.value
+  if (!canSaveDirectiveSet(st, directives.value.list.length)) return
+  directiveSets.value = { ...st, busy: true, error: '' }
+  try {
+    const out = await directiveSetsPost(_this.requestUrl.conversationDirectiveSaveAsPreset, {
+      conversationId: String(unref(conversationId) || ''), title: clampSetTitle(st.name, st.maxTitle), bindCard: st.bindCard,
+    })
+    const name = String(out?.preset?.title || st.name)
+    directiveSets.value = backToDirectiveList({
+      ...directiveSets.value,
+      ...(st.bindCard ? { cardPresetId: String(out?.preset?.presetId || ''), cardChosen: true } : {}),
+      status: st.bindCard ? t('directive.set.done.upgrade', { name }) : t('directive.set.done.saved', { name }),
+    })
+    loadDirectiveSets()
+  } catch (e) {
+    directiveSets.value = { ...directiveSets.value, busy: false, error: directiveSetsError(e) }
+  }
+}
+
+// 升級提示的主按鈕：不跳命名框，用卡名當組名（太長截掉），存成一組並讓這張卡的新存檔自動帶上。
+async function onDirectiveSetsUpgrade() {
+  const st = directiveSets.value
+  if (st.upgradeBusy || !unref(conversationId)) return
+  directiveSets.value = { ...st, upgradeBusy: true, upgradeError: '' }
+  try {
+    const out = await directiveSetsPost(_this.requestUrl.conversationDirectiveSaveAsPreset, {
+      conversationId: String(unref(conversationId) || ''),
+      title: clampSetTitle(String((roleView.value as any).roleName || t('directive.title')), st.maxTitle),
+      bindCard: true,
+    })
+    const name = String(out?.preset?.title || '')
+    directiveSets.value = { ...directiveSets.value, upgradeBusy: false, cardPresetId: String(out?.preset?.presetId || ''), cardChosen: true, status: t('directive.set.done.upgrade', { name }) }
+    loadDirectiveSets()
+  } catch (e) {
+    directiveSets.value = { ...directiveSets.value, upgradeBusy: false, upgradeError: directiveSetsError(e) }
+  }
+}
+
+function onDirectiveSetsDismiss() {
+  try { stageHost.storage.set(directiveSetsDismissKey(), '1') } catch (e) {}
+  directiveSets.value = { ...directiveSets.value, upgradeDismissed: true }
+}
+
+function onDirectiveSetsManage() {
+  stageHost.nav.toInstructions?.()
 }
 
 // ── 上下文用量（舊名「這則回覆的組成」）──────────────────────────────────

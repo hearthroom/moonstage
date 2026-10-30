@@ -43,7 +43,8 @@ const EVENTS: Record<string, string[]> = {
   background: ['pick', 'color', 'file', 'retry', 'delete'],
   font: ['pick'],
   persona: ['save', 'close'],
-  directives: ['add', 'edit', 'save-edit', 'cancel-edit', 'ask-delete', 'confirm-delete', 'cancel-delete', 'retry', 'close', 'update:draft', 'update:editing-text'],
+  directives: ['add', 'edit', 'save-edit', 'cancel-edit', 'ask-delete', 'confirm-delete', 'cancel-delete', 'retry', 'close', 'update:draft', 'update:editing-text',
+    'sets-open', 'sets-save-as-open', 'sets-upgrade', 'sets-dismiss', 'sets-retry', 'sets-back', 'sets-scope', 'sets-pick', 'sets-apply', 'sets-manage', 'update:set-name', 'sets-bind', 'sets-save-as'],
   notepad: ['save', 'retry', 'close', 'toggle-templates', 'apply-template', 'save-template', 'update:code', 'preview-code', 'cancel-preview', 'confirm-import', 'share-template', 'delete-template', 'copy-share-code', 'revoke-share', 'close-share', 'toggle-copy', 'copy-from', 'update:draft'],
   'context-breakdown': ['close', 'retry', 'toggle-mod-details'],
   memory: ['close', 'retry', 'delete', 'toggle-expand'],
@@ -53,7 +54,7 @@ const EVENTS: Record<string, string[]> = {
 }
 
 /** 殼自己持有的可打字欄位：事件名 → 屬性名。 */
-const LOCAL_FIELDS: Record<string, string> = { 'update:draft': 'draft', 'update:editing-text': 'editingText', 'update:code': 'code' }
+const LOCAL_FIELDS: Record<string, string> = { 'update:draft': 'draft', 'update:editing-text': 'editingText', 'update:code': 'code', 'update:set-name': 'setName' }
 
 // 事件名要照 Vue 自己的拼法轉成屬性名：連字號併成駝峰、冒號保留——`update:draft` 是 `onUpdate:draft`，
 // `update:editing-text` 是 `onUpdate:editingText`。自己拆字串會把冒號也吃掉，Vue 就找不到處理函式，

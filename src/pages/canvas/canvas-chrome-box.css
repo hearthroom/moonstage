@@ -375,6 +375,42 @@
 .custom-instruction-scope .ci-retry {
     margin-left: 8px
 }
+.custom-instruction-scope .ci-source {
+    padding: 8px 12px
+}
+.custom-instruction-scope .ci-source-links {
+    margin-left: auto
+}
+.custom-instruction-scope .ci-link {
+    margin-left: auto
+}
+.custom-instruction-scope .ci-source-links .ci-link {
+    margin-left: 0
+}
+.custom-instruction-scope .ci-upgrade {
+    padding: 12px
+}
+.custom-instruction-scope .ci-main-btn {
+    padding: 6px 16px
+}
+.custom-instruction-scope .ci-sets-head {
+    padding-right: 36px
+}
+.custom-instruction-scope .ci-scope {
+    padding: 3px
+}
+.custom-instruction-scope .ci-scope-item {
+    padding: 4px 8px
+}
+.custom-instruction-scope .ci-set {
+    padding: 10px 12px
+}
+.custom-instruction-scope .ci-sets-actions .ci-link {
+    margin: 0 auto
+}
+.custom-instruction-scope .ci-input {
+    padding: 8px 12px
+}
 .np-top {
     padding-right: 36px
 }

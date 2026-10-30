@@ -4625,6 +4625,338 @@
     cursor: pointer;
   }
 
+  /*
+     ── 指令組（來源區、升級提示、子視圖）──
+     次要動作：三個連結跟條目上的「編輯」同一級，中性色；紅色只留給刪除。
+     升級提示是建議不是警告：中性底加髮絲線，只有主按鈕用強調色。
+  */
+  .custom-instruction-scope .ci-source {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px;
+    border-radius: var(--lt-canvas-radius);
+    border: 1px solid var(--lt-canvas-sheet-line);
+  }
+
+  .custom-instruction-scope .ci-source-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 8px;
+    min-height: 30px;
+    font-size: 13px;
+  }
+
+  .custom-instruction-scope .ci-source-label {
+    color: var(--lt-canvas-muted);
+    font-size: 12px;
+  }
+
+  .custom-instruction-scope .ci-source-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .custom-instruction-scope .ci-source-links {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 12px;
+    margin-left: auto;
+  }
+
+  .custom-instruction-scope .ci-source-ghost {
+    height: 60px;
+    border-radius: var(--lt-canvas-radius);
+    background: var(--lt-canvas-sheet-item-bg);
+  }
+
+  .custom-instruction-scope .ci-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    margin-left: auto;
+    color: var(--lt-canvas-muted);
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .custom-instruction-scope .ci-source-links .ci-link {
+    margin-left: 0;
+  }
+
+  .custom-instruction-scope .ci-link:hover,
+  .custom-instruction-scope .ci-link:focus-visible {
+    color: var(--lt-canvas-fg);
+  }
+
+  .custom-instruction-scope :is(.ci-link, .ci-btn, .ci-main-btn, .ci-set, .ci-scope-item, .ci-check, .ci-sets-back):focus-visible {
+    outline: 2px solid var(--lt-canvas-accent);
+    outline-offset: 2px;
+  }
+
+  .custom-instruction-scope .ci-status {
+    font-size: 12px;
+    color: var(--lt-canvas-muted);
+  }
+
+  .custom-instruction-scope .ci-status[hidden] {
+    display: none;
+  }
+
+  .custom-instruction-scope .ci-upgrade {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border-radius: var(--lt-canvas-radius);
+    border: 1px solid var(--lt-canvas-sheet-line);
+    background: var(--lt-canvas-sheet-item-bg);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .custom-instruction-scope .ci-upgrade-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .custom-instruction-scope .ci-upgrade-acts > * {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .custom-instruction-scope .ci-upgrade-note {
+    font-size: 11px;
+    color: var(--lt-canvas-muted);
+  }
+
+  .custom-instruction-scope .ci-main-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 16px;
+    border-radius: 9999px;
+    background: var(--lt-canvas-accent-bg);
+    color: var(--lt-canvas-accent);
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .custom-instruction-scope .ci-main-btn.is-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .custom-instruction-scope .ci-main-btn.is-busy {
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .custom-instruction-scope .ci-sets {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+  }
+
+  .custom-instruction-scope .ci-sets-head {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-right: 36px;
+  }
+
+  .custom-instruction-scope .ci-sets-back {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    color: var(--lt-canvas-muted);
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .custom-instruction-scope .ci-sets-title {
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .custom-instruction-scope .ci-scope {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 3px;
+    border-radius: 9999px;
+    background: var(--lt-canvas-sheet-item-bg);
+  }
+
+  .custom-instruction-scope .ci-scope-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 4px 8px;
+    border-radius: 9999px;
+    font-size: 13px;
+    text-align: center;
+    color: var(--lt-canvas-muted);
+    cursor: pointer;
+  }
+
+  .custom-instruction-scope .ci-scope-item.is-on {
+    background: var(--lt-canvas-sheet-item-bg-on);
+    color: var(--lt-canvas-fg);
+  }
+
+  .custom-instruction-scope .ci-scope-item.is-disabled:not(.is-on) {
+    opacity: 0.5;
+  }
+
+  .custom-instruction-scope .ci-set-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+
+  .custom-instruction-scope .ci-set {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border-radius: var(--lt-canvas-radius);
+    border: 1px solid transparent;
+    background: var(--lt-canvas-sheet-item-bg);
+    cursor: pointer;
+  }
+
+  .custom-instruction-scope .ci-set.is-on {
+    border-color: var(--lt-canvas-accent);
+    background: var(--lt-canvas-sheet-item-bg-on);
+  }
+
+  .custom-instruction-scope .ci-set-top {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .custom-instruction-scope .ci-set-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .custom-instruction-scope .ci-set-count {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--lt-canvas-muted);
+  }
+
+  .custom-instruction-scope .ci-set-preview {
+    font-size: 12px;
+    color: var(--lt-canvas-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .custom-instruction-scope .ci-sum {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .custom-instruction-scope .ci-sets-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .custom-instruction-scope .ci-sets-actions .ci-main-btn {
+    min-height: 44px;
+  }
+
+  .custom-instruction-scope .ci-sets-actions .ci-link {
+    margin: 0 auto;
+  }
+
+  .custom-instruction-scope .ci-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .custom-instruction-scope .ci-field-label {
+    font-size: 12px;
+    color: var(--lt-canvas-muted);
+  }
+
+  .custom-instruction-scope .ci-input {
+    min-height: 40px;
+    padding: 8px 12px;
+    border-radius: var(--lt-canvas-radius);
+    border: 1px solid var(--lt-canvas-sheet-line);
+    background: var(--lt-canvas-sheet-item-bg);
+    color: inherit;
+    font: inherit;
+    font-size: 16px;
+  }
+
+  .custom-instruction-scope .ci-field .ci-count {
+    align-self: flex-end;
+  }
+
+  .custom-instruction-scope .ci-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .custom-instruction-scope .ci-check-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid var(--lt-canvas-sheet-line);
+    font-size: 12px;
+  }
+
+  .custom-instruction-scope .ci-check-box.is-on {
+    border-color: var(--lt-canvas-accent);
+    background: var(--lt-canvas-accent-bg);
+    color: var(--lt-canvas-accent);
+  }
+
+  :lang(ko) .custom-instruction-scope :is(.ci-source, .ci-upgrade, .ci-sets) {
+    word-break: keep-all;
+  }
+
   /* ── AI 筆記 ──────────────────────────────────────────────────── */
 
   .notepad-scope {

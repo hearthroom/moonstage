@@ -61,6 +61,8 @@ export interface StageHost {
     canBack?(): boolean
     /** 到宿主站的「我的預設」（建立、匯入、編輯預設）。不實作就不畫那個連結。 */
     toPresets?(): void
+    /** 到宿主站的「長期指令」頁（管理指令組）。不實作就不畫那個連結。 */
+    toInstructions?(): void
   }
   locale: {
     get(): string
