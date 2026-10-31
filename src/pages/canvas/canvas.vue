@@ -10673,7 +10673,7 @@ async function onShortcut(key: string) {
   if (key === 'conversations') { openConversationList(); return }
   if (key === 'persona') { openPersonaSheet(); return }
   if (key === 'directives') { openDirectivesSheet(); return }
-  if (key === 'response-settings') { openResponseSettings(); return }
+  if (key === 'response-settings') return openResponseSettings()
   if (key === 'notepad') { openNotepadSheet(); return }
   if (key === 'memory') { openMemorySheet(); return }
   if (key === 'background') { panel.value = openSheet(panel.value, 'background'); return }
