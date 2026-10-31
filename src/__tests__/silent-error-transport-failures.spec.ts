@@ -36,6 +36,9 @@ describe('靜默錯誤清單不得吞掉傳輸層失敗', () => {
   it('清單本身保留，且每一項都要寫明由誰呈現', () => {
     const list = main.slice(main.indexOf('const silentErrorApis'), main.indexOf('const isSilentErrorRequest'))
     expect(list).toContain('/conversation/rewrite-by-id')
+    // 自訂預設選擇器與預設庫抽屜在頁內講讀取失敗，不再疊 toast（美術總監 R2 K2）
+    expect(list).toContain('/preset-shelf')
+    expect(list).toContain('/preset-library')
     // 每個條目都應該有註解說明「錯誤改由誰呈現」——沒有理由的靜默就是下一個黑洞。
     const entries = list.split('\n').filter(line => line.trim().startsWith("'"))
     expect(entries.length).toBeGreaterThan(0)

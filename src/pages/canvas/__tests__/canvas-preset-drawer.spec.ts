@@ -94,3 +94,16 @@ it('the picker offers "browse the library" only when the page can list it, and t
  await wrapper.get('[data-action="preset-browse"]').trigger('click')
  expect(wrapper.emitted('browse')).toHaveLength(1)
 })
+
+it('the picker sets the readable text tone on its apply button, like the panel does for its own buttons when it opens', async () => {
+ const presets = api({ card: vi.fn(async () => ({ mode: 'card_default', presetId: null, bindingVersion: 0, state: 'ready' })) })
+ // 跟畫布一樣放在彈層殼裡（主鈕的字色規則只對彈層內的面板）
+ const shell = document.createElement('div'); shell.className = 'u-popup'
+ const content = document.createElement('div'); content.className = 'u-popup__content'
+ shell.append(content); document.body.append(shell)
+ wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => ({ conversationId: 'c1', scope: 'conversation', schemaVersion: 1, revision: 0, overrides: {}, effective: { agency: 'coauthor', style: 'card', perspective: 'card', length: 'auto', pace: 'natural' }, presetLocked: [] }), save: vi.fn(), t, presets }, attachTo: content })
+ await flushPromises()
+ await wrapper.get('[data-action="preset-pick"]').trigger('click'); await flushPromises()
+ expect(wrapper.get('[data-lt="preset-picker"] [data-action="preset-apply"]').attributes('data-lt-tone')).toMatch(/^(light|dark)$/)
+ shell.remove()
+})

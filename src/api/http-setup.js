@@ -43,6 +43,8 @@ export function setupHttp(http, deps) {
         '/conversation/response-settings', // 回覆偏好面板保留草稿並呈現載入、儲存與版本衝突錯誤
 		'/player/preset-default',     // 回覆偏好的自訂預設：面板自己講正在回覆、版本被改、讀不到套用的版本
 		'/open/v1/presets',           // 選預設時列出自己的預設；讀不到就當沒有，不彈錯誤
+		'/preset-shelf',              // 自訂預設選擇器的「喜愛與用過」：讀不到時選擇器自己在那一頁講，不再疊 toast
+		'/preset-library',            // 選擇器的熱門、預設庫抽屜、喜愛：讀不到或沒存到都在畫面上那一行講
 		'/conversation/operations',   // 背景恢復查詢；拿不到就靜默回退，不打擾使用者
 		'/conversation/rewrite-by-id', // 重寫的錯誤由聊天頁的系統訊息卡呈現，避免重複 toast
 		'/role/author-asset/serve',   // 玩家路徑：沒有資產就是「這張卡沒裝修」，不是使用者要處理的錯誤

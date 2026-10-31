@@ -1,5 +1,5 @@
 <template>
- <div class="preset-picker" data-lt="preset-picker">
+ <div ref="root" class="preset-picker" data-lt="preset-picker">
   <div class="preset-picker-head">
    <button ref="backButton" type="button" class="preset-picker-back" data-action="preset-back" :aria-label="t('responseSettings.preset.pick.back')" @click="emit('back')">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -77,7 +77,8 @@
 // 自訂預設選擇器（P2，PM 2026-10-30）：回覆偏好裡一層，三組「我的／喜愛與用過／預設庫」。
 // 預設庫只列目前模型的熱門前三，下面「瀏覽預設庫」開抽屜看全部；選了按「套用『X』到這張卡」。
 // 「不用預設」＝取消套用，回到玩家原本的選擇。每一列旁有到網站看內容的連結（宿主給了才畫）。
-import { computed, defineComponent, h, nextTick, onMounted, ref, type PropType } from 'vue'
+import { computed, defineComponent, h, nextTick, onMounted, ref, watch, type PropType } from 'vue'
+import { syncChromeTone } from '../canvas-chrome-tone'
 import { usePresetApply } from '../canvas-preset-apply'
 import { modelValueName, readPresetRows, type PresetApi, type PresetBinding, type PresetRow } from '../canvas-preset'
 
@@ -100,6 +101,10 @@ const emit = defineEmits<{ (e: 'back'): void; (e: 'browse'): void; (e: 'changed'
 
 const uid = `pp-${Math.random().toString(36).slice(2, 8)}`
 const backButton = ref<HTMLButtonElement | null>(null)
+const root = ref<HTMLElement | null>(null)
+// 主鈕的字色要照實際底色挑深或淺（作者的卡可能把面板漆成任何顏色）：面板只在打開時量一次，
+// 這一層是後來才掛上的，所以自己量；換選擇時按鈕可能從停用變可按，再量一次
+const syncTone = () => void nextTick(() => syncChromeTone(root.value?.closest('.u-popup') ?? root.value))
 const current = ref<PresetBinding | null>(props.binding)
 const currentId = computed(() => (current.value?.mode === 'preset' ? current.value.presetId : null))
 
@@ -202,7 +207,9 @@ const PresetRowItem = defineComponent({
  },
 })
 
+watch(() => [choice.value, busy.value], syncTone)
 onMounted(() => {
+ syncTone()
  openTab(tab.value)
  void nextTick(() => backButton.value?.focus())
 })
