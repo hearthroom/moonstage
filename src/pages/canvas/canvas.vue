@@ -10466,8 +10466,8 @@ async function closeTopCanvasOverlay() {
   if (presetDrawerOpen.value) { presetDrawerOpen.value = false; return }
   if (responseLayers.value.picker) { responseSettingsPanel.value?.backLayer(); return }
   if (menuOpen.value) { closeMessageMenu(); return }
-  if (panel.value.sheet === 'capacity') { closeCapacityChoice(); return }
-  if (panel.value.sheet === 'confirm') { onConfirmCancel(); return }
+  if (panel.value.sheet === 'capacity') { closeCapacityChoice(true); return }
+  if (panel.value.sheet === 'confirm') { onConfirmCancel(true); return }
   if (panel.value.sheet) await closeCanvasSheet(true)
   else { moreParent.value = false; panel.value = closeMore(panel.value) }
 }
@@ -10728,9 +10728,9 @@ const capacityProps = computed(() => {
   }
 })
 
-function closeCapacityChoice() {
+function closeCapacityChoice(restoreMore = false) {
   if (capacitySpec.value.saving) return
-  if (panel.value.sheet === 'capacity') panel.value = closeSheet(panel.value)
+  if (panel.value.sheet === 'capacity') void closeCanvasSheet(restoreMore)
 }
 
 // 只寫動到的那一個欄位；存失敗就還原，畫面上的檔位不能停在沒存進去的值。
@@ -10781,7 +10781,7 @@ function askConfirm(kind: string, title: string, content: string, okText: string
   panel.value = openSheet(panel.value, 'confirm')
 }
 
-function onConfirmCancel() {
+function onConfirmCancel(restoreMore = false) {
   // 從記憶那一片來的確認：取消要回到清單，不能把玩家丟在空畫布上。
   if (confirmSpec.value.kind === 'delete-memory') {
     memory.value = { ...memory.value, pendingDeleteId: '' }
@@ -10794,7 +10794,7 @@ function onConfirmCancel() {
     openConversationList()
     return
   }
-  closeCanvasSheet()
+  void closeCanvasSheet(restoreMore)
 }
 
 function onConfirmOk() {
