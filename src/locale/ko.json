@@ -556,7 +556,6 @@
 	"chat.model_normal": "일반 모델",
 	"chat.model_level": "기본",
 	"chat.model_select": "모델 선택",
-	"chat.model_vip_tips": "선택하신 모델은 멤버십 가입이 필요합니다!",
 	"chat.models_unit": "개 모델",
 	"chat.per_message": "메시지당",
 	"chat.my_create": "내가 만든",

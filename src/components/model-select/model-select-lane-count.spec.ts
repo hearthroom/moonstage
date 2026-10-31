@@ -59,3 +59,42 @@ it('counts every lane the expanded list would show, not just the four drawn coll
     expect(row.find('.ms-expand-hint').text()).toBe(`modelSelect.expandLanes:${shown}`)
   } finally { wrapper.unmount() }
 })
+
+it('the floating-price note only speaks about lanes the list shows', async () => {
+  const live = JSON.parse(JSON.stringify((await import('../../pages/canvas/__tests__/fixtures/model-catalog-live.json')).default))
+  const deepseek = live[0].families.find((f: any) => f.family === 'DeepSeek V4 Flash')
+  deepseek.variants = deepseek.variants.slice(0, 4)
+  const deadStatus = { status: 'red', uptime: { percent24h: 0, samples24h: 90 } }
+  const mount = () => shallowMount(ModelSelectPanel, {
+    props: { open: true, roleId: 'fixture-role', selectModel: 'deepseek-v4-flash-ripple' },
+    global: { config: { globalProperties: {
+      http: { get: vi.fn(async (url: string) => url === '/models' ? { statusCode: 200, data: live } : { statusCode: 200, data: [] }) },
+      requestUrl: { playerAgentMode: '/agent-mode', getModelListV2: '/models' },
+    } } },
+  })
+  const note = (w: any) => { const n = w.find('.ms-note'); return n.exists() ? n.text() : '' }
+
+  // 浮動的兩條都壞了：清單上全是固定價，不該出現浮動說明。
+  deepseek.variants.forEach((v: any, i: number) => {
+    v.billingType = i >= 2 ? 'dynamic' : 'fixed'
+    v.status = i >= 2 ? deadStatus : undefined
+  })
+  const onlyDeadDynamic = mount()
+  try {
+    await flushPromises()
+    expect(onlyDeadDynamic.findAll('.ms-opt')).toHaveLength(2)
+    expect(note(onlyDeadDynamic)).not.toContain('modelSelect.dynamicLaneNote')
+  } finally { onlyDeadDynamic.unmount() }
+
+  // 活著的兩條都浮動、壞的是固定：清單上看到的就是「全部浮動」。
+  deepseek.variants.forEach((v: any, i: number) => {
+    v.billingType = i < 2 ? 'dynamic' : 'fixed'
+    v.status = i >= 2 ? deadStatus : undefined
+  })
+  const aliveAllDynamic = mount()
+  try {
+    await flushPromises()
+    expect(note(aliveAllDynamic)).toContain('modelSelect.dynamicLaneNoteAll')
+  } finally { aliveAllDynamic.unmount() }
+})
+

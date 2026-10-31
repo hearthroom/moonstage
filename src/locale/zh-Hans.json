@@ -555,7 +555,6 @@
 	"chat.model_normal": "普通模型",
 	"chat.model_level": "基础",
 	"chat.model_select": "选择模型",
-	"chat.model_vip_tips": "当前选择的模型需开通会员才能使用！",
 	"chat.models_unit": "个模型",
 	"chat.per_message": "每条",
 	"chat.my_create": "我创建的",

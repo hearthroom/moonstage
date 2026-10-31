@@ -1392,7 +1392,7 @@ const truncationText = (completionRate: number) => {
 	 */
 	const DYNAMIC_NOTE_NAME_LIMIT = 3;
 	const dynamicNoteFor = (family) => {
-		const variants = getFilteredVariants(family) || [];
+		const variants = visibleLanes(getFilteredVariants(family), formData.selectModel, true);
 		const dyn = variants.filter(v => v && v.billingType === 'dynamic');
 		if (!dyn.length) return '';
 		const hint = getPriceEstHint(dyn[0]);
@@ -1856,27 +1856,6 @@ const truncationText = (completionRate: number) => {
 	const isFamilySelected = (family) => {
 		return family.variants.some(v => v.value === formData.selectModel);
 	};
-
-	// Select the default (cheapest) variant of a family
-	const selectDefaultVariant = (family) => {
-		if (family.isMember && !userInfo.isMember && !userInfo.isTryMember && !userInfo.isNoLimitMember && !userInfo.isUseLimitMember) {
-			message.warning(t('chat.model_vip_tips'));
-			return;
-		}
-		// If already selected within this family, don't change variant
-		const existing = family.variants.find(v => v.value === formData.selectModel);
-		if (existing) return;
-
-		// Select cheapest variant
-		const variant = family.variants[0];
-		if (variant) {
-			formData.selectModel = variant.value;
-			selectItem.value = { ...variant, family: family.family };
-			normalizeContextForSelectedModel(false);
-			activatedFamilies.value.add(family.family);
-		}
-	};
-
 
 	const selectVariant = (family, variant) => {
 		const sameFamily = Boolean(selectItem.value) && selectItem.value.family === family.family;
