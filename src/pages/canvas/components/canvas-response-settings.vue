@@ -353,7 +353,7 @@ async function refreshAfterPreset(){
 onMounted(()=>{void reload();void loadPreset()})
 // 選擇器開著時按關閉：整個面板一起關（跟偏好那一層一樣先問沒存的修改）；回上一層用選擇器自己的返回
 async function mayCloseAll(){const ok=await mayClose();if(ok)pickerOpen.value=false;return ok}
-defineExpose({mayClose:mayCloseAll,closePicker})
+defineExpose({mayClose:mayCloseAll,closePicker,confirmLeave})
 </script>
 
 <style scoped>

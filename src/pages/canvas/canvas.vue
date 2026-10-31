@@ -257,8 +257,11 @@
       :title="t('responseSettings.title')" :close-label="t('main.cancel')" @close="closeCanvasSheet">
       <CanvasResponseSettings :key="String(conversationId)" ref="responseSettingsPanel" :conversation-id="String(conversationId)" @close="closeCanvasSheet"
         :world-mode="Boolean((roleView as any).world)" :load="loadResponseSettings" :save="saveResponseSettings" :t="t" :frame="responseFrame" :save-frame="saveResponseFrame"
-        :presets="presetApi" />
+        :presets="presetApi" @browse="presetDrawerOpen = true" />
     </CanvasPopup>
+    <!-- 預設庫抽屜：從選擇器「瀏覽預設庫」開，蓋在回覆偏好上面 -->
+    <CanvasPresetDrawer v-if="presetDrawerOpen && presetApi" :api="presetApi" :t="t" :confirm-leave="presetDrawerConfirmLeave"
+      @close="presetDrawerOpen = false" @applied="presetDrawerApplied" />
 
     <CanvasPopup :open="panel.sheet === 'directives'" v-if="!sandboxCard" :title="t('directive.title')"
                  :close-label="t('main.cancel')" @close="closeCanvasSheet">
@@ -551,6 +554,7 @@ import CanvasConversationList from './components/canvas-conversation-list.vue'
 import CanvasPersona from './components/canvas-persona.vue'
 import CanvasDirectives from './components/canvas-directives.vue'
 import CanvasResponseSettings from './components/canvas-response-settings.vue'
+import CanvasPresetDrawer from './components/canvas-preset-drawer.vue'
 import ChatSystemMessage from '@/components/chat-system-message/chat-system-message.vue'
 import CanvasNotepad from './components/canvas-notepad.vue'
 import { notepadLength, notepadSourceRowsOf } from './canvas-notepad-sources'
@@ -10481,10 +10485,19 @@ const presetApi = computed<PresetApi | undefined>(() => presetSettingsVersion.va
   // 喜愛與用過、熱門：別人公開的預設也能直接套用（P2 分享）
   shelf: () => presetCall('get', _this.requestUrl.presetShelf, { limit: 50 }),
   hot: (model) => presetCall('get', _this.requestUrl.presetLibraryHot, { model }),
+  library: (query) => presetCall('get', _this.requestUrl.presetLibrary, { ...query }),
   favorite: (presetId, on) => presetCall('post', `${_this.requestUrl.presetLibrary}/${encodeURIComponent(presetId)}/favorite`, { favorite: on }),
   ...(stageHost.nav.toPreset ? { view: (presetId: string) => stageHost.nav.toPreset!(presetId) } : {}),
   context: () => ({ model: String(formData.selectModel || ''), card: String((roleView.value as any)?.roleName || '') }),
 })
+// 預設庫抽屜：套用前問回覆偏好有沒有沒存的修改；套好關掉抽屜與回覆偏好，回到對話出一行提示
+const presetDrawerOpen = ref(false)
+const presetDrawerConfirmLeave = () => responseSettingsPanel.value?.confirmLeave?.() ?? Promise.resolve(true)
+function presetDrawerApplied(message: string) {
+  presetDrawerOpen.value = false
+  if (panel.value.sheet === 'response-settings') panel.value = closeSheet(panel.value)
+  uni.showToast({ title: message, icon: 'none' })
+}
 // quiet：背景讀取（內容限制卡的流式值）不跳網路錯誤提示，玩家沒做任何事；面板的讀取照舊。
 async function loadResponseSettings(id: string, quiet = false) {
   const res = await _this.http.get('/open/v1/conversation/response-settings', { data: { conversationId: id, model: formData.selectModel || '' }, showLoading: false, ...(quiet ? { quietTransport: true } : {}) })
