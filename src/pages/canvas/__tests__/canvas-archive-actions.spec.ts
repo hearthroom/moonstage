@@ -96,6 +96,11 @@ describe('branch from a message', () => {
     expect(f.error).toHaveBeenCalledWith('canvas.archive.forkUnsaved')
     expect(f.bindings.adoptConversation).not.toHaveBeenCalled()
   })
+  it('preserves the SDK contract that a saved player message can be a branch target', async () => {
+    const f = forkFixture({ id: 'saved-player', type: 1, chatFinish: true })
+    await f.run()
+    expect(f.post).toHaveBeenCalledWith('/fork', { conversationId: 'current', chatId: 'saved-player' })
+  })
   it('branches a saved partial reply using its server chat id instead of its display id', async () => {
     const f = forkFixture({ id: 'local-12', chatId: 'saved-ai', assistantChatId: 'saved-ai', type: 0, chatFinish: true })
     await f.run()

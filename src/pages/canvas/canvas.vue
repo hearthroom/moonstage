@@ -12531,7 +12531,7 @@ function askForkArchive(chatId = '') {
 /** 本機提示列不是歷史訊息；串流列的顯示 id 也未必是伺服器的 chatId。 */
 function savedForkChatId(messageId: string): string {
   const row = talkList.value.find((m: any) => [m.id, m.chatId, m.assistantChatId].some(id => String(id || '') === messageId))
-  if (!row || row.systemOnly || row.isSummary || row.chatLoading || row.type != 0) return ''
+  if (!row || row.systemOnly || row.isSummary || row.chatLoading) return ''
   return String(row.chatId || row.assistantChatId || row.id || '')
 }
 
