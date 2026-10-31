@@ -16,12 +16,6 @@ export interface PresetBinding {
  state: 'ready' | 'unavailable'
 }
 
-export interface PresetChoice {
- id: string
- title: string
- recommendedModels: string[]
-}
-
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
 export function readBinding(raw: unknown): PresetBinding {
@@ -41,13 +35,39 @@ export function readBinding(raw: unknown): PresetBinding {
  }
 }
 
-/** 可以套用的預設（玩家自己的；刪除的伺服器不會列出）。 */
-export function readPresetChoices(raw: unknown): PresetChoice[] {
+/**
+ * 選擇器與預設庫的一列：自己的（/presets 給 id）、喜愛與用過、熱門、預設庫（給 presetId）都讀成同一個形狀。
+ * listed:false＝作者改回私人或被下架；喜愛或用過的人照常可以套用（owner 2026-10-30）。
+ */
+export interface PresetRow {
+ id: string
+ title: string
+ author: string
+ usesLast7d: number
+ fresh: boolean
+ listed: boolean
+ favorited: boolean
+ lastAppliedAt: string
+ mine: boolean
+ recommendedModels: string[]
+}
+
+const models = (v: unknown) => (Array.isArray(v) ? (v as unknown[]).map(str).filter(Boolean) : [])
+
+export function readPresetRows(raw: unknown): PresetRow[] {
  const items = Array.isArray((raw as { items?: unknown })?.items) ? (raw as { items: Record<string, unknown>[] }).items : []
- return items.filter((p) => str(p.id)).map((p) => ({
-  id: str(p.id), title: str(p.title),
-  recommendedModels: Array.isArray(p.recommendedModels) ? (p.recommendedModels as unknown[]).map(str).filter(Boolean) : [],
- }))
+ return items.map((p) => ({
+  id: str(p.presetId) || str(p.id), title: str(p.title), author: str(p.authorName),
+  usesLast7d: Number(p.usesLast7d) || 0, fresh: p.fresh === true, listed: p.listed !== false, favorited: p.favorited === true,
+  lastAppliedAt: str(p.lastAppliedAt), mine: p.mine === true, recommendedModels: models(p.recommendedModels),
+ })).filter((p) => p.id)
+}
+
+/** 測試過的模型存的是 series:<系列>／model:<模型>（網頁同一個規則）；畫布只顯示名稱。 */
+export function modelValueName(value: string): string {
+ if (value.startsWith('series:')) return value.slice(7)
+ if (value.startsWith('model:')) return value.slice(6)
+ return value
 }
 
 export type PresetFailure = 'busy' | 'conflict' | 'gone' | 'capacity' | 'loadFailed' | 'modelSettingUnsupported' | 'unknown' | 'failed'
@@ -94,6 +114,18 @@ export interface PresetApi {
  list(): Promise<unknown>
  /** 套用到整張卡；presetId 是 null 就是取消套用。expectedVersion 是讀到的綁定版本。 */
  apply(presetId: string | null, expectedVersion: number, key: string): Promise<unknown>
+ /** 喜愛（收藏在前）與用過，別人的預設；自己的不列 */
+ shelf?(): Promise<unknown>
+ /** 預設庫熱門（依目前線路篩選） */
+ hot?(model: string): Promise<unknown>
+ /** 預設庫：model＝線路代號、model:X、series:S、general 或 all；sort 熱門或最新 */
+ library?(query: { model: string; q: string; sort: 'hot' | 'new'; offset: number; limit: number }): Promise<unknown>
+ /** 加入或取消喜愛（冪等） */
+ favorite?(presetId: string, on: boolean): Promise<unknown>
+ /** 到宿主站看這份預設的內容 */
+ view?(presetId: string): void
+ /** 目前對話的線路代號與卡名（預設庫抽屜要用） */
+ context?(): { model: string; card: string }
  /** 模型代碼 → 站上公開的名稱；查不到就顯示代碼 */
  modelName?(value: string): string
  /** 到宿主站的「我的預設」；宿主沒給就不畫這個連結 */

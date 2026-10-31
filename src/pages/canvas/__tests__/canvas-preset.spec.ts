@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { lockedPatch, presetFailure, presetLockedOf, readBinding, readPresetChoices } from '../canvas-preset'
+import { lockedPatch, modelValueName, presetFailure, presetLockedOf, readBinding, readPresetRows } from '../canvas-preset'
 
 // 跟著作者走（owner 2026-10-30）：卡綁的是預設本身，沒有版本
 const binding = (over: Record<string, unknown> = {}) => ({ scope: 'card', mode: 'preset', presetId: 'p1', presetTitle: '細膩', bindingVersion: 3, state: 'ready', cacheEffect: 'none', ...over })
@@ -19,13 +19,14 @@ it('keeps an unavailable binding as unavailable instead of falling back', () => 
  expect(readBinding(binding({ state: 'unavailable' })).state).toBe('unavailable')
 })
 
-it('lists the presets the server returns, by id and name only', () => {
- const list = readPresetChoices({ items: [
-  { id: 'p1', title: 'A', recommendedModels: ['m1'] },
-  { id: '', title: 'broken' },
-  { id: 'p2', title: 'B' },
- ] })
- expect(list).toEqual([{ id: 'p1', title: 'A', recommendedModels: ['m1'] }, { id: 'p2', title: 'B', recommendedModels: [] }])
+it('reads my presets (id) and shelf, hot and library rows (presetId) into one row shape', () => {
+ const mine = readPresetRows({ items: [{ id: 'p1', title: 'A', recommendedModels: ['model:Gemini 4'] }, { id: '', title: 'broken' }] })
+ expect(mine).toEqual([{ id: 'p1', title: 'A', author: '', usesLast7d: 0, fresh: false, listed: true, favorited: false, lastAppliedAt: '', mine: false, recommendedModels: ['model:Gemini 4'] }])
+ const shelf = readPresetRows({ items: [{ presetId: 'x9', title: 'B', authorName: '小麥', usesLast7d: 42, listed: false, favorited: true, lastAppliedAt: '2026-10-27T00:00:00Z', mine: false }] })
+ expect(shelf[0]).toMatchObject({ id: 'x9', author: '小麥', usesLast7d: 42, listed: false, favorited: true, lastAppliedAt: '2026-10-27T00:00:00Z' })
+ expect(modelValueName('series:DeepSeek')).toBe('DeepSeek')
+ expect(modelValueName('model:Gemini 4')).toBe('Gemini 4')
+ expect(modelValueName('old-lane')).toBe('old-lane')
 })
 
 it('classifies apply failures into what the player can do next', () => {

@@ -61,6 +61,9 @@ export const requestUrl = {
 	playerCompactPreference: `${V1}/player/compact-preference`,
 	// 玩家自己的預設（在宿主站「我的預設」建立／匯入）：列出可選的、這段對話或這張卡的新存檔綁哪一版、套用
 	presetList: `${V1}/presets`,
+	presetShelf: `${V1}/preset-shelf`,
+	presetLibrary: `${V1}/preset-library`,
+	presetLibraryHot: `${V1}/preset-library/hot`,
 	playerPresetDefault: `${V1}/player/preset-default`,
 	playerPresetDefaultSave: `${V1}/player/preset-default/save`,
 	getModelListV2: `${V1}/models`,

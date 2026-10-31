@@ -63,6 +63,8 @@ export interface StageHost {
     toPresets?(): void
     /** 到宿主站的「長期指令」頁（管理指令組）。不實作就不畫那個連結。 */
     toInstructions?(): void
+    /** 到宿主站看某一份預設的內容（預設詳情頁）。不實作就不畫「在網站查看內容」。 */
+    toPreset?(presetId: string): void
   }
   locale: {
     get(): string

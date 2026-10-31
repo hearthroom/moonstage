@@ -9,7 +9,7 @@ const lockedSettings = (over: Record<string, unknown> = {}) => settings({ styleS
 const cardDefault = { mode: 'card_default', presetId: null, bindingVersion: 0, state: 'ready' }
 // 跟著作者走（owner 2026-10-30）：卡綁的是預設本身，沒有版本
 const bound = (over: Record<string, unknown> = {}) => ({ scope: 'card', mode: 'preset', presetId: 'p1', bindingVersion: 2, presetTitle: '細膩', state: 'ready', ...over })
-const list = { items: [{ id: 'p1', title: '細膩', recommendedModels: ['m-1'] }] }
+const list = { items: [{ id: 'p1', title: '細膩', recommendedModels: ['model:Model One'] }] }
 const t = (k: string, v?: Record<string, unknown>) => (v ? `${k}${JSON.stringify(v)}` : k)
 const frame = { sandboxLevel: 'standard', jailbreak: '', defaultJailbreak: '', options: [{ value: 'light', label: '輕量' }, { value: 'standard', label: '標準' }], maxLength: 2000 }
 
@@ -25,33 +25,38 @@ it('changes nothing when the page does not offer presets', async () => {
  wrapper.unmount()
 })
 
-it('lists my presets at the bottom and applies the picked one to the whole card', async () => {
+it('the preset section sits at the bottom; picking opens a layer with my presets and applies the picked one to the whole card', async () => {
  const load = vi.fn().mockResolvedValueOnce(settings()).mockResolvedValue(lockedSettings())
  const presets = api({ card: vi.fn().mockResolvedValueOnce(cardDefault).mockResolvedValue(bound()) })
  const wrapper = mount(Panel, { props: { conversationId: 'c1', load, save: vi.fn(), t, presets, frame, saveFrame: vi.fn() } })
  await flushPromises()
  const section = wrapper.get('[data-lt="response-preset"]')
- // 放在面板最下面（破甲那段之後），直接列出來，不用另開一層
+ // 放在面板最下面（破甲那段之後）
  expect(section.element.compareDocumentPosition(wrapper.get('[data-lt="response-frame"]').element) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
- expect(section.text()).toContain('responseSettings.preset.source')
  expect(section.text()).toContain('responseSettings.preset.hint.off')
- expect(section.text()).toContain('responseSettings.preset.hint.takeover')
- // 沒有範圍可選，也沒有「不用預設」那個選項；不顯示版本
- expect(section.findAll('.preset-option').map((o) => o.attributes('data-value'))).toEqual(['p1'])
- expect(section.find('[data-axis="preset-scope"]').exists()).toBe(false)
- expect(section.text()).toContain('Model One')
- expect(section.get('[data-action="preset-apply"]').attributes('disabled')).toBeDefined()
  expect(section.find('[data-action="preset-stop"]').exists()).toBe(false)
- await section.get('.preset-option[data-value="p1"]').trigger('click')
- await section.get('[data-action="preset-apply"]').trigger('click'); await flushPromises()
+ expect(section.get('[data-action="preset-pick"]').text()).toBe('responseSettings.preset.pick.title')
+ await section.get('[data-action="preset-pick"]').trigger('click'); await flushPromises()
+ const picker = wrapper.get('[data-lt="preset-picker"]')
+ expect(wrapper.get('.response-settings-main').isVisible()).toBe(false)
+ expect(picker.get('[role="tab"][aria-selected="true"]').attributes('data-tab')).toBe('mine')
+ // 第一列是「不用預設」；測試過的模型只顯示名稱；不顯示版本
+ expect(picker.findAll('.preset-option').map((o) => o.attributes('data-value'))).toEqual(['', 'p1'])
+ expect(picker.text()).toContain('Model One')
+ expect(picker.get('[data-action="preset-apply"]').attributes('disabled')).toBeDefined()
+ await picker.get('.preset-option[data-value="p1"]').trigger('click')
+ expect(picker.get('[data-action="preset-apply"]').text()).toBe(t('responseSettings.preset.pick.apply', { name: '細膩' }))
+ expect(picker.text()).toContain('responseSettings.preset.pick.follow')
+ await picker.get('[data-action="preset-apply"]').trigger('click'); await flushPromises()
  expect(presets.apply).toHaveBeenCalledWith('p1', 0, expect.any(String))
+ // 套用好回到偏好那一層，結果寫在自訂預設那一區；偏好重讀，接管的項目收起
+ expect(wrapper.find('[data-lt="preset-picker"]').exists()).toBe(false)
  expect(wrapper.get('[data-lt="preset-message"]').text()).toBe(t('responseSettings.preset.applied', { name: '細膩' }))
- expect(section.text()).not.toMatch(/v\d/)
+ expect(wrapper.text()).not.toMatch(/v\d/)
  expect(load).toHaveBeenCalledTimes(2)
  expect(wrapper.find('[data-lt="preset-takeover"]').exists()).toBe(true)
  wrapper.unmount()
 })
-
 it('while a preset is applied, the settings it decides fold into one line and are left out of saves', async () => {
  const save = vi.fn(async (_id: string, rev: number) => lockedSettings({ revision: rev + 1, overrides: { length: 'recommended' } }))
  const saveFrame = vi.fn(async () => true)
@@ -90,26 +95,26 @@ it('tells the player when a reply is still running', async () => {
  const presets = api({ apply: vi.fn(async () => { throw { statusCode: 409, data: { error: 'preset_conflict', reason: 'operation_active' } } }) })
  const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => settings(), save: vi.fn(), t, presets } })
  await flushPromises()
+ await wrapper.get('[data-action="preset-pick"]').trigger('click'); await flushPromises()
  await wrapper.get('.preset-option[data-value="p1"]').trigger('click')
  await wrapper.get('[data-action="preset-apply"]').trigger('click'); await flushPromises()
  expect(presets.apply).toHaveBeenCalledWith('p1', 0, expect.any(String))
- expect(wrapper.get('[data-lt="preset-message"]').text()).toBe('responseSettings.preset.busy')
+ expect(wrapper.get('[data-lt="preset-picker"] [data-lt="preset-message"]').text()).toBe('responseSettings.preset.busy')
  wrapper.unmount()
 })
-
 it('a preset deleted after the list loaded says so and the list is read again without it', async () => {
  const listCall = vi.fn().mockResolvedValueOnce(list).mockResolvedValue({ items: [] })
  const presets = api({ list: listCall, apply: vi.fn(async () => { throw { statusCode: 404, data: { error: 'not_found' } } }) })
  const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => settings(), save: vi.fn(), t, presets } })
  await flushPromises()
+ await wrapper.get('[data-action="preset-pick"]').trigger('click'); await flushPromises()
  await wrapper.get('.preset-option[data-value="p1"]').trigger('click')
  await wrapper.get('[data-action="preset-apply"]').trigger('click'); await flushPromises()
  expect(listCall).toHaveBeenCalledTimes(2)
  expect(wrapper.find('.preset-option[data-value="p1"]').exists()).toBe(false)
- expect(wrapper.get('[data-lt="preset-message"]').text()).toBe('responseSettings.preset.gone')
+ expect(wrapper.get('[data-lt="preset-picker"] [data-lt="preset-message"]').text()).toBe('responseSettings.preset.gone')
  wrapper.unmount()
 })
-
 it('removing the preset clears it for the whole card', async () => {
  const presets = api({ card: vi.fn().mockResolvedValueOnce(bound()).mockResolvedValue(cardDefault), apply: vi.fn(async () => cardDefault) })
  const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => lockedSettings(), save: vi.fn(), t, presets } })
@@ -174,11 +179,66 @@ it('an applied preset the author deleted stays shown as current instead of being
  const presets = api({ card: vi.fn(async () => bound({ presetId: 'p9', presetTitle: '刪掉的' })) })
  const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => lockedSettings(), save: vi.fn(), t, presets } })
  await flushPromises()
- expect(wrapper.get('.preset-option[data-value="current"]').attributes('aria-checked')).toBe('true')
+ expect(wrapper.get('[data-lt="preset-current"]').text()).toBe('刪掉的')
+ expect(wrapper.get('[data-lt="response-preset"]').text()).toContain('responseSettings.preset.pick.tag.inUse')
+ await wrapper.get('[data-action="preset-pick"]').trigger('click'); await flushPromises()
+ expect(wrapper.get('.preset-option[data-value="p9"]').attributes('aria-checked')).toBe('true')
  expect(wrapper.get('[data-action="preset-apply"]').attributes('disabled')).toBeDefined()
  wrapper.unmount()
 })
 
+it('picker tabs: favourites then recently used (unlisted marked), the library tab shows the top three for this model and browse only when the page can open the library', async () => {
+ const shelfRows = { items: [
+  { presetId: 'f1', title: '電影感長篇', authorName: 'Aster', favorited: true, listed: true },
+  { presetId: 'u1', title: '靜夜獨白', authorName: '沐雨', favorited: false, listed: false, lastAppliedAt: '2026-10-27T00:00:00Z' },
+ ] }
+ const hotRows = { items: [1, 2, 3, 4].map((n) => ({ presetId: `h${n}`, title: `熱門${n}`, authorName: `作者${n}`, usesLast7d: 10 * n })) }
+ const hot = vi.fn(async () => hotRows), view = vi.fn()
+ const presets = api({ shelf: vi.fn(async () => shelfRows), hot, view, context: () => ({ model: 'm-1', card: '測試卡' }) })
+ const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => settings(), save: vi.fn(), t, presets } })
+ await flushPromises()
+ await wrapper.get('[data-action="preset-pick"]').trigger('click'); await flushPromises()
+ expect(hot).not.toHaveBeenCalled()
+ await wrapper.get('[role="tab"][data-tab="fav"]').trigger('click'); await flushPromises()
+ const picker = wrapper.get('[data-lt="preset-picker"]')
+ expect(picker.text()).toContain('responseSettings.preset.pick.group.fav')
+ expect(picker.text()).toContain('responseSettings.preset.pick.group.used')
+ expect(picker.get('.preset-option[data-value="u1"]').text()).toContain('responseSettings.preset.unlisted')
+ expect(picker.get('.preset-option[data-value="u1"]').text()).toContain(t('responseSettings.preset.pick.used.on', { date: '10/27' }))
+ await picker.findAll('[data-action="preset-view"]')[0]!.trigger('click')
+ expect(view).toHaveBeenCalledWith('f1')
+ await wrapper.get('[role="tab"][data-tab="public"]').trigger('click'); await flushPromises()
+ expect(hot).toHaveBeenCalledWith('m-1')
+ expect(wrapper.text()).toContain(t('responseSettings.preset.pick.group.hotModel', { model: 'Model One' }))
+ expect(wrapper.findAll('.preset-option').map((o) => o.attributes('data-value'))).toEqual(['', 'h1', 'h2', 'h3'])
+ expect(wrapper.find('[data-action="preset-browse"]').exists()).toBe(false)
+ // 返回回到偏好那一層
+ await wrapper.get('[data-action="preset-back"]').trigger('click'); await flushPromises()
+ expect(wrapper.find('[data-lt="preset-picker"]').exists()).toBe(false)
+ expect(wrapper.get('.response-settings-main').isVisible()).toBe(true)
+ wrapper.unmount()
+})
+
+it('choosing "no preset" in the picker removes it from the card; the applied one is tagged in use', async () => {
+ const presets = api({ card: vi.fn().mockResolvedValueOnce(bound()).mockResolvedValue(cardDefault), apply: vi.fn(async () => cardDefault) })
+ const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => lockedSettings(), save: vi.fn(), t, presets } })
+ await flushPromises()
+ await wrapper.get('[data-action="preset-pick"]').trigger('click'); await flushPromises()
+ expect(wrapper.get('.preset-option[data-value="p1"]').text()).toContain('responseSettings.preset.pick.tag.inUse')
+ await wrapper.get('.preset-option[data-value=""]').trigger('click')
+ expect(wrapper.get('[data-action="preset-apply"]').text()).toBe('responseSettings.preset.useCard')
+ await wrapper.get('[data-action="preset-apply"]').trigger('click'); await flushPromises()
+ expect(presets.apply).toHaveBeenCalledWith(null, 2, expect.any(String))
+ wrapper.unmount()
+})
+
+it('the section says when the applied preset is no longer public', async () => {
+ const presets = api({ card: vi.fn(async () => bound({ presetId: 'u1', presetTitle: '靜夜獨白' })), shelf: vi.fn(async () => ({ items: [{ presetId: 'u1', title: '靜夜獨白', listed: false }] })) })
+ const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => lockedSettings(), save: vi.fn(), t, presets } })
+ await flushPromises()
+ expect(wrapper.get('[data-lt="preset-unlisted"]').text()).toContain('responseSettings.preset.unlisted.hint')
+ wrapper.unmount()
+})
 it('when the result never comes back, re-reads the binding and reports what actually happened', async () => {
  vi.useFakeTimers()
  const card = vi.fn().mockResolvedValueOnce(bound()).mockResolvedValue(cardDefault)

@@ -10478,6 +10478,12 @@ const presetApi = computed<PresetApi | undefined>(() => presetSettingsVersion.va
     return value
   },
   ...(stageHost.nav.toPresets ? { manage: () => stageHost.nav.toPresets!() } : {}),
+  // 喜愛與用過、熱門：別人公開的預設也能直接套用（P2 分享）
+  shelf: () => presetCall('get', _this.requestUrl.presetShelf, { limit: 50 }),
+  hot: (model) => presetCall('get', _this.requestUrl.presetLibraryHot, { model }),
+  favorite: (presetId, on) => presetCall('post', `${_this.requestUrl.presetLibrary}/${encodeURIComponent(presetId)}/favorite`, { favorite: on }),
+  ...(stageHost.nav.toPreset ? { view: (presetId: string) => stageHost.nav.toPreset!(presetId) } : {}),
+  context: () => ({ model: String(formData.selectModel || ''), card: String((roleView.value as any)?.roleName || '') }),
 })
 // quiet：背景讀取（內容限制卡的流式值）不跳網路錯誤提示，玩家沒做任何事；面板的讀取照舊。
 async function loadResponseSettings(id: string, quiet = false) {

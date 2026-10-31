@@ -6,6 +6,10 @@
     都掛「補充說明」與「恢復預設」，整頁擠成一片，玩家看不出重點（owner 2026-09-27 截圖）。
     補充說明是進階用法，收進底部的「進階」，跟人設頁的破限詞同一個位置。
   -->
+  <!-- 自訂預設選擇器是同一個面板裡的一層：偏好那一層只是藏起來，草稿與捲動位置都留著 -->
+  <CanvasPresetPicker v-if="pickerOpen && presets && binding" :api="presets" :binding="binding" :mine="choices" :shelf="shelf" :confirm-leave="confirmLeave" :t="t"
+   @back="closePicker" @changed="refreshAfterPreset" @stale="loadPreset" @applied="pickerApplied" @browse="emit('browse')" />
+  <div v-show="!pickerOpen" class="response-settings-main">
   <div class="header-scope">
    <div class="header-box"><div class="page-title">{{ t('responseSettings.title') }}</div></div>
   </div>
@@ -116,8 +120,8 @@
   </template>
 
   <!-- 自訂預設直接列在最下面，不收折（owner 2026-10-30）。世界模式不開放。 -->
-  <CanvasPresetSection v-if="presets && !worldMode && binding" :api="presets" :binding="binding" :choices="choices" :disabled="loading || saving"
-   :tool-note="toolReplyNote" :confirm-leave="confirmLeave" :t="t" @changed="refreshAfterPreset" @stale="loadPreset" />
+  <CanvasPresetSection v-if="presets && !worldMode && binding" :api="presets" :binding="binding" :unlisted="currentUnlisted" :notice="presetNotice" :disabled="loading || saving"
+   :tool-note="toolReplyNote" :confirm-leave="confirmLeave" :t="t" @changed="refreshAfterPreset" @stale="loadPreset" @pick="openPicker" />
   <p v-else-if="presets && !worldMode && presetError" class="mode-hint response-error" role="alert" data-lt="preset-error">{{ presetError }}</p>
 
   <div class="role-setting__actions">
@@ -125,6 +129,7 @@
    <button v-if="saved || frame" type="button" class="complete-btn" data-action="save" :disabled="!canSave" @click="submit">
     {{ t(saving ? 'responseSettings.saving' : 'responseSettings.save') }}
    </button>
+  </div>
   </div>
  <!-- 另一個 top-layer 彈層：不跟偏好內容一起捲動，也不會落在父彈層底下。 -->
  <CanvasPopup class="response-discard" :open="discardAsked" :title="t('responseSettings.discard')" :close-label="t('responseSettings.keepEditing')"
@@ -146,7 +151,8 @@ import MsSwitch from '../../../components/model-select/ms-switch.vue'
 import CanvasPopup from './canvas-popup.vue'
 import { CanvasTextField } from './canvas-field'
 import CanvasPresetSection from './canvas-preset-section.vue'
-import { lockedPatch, presetLockedOf, readBinding, readPresetChoices, type PresetApi, type PresetBinding, type PresetChoice } from '../canvas-preset'
+import CanvasPresetPicker from './canvas-preset-picker.vue'
+import { lockedPatch, presetLockedOf, readBinding, readPresetRows, type PresetApi, type PresetBinding, type PresetRow } from '../canvas-preset'
 import { lengthMode, lengthTargetLadder, lengthTargetOf, lengthZone, maxResponseNoteLength, readResponseSettings, responseAxes, responseBase, responseNoteKeys, responsePatch, type LengthZone, type ResponseAxis, type ResponseDraft, type ResponseSettings } from '../canvas-response-settings'
 const props=defineProps<{
  conversationId:string
@@ -160,7 +166,8 @@ const props=defineProps<{
  // 伺服器說這段對話能用預設時，頁面才給；沒給就完全照舊。
  presets?:PresetApi
 }>()
-const emit=defineEmits<{ (e: 'close'): void }>()
+// browse：開預設庫抽屜（畫布那一層畫，面板不管）
+const emit=defineEmits<{ (e: 'close'): void; (e: 'browse'): void }>()
 const saved=ref<ResponseSettings|null>(null),draft=ref<ResponseDraft>({}),loading=ref(false),saving=ref(false),error=ref('')
 let alive=true
 const discardAsked=ref(false)
@@ -307,7 +314,15 @@ async function submit(){
  if(done && alive)emit('close')
 }
 // ── 自訂預設 ──────────────────────────────────────────────
-const binding=ref<PresetBinding|null>(null),choices=ref<PresetChoice[]>([]),presetError=ref('')
+const binding=ref<PresetBinding|null>(null),choices=ref<PresetRow[]>([]),presetError=ref('')
+// 喜愛與用過：也拿來知道目前套用的那份是不是已不公開（自己的預設不會出現在這裡）
+const shelf=ref<PresetRow[]|null>(null)
+const currentUnlisted=computed(()=>!!binding.value?.presetId && !!shelf.value?.some(p=>p.id===binding.value!.presetId && !p.listed))
+const pickerOpen=ref(false),presetNotice=ref('')
+function openPicker(){presetNotice.value='';pickerOpen.value=true}
+function closePicker(){pickerOpen.value=false;void nextTick(()=>document.querySelector<HTMLElement>('[data-action="preset-pick"]')?.focus())}
+// 選擇器裡套用成功：回到偏好那一層，結果寫在自訂預設那一區
+function pickerApplied(message:string){presetNotice.value=message;closePicker()}
 // 哪幾項由預設決定以伺服器為準（response-settings 的 presetLocked），不從綁定自己推。
 const locked=computed(()=>presetLockedOf(saved.value))
 // 破甲強度與破限詞也由預設決定時，整段收起；沒改就不會送，存卡設定時自然不帶這兩鍵
@@ -321,12 +336,13 @@ const toolReplyNote=computed(()=>toolReplyStatus.value==='model_unsupported' ? p
 async function loadPreset(){
  if(!props.presets || props.worldMode)return
  presetError.value=''
- const [b,list]=await Promise.allSettled([props.presets.card(),props.presets.list()])
+ const [b,list,fav]=await Promise.allSettled([props.presets.card(),props.presets.list(),props.presets.shelf ? props.presets.shelf() : Promise.resolve(null)])
  if(!alive)return
  // 重讀失敗就留著上一次讀到的：不讓預設那一區連同錯誤訊息一起消失
  if(b.status==='fulfilled'){try{binding.value=readBinding(b.value)}catch{if(!binding.value)presetError.value=props.t('responseSettings.preset.loadFailed')}}
  else if(!binding.value)presetError.value=props.t('responseSettings.preset.loadFailed')
- choices.value=list.status==='fulfilled' ? readPresetChoices(list.value) : []
+ choices.value=list.status==='fulfilled' ? readPresetRows(list.value) : []
+ shelf.value=fav.status==='fulfilled' && fav.value ? readPresetRows(fav.value) : null
 }
 // 套用後面板會重讀偏好，沒存的修改會不見：先問
 const confirmLeave=async()=>!responseDirty.value || await askDiscard()
@@ -335,11 +351,15 @@ async function refreshAfterPreset(){
  await loadPreset()
 }
 onMounted(()=>{void reload();void loadPreset()})
-defineExpose({mayClose})
+// 選擇器開著時按關閉：整個面板一起關（跟偏好那一層一樣先問沒存的修改）；回上一層用選擇器自己的返回
+async function mayCloseAll(){const ok=await mayClose();if(ok)pickerOpen.value=false;return ok}
+defineExpose({mayClose:mayCloseAll,closePicker})
 </script>
 
 <style scoped>
 @layer lt-base {
+ /* 偏好那一層的外框：不另成一層排版，子元素照樣排在面板裡 */
+ .response-settings-main{display:contents}
  .response-discard :deep(.u-popup__content){width:min(440px,calc(100vw - 32px))}
  .response-discard :deep(.u-popup__content__close){display:none}
  .response-discard-body{display:flex;flex-direction:column;gap:16px}
