@@ -40,6 +40,7 @@ export function readBinding(raw: unknown): PresetBinding {
  * listed:false＝作者改回私人或被下架；喜愛或用過的人照常可以套用（owner 2026-10-30）。
  */
 export interface PresetRow {
+ purpose: '' | 'general' | 'specific'
  id: string
  title: string
  author: string
@@ -57,6 +58,7 @@ const models = (v: unknown) => (Array.isArray(v) ? (v as unknown[]).map(str).fil
 export function readPresetRows(raw: unknown): PresetRow[] {
  const items = Array.isArray((raw as { items?: unknown })?.items) ? (raw as { items: Record<string, unknown>[] }).items : []
  return items.map((p) => ({
+  purpose: p.purpose === 'general' || p.purpose === 'specific' ? p.purpose : '',
   id: str(p.presetId) || str(p.id), title: str(p.title), author: str(p.authorName),
   usesLast7d: Number(p.usesLast7d) || 0, fresh: p.fresh === true, listed: p.listed !== false, favorited: p.favorited === true,
   lastAppliedAt: str(p.lastAppliedAt), mine: p.mine === true, recommendedModels: models(p.recommendedModels),
@@ -128,6 +130,8 @@ export interface PresetApi {
  context?(): { model: string; card: string }
  /** 模型代碼 → 站上公開的名稱；查不到就顯示代碼 */
  modelName?(value: string): string
+ /** Match series/model labels against the live catalog, never display substrings. */
+ modelMatches?(models: string[], value: string): boolean
  /** 到宿主站的「我的預設」；宿主沒給就不畫這個連結 */
  manage?(): void
 }
@@ -144,4 +148,23 @@ export async function applyOnce(call: (key: string) => Promise<unknown>, onUnkno
    await wait(1500 * (attempt + 1))
   }
  }
+}
+
+
+export function presetModelsMatch(models: string[], value: string, groups: {group: string; families: {family: string; variants?: {value: string}[]}[]}[]): boolean {
+ let family = value.startsWith('model:') ? value.slice(6) : ''
+ let series = value.startsWith('series:') ? value.slice(7) : ''
+ for (const group of groups) for (const f of group.families ?? []) {
+  if (f.family === family || (f.variants ?? []).some(v => v.value === value)) { family = f.family; series = group.group }
+ }
+ return models.some(m => m === value || (m.startsWith('model:') && !!family && m.slice(6) === family) || (m.startsWith('series:') && !!series && m.slice(7) === series))
+}
+
+export function presetPurposeLine(row: PresetRow, model: string, api: PresetApi, t: (key: string, values?: Record<string, unknown>) => string): string {
+ if (!row.purpose) return ''
+ const parts = [t(`responseSettings.preset.purpose.${row.purpose}`)]
+ const matches = !!model && (api.modelMatches?.(row.recommendedModels, model) ?? row.recommendedModels.includes(model))
+ if (row.purpose === 'general' && matches) parts.push(t('responseSettings.preset.purpose.tested'))
+ if (row.purpose === 'specific' && model && !matches) parts.push(t('responseSettings.preset.purpose.recommendation', {models: row.recommendedModels.map(modelValueName).join(t('responseSettings.preset.separator'))}))
+ return parts.join(' · ')
 }

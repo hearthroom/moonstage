@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { lockedPatch, modelValueName, presetFailure, presetLockedOf, readBinding, readPresetRows } from '../canvas-preset'
+import { presetModelsMatch, presetPurposeLine, lockedPatch, modelValueName, presetFailure, presetLockedOf, readBinding, readPresetRows } from '../canvas-preset'
 
 // 跟著作者走（owner 2026-10-30）：卡綁的是預設本身，沒有版本
 const binding = (over: Record<string, unknown> = {}) => ({ scope: 'card', mode: 'preset', presetId: 'p1', presetTitle: '細膩', bindingVersion: 3, state: 'ready', cacheEffect: 'none', ...over })
@@ -20,8 +20,8 @@ it('keeps an unavailable binding as unavailable instead of falling back', () => 
 })
 
 it('reads my presets (id) and shelf, hot and library rows (presetId) into one row shape', () => {
- const mine = readPresetRows({ items: [{ id: 'p1', title: 'A', recommendedModels: ['model:Gemini 4'] }, { id: '', title: 'broken' }] })
- expect(mine).toEqual([{ id: 'p1', title: 'A', author: '', usesLast7d: 0, fresh: false, listed: true, favorited: false, lastAppliedAt: '', mine: false, recommendedModels: ['model:Gemini 4'] }])
+ const mine = readPresetRows({ items: [{ purpose: '', id: 'p1', title: 'A', recommendedModels: ['model:Gemini 4'] }, { id: '', title: 'broken' }] })
+ expect(mine).toEqual([{ purpose: '', id: 'p1', title: 'A', author: '', usesLast7d: 0, fresh: false, listed: true, favorited: false, lastAppliedAt: '', mine: false, recommendedModels: ['model:Gemini 4'] }])
  const shelf = readPresetRows({ items: [{ presetId: 'x9', title: 'B', authorName: '小麥', usesLast7d: 42, listed: false, favorited: true, lastAppliedAt: '2026-10-27T00:00:00Z', mine: false }] })
  expect(shelf[0]).toMatchObject({ id: 'x9', author: '小麥', usesLast7d: 42, listed: false, favorited: true, lastAppliedAt: '2026-10-27T00:00:00Z' })
  expect(modelValueName('series:DeepSeek')).toBe('DeepSeek')
@@ -60,4 +60,21 @@ it('reads which settings the preset decides from the server, and falls back to t
 
 it('treats the retired per-conversation scope as a version conflict: re-read and try again', () => {
  expect(presetFailure({ statusCode: 409, data: { error: 'preset_conflict', reason: 'preset_scope_changed' } })).toBe('conflict')
+})
+
+it('keeps a general purpose independent of the tested model list', () => {
+ const [row] = readPresetRows({ items: [{presetId:'tested-general', purpose:'general', recommendedModels:['model:Opus']}] })
+ expect(row).toMatchObject({purpose:'general',recommendedModels:['model:Opus']})
+})
+
+
+it('matches recommendation series and model labels with real lane membership', () => {
+ const groups = [{group:'Claude',families:[{family:'Opus',variants:[{value:'opus-lane'}]},{family:'Sonnet',variants:[{value:'sonnet-lane'}]}]}]
+ expect(presetModelsMatch(['model:Opus'],'opus-lane',groups)).toBe(true)
+ expect(presetModelsMatch(['series:Claude'],'sonnet-lane',groups)).toBe(true)
+ expect(presetModelsMatch(['model:Opus'],'sonnet-lane',groups)).toBe(false)
+ const row=readPresetRows({items:[{presetId:'p',purpose:'specific',recommendedModels:['model:Opus']}]})[0]
+ const t=(k:string,v?:Record<string,unknown>)=> k+(v ? JSON.stringify(v):'')
+ expect(presetPurposeLine(row,'sonnet-lane',{modelMatches:(m,v)=>presetModelsMatch(m,v,groups)} as any,t)).toContain('recommendation')
+ expect(presetPurposeLine({...row,purpose:'general'},'opus-lane',{modelMatches:(m,v)=>presetModelsMatch(m,v,groups)} as any,t)).toContain('tested')
 })

@@ -4383,7 +4383,7 @@
 	"responseSettings.preset.pick.filter.label": "模型筛选",
 	"responseSettings.preset.pick.filter.general": "通用",
 	"responseSettings.preset.pick.filter.all": "全部",
-	"responseSettings.preset.pick.sort.model": "列出在当前模型上测试过的预设，按近 7 天使用人数排序。",
+	"responseSettings.preset.pick.sort.model": "列出作者推荐或测试过当前模型的预设，按近 7 天使用人数排序。",
 	"responseSettings.preset.pick.list.more": "加载更多",
 	"responseSettings.preset.pick.group.fav": "喜爱",
 	"responseSettings.preset.pick.group.used": "最近用过",
@@ -4410,5 +4410,16 @@
 	"responseSettings.preset.pick.drawer.apply": "应用",
 	"responseSettings.preset.pick.fav.add": "加入喜爱",
 	"responseSettings.preset.pick.fav.remove": "取消喜爱",
-	"responseSettings.preset.pick.fresh": "新公开"
+	"responseSettings.preset.pick.fresh": "新公开",
+  "responseSettings.preset.purpose.label": "用途",
+  "responseSettings.preset.purpose.general": "通用",
+  "responseSettings.preset.purpose.general.hint": "各模型都能用",
+  "responseSettings.preset.purpose.specific": "特定模型",
+  "responseSettings.preset.purpose.specific.hint": "只推荐用在选定的模型",
+  "responseSettings.preset.purpose.models.general": "测试过的模型（选填）",
+  "responseSettings.preset.purpose.models.specific": "适用模型",
+  "responseSettings.preset.purpose.required": "选择用途",
+  "responseSettings.preset.purpose.models.required": "至少选一个模型",
+  "responseSettings.preset.purpose.tested": "已测试",
+  "responseSettings.preset.purpose.recommendation": "作者推荐用于：{models}"
 }

@@ -580,7 +580,7 @@ import { resolveStoredModel, composeModelDisplayName, isDeadLane } from './canva
 import { filterCardActions, isInputPolicyFilter, cardRetryTarget } from './canvas-filter-card'
 import { traditionalResendText } from './canvas-traditional-resend'
 import { readResponseSettings, responseBase, responsePatch } from './canvas-response-settings'
-import type { PresetApi } from './canvas-preset'
+import { presetModelsMatch, type PresetApi } from './canvas-preset'
 import {
   BREAKDOWN_META,
   contextRingFromReport,
@@ -10477,6 +10477,7 @@ const presetApi = computed<PresetApi | undefined>(() => presetSettingsVersion.va
   list: () => presetCall('get', _this.requestUrl.presetList, { limit: 50 }),
   // 只有一種範圍：整張卡（owner 2026-10-30）。scope 要明說，伺服器才知道這是新的整張卡語意
   apply: (presetId, expectedVersion, key) => presetCall('post', _this.requestUrl.playerPresetDefaultSave, { roleId: String(unref(roleId) || ''), scope: 'card', mode: presetId ? 'preset' : 'card_default', ...(presetId ? { presetId } : {}), expectedVersion }, key),
+  modelMatches: (models, value) => presetModelsMatch(models, value, modelGroups.value),
   modelName: (value) => {
     for (const group of modelGroups.value) for (const family of group?.families ?? []) if ((family?.variants ?? []).some((v: any) => v?.value === value)) return String(family.family || value)
     return value

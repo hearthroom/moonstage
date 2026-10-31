@@ -4383,7 +4383,7 @@
 	"responseSettings.preset.pick.filter.label": "모델 필터",
 	"responseSettings.preset.pick.filter.general": "범용",
 	"responseSettings.preset.pick.filter.all": "전체",
-	"responseSettings.preset.pick.sort.model": "현재 모델에서 테스트한 프리셋을 최근 7일 사용 인원 순으로 보여 줍니다.",
+	"responseSettings.preset.pick.sort.model": "현재 모델에 추천하거나 테스트한 프리셋을 최근 7일간 사용자 수 순으로 표시해요.",
 	"responseSettings.preset.pick.list.more": "더 보기",
 	"responseSettings.preset.pick.group.fav": "즐겨찾기",
 	"responseSettings.preset.pick.group.used": "최근 사용",
@@ -4410,5 +4410,16 @@
 	"responseSettings.preset.pick.drawer.apply": "적용",
 	"responseSettings.preset.pick.fav.add": "즐겨찾기에 추가",
 	"responseSettings.preset.pick.fav.remove": "즐겨찾기에서 제거",
-	"responseSettings.preset.pick.fresh": "새로 공개"
+	"responseSettings.preset.pick.fresh": "새로 공개",
+  "responseSettings.preset.purpose.label": "용도",
+  "responseSettings.preset.purpose.general": "범용",
+  "responseSettings.preset.purpose.general.hint": "모든 모델에서 사용",
+  "responseSettings.preset.purpose.specific": "특정 모델 전용",
+  "responseSettings.preset.purpose.specific.hint": "선택한 모델에만 추천",
+  "responseSettings.preset.purpose.models.general": "테스트한 모델(선택)",
+  "responseSettings.preset.purpose.models.specific": "추천 모델",
+  "responseSettings.preset.purpose.required": "용도 선택",
+  "responseSettings.preset.purpose.models.required": "모델을 하나 이상 선택",
+  "responseSettings.preset.purpose.tested": "테스트됨",
+  "responseSettings.preset.purpose.recommendation": "작성자 추천: {models}"
 }

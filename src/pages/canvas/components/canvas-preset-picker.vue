@@ -80,7 +80,7 @@
 import { computed, defineComponent, h, nextTick, onMounted, ref, watch, type PropType } from 'vue'
 import { syncChromeTone } from '../canvas-chrome-tone'
 import { usePresetApply } from '../canvas-preset-apply'
-import { modelValueName, readPresetRows, type PresetApi, type PresetBinding, type PresetRow } from '../canvas-preset'
+import { modelValueName, presetPurposeLine, readPresetRows, type PresetApi, type PresetBinding, type PresetRow } from '../canvas-preset'
 
 type Tab = 'mine' | 'fav' | 'public'
 const TABS: Tab[] = ['mine', 'fav', 'public']
@@ -130,7 +130,7 @@ const choice = ref<string>(currentId.value ?? NONE)
 const orphan = computed<PresetRow | null>(() => {
  const id = currentId.value
  if (!id || [...props.mine, ...(shelfRows.value ?? []), ...hotRows.value].some((p) => p.id === id)) return null
- return { id, title: current.value?.title ?? '', author: '', usesLast7d: 0, fresh: false, listed: true, favorited: false, lastAppliedAt: '', mine: false, recommendedModels: [] }
+ return { purpose: '', id, title: current.value?.title ?? '', author: '', usesLast7d: 0, fresh: false, listed: true, favorited: false, lastAppliedAt: '', mine: false, recommendedModels: [] }
 })
 const all = computed(() => [...(orphan.value ? [orphan.value] : []), ...props.mine, ...(shelfRows.value ?? []), ...hotRows.value])
 const picked = computed(() => (choice.value === NONE ? null : all.value.find((p) => p.id === choice.value) ?? null))
@@ -174,7 +174,7 @@ async function confirm() {
 const dateOf = (iso: string) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}/${d.getDate()}` }
 const unlisted = (p: PresetRow) => (p.listed ? [] : [props.t('responseSettings.preset.unlisted')])
 function testedLine(p: PresetRow) {
- return p.recommendedModels.length ? props.t('responseSettings.preset.pick.models', { models: p.recommendedModels.map(modelValueName).join(props.t('responseSettings.preset.separator')) }) : ''
+ return p.recommendedModels.length ? props.t(p.purpose === 'specific' ? 'responseSettings.preset.purpose.recommendation' : 'responseSettings.preset.pick.models', { models: p.recommendedModels.map(modelValueName).join(props.t('responseSettings.preset.separator')) }) : ''
 }
 function authorLine(p: PresetRow, withDate = false) {
  const date = withDate && p.lastAppliedAt ? dateOf(p.lastAppliedAt) : ''
@@ -199,6 +199,7 @@ const PresetRowItem = defineComponent({
       h('span', { class: 'preset-option-name' }, p.title),
       p.id === currentId.value ? h('span', { class: 'preset-option-tag' }, props.t('responseSettings.preset.pick.tag.inUse')) : null,
      ]),
+     presetPurposeLine(p, lane.value, props.api, props.t) ? h('span', { class: 'mode-hint', 'data-lt': 'preset-purpose' }, presetPurposeLine(p, lane.value, props.api, props.t)) : null,
      rowProps.sub ? h('span', { class: 'mode-hint' }, rowProps.sub) : null,
     ]),
     props.api.view ? h('button', { type: 'button', class: 'preset-row-view', 'data-action': 'preset-view', 'aria-label': props.t('responseSettings.preset.pick.view'), title: props.t('responseSettings.preset.pick.view'), onClick: () => props.api.view!(p.id) }, [

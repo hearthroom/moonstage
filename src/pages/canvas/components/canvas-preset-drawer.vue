@@ -32,6 +32,7 @@
        <strong class="preset-drawer-name">{{ p.title }}</strong>
        <span v-if="p.author" class="mode-hint">{{ p.author }}</span>
        <span class="mode-hint">{{ statLine(p) }}</span>
+       <span v-if="p.purpose" class="mode-hint" data-lt="drawer-purpose">{{ presetPurposeLine(p, lane, api, t) }}</span>
       </div>
       <button v-if="api.view" type="button" class="preset-drawer-icon" data-action="drawer-view" :aria-label="t('responseSettings.preset.pick.view')" :title="t('responseSettings.preset.pick.view')" @click="api.view!(p.id)">
        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M10 6H6a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -59,7 +60,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { usePresetApply } from '../canvas-preset-apply'
 import { leaveTopLayer, raiseToTopLayer } from '../canvas-top-layer'
 import { useCanvasModalFocus } from '../canvas-modal-focus'
-import { readBinding, readPresetRows, type PresetApi, type PresetBinding, type PresetRow } from '../canvas-preset'
+import { presetPurposeLine, readBinding, readPresetRows, type PresetApi, type PresetBinding, type PresetRow } from '../canvas-preset'
 
 const PAGE = 20
 

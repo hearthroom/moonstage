@@ -4383,7 +4383,7 @@
 	"responseSettings.preset.pick.filter.label": "モデルで絞り込み",
 	"responseSettings.preset.pick.filter.general": "汎用",
 	"responseSettings.preset.pick.filter.all": "すべて",
-	"responseSettings.preset.pick.sort.model": "現在のモデルでテストされたプリセットを、直近7日間の使用人数順に表示します。",
+	"responseSettings.preset.pick.sort.model": "現在のモデル向けにおすすめ、またはテスト済みのプリセットを、過去7日間の利用者数順に表示します。",
 	"responseSettings.preset.pick.list.more": "もっと見る",
 	"responseSettings.preset.pick.group.fav": "お気に入り",
 	"responseSettings.preset.pick.group.used": "最近使ったもの",
@@ -4410,5 +4410,16 @@
 	"responseSettings.preset.pick.drawer.apply": "適用",
 	"responseSettings.preset.pick.fav.add": "お気に入りに追加",
 	"responseSettings.preset.pick.fav.remove": "お気に入りから外す",
-	"responseSettings.preset.pick.fresh": "新着"
+	"responseSettings.preset.pick.fresh": "新着",
+  "responseSettings.preset.purpose.label": "用途",
+  "responseSettings.preset.purpose.general": "汎用",
+  "responseSettings.preset.purpose.general.hint": "どのモデルでも使える",
+  "responseSettings.preset.purpose.specific": "特定モデル向け",
+  "responseSettings.preset.purpose.specific.hint": "選んだモデルにだけおすすめ",
+  "responseSettings.preset.purpose.models.general": "テスト済みモデル（任意）",
+  "responseSettings.preset.purpose.models.specific": "おすすめモデル",
+  "responseSettings.preset.purpose.required": "用途を選択",
+  "responseSettings.preset.purpose.models.required": "モデルを1つ以上選択",
+  "responseSettings.preset.purpose.tested": "テスト済み",
+  "responseSettings.preset.purpose.recommendation": "作者のおすすめ：{models}"
 }

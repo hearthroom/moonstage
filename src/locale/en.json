@@ -4383,7 +4383,7 @@
 	"responseSettings.preset.pick.filter.label": "Filter by model",
 	"responseSettings.preset.pick.filter.general": "General",
 	"responseSettings.preset.pick.filter.all": "All",
-	"responseSettings.preset.pick.sort.model": "Presets tested on the current model, sorted by users in the last 7 days.",
+	"responseSettings.preset.pick.sort.model": "Presets recommended or tested for the current model, sorted by users in the last 7 days.",
 	"responseSettings.preset.pick.list.more": "Load more",
 	"responseSettings.preset.pick.group.fav": "Favorites",
 	"responseSettings.preset.pick.group.used": "Recently used",
@@ -4410,5 +4410,16 @@
 	"responseSettings.preset.pick.drawer.apply": "Apply",
 	"responseSettings.preset.pick.fav.add": "Add to favorites",
 	"responseSettings.preset.pick.fav.remove": "Remove from favorites",
-	"responseSettings.preset.pick.fresh": "New"
+	"responseSettings.preset.pick.fresh": "New",
+  "responseSettings.preset.purpose.label": "Use",
+  "responseSettings.preset.purpose.general": "General",
+  "responseSettings.preset.purpose.general.hint": "Works with any model",
+  "responseSettings.preset.purpose.specific": "Model-specific",
+  "responseSettings.preset.purpose.specific.hint": "Recommended only for the models you pick",
+  "responseSettings.preset.purpose.models.general": "Tested on (optional)",
+  "responseSettings.preset.purpose.models.specific": "Recommended models",
+  "responseSettings.preset.purpose.required": "Choose a use",
+  "responseSettings.preset.purpose.models.required": "Pick at least one model",
+  "responseSettings.preset.purpose.tested": "Tested",
+  "responseSettings.preset.purpose.recommendation": "Author recommends: {models}"
 }
