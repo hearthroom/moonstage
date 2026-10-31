@@ -4409,5 +4409,6 @@
 	"responseSettings.preset.pick.drawer.close": "Close and return to the conversation",
 	"responseSettings.preset.pick.drawer.apply": "Apply",
 	"responseSettings.preset.pick.fav.add": "Add to favorites",
-	"responseSettings.preset.pick.fav.remove": "Remove from favorites"
+	"responseSettings.preset.pick.fav.remove": "Remove from favorites",
+	"responseSettings.preset.pick.fresh": "New"
 }

@@ -4409,5 +4409,6 @@
 	"responseSettings.preset.pick.drawer.close": "닫고 대화로 돌아가기",
 	"responseSettings.preset.pick.drawer.apply": "적용",
 	"responseSettings.preset.pick.fav.add": "즐겨찾기에 추가",
-	"responseSettings.preset.pick.fav.remove": "즐겨찾기에서 제거"
+	"responseSettings.preset.pick.fav.remove": "즐겨찾기에서 제거",
+	"responseSettings.preset.pick.fresh": "새로 공개"
 }

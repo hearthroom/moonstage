@@ -107,3 +107,11 @@ it('the picker sets the readable text tone on its apply button, like the panel d
  expect(wrapper.get('[data-lt="preset-picker"] [data-action="preset-apply"]').attributes('data-lt-tone')).toMatch(/^(light|dark)$/)
  shell.remove()
 })
+
+it('a preset published this week that nobody has used yet reads as new, not as used by 0 people', async () => {
+ const presets = api({ library: vi.fn(async () => ({ items: [row(7, { usesLast7d: 0, fresh: true }), row(8, { usesLast7d: 0, fresh: false })] })) })
+ wrapper = mount(Drawer, { props: { api: presets, t }, attachTo: document.body })
+ await flushPromises()
+ expect(wrapper.get('[data-id="x7"]').text()).toContain('responseSettings.preset.pick.fresh')
+ expect(wrapper.get('[data-id="x8"]').text()).toContain(t('responseSettings.preset.pick.users7d', { n: 0 }))
+})

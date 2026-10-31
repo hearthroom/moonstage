@@ -123,7 +123,8 @@ async function toggleFav(p: PresetRow) {
   message.value = props.t('responseSettings.saveFailed'); failed.value = true
  } finally { faving.value = '' }
 }
-const statLine = (p: PresetRow) => props.t('responseSettings.preset.pick.users7d', { n: p.usesLast7d })
+// 公開未滿 7 天、還沒人用：寫「新公開」，不寫「近 7 天 0 人使用」（伺服器的 fresh）
+const statLine = (p: PresetRow) => (p.fresh && !p.usesLast7d ? props.t('responseSettings.preset.pick.fresh') : props.t('responseSettings.preset.pick.users7d', { n: p.usesLast7d }))
 
 // Esc 只關抽屜：攔在 capture，不讓底下的回覆偏好也一起關
 function onKey(e: KeyboardEvent) {

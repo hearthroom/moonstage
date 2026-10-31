@@ -4409,5 +4409,6 @@
 	"responseSettings.preset.pick.drawer.close": "关闭，回到对话",
 	"responseSettings.preset.pick.drawer.apply": "应用",
 	"responseSettings.preset.pick.fav.add": "加入喜爱",
-	"responseSettings.preset.pick.fav.remove": "取消喜爱"
+	"responseSettings.preset.pick.fav.remove": "取消喜爱",
+	"responseSettings.preset.pick.fresh": "新公开"
 }

@@ -180,8 +180,10 @@ function authorLine(p: PresetRow, withDate = false) {
  const date = withDate && p.lastAppliedAt ? dateOf(p.lastAppliedAt) : ''
  return [p.author, ...unlisted(p), ...(date ? [props.t('responseSettings.preset.pick.used.on', { date })] : [])].filter(Boolean).join(' · ')
 }
+// 公開未滿 7 天、還沒人用：寫「新公開」，不寫「近 7 天 0 人使用」（伺服器的 fresh）
+const usesOrFresh = (p: PresetRow) => (p.fresh && !p.usesLast7d ? props.t('responseSettings.preset.pick.fresh') : props.t('responseSettings.preset.pick.users7d', { n: p.usesLast7d }))
 function usesLine(p: PresetRow) {
- return [p.author, props.t('responseSettings.preset.pick.users7d', { n: p.usesLast7d })].filter(Boolean).join(' · ')
+ return [p.author, usesOrFresh(p)].filter(Boolean).join(' · ')
 }
 
 // 一列：選這份（單選）＋到網站看內容
