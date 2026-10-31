@@ -18,9 +18,9 @@
      <input v-model="query" type="search" data-lt="drawer-search" :placeholder="t('responseSettings.preset.pick.search.placeholder')" @input="search" />
     </label>
     <div class="preset-drawer-filters" role="group" :aria-label="t('responseSettings.preset.pick.filter.label')">
-     <button type="button" class="mode-item" :class="{ selected: filter === 'all' }" :aria-pressed="filter === 'all' ? 'true' : 'false'" data-filter="all" @click="setFilter('all')">{{ t('responseSettings.preset.pick.filter.all') }}</button>
-     <button type="button" class="mode-item" :class="{ selected: filter === 'general' }" :aria-pressed="filter === 'general' ? 'true' : 'false'" data-filter="general" @click="setFilter('general')">{{ t('responseSettings.preset.pick.filter.general') }}</button>
-     <button v-if="lane" type="button" class="mode-item" :class="{ selected: filter === lane }" :aria-pressed="filter === lane ? 'true' : 'false'" data-filter="model" @click="setFilter(lane)">{{ modelLabel }}</button>
+     <button type="button" class="preset-drawer-chip" :class="{ selected: filter === 'all' }" :aria-pressed="filter === 'all' ? 'true' : 'false'" data-filter="all" @click="setFilter('all')">{{ t('responseSettings.preset.pick.filter.all') }}</button>
+     <button type="button" class="preset-drawer-chip" :class="{ selected: filter === 'general' }" :aria-pressed="filter === 'general' ? 'true' : 'false'" data-filter="general" @click="setFilter('general')">{{ t('responseSettings.preset.pick.filter.general') }}</button>
+     <button v-if="lane" type="button" class="preset-drawer-chip" :class="{ selected: filter === lane }" :aria-pressed="filter === lane ? 'true' : 'false'" data-filter="model" @click="setFilter(lane)">{{ modelLabel }}</button>
     </div>
     <p v-if="filter === lane && lane" class="mode-hint">{{ t('responseSettings.preset.pick.sort.model') }}</p>
 
@@ -37,11 +37,11 @@
        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M10 6H6a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" /></svg>
       </button>
       <span v-if="p.id === currentId" class="preset-drawer-tag">{{ t('responseSettings.preset.pick.tag.inUse') }}</span>
-      <button v-else type="button" class="complete-btn preset-drawer-apply" data-action="drawer-apply" :disabled="busy" @click="choose(p)">{{ t('responseSettings.preset.pick.drawer.apply') }}</button>
+      <button v-else type="button" class="preset-drawer-apply" data-action="drawer-apply" :disabled="busy" @click="choose(p)">{{ t('responseSettings.preset.pick.drawer.apply') }}</button>
      </li>
     </ul>
     <p v-if="message" class="mode-hint" :class="{ 'response-error': failed }" role="status" data-lt="drawer-message">{{ message }}</p>
-    <button v-if="more" type="button" class="mode-item preset-drawer-more" data-action="drawer-more" :disabled="state === 'loading'" @click="load(true)">{{ t('responseSettings.preset.pick.list.more') }}</button>
+    <button v-if="more" type="button" class="preset-drawer-chip preset-drawer-more" data-action="drawer-more" :disabled="state === 'loading'" @click="load(true)">{{ t('responseSettings.preset.pick.list.more') }}</button>
    </div>
   </section>
  </div>
@@ -149,14 +149,17 @@ onBeforeUnmount(() => {
  .preset-drawer-body > p{margin:0}
  .preset-drawer-search input{width:100%;box-sizing:border-box;height:44px;padding:0 12px;border:1px solid var(--lt-canvas-sheet-line);border-radius:var(--lt-canvas-radius);background:var(--lt-canvas-sheet-item-bg);color:var(--lt-canvas-sheet-fg);font:inherit;font-size:16px}
  .preset-drawer-filters{display:flex;flex-wrap:wrap;gap:8px}
- .preset-drawer-filters .mode-item{min-height:44px}
+ .preset-drawer-chip{min-height:44px;padding:0 14px;border:1px solid var(--lt-canvas-sheet-line);border-radius:9999px;background:transparent;color:var(--lt-canvas-sheet-fg);font:inherit;font-size:14px;cursor:pointer}
+ .preset-drawer-chip.selected{border-color:var(--lt-canvas-accent);background:var(--lt-canvas-accent-bg);color:var(--lt-canvas-accent)}
+ .preset-drawer-chip:focus-visible{outline:2px solid var(--lt-canvas-accent);outline-offset:2px}
  .preset-drawer-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
  .preset-drawer-row{display:flex;align-items:center;gap:8px;padding:12px;border:1px solid var(--lt-canvas-sheet-line);border-radius:var(--lt-canvas-radius);background:var(--lt-canvas-sheet-item-bg)}
  .preset-drawer-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
  .preset-drawer-name{font-weight:600;overflow-wrap:anywhere}
- .preset-drawer-apply{flex:none;min-height:44px;padding:0 16px}
+ .preset-drawer-apply{flex:none;min-height:44px;padding:0 16px;border:0;border-radius:9999px;background:var(--lt-canvas-accent-bg);color:var(--lt-canvas-accent);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+ .preset-drawer-apply:disabled{opacity:.5;cursor:default}
  .preset-drawer-tag{flex:none;font-size:13px;color:var(--lt-canvas-accent)}
- .preset-drawer-more{align-self:center;min-height:44px}
+ .preset-drawer-more{align-self:center}
  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 }
 </style>
