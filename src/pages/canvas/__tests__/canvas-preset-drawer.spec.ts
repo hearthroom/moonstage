@@ -57,6 +57,23 @@ it('applying a row goes through the same apply path with the current binding ver
  expect(wrapper.emitted('applied')?.[0]).toEqual([t('responseSettings.preset.applied', { name: '公開1' })])
 })
 
+it('the heart adds or removes a favourite and says which it will do; own presets have no heart', async () => {
+ const favorite = vi.fn(async (_id: string, on: boolean) => ({ favorited: on }))
+ const presets = api({ favorite, library: vi.fn(async () => ({ items: [row(1), row(3, { favorited: true }), row(4, { mine: true })] })) })
+ wrapper = mount(Drawer, { props: { api: presets, t }, attachTo: document.body })
+ await flushPromises()
+ const heart = () => wrapper!.get('[data-id="x1"] [data-action="drawer-fav"]')
+ expect(heart().attributes('aria-label')).toBe('responseSettings.preset.pick.fav.add')
+ expect(heart().attributes('aria-pressed')).toBe('false')
+ await heart().trigger('click'); await flushPromises()
+ expect(favorite).toHaveBeenCalledWith('x1', true)
+ expect(heart().attributes('aria-pressed')).toBe('true')
+ expect(heart().attributes('aria-label')).toBe('responseSettings.preset.pick.fav.remove')
+ await wrapper.get('[data-id="x3"] [data-action="drawer-fav"]').trigger('click'); await flushPromises()
+ expect(favorite).toHaveBeenLastCalledWith('x3', false)
+ expect(wrapper.find('[data-id="x4"] [data-action="drawer-fav"]').exists()).toBe(false)
+})
+
 it('Esc closes only the drawer, not the preferences underneath', async () => {
  wrapper = mount(Drawer, { props: { api: api(), t }, attachTo: document.body })
  await flushPromises()

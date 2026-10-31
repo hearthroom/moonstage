@@ -4407,5 +4407,7 @@
 	"responseSettings.preset.pick.drawer.title": "Preset library",
 	"responseSettings.preset.pick.drawer.sub": "Pick one to apply it right away to \"{card}\"",
 	"responseSettings.preset.pick.drawer.close": "Close and return to the conversation",
-	"responseSettings.preset.pick.drawer.apply": "Apply"
+	"responseSettings.preset.pick.drawer.apply": "Apply",
+	"responseSettings.preset.pick.fav.add": "Add to favorites",
+	"responseSettings.preset.pick.fav.remove": "Remove from favorites"
 }

@@ -4407,5 +4407,7 @@
 	"responseSettings.preset.pick.drawer.title": "預設庫",
 	"responseSettings.preset.pick.drawer.sub": "選好會直接套用到「{card}」",
 	"responseSettings.preset.pick.drawer.close": "關閉，回到對話",
-	"responseSettings.preset.pick.drawer.apply": "套用"
+	"responseSettings.preset.pick.drawer.apply": "套用",
+	"responseSettings.preset.pick.fav.add": "加入喜愛",
+	"responseSettings.preset.pick.fav.remove": "取消喜愛"
 }

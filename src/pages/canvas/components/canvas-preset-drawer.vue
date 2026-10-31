@@ -36,6 +36,10 @@
       <button v-if="api.view" type="button" class="preset-drawer-icon" data-action="drawer-view" :aria-label="t('responseSettings.preset.pick.view')" :title="t('responseSettings.preset.pick.view')" @click="api.view!(p.id)">
        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M10 6H6a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" /></svg>
       </button>
+      <button v-if="api.favorite && !p.mine" type="button" class="preset-drawer-icon preset-drawer-fav" :class="{ on: p.favorited }" data-action="drawer-fav"
+       :aria-pressed="p.favorited ? 'true' : 'false'" :aria-label="t(p.favorited ? 'responseSettings.preset.pick.fav.remove' : 'responseSettings.preset.pick.fav.add')" :title="t(p.favorited ? 'responseSettings.preset.pick.fav.remove' : 'responseSettings.preset.pick.fav.add')" :disabled="faving === p.id" @click="toggleFav(p)">
+       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7.5-4.6-9.3-9.4C1.4 7.2 3.5 4 6.8 4c2 0 3.6 1.1 5.2 3.1C13.6 5.1 15.2 4 17.2 4c3.3 0 5.4 3.2 4.1 6.6C19.5 15.4 12 20 12 20z" :fill="p.favorited ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" /></svg>
+      </button>
       <span v-if="p.id === currentId" class="preset-drawer-tag">{{ t('responseSettings.preset.pick.tag.inUse') }}</span>
       <button v-else type="button" class="preset-drawer-apply" data-action="drawer-apply" :disabled="busy" @click="choose(p)">{{ t('responseSettings.preset.pick.drawer.apply') }}</button>
      </li>
@@ -106,6 +110,19 @@ const { busy, message, failed, apply } = usePresetApply({
 async function choose(p: PresetRow) {
  if (await apply({ id: p.id, title: p.title })) emit('applied', message.value)
 }
+// 喜愛：抽屜只列公開中的，取消後還找得回來，不另外確認（已不公開的取消會找不回來，那個確認在網站上）
+const faving = ref('')
+async function toggleFav(p: PresetRow) {
+ if (!props.api.favorite || faving.value) return
+ faving.value = p.id
+ const want = !p.favorited
+ try {
+  const res = (await props.api.favorite(p.id, want)) as { favorited?: boolean } | null
+  p.favorited = typeof res?.favorited === 'boolean' ? res.favorited : want
+ } catch {
+  message.value = props.t('responseSettings.saveFailed'); failed.value = true
+ } finally { faving.value = '' }
+}
 const statLine = (p: PresetRow) => props.t('responseSettings.preset.pick.users7d', { n: p.usesLast7d })
 
 // Esc 只關抽屜：攔在 capture，不讓底下的回覆偏好也一起關
@@ -158,6 +175,7 @@ onBeforeUnmount(() => {
  .preset-drawer-name{font-weight:600;overflow-wrap:anywhere}
  .preset-drawer-apply{flex:none;min-height:44px;padding:0 16px;border:0;border-radius:9999px;background:var(--lt-canvas-accent-bg);color:var(--lt-canvas-accent);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
  .preset-drawer-apply:disabled{opacity:.5;cursor:default}
+ .preset-drawer-fav.on{color:var(--lt-canvas-accent);background:var(--lt-canvas-accent-bg)}
  .preset-drawer-tag{flex:none;font-size:13px;color:var(--lt-canvas-accent)}
  .preset-drawer-more{align-self:center}
  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

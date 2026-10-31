@@ -4407,5 +4407,7 @@
 	"responseSettings.preset.pick.drawer.title": "プリセットライブラリ",
 	"responseSettings.preset.pick.drawer.sub": "選ぶとすぐ「{card}」に適用されます",
 	"responseSettings.preset.pick.drawer.close": "閉じて会話に戻る",
-	"responseSettings.preset.pick.drawer.apply": "適用"
+	"responseSettings.preset.pick.drawer.apply": "適用",
+	"responseSettings.preset.pick.fav.add": "お気に入りに追加",
+	"responseSettings.preset.pick.fav.remove": "お気に入りから外す"
 }
