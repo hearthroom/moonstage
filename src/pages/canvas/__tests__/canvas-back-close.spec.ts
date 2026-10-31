@@ -81,4 +81,21 @@ describe('system and browser Back close canvas layers', () => {
     expect(b.win.history.go).not.toHaveBeenCalled()
     expect(b.win.history.back).not.toHaveBeenCalled()
   })
+  it('cleans stale overlay steps when a route return or refresh mounts a new canvas', () => {
+    const b = browser()
+    const old = createCanvasBackClose({ window: b.win, close: vi.fn() })
+    old.sync(2)
+    b.win.location.href = 'https://example.test/me/presets'
+    old.dispose()
+    b.win.location.href = 'https://example.test/play'
+    const close = vi.fn()
+    const fresh = createCanvasBackClose({ window: b.win, close })
+    fresh.sync(0); b.flush()
+    expect(b.at).toBe(1)
+    expect(close).not.toHaveBeenCalled()
+    b.win.history.back(); b.flush()
+    expect(b.at).toBe(0)
+    fresh.dispose()
+  })
+
 })

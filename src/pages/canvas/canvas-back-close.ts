@@ -7,10 +7,15 @@ const MARKER = '__moonstageOverlay'
  */
 export function createCanvasBackClose(options: { window: Window; close: () => void | Promise<void> }) {
   const win = options.window
-  const token = `overlay-${Date.now()}-${++sequence}`
+  // Route departure preserves entries beneath the destination. On remount (or
+  // refresh), there are no open panels: adopt and consume our old temporary steps.
+  const previous = win.history.state?.[MARKER]
+  const inheritedDepth = previous && typeof previous.token === 'string'
+    && Number.isSafeInteger(previous.depth) && previous.depth > 0 ? previous.depth : 0
+  const token = inheritedDepth ? previous.token : `overlay-${Date.now()}-${++sequence}`
   const url = win.location.href
   let desired = 0
-  let depth = 0
+  let depth = inheritedDepth
   let disposed = false
   let removing = false
   let responding = false
