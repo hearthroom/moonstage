@@ -7,7 +7,7 @@
      <h2 :id="`${uid}-title`" class="preset-drawer-title">{{ t('responseSettings.preset.pick.drawer.title') }}</h2>
      <span v-if="card" class="mode-hint">{{ t('responseSettings.preset.pick.drawer.sub', { card }) }}</span>
     </div>
-    <button ref="closeButton" type="button" class="preset-drawer-icon" data-action="drawer-close" :aria-label="t('responseSettings.preset.pick.drawer.close')" @click="emit('close')">
+    <button type="button" class="preset-drawer-icon" data-action="drawer-close" :aria-label="t('responseSettings.preset.pick.drawer.close')" @click="emit('close')">
      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
     </button>
    </header>
@@ -54,6 +54,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { usePresetApply } from '../canvas-preset-apply'
 import { leaveTopLayer, raiseToTopLayer } from '../canvas-top-layer'
+import { useCanvasModalFocus } from '../canvas-modal-focus'
 import { readBinding, readPresetRows, type PresetApi, type PresetBinding, type PresetRow } from '../canvas-preset'
 
 const PAGE = 20
@@ -68,7 +69,6 @@ const emit = defineEmits<{ (e: 'close'): void; (e: 'applied', message: string): 
 
 const uid = `pd-${Math.random().toString(36).slice(2, 8)}`
 const root = ref<HTMLElement | null>(null)
-const closeButton = ref<HTMLButtonElement | null>(null)
 const ctx = props.api.context?.() ?? { model: '', card: '' }
 const lane = ctx.model
 const card = ctx.card
@@ -114,24 +114,19 @@ function onKey(e: KeyboardEvent) {
  e.preventDefault(); e.stopImmediatePropagation()
  emit('close')
 }
-// 焦點留在抽屜裡（底下的回覆偏好還開著）
-function onFocusIn(e: FocusEvent) {
- if (root.value && e.target instanceof Node && !root.value.contains(e.target)) closeButton.value?.focus()
-}
+// 跟畫布其他彈層同一個疊放：抽屜在最上面時，底下的回覆偏好變成不可操作，焦點留在抽屜裡；關掉後焦點回到「瀏覽預設庫」
+useCanvasModalFocus(root, () => true, { initial: () => '[data-action="drawer-close"]' })
 
 onMounted(async () => {
  document.addEventListener('keydown', onKey, true)
- document.addEventListener('focusin', onFocusIn)
  await nextTick()
  raiseToTopLayer(root.value)
- closeButton.value?.focus()
  try { binding.value = readBinding(await props.api.card()) } catch { /* 讀不到就照樣列，套用時伺服器會擋版本不符 */ }
  void load()
 })
 onBeforeUnmount(() => {
  clearTimeout(timer)
  document.removeEventListener('keydown', onKey, true)
- document.removeEventListener('focusin', onFocusIn)
  leaveTopLayer(root.value)
 })
 </script>

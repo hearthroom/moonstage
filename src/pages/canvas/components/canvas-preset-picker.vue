@@ -66,7 +66,7 @@
   <p v-if="message" class="mode-hint" :class="{ 'response-error': failed }" role="status" data-lt="preset-message">{{ message }}</p>
   <div class="preset-picker-actions">
    <button type="button" class="complete-btn" data-action="preset-apply" :disabled="!canApply" @click="confirm">
-    {{ busy ? t('responseSettings.preset.applying') : picked ? t('responseSettings.preset.pick.apply', { name: picked.title }) : t('responseSettings.preset.useCard') }}
+    {{ busy ? t('responseSettings.preset.applying') : picked ? t('responseSettings.preset.pick.apply', { name: picked.title }) : t(currentId ? 'responseSettings.preset.useCard' : 'responseSettings.preset.apply') }}
    </button>
    <span v-if="picked" class="mode-hint">{{ t('responseSettings.preset.pick.follow') }}</span>
   </div>
