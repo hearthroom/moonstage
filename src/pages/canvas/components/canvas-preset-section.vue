@@ -69,6 +69,8 @@ const { busy, message, failed, apply } = usePresetApply({
  api: () => props.api, binding: current, t: props.t, confirmLeave: props.confirmLeave,
  onChanged: () => emit('changed'), onStale: () => emit('stale'),
 })
+// 選擇器帶回新的結果時，這一區自己上一次的訊息（例如「已取消套用」）就過時了
+watch(() => props.notice, (v) => { if (v) { message.value = ''; failed.value = false } })
 const shown = computed(() => message.value || props.notice || '')
 </script>
 

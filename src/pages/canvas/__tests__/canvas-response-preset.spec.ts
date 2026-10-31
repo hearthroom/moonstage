@@ -305,3 +305,17 @@ it('shows nothing about tool replies when the server says off, unavailable, or s
   wrapper.unmount()
  }
 })
+
+it('removing and then applying from the picker shows the new result, not the old "removed" note (QA W2)', async () => {
+ const card = vi.fn().mockResolvedValueOnce(bound()).mockResolvedValueOnce(cardDefault).mockResolvedValue(bound())
+ const apply = vi.fn().mockResolvedValueOnce(cardDefault).mockResolvedValue(bound())
+ const wrapper = mount(Panel, { props: { conversationId: 'c1', load: async () => lockedSettings(), save: vi.fn(), t, presets: api({ card, apply }) } })
+ await flushPromises()
+ await wrapper.get('[data-action="preset-stop"]').trigger('click'); await flushPromises()
+ expect(wrapper.get('[data-lt="preset-message"]').text()).toBe('responseSettings.preset.reverted')
+ await wrapper.get('[data-action="preset-pick"]').trigger('click'); await flushPromises()
+ await wrapper.get('.preset-option[data-value="p1"]').trigger('click')
+ await wrapper.get('[data-action="preset-apply"]').trigger('click'); await flushPromises()
+ expect(wrapper.get('[data-lt="preset-message"]').text()).toBe(t('responseSettings.preset.applied', { name: '細膩' }))
+ wrapper.unmount()
+})

@@ -153,7 +153,8 @@ onBeforeUnmount(() => {
 @layer lt-base {
  .preset-drawer{position:fixed;inset:0;margin:0;padding:0;width:100%;height:100%;max-width:none;max-height:none;border:0;background:transparent;overflow:hidden;z-index:60}
  .preset-drawer-mask{position:absolute;inset:0;background:rgba(0,0,0,.5)}
- .preset-drawer-sheet{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--lt-canvas-sheet-bg);color:var(--lt-canvas-sheet-fg);font-family:var(--lt-canvas-font, inherit)}
+ /* 面板色可能帶一點透明（預設 0.98）：疊在不透明的畫布底色上，底下的選擇器字才不會透出來 */
+ .preset-drawer-sheet{position:absolute;inset:0;display:flex;flex-direction:column;background:linear-gradient(var(--lt-canvas-sheet-bg),var(--lt-canvas-sheet-bg)),linear-gradient(var(--lt-canvas-bg),var(--lt-canvas-bg)),#0f1217;color:var(--lt-canvas-sheet-fg);font-family:var(--lt-canvas-font, inherit)}
  @media (min-width:768px){
   .preset-drawer-sheet{left:auto;width:min(600px,100%);box-shadow:-12px 0 32px -8px rgba(0,0,0,.5)}
  }
