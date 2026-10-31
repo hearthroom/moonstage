@@ -1,75 +1,74 @@
-type NativeWatcher = EventTarget & { destroy(): void }
-type CloseWindow = Window & { CloseWatcher?: new () => NativeWatcher }
 let sequence = 0
 const MARKER = '__moonstageOverlay'
 
-/** Android Back/Escape belong to the open overlay, never to the running reply.
- * CloseWatcher leaves browser history alone. Older browsers get one temporary,
- * same-URL entry, preserving the host router's state and position bookkeeping.
+/** Same-URL history entries cover browser Back as well as Android/iOS gestures.
+ * Keep the host router's state and position bookkeeping intact. CloseWatcher
+ * handles platform close requests, but cannot intercept the browser Back button.
  */
 export function createCanvasBackClose(options: { window: Window; close: () => void | Promise<void> }) {
-  const win = options.window as CloseWindow
-  const token = `overlay-${++sequence}`
-  let open = false
+  const win = options.window
+  const token = `overlay-${Date.now()}-${++sequence}`
+  const url = win.location.href
+  let desired = 0
+  let depth = 0
   let disposed = false
-  let watcher: NativeWatcher | null = null
-  let armed = false
   let removing = false
-  let armedUrl = ''
-  const ownsEntry = () => win.history.state?.[MARKER] === token && win.location.href === armedUrl
+  let responding = false
+  const ownsEntry = () => win.location.href === url && win.history.state?.[MARKER]?.token === token
 
-  const close = async () => {
-    if (disposed) return
-    // A pending discard decision is itself an overlay. Keep Back available so
-    // another request can dismiss that decision and return to editing.
-    try { const pending = options.close(); sync(open); await pending }
-    catch { console.warn('[canvas] 無法關閉面板，保留目前畫面') }
-    finally {
-      sync(open)
-    }
-  }
-  function sync(nextOpen: boolean) {
-    open = nextOpen
-    if (disposed) return
-    if (win.CloseWatcher) {
-      if (!open) { watcher?.destroy(); watcher = null }
-      else if (!watcher) {
-        watcher = new win.CloseWatcher()
-        watcher.addEventListener('close', () => { watcher = null; close() }, { once: true })
-      }
+  function reconcile() {
+    if (disposed || responding || removing || win.location.href !== url) return
+    if (desired < depth && ownsEntry()) {
+      removing = true
+      win.history.go(desired - depth)
       return
     }
-    if (!open && armed && ownsEntry()) {
-      armed = false
-      removing = true
-      win.history.back()
-    } else if (open && !armed && !removing) {
+    while (depth < desired) {
       const state = win.history.state || {}
-      armedUrl = win.location.href
+      depth++
       win.history.pushState({
-        ...state, [MARKER]: token,
+        ...state, [MARKER]: { token, depth },
         ...(Number.isFinite(state.position) ? { position: state.position + 1, back: state.current, forward: null, replaced: false } : {}),
-      }, '', armedUrl)
-      armed = true
+      }, '', url)
     }
   }
+  function sync(nextDepth: number) {
+    desired = Math.max(0, nextDepth)
+    reconcile()
+  }
   const onPop = () => {
-    if (removing) { removing = false; sync(open); return }
-    if (!armed || ownsEntry()) return
-    armed = false
-    // A multi-entry traversal or a host navigation must still be able to leave.
-    if (win.location.href === armedUrl && open) close()
+    if (win.location.href !== url) return
+    const next = ownsEntry() ? win.history.state[MARKER].depth : 0
+    const steps = depth - next
+    depth = next
+    if (removing) { removing = false; reconcile(); return }
+    if (steps <= 0) {
+      // Forward must not resurrect a dismissed overlay or leave an empty step.
+      reconcile()
+      return
+    }
+    responding = true
+    // Do not await a discard decision: its dialog must itself accept Back.
+    const close = async () => {
+      for (let i = 0; i < steps && !disposed; i++) {
+        const before = desired
+        await options.close()
+        if (desired >= before) break
+      }
+    }
+    const pending = close()
+    responding = false
+    reconcile()
+    void pending.catch(() => console.warn('[canvas] 無法關閉面板，保留目前畫面')).finally(reconcile)
   }
   win.addEventListener('popstate', onPop)
   return {
     sync,
     dispose() {
+      if (disposed) return
       disposed = true
-      watcher?.destroy()
-      watcher = null
       win.removeEventListener('popstate', onPop)
-      if (armed && ownsEntry()) win.history.back()
-      armed = false
+      if (!removing && depth && ownsEntry()) win.history.go(-depth)
     },
   }
 }

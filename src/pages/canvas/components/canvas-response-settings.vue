@@ -167,7 +167,7 @@ const props=defineProps<{
  presets?:PresetApi
 }>()
 // browse：開預設庫抽屜（畫布那一層畫，面板不管）
-const emit=defineEmits<{ (e: 'close'): void; (e: 'browse'): void }>()
+const emit=defineEmits<{ (e: 'close'): void; (e: 'browse'): void; (e: 'layers', value: { picker: boolean; discard: boolean }): void }>()
 const saved=ref<ResponseSettings|null>(null),draft=ref<ResponseDraft>({}),loading=ref(false),saving=ref(false),error=ref('')
 let alive=true
 const discardAsked=ref(false)
@@ -319,6 +319,12 @@ const binding=ref<PresetBinding|null>(null),choices=ref<PresetRow[]>([]),presetE
 const shelf=ref<PresetRow[]|null>(null)
 const currentUnlisted=computed(()=>!!binding.value?.presetId && !!shelf.value?.some(p=>p.id===binding.value!.presetId && !p.listed))
 const pickerOpen=ref(false),presetNotice=ref('')
+watch([pickerOpen, discardAsked], ([picker, discard]) => emit('layers', { picker, discard }), { flush: 'sync' })
+function backLayer(){
+ if(discardAsked.value){answerDiscard(false);return true}
+ if(pickerOpen.value){closePicker();return true}
+ return false
+}
 function openPicker(){presetNotice.value='';pickerOpen.value=true}
 function closePicker(){pickerOpen.value=false;void nextTick(()=>document.querySelector<HTMLElement>('[data-action="preset-pick"]')?.focus())}
 // 選擇器裡套用成功：回到偏好那一層，結果寫在自訂預設那一區
@@ -353,7 +359,7 @@ async function refreshAfterPreset(){
 onMounted(()=>{void reload();void loadPreset()})
 // 選擇器開著時按關閉：整個面板一起關（跟偏好那一層一樣先問沒存的修改）；回上一層用選擇器自己的返回
 async function mayCloseAll(){const ok=await mayClose();if(ok)pickerOpen.value=false;return ok}
-defineExpose({mayClose:mayCloseAll,closePicker,confirmLeave})
+defineExpose({mayClose:mayCloseAll,closePicker,confirmLeave,backLayer})
 </script>
 
 <style scoped>

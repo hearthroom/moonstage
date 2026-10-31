@@ -257,7 +257,7 @@
       :title="t('responseSettings.title')" :close-label="t('main.cancel')" @close="closeCanvasSheet">
       <CanvasResponseSettings :key="String(conversationId)" ref="responseSettingsPanel" :conversation-id="String(conversationId)" @close="closeCanvasSheet"
         :world-mode="Boolean((roleView as any).world)" :load="loadResponseSettings" :save="saveResponseSettings" :t="t" :frame="responseFrame" :save-frame="saveResponseFrame"
-        :presets="presetApi" @browse="presetDrawerOpen = true" />
+        :presets="presetApi" @browse="presetDrawerOpen = true" @layers="responseLayers = $event" />
     </CanvasPopup>
     <!-- 預設庫抽屜：從選擇器「瀏覽預設庫」開，蓋在回覆偏好上面 -->
     <CanvasPresetDrawer v-if="presetDrawerOpen && presetApi" :api="presetApi" :t="t" :confirm-leave="presetDrawerConfirmLeave"
@@ -10443,20 +10443,44 @@ useCanvasModalFocus(sandboxFrame, () => !!sandboxCard.value && !['model', 'respo
 // 模型選單這次要停在哪裡：'lanes' ＝目前這顆模型的線路清單。選單關掉就歸零，下次照一般方式開。
 const modelPanelFocus = ref<'' | 'lanes'>('')
 watch(() => panel.value.sheet, (sheet) => { if (sheet !== 'model') modelPanelFocus.value = '' })
+const presetDrawerOpen = ref(false)
+const moreParent = ref(false)
+const responseLayers = ref({ picker: false, discard: false })
+// A sheet replaces the visible + grid, but system Back returns to that grid.
+watch(() => panel.value.sheet, sheet => {
+  if (!sheet) moreParent.value = false
+  if (sheet !== 'response-settings') {
+    presetDrawerOpen.value = false
+    responseLayers.value = { picker: false, discard: false }
+  }
+})
 let canvasBackClose: ReturnType<typeof createCanvasBackClose> | null = null
-function hasCanvasOverlay() { return menuOpen.value || Boolean(panel.value.sheet) || panel.value.more }
-async function closeTopCanvasOverlay() {
-  if (menuOpen.value) closeMessageMenu()
-  else if (panel.value.sheet) await closeCanvasSheet()
-  else panel.value = closeMore(panel.value)
+function canvasOverlayDepth() {
+  return Number(panel.value.more || moreParent.value) + Number(!!panel.value.sheet) + Number(menuOpen.value)
+    + (panel.value.sheet === 'response-settings' ? Number(responseLayers.value.picker) + Number(responseLayers.value.discard) : 0)
+    + Number(presetDrawerOpen.value)
 }
-watch(hasCanvasOverlay, open => canvasBackClose?.sync(open), { flush: 'sync' })
+function hasCanvasOverlay() { return canvasOverlayDepth() > 0 }
+async function closeTopCanvasOverlay() {
+  if (responseLayers.value.discard) { responseSettingsPanel.value?.backLayer(); return }
+  if (presetDrawerOpen.value) { presetDrawerOpen.value = false; return }
+  if (responseLayers.value.picker) { responseSettingsPanel.value?.backLayer(); return }
+  if (menuOpen.value) { closeMessageMenu(); return }
+  if (panel.value.sheet === 'capacity') { closeCapacityChoice(); return }
+  if (panel.value.sheet === 'confirm') { onConfirmCancel(); return }
+  if (panel.value.sheet) await closeCanvasSheet(true)
+  else { moreParent.value = false; panel.value = closeMore(panel.value) }
+}
+// Batch related state changes: selecting a sheet hides + in the same update.
+watch(canvasOverlayDepth, depth => canvasBackClose?.sync(depth), { flush: 'post' })
 onMounted(() => {
   if (typeof window === 'undefined') return
   canvasBackClose = createCanvasBackClose({ window, close: closeTopCanvasOverlay })
-  canvasBackClose.sync(hasCanvasOverlay())
+  canvasBackClose.sync(canvasOverlayDepth())
 })
-onUnload(() => { canvasBackClose?.dispose(); canvasBackClose = null })
+function disposeCanvasBackClose() { canvasBackClose?.dispose(); canvasBackClose = null }
+onUnload(disposeCanvasBackClose)
+onUnmounted(disposeCanvasBackClose)
 const responseSettingsVersion = ref(0)
 const responseSettingsSupported = computed(() => responseSettingsVersion.value === 1 && Boolean(conversationId.value) && !previewOnly.value)
 // 有替代開場白的卡在第一次送出前還沒開對話；回覆偏好掛在對話上，所以這時也列出來，
@@ -10492,7 +10516,6 @@ const presetApi = computed<PresetApi | undefined>(() => presetSettingsVersion.va
   context: () => ({ model: String(formData.selectModel || ''), card: String((roleView.value as any)?.roleName || '') }),
 })
 // 預設庫抽屜：套用前問回覆偏好有沒有沒存的修改；套好關掉抽屜與回覆偏好，回到對話出一行提示
-const presetDrawerOpen = ref(false)
 const presetDrawerConfirmLeave = () => responseSettingsPanel.value?.confirmLeave?.() ?? Promise.resolve(true)
 function presetDrawerApplied(message: string) {
   presetDrawerOpen.value = false
@@ -10613,14 +10636,18 @@ const moreItems = computed(() => previewOnly.value ? [
   { key: 'bottom', label: t('canvas.shortcut.toBottom') },
 ].filter(item => allowsStagePanel(stageHost.capabilities, item.key)))
 
-async function closeCanvasSheet() {
+async function closeCanvasSheet(restoreMore = false) {
   if (panel.value.sheet === 'response-settings' && responseSettingsPanel.value && !await responseSettingsPanel.value.mayClose()) return
-  panel.value = closeSheet(panel.value)
+  const more = restoreMore === true && moreParent.value
+  moreParent.value = false
+  panel.value = { ...closeSheet(panel.value), more }
 }
 
-function onPanelPick(key: string) {
+async function onPanelPick(key: string) {
+  const fromMore = panel.value.more
+  await onShortcut(key)
+  if (panel.value.sheet) moreParent.value = fromMore
   panel.value = closeMore(panel.value)
-  onShortcut(key)
 }
 
 async function onShortcut(key: string) {
