@@ -18,7 +18,9 @@ it('counts the lanes on the row the same way the list below draws them', async (
     props: { open: true, roleId: 'fixture-role', selectModel },
     global: { config: { globalProperties: { http: { get }, requestUrl: { playerAgentMode: '/agent-mode', getModelListV2: '/models' } } } },
   })
-  const hint = (w: any) => w.findAll('.ms-expand-hint').map((h: any) => h.text()).find((t: string) => t.startsWith('modelSelect.expandLanes'))
+  const hint = (w: any) => w.findAll('.ms-row')
+    .find((r: any) => r.find('.ms-name').text() === 'DeepSeek V4 Flash')
+    .find('.ms-expand-hint').text()
 
   const healthy = mount('deepseek-v4-flash-ripple')
   try {
@@ -34,4 +36,26 @@ it('counts the lanes on the row the same way the list below draws them', async (
     expect(onDead.findAll('.ms-opt')).toHaveLength(3)
     expect(hint(onDead)).toBe('modelSelect.expandLanes:3')
   } finally { onDead.unmount() }
+})
+
+it('counts every lane the expanded list would show, not just the four drawn collapsed', async () => {
+  const live = JSON.parse(JSON.stringify((await import('../../pages/canvas/__tests__/fixtures/model-catalog-live.json')).default))
+  const deepseek = live[0].families.find((f: any) => f.family === 'DeepSeek V4 Flash')
+  const deadStatus = { status: 'red', uptime: { percent24h: 0, samples24h: 90 } }
+  deepseek.variants.slice(-4).forEach((v: any) => { v.status = deadStatus })
+  const get = vi.fn(async (url: string) => url === '/models'
+    ? { statusCode: 200, data: live }
+    : { statusCode: 200, data: [] })
+  const wrapper = shallowMount(ModelSelectPanel, {
+    props: { open: true, roleId: 'fixture-role', selectModel: 'deepseek-v4-flash-ripple' },
+    global: { config: { globalProperties: { http: { get }, requestUrl: { playerAgentMode: '/agent-mode', getModelListV2: '/models' } } } },
+  })
+  try {
+    await flushPromises()
+    const row = wrapper.findAll('.ms-row').find((r: any) => r.find('.ms-name').text() === 'DeepSeek V4 Flash')!
+    await wrapper.find('.ms-more').trigger('click')
+    const shown = wrapper.findAll('.ms-opt').length
+    expect(shown).toBe(deepseek.variants.length - 4)
+    expect(row.find('.ms-expand-hint').text()).toBe(`modelSelect.expandLanes:${shown}`)
+  } finally { wrapper.unmount() }
 })
