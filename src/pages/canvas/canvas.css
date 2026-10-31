@@ -4416,11 +4416,21 @@
 
   /* ── 自訂指令 ─────────────────────────────────────────────────── */
 
+  /*
+     面板本身是彈層裡會縮的 flex 子項，彈層 overflow:hidden。內容放不下（矮螢幕＋升級提示）時
+     由這一層自己捲，子項維持原本高度；不然「新增」與輸入框會被推到彈層外、點不到。
+  */
   .custom-instruction-scope {
     display: flex;
     flex-direction: column;
     gap: 12px;
     min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .custom-instruction-scope > * {
+    flex-shrink: 0;
   }
 
   /*
