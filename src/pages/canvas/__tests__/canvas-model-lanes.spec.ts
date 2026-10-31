@@ -16,6 +16,7 @@ import {
   primaryVariant,
   visibleLanes,
   hiddenLaneCount,
+  laneCount,
   composeModelDisplayName,
   resolveStoredModel,
   createModelLookup,
@@ -174,6 +175,13 @@ describe('壞掉的線路不列出來', () => {
   it('玩家正在用的那條就算壞了也看得到', () => {
     const lanes = [ok('a'), dead('b')]
     expect(visibleLanes(lanes, 'b', false).map((v: any) => v.value)).toEqual(['a', 'b'])
+  })
+
+  it('線路數跟展開後列出來的條數一致：壞的不算，玩家正在用的那條照樣算', () => {
+    const lanes = [ok('a'), ok('b'), dead('c'), dead('d')]
+    expect(laneCount(lanes, 'a')).toBe(2)
+    expect(laneCount(lanes, 'c')).toBe(3)
+    expect(laneCount([ok('a'), ok('b')], '')).toBe(2)
   })
 })
 

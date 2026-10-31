@@ -446,7 +446,7 @@
 	import { useStageHost } from '@/host/stage-host'
 	const stageHost = useStageHost()
 	import { variantPrice, priceMeaning } from '@/pages/canvas/canvas-model-catalog'
-	import { visibleLanes, hiddenLaneCount, laneTagOf, isDeadLane, composeModelDisplayName } from '@/pages/canvas/canvas-model-lanes'
+	import { visibleLanes, hiddenLaneCount, laneCount, laneTagOf, isDeadLane, composeModelDisplayName } from '@/pages/canvas/canvas-model-lanes'
 	import icon_deepseek from '@/static/icon/models/deepseek.png';
 	import icon_gpt from '@/static/icon/models/gpt.png';
 	import icon_claude from '@/static/icon/models/claude.png';
@@ -1312,7 +1312,7 @@ const truncationText = (completionRate: number) => {
 	};
 
 	const expandHintFor = (family) => {
-		const n = getFilteredVariants(family).length;
+		const n = laneCount(getFilteredVariants(family), formData.selectModel);
 		if (n <= 1) return '';
 		return t(isFreeFamily(family) ? 'modelSelect.expandSlots' : 'modelSelect.expandLanes', { n });
 	};

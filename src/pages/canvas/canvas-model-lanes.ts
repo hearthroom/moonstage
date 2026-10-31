@@ -178,6 +178,11 @@ export function visibleLanes<T>(
   return manual.concat(listed.filter((v) => keep.has(v)))
 }
 
+/** 全部展開後列得出來的條數；模型列上的「N 線路」用這個數，才跟展開後看到的一致。 */
+export function laneCount<T>(variants: T[] | null | undefined, selectedValue = ''): number {
+  return visibleLanes(variants, selectedValue, true).length
+}
+
 /**
  * 收合時還沒露出來幾條；展開時回「按收合會藏起來幾條」，讓按鈕留在原地。
  * 按鈕消失會讓剛展開的人找不到回去的路。
