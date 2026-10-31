@@ -5787,30 +5787,32 @@ function chatDelete(chatId) {
 /**
  * 保存目前對話並開啟新對話
  */
-function saveAndStartNew() {
-  _this.http.post(_this.requestUrl.saveAndStartNew, {
-    header: {
-      'content-type': 'application/json'
-    },
-    showLoading: false,
-    data: {
-      conversationId: unref(conversationId),
-      save: true
+async function saveAndStartNew() {
+  if (!canGenerate.value || archiveBusy.value) return;
+  if (isTimelineMutationBlocked()) { notifyTimelineMutationBlocked(); return }
+  archiveBusy.value = true;
+  try {
+    // 選開場白時還沒有對話可存；先把選到的開場白建成對話，不送空的 conversationId。
+    if (!unref(conversationId)) {
+      if (pendingGreetingStart.value) await startPendingGreeting();
+      else await chatStart();
+      return;
     }
-  }).then(res => {
-    if (res.statusCode == 200) {
+    const res = await postArchiveAction(_this.requestUrl.saveAndStartNew, { conversationId: unref(conversationId), save: true });
+    if (res.statusCode === 200 && res.data?.conversationId) {
       adoptStartedConversation(res.data);
-    } else if (res.statusCode === 409 && res.data && res.data.error === 'conversation_limit_reached') {
-      // 存檔滿了（伺服器數的）：講清楚、給一條去刪的路，不當成一般錯誤。
+    } else if (res.statusCode === 409 && res.data?.error === 'conversation_limit_reached') {
       archiveCount.value = Number(res.data.count || archiveCount.value);
       if (Number(res.data.limit) > 0) archiveLimit.value = Number(res.data.limit);
       askArchivesFull();
     } else {
-      message.error(resolveChatErrorMessage(resolveChatErrorTypeFromFailure(res), t));
+      message.error(t('canvas.archive.newFailed'));
     }
-  }).catch(e => {
-    console.error(e);
-  });
+  } catch {
+    message.error(t('canvas.archive.newFailed'));
+  } finally {
+    archiveBusy.value = false;
+  }
 }
 
 /** 另開新檔成功之後的收尾（存檔清單的「開新對話」與 sdk.archive.start 共用）：換 conversationId、推開場白、捲到底。 */
@@ -5911,7 +5913,7 @@ function chatStart(greetingIndex?: number) {
       message.error(resolveChatErrorMessage(resolveChatErrorTypeFromFailure(res), t));
     }
   }).catch(e => {
-    console.error(e);
+    message.error(t('canvas.archive.newFailed'));
   });
 }
 
@@ -12407,7 +12409,13 @@ function postArchiveAction(url: string, data: Record<string, any>) {
   return _this.http.post(url, {
     header: { 'content-type': 'application/json' },
     showLoading: false,
+    quietErrors: true,
+    quietTransport: true,
     data,
+  }).catch((failure: any) => {
+    // HTTP 業務拒絕也交回各動作判讀（例如 409 滿檔）；傳輸失敗仍走 catch。
+    if (failure?.statusCode >= 400) return failure
+    throw failure
   })
 }
 
@@ -12520,11 +12528,24 @@ function askForkArchive(chatId = '') {
   askConfirm('fork-archive', t('canvas.archive.fork'), hint, t('canvas.archive.fork'))
 }
 
+/** 本機提示列不是歷史訊息；串流列的顯示 id 也未必是伺服器的 chatId。 */
+function savedForkChatId(messageId: string): string {
+  const row = talkList.value.find((m: any) => [m.id, m.chatId, m.assistantChatId].some(id => String(id || '') === messageId))
+  if (!row || row.systemOnly || row.isSummary || row.chatLoading || row.type != 0) return ''
+  return String(row.chatId || row.assistantChatId || row.id || '')
+}
+
+function reportForkFailure(res: any) {
+  message.error(t(res?.data?.error === 'chat_not_found' ? 'canvas.archive.forkUnsaved' : 'canvas.archive.forkFailed'))
+}
+
 async function forkArchive() {
   const id = String(unref(conversationId) || '')
-  const chatId = pendingForkChatId.value
+  const requestedChatId = pendingForkChatId.value
+  const chatId = requestedChatId ? savedForkChatId(requestedChatId) : ''
   pendingForkChatId.value = ''
-  if (!id) return
+  if (requestedChatId && !chatId) { message.error(t('canvas.archive.forkUnsaved')); return }
+  if (!id) { message.error(t('canvas.archive.forkFailed')); return }
   if (isTimelineMutationBlocked()) { notifyTimelineMutationBlocked(); return }
   if (archiveBusy.value) return
   archiveBusy.value = true
@@ -12538,12 +12559,11 @@ async function forkArchive() {
       askArchivesFull()
       return
     }
-    if (res.statusCode !== 200 || !res.data || !res.data.conversationId) { reportArchiveFailure(res); return }
+    if (res.statusCode !== 200 || !res.data || !res.data.conversationId) { reportForkFailure(res); return }
     adoptConversation(String(res.data.conversationId))
     loadArchives()
   } catch (e) {
-    console.error('分叉存檔失敗', e)
-    message.error(t('canvas.archive.failed'))
+    reportForkFailure(e)
   } finally {
     archiveBusy.value = false
   }
@@ -12607,8 +12627,9 @@ const sandboxArchive: SandboxArchiveHost = {
   fork: (messageId) => archiveGuarded(async () => {
     const id = String(unref(conversationId) || '')
     if (!id) return { ok: false, code: 'HOST_DENIED' }
-    if (!(unref(talkList) as any[]).some((m) => String(m.id) === messageId)) return { ok: false, code: 'INVALID_ARGS', message: 'message not found' }
-    const res = await postArchiveAction(_this.requestUrl.conversationFork, { conversationId: id, chatId: messageId })
+    const chatId = savedForkChatId(messageId)
+    if (!chatId) return { ok: false, code: 'INVALID_ARGS', message: t('canvas.archive.forkUnsaved') }
+    const res = await postArchiveAction(_this.requestUrl.conversationFork, { conversationId: id, chatId })
     if (isArchiveFull(res)) return archiveLimitError(res)
     if (res.statusCode !== 200 || !res.data || !res.data.conversationId) return archiveFailure(res)
     const next = String(res.data.conversationId)
@@ -12626,10 +12647,16 @@ const sandboxArchive: SandboxArchiveHost = {
   }),
   start: (opening) => archiveGuarded(async () => {
     if (!canGenerate.value) return {ok:false,code:'NOT_SUPPORTED',message:t('canvas.historyAccess.closed')};
-    const res = await _this.http.post(_this.requestUrl.saveAndStartNew, {
-      header: { 'content-type': 'application/json' }, showLoading: false,
-      data: { conversationId: unref(conversationId), save: true, greetingIndex: opening },
-    })
+    if (!unref(conversationId)) {
+      if (pendingGreetingStart.value) {
+        const previous = greeting.index
+        if (opening !== undefined) greeting.index = opening
+        if (!(await startPendingGreeting())) { greeting.index = previous; renderGreetingPreview() }
+      } else await chatStart(opening)
+      const id = String(unref(conversationId) || '')
+      return id ? { ok: true, value: { id } } : { ok: false, code: 'NETWORK', message: t('canvas.archive.newFailed') }
+    }
+    const res = await postArchiveAction(_this.requestUrl.saveAndStartNew, { conversationId: unref(conversationId), save: true, greetingIndex: opening })
     if (isArchiveFull(res)) return archiveLimitError(res)
     if (res.statusCode !== 200 || !res.data || !res.data.conversationId) return archiveFailure(res)
     adoptStartedConversation(res.data)
