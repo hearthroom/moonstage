@@ -80,3 +80,23 @@ describe('殼裡面板的打字欄位：每一次輸入都要交回宿主', () =
     expect(send).toHaveBeenCalledWith('notepad', 'save', [])
   })
 })
+
+describe('快速連打：宿主慢一拍的回音不能蓋掉殼裡較新的字', () => {
+  it('長期指令新增欄：回音是前幾個字時保留草稿；宿主真的換了值（例如送出後清空）才採用', async () => {
+    await open('directives', { draft: '', list: [], hasConversation: true, canAdd: false })
+    const ta = mount!.querySelector<HTMLTextAreaElement>('.edit-scope textarea')!
+    for (const v of ['S', 'Sa', 'San', 'Sand']) type(ta, v)
+    // 宿主的回音還停在第二個字
+    panels!.set({ ...base, sheet: 'directives', props: { draft: 'Sa', list: [], hasConversation: true, canAdd: true } })
+    await nextTick()
+    expect(ta.value).toBe('Sand')
+    // 回音追上
+    panels!.set({ ...base, sheet: 'directives', props: { draft: 'Sand', list: [], hasConversation: true, canAdd: true } })
+    await nextTick()
+    expect(ta.value).toBe('Sand')
+    // 送出後宿主清空：這是宿主的新值，不是回音
+    panels!.set({ ...base, sheet: 'directives', props: { draft: '', list: [], hasConversation: true, canAdd: false } })
+    await nextTick()
+    expect(ta.value).toBe('')
+  })
+})

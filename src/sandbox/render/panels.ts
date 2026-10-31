@@ -76,7 +76,9 @@ const EMPTY: PanelsState = { sheet: '', title: '', closeLabel: '', props: {}, me
 export function createPanels(deps: PanelsDeps): PanelsController {
   const state = reactive<{ current: PanelsState }>({ current: EMPTY })
   const drafts = reactive<Record<string, string>>({})
-  const lastSent: Record<string, string> = {}
+  // 送出但宿主還沒回音的值（依序）。連打時宿主的回音會慢幾拍，只記最後一個的話，
+  // 一個較舊的回音就會被當成「宿主換了值」而蓋掉殼裡較新的字。
+  const pending: Record<string, string[]> = {}
   const menuDraft = reactive<{ value: string | null; lastSent: string | null }>({ value: null, lastSent: null })
 
   const handlersFor = (sheet: string) => {
@@ -84,7 +86,12 @@ export function createPanels(deps: PanelsDeps): PanelsController {
     for (const ev of EVENTS[sheet] || []) {
       out[emitKey(ev)] = (...args: unknown[]) => {
         const field = LOCAL_FIELDS[ev]
-        if (field) { drafts[`${sheet}.${field}`] = String(args[0] ?? ''); lastSent[`${sheet}.${field}`] = String(args[0] ?? '') }
+        if (field) {
+          const key = `${sheet}.${field}`
+          drafts[key] = String(args[0] ?? '')
+          ;(pending[key] ||= []).push(drafts[key])
+          if (pending[key].length > 64) pending[key].shift()
+        }
         deps.send(sheet, ev, args)
       }
     }
@@ -126,11 +133,13 @@ export function createPanels(deps: PanelsDeps): PanelsController {
 
   return {
     set(next) {
-      // 回音判定：宿主的值等於上次送出的就保留殼裡的草稿；不同就採宿主的
+      // 回音判定：宿主的值是殼送出過、還沒回音的其中一個 → 保留殼裡的草稿（丟掉那一個以前的）；
+      // 都不是 → 宿主自己換了值（例如送出後清空），採宿主的
       for (const key of Object.keys(drafts)) {
         const [s, field] = key.split('.')
         const hostValue = s === next.sheet ? String((next.props || {})[field] ?? '') : null
-        if (hostValue == null || hostValue !== lastSent[key]) { delete drafts[key]; delete lastSent[key] }
+        const at = hostValue == null ? -1 : (pending[key] || []).lastIndexOf(hostValue)
+        if (at < 0) { delete drafts[key]; delete pending[key] } else pending[key] = pending[key].slice(at + 1)
       }
       if (menuDraft.value != null && next.menu.draft !== menuDraft.lastSent) { menuDraft.value = null; menuDraft.lastSent = null }
       if (!next.menu.open) { menuDraft.value = null; menuDraft.lastSent = null }

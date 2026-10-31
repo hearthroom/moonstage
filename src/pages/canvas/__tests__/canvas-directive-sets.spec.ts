@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createI18n } from 'vue-i18n'
 import messages from '@/locale/index.js'
@@ -156,5 +158,14 @@ describe('主按鈕與摘要跟著選取', () => {
   it('這個存檔還沒選組：摘要說選了會看到什麼，不留白', () => {
     const vm = buildDirectiveSetsView({ list: items('manual') }, sets({ view: 'sets', scope: 'save' }), ctx)
     expect(vm.sets.summary).toBe(ctx.t('directive.set.save.pickHint'))
+  })
+})
+
+describe('指令組的錯誤由面板自己講，不再疊共用的錯誤提示', () => {
+  const src = fs.readFileSync(path.join(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
+  const body = (start: string) => { const i = src.indexOf(start); return src.slice(i, src.indexOf('\n}\n', i)) }
+  it('讀指令組與三個寫入都宣告 quietErrors', () => {
+    expect(body('async function loadDirectiveSets(')).toContain('quietErrors: true')
+    expect(body('async function directiveSetsPost(')).toContain('quietErrors: true')
   })
 })

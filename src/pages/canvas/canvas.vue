@@ -11473,13 +11473,16 @@ async function loadDirectiveSets() {
   try { dismissed = stageHost.storage.get(directiveSetsDismissKey()) === '1' } catch (e) {}
   directiveSets.value = { ...directiveSets.value, loading: true, loadFailed: false, upgradeDismissed: dismissed }
   try {
-    const res = await _this.http.get(_this.requestUrl.playerDirectivePresets, {
+    // 面板自己講讀取失敗與重試（目前的指令不受影響），不再疊共用的錯誤提示。
+    // 請求層對 404 與 5xx 是 reject：拿 reject 回來的回應一起判斷，舊供應商的 404 才分得出來。
+    const res: any = await _this.http.get(_this.requestUrl.playerDirectivePresets, {
       data: { roleId: String(unref(roleId) || '') },
       showLoading: false,
       quietTransport: true,
+      quietErrors: true,
       timeout: 8000,
-    })
-    const outcome = directiveSetsLoadOutcome(res.statusCode, res.data)
+    }).catch((e: any) => e)
+    const outcome = directiveSetsLoadOutcome(Number(res?.statusCode), res?.data)
     if (outcome === 'unsupported') { directiveSetsSupported.value = false; return }
     if (outcome !== 'ok') throw new Error('unexpected status')
     const choice = readCardDirectiveChoice(res.data)
@@ -11500,7 +11503,7 @@ function onDirectiveSetsOpen(scope: string) {
 }
 
 async function directiveSetsPost(url: string, data: Record<string, unknown>) {
-  const res = await _this.http.post(url, { header: { 'content-type': 'application/json' }, data, showLoading: false, quietTransport: true })
+  const res = await _this.http.post(url, { header: { 'content-type': 'application/json' }, data, showLoading: false, quietTransport: true, quietErrors: true })
   if (res.statusCode !== 200) throw { statusCode: res.statusCode, data: res.data }
   return res.data
 }
