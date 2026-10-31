@@ -4423,9 +4423,15 @@
     min-height: 0;
   }
 
+  /*
+     清單不讓位給升級提示與來源區：矮螢幕（375×667、320）上它是被壓縮的 flex 子項，
+     條目會被壓成 0 高、提示蓋到標題上。清單保持自己的高度（長清單在 .content-scope 裡自己捲），
+     放不下時整片面板捲動。
+  */
   .custom-instruction-scope .list-scope {
     display: flex;
     flex-direction: column;
+    flex-shrink: 0;
     gap: 8px;
     min-height: 0;
   }
@@ -4502,6 +4508,7 @@
     flex-direction: column;
     gap: 8px;
     min-height: 0;
+    max-height: 40vh;
     overflow-y: auto;
   }
 
