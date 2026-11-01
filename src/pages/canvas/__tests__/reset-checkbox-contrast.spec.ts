@@ -43,8 +43,15 @@ it('keeps reset checkbox boundaries, selected marks and keyboard focus distingui
     const proc = spawn(chrome!, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(dir, 'profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore' })
     shutdown = observeNativeBrowser(proc)
     const portFile = join(dir, 'profile', 'DevToolsActivePort')
-    for (let count = 0; !existsSync(portFile) && count < 100; count++) await pause(100)
-    const [port, endpoint] = readFileSync(portFile, 'utf8').trim().split('\n')
+    let address: string[] | undefined
+    for (let count = 0; count < 100; count++) {
+      const lines = existsSync(portFile) ? readFileSync(portFile, 'utf8').trim().split('\n') : []
+      // Chrome creates the file before both lines are necessarily visible.
+      if (/^\d+$/.test(lines[0] || '') && /^\/devtools\/browser\/[^\s]+$/.test(lines[1] || '')) { address = lines; break }
+      await pause(100)
+    }
+    expect(address, 'Chrome must publish a complete DevTools address').toBeDefined()
+    const [port, endpoint] = address!
     ws = new WebSocket(`ws://127.0.0.1:${port}${endpoint}`)
     await new Promise<void>((resolve, reject) => { ws!.onopen = () => resolve(); ws!.onerror = reject })
     let seq = 0
