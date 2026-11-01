@@ -40,6 +40,48 @@ const family = (name: string, variants: any[], extra: Record<string, any> = {}) 
   family: name, variants, bestStatus: 'green', ...extra,
 })
 
+describe('Claude 在預設熱門序中依系列與版本排列', () => {
+  const f = (name: string, popularity: number, price: number, isNew = false) => family(
+    name, [fixedVariant(name, price)], { usageShare: popularity, badges: isNew ? ['new'] : [] })
+  const input = () => [
+    f('Claude Haiku 5.5', 90, 1, true), f('Gemini 4 Argon', 80, 7),
+    f('Claude Sonnet 5', 70, 3), f('Grok 4.7', 60, 8),
+    f('Claude Opus 4.8', 50, 6), f('Claude Sonnet 5.5', 40, 2),
+    f('Claude Opus 4.10', 30, 5), f('Claude Opus 5.5', 20, 4),
+    f('Claude Haiku 4.5', 10, 0),
+  ]
+  const expected = ['Claude Opus 5.5', 'Claude Opus 4.10', 'Claude Opus 4.8',
+    'Claude Sonnet 5.5', 'Claude Sonnet 5', 'Claude Haiku 5.5', 'Claude Haiku 4.5']
+
+  it('新品和熱門度不覆蓋 Claude 次序，其他品牌仍在原熱門位置；不改輸入陣列', () => {
+    const original = input()
+    const before = original.slice()
+    const sorted = sortFamilies(original, 'popular')
+    expect(sorted.filter(x => x.family.startsWith('Claude ')).map(x => x.family)).toEqual(expected)
+    expect(sorted[1].family).toBe('Gemini 4 Argon')
+    expect(sorted[3].family).toBe('Grok 4.7')
+    expect(original).toEqual(before)
+  })
+
+  it('熱門模式不把進頁時使用中的 Haiku 搬到 Opus 前；非 Claude 仍釘頂', () => {
+    const sorted = sortFamilies(input(), 'popular')
+    expect(pinFamilyToTop(sorted, 'Claude Haiku 5.5', 'popular')).toEqual(sorted)
+    const pinned = pinFamilyToTop(sorted, 'Grok 4.7', 'popular')
+    expect(pinned[0].family).toBe('Grok 4.7')
+    expect(pinned.filter(x => x.family.startsWith('Claude ')).map(x => x.family)).toEqual(expected)
+  })
+
+  it('明確選擇價格或 default 時保留原語意，原有目前使用釘頂仍可用', () => {
+    expect(sortFamilies(input(), 'price').map(x => x.family)).toEqual([
+      'Claude Haiku 4.5', 'Claude Haiku 5.5', 'Claude Sonnet 5.5', 'Claude Sonnet 5',
+      'Claude Opus 5.5', 'Claude Opus 4.10', 'Claude Opus 4.8', 'Gemini 4 Argon', 'Grok 4.7',
+    ])
+    expect(sortFamilies(input(), 'default')).toEqual(input())
+    expect(pinFamilyToTop(sortFamilies(input(), 'price'), 'Claude Haiku 5.5', 'price')[0].family)
+      .toBe('Claude Haiku 5.5')
+  })
+})
+
 describe('familyPriceDisplay — 列上永遠回答「至少多少」', () => {
   it('所有線路固定且同價 → 只給數字，不加「起」', () => {
     const f = family('MiMo V2.5', [fixedVariant('mimo-v2.5-snow', 25), fixedVariant('mimo-v2.5-mist', 25)])

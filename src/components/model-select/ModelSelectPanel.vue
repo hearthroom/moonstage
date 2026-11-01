@@ -1171,7 +1171,7 @@ const truncationText = (completionRate: number) => {
 
 	/**
 	 * 列表最終要渲染的：免費模型收成一列 → 搜尋 → 排序 → 目前使用釘最上面。
-	 * 釘住那一步一定要在排序之後，否則排序會把它推走。
+	 * 釘住那一步在排序之後；熱門模式的 Claude 則保留系列／版本順序。
 	 */
 	const displayFamilies = computed(() => {
 		// 去重要在排序**之前**做。「全部」把每個分類攤平，同一個模型同時掛在「精選」
@@ -1210,7 +1210,7 @@ const truncationText = (completionRate: number) => {
 		// 釘住的是**進頁時**在用的那個模型，不是當下選中的那個。
 		// 取當下選中的話，使用者點一條線路就改變了當下選中 → 清單重排 → 他正在
 		// 看的那一列被搬走（手機端症狀是「點完就消失」）。
-		return pinFamilyToTop(families, pinnedModelValue.value);
+		return pinFamilyToTop(families, pinnedModelValue.value, sortMode.value);
 	});
 
 	// 寬螢幕（跟 canvas.css 的桌機斷點同一條）把清單拆成左右兩欄，照順序左右交錯：

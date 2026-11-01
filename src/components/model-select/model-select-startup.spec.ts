@@ -4,6 +4,41 @@ import ModelSelectPanel from './ModelSelectPanel.vue'
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 
+it('popular Claude order survives a selected new Haiku, without changing brand tabs or manual price sorting', async () => {
+  const f = (name: string, usageShare: number, costScore: number, badges: string[] = []) => ({
+    family: name, usageShare, badges, variants: [{ value: name, name, costScore, billingType: 'fixed' }],
+  })
+  const catalog = [
+    { group: 'DeepSeek', families: [f('DeepSeek V4', 100, 6)] },
+    { group: 'Claude', families: [f('Claude Haiku 5.5', 90, 1, ['new']), f('Claude Sonnet 5', 80, 3),
+      f('Claude Opus 4.6', 70, 5), f('Claude Sonnet 5.5', 60, 2), f('Claude Opus 5.5', 50, 4)] },
+    { group: 'Grok', families: [f('Grok 4.7', 40, 7)] },
+    { group: 'Gemini', families: [f('Gemini 4 Argon', 30, 8)] },
+  ]
+  const get = vi.fn(async (url: string) => ({ statusCode: 200, data: url === '/models' ? catalog : [] }))
+  const wrapper = shallowMount(ModelSelectPanel, {
+    props: { open: true, roleId: 'fixture-role', selectModel: 'Claude Haiku 5.5' },
+    global: { config: { globalProperties: { http: { get }, requestUrl: { playerAgentMode: '/agent-mode', getModelListV2: '/models' } } } },
+  })
+  try {
+    await flushPromises()
+    const vm = wrapper.vm as any
+    const names = () => vm.displayFamilies.map((x: any) => x.family)
+    const claudes = () => names().filter((n: string) => n.startsWith('Claude '))
+    expect(claudes()).toEqual(['Claude Opus 5.5', 'Claude Opus 4.6', 'Claude Sonnet 5.5', 'Claude Sonnet 5', 'Claude Haiku 5.5'])
+    expect(vm.displayTabs.map((x: any) => x.name)).toEqual(['DeepSeek', 'Claude', 'Grok', 'Gemini'])
+    expect(wrapper.findAll('.ms-rail .model-filter-tab').map(x => x.text()))
+      .toEqual(['DeepSeek', 'Claude', 'Grok', 'Gemini'])
+    vm.chooseSort('price')
+    await flushPromises()
+    expect(claudes()).toEqual(['Claude Haiku 5.5', 'Claude Sonnet 5.5', 'Claude Sonnet 5', 'Claude Opus 5.5', 'Claude Opus 4.6'])
+    vm.chooseSort('popular')
+    await flushPromises()
+    expect(claudes()[0]).toBe('Claude Opus 5.5')
+    expect(get.mock.calls.every(call => call[0] === '/models' || call[0] === '/agent-mode')).toBe(true)
+  } finally { wrapper.unmount() }
+})
+
 it('does not fetch preferences while closed; opening and changing a model each fetch once', async () => {
   const get = vi.fn(async () => ({ statusCode: 200, data: [] }))
   const wrapper = shallowMount(ModelSelectPanel, {

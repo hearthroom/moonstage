@@ -262,6 +262,38 @@ export function isNewFamily(f: any): boolean {
   return Array.isArray(f && f.badges) && f.badges.indexOf('new') !== -1
 }
 
+function claudeOrderOf(f: Family): { series: number; version: number[] } | null {
+  const match = /^Claude\s+(Opus|Sonnet|Haiku)\s+(\d+(?:\.\d+)*)(?:\b|$)/i.exec(String(f?.family || ''))
+  if (!match) return null
+  return {
+    series: ['opus', 'sonnet', 'haiku'].indexOf(match[1].toLowerCase()),
+    version: match[2].split('.').map(Number),
+  }
+}
+
+/**
+ * 預設瀏覽時 Claude 固定為 Opus → Sonnet → Haiku，同系列按數字版本遞減。
+ * 只交換 Claude 原本佔用的位置，保留其他品牌的新品／熱門次序；不能把這個規則
+ * 混進熱門 comparator，否則跨品牌比較會失去傳遞性。
+ */
+function orderClaudeFamilies(families: Family[]): Family[] {
+  const claudes = families.flatMap((f, i) => {
+    const order = claudeOrderOf(f)
+    return order ? [{ f, i, ...order }] : []
+  })
+  if (claudes.length < 2) return families
+  claudes.sort((a, b) => {
+    if (a.series !== b.series) return a.series - b.series
+    for (let i = 0; i < Math.max(a.version.length, b.version.length); i++) {
+      const diff = (b.version[i] || 0) - (a.version[i] || 0)
+      if (diff) return diff
+    }
+    return a.i - b.i
+  })
+  let next = 0
+  return families.map(f => claudeOrderOf(f) ? claudes[next++].f : f)
+}
+
 export function sortFamilies(families: Family[], mode: string, ctx: SortContext = {}): Family[] {
   if (!Array.isArray(families)) return families
   const metric = SORT_METRICS[mode]
@@ -284,7 +316,8 @@ export function sortFamilies(families: Family[], mode: string, ctx: SortContext 
     }
     return x.i - y.i
   })
-  return indexed.map(x => x.f)
+  const sorted = indexed.map(x => x.f)
+  return mode === 'popular' ? orderClaudeFamilies(sorted) : sorted
 }
 
 /**
@@ -377,12 +410,14 @@ export function dedupeFamilies(families: Family[]): Family[] {
  * 使用者點一條線路就改變了當下選中，於是他自己的動作把他正在看的那一列搬走。
  * 呼叫端要傳的是**進頁時**的選擇。
  */
-export function pinFamilyToTop(families: any[], selectedModelValue: string | null | undefined): any[] {
+export function pinFamilyToTop(families: any[], selectedModelValue: string | null | undefined, mode?: string): any[] {
   const list = Array.isArray(families) ? families : []
   if (!selectedModelValue) return list
   const idx = list.findIndex(f =>
     Array.isArray(f && f.variants) && f.variants.some((v: any) => v && v.value === selectedModelValue))
   if (idx <= 0) return list
+  // 預設 Claude 系列順序優先於目前使用釘頂；手動排序及其他品牌沿用既有行為。
+  if (mode === 'popular' && claudeOrderOf(list[idx])) return list
   return [list[idx]].concat(list.slice(0, idx)).concat(list.slice(idx + 1))
 }
 
