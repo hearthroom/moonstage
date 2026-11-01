@@ -73,6 +73,33 @@ describe('殼：冷啟動與事件順序', () => {
     expect(s.refs.statusbar!.textContent).toContain('script state')
   })
 
+  it('全局改名更新作者以同值 textContent 重建的可見巨集，不丟直接 handler', () => {
+    const html = '<button id="name-action">GlobalOld</button><input id="name-draft" value="initial"><span id="name-count">0</span>'
+    const s = boot(config({ user: { nickname: 'GlobalOld', avatarUrl: '' }, card: { rules: [SCRIPT_RULE(`
+      var name = document.getElementById('name-action');
+      name.textContent = name.textContent;
+      window.__globalNameClicks = 0;
+      name.addEventListener('click', function () { window.__globalNameClicks++; });
+      document.getElementById('name-count').textContent = '7';
+    `)], statusbar: 'mount', statusbarHtml: html } }))
+    const button = document.getElementById('name-action')!
+    const input = document.getElementById('name-draft') as HTMLInputElement
+    input.value = 'draft'
+    for (const nickname of ['GlobalNew', 'GlobalThird', 'GlobalFourth']) {
+      s.handle({ type: 'user', nickname, statusbarHtml: html.replace('GlobalOld', nickname) })
+      expect(s.sdk.user.get().nickname).toBe(nickname)
+      expect(button.textContent).toBe(nickname)
+      // 作者再次刷新同值，不應使下一次改名失去文字 reference。
+      button.textContent = button.textContent
+    }
+    expect(document.getElementById('name-action')).toBe(button)
+    button.click()
+    expect((window as any).__globalNameClicks).toBe(1)
+    expect(document.getElementById('name-draft')).toBe(input)
+    expect(input.value).toBe('draft')
+    expect(document.getElementById('name-count')!.textContent).toBe('7')
+  })
+
   it('宿主有提供 view 時，改名不重掛舊 view；由新的 message.view 更新正文', async () => {
     const s = boot(config())
     s.handle({ type: 'messages', messages: [{ id: 'g', role: 'ai', content: '你好，{{user}}', serverId: null, state: 'done', view: { name: '露娜', html: '<p>你好，小明</p>', finished: true } }] })

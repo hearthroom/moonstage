@@ -24,8 +24,15 @@ export function createLiveHtml(root: HTMLElement) {
     bind(source, root)
   }
   const patch = (before: Node, after: Node) => {
-    const target = live.get(before)
+    let target = live.get(before)
     if (!target) return
+    // innerText/textContent 即使寫回同值也會換掉 Text。只重新認領同一父節點下
+    // 唯一且值相同的文字；作者改寫的值與搬到別處的節點仍由作者管理。
+    if (before.nodeType === 3 && !target.parentNode && before.parentNode) {
+      const parent = live.get(before.parentNode)
+      const matches = Array.from(parent?.childNodes || []).filter(node => node.isEqualNode(before))
+      if (matches.length === 1) target = matches[0]
+    }
     if (before.nodeType !== after.nodeType || before.nodeName !== after.nodeName) {
       const replacement = after.cloneNode(true)
       target.parentNode?.replaceChild(replacement, target)

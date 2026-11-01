@@ -26,6 +26,38 @@ describe('狀態欄來源投影', () => {
     expect(root.lastChild).toBe(button)
   })
 
+  it('作者以同值 textContent 重建文字後，連續改名仍更新可見節點', () => {
+    const root = document.createElement('div')
+    const html = createLiveHtml(root)
+    html.replace('<button>GlobalOld</button><span>0</span>')
+    const button = root.querySelector('button')!, counter = root.querySelector('span')!
+    let clicks = 0
+    button.addEventListener('click', () => clicks++)
+    const oldText = button.firstChild
+    button.textContent = 'GlobalOld'
+    expect(button.firstChild).not.toBe(oldText)
+    counter.textContent = '7'
+    html.update('<button>GlobalNew</button><span>0</span>')
+    expect(button.textContent).toBe('GlobalNew')
+    button.textContent = 'GlobalNew'
+    html.update('<button>GlobalThird</button><span>0</span>')
+    expect(button.textContent).toBe('GlobalThird')
+    expect(root.querySelector('button')).toBe(button)
+    button.click()
+    expect(clicks).toBe(1)
+    expect(counter.textContent).toBe('7')
+  })
+
+  it('作者重建並改寫的文字仍保留，不把不同值猜成玩家名', () => {
+    const root = document.createElement('div')
+    const html = createLiveHtml(root)
+    html.replace('<span>GlobalOld</span>')
+    const span = root.querySelector('span')!
+    span.textContent = 'Author override'
+    html.update('<span>GlobalNew</span>')
+    expect(span.textContent).toBe('Author override')
+  })
+
   it('來源新增、移除或更換標籤時，仍反映新來源而不重建未變的節點', () => {
     const root = document.createElement('div')
     const html = createLiveHtml(root)
