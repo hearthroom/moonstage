@@ -90,7 +90,14 @@ export const BACKWARD_OPERATION_ENTRY_VERSION = 2
 const BACKWARD_OPERATION_RETRY_DELAYS = [2_000, 5_000, 10_000, 20_000, 30_000] as const
 export const BACKWARD_OPERATION_SLOW_RETRY_DELAY_MS = 60_000
 
+export interface ResetOptions {
+  clearNotepad: boolean
+  clearDirectives: boolean
+  clearResponseSettings: boolean
+}
+
 export interface BackwardOperationEntry {
+  resetOptions?: ResetOptions
   version: typeof BACKWARD_OPERATION_ENTRY_VERSION
   operationId: string
   conversationId: string
@@ -130,6 +137,12 @@ export function normalizeBackwardOperationEntry(
   now: number = Date.now(),
 ): BackwardOperationEntry | null {
   if (!input || Number(input.version) !== BACKWARD_OPERATION_ENTRY_VERSION) return null
+  let resetOptions: ResetOptions | undefined
+  if (input.resetOptions !== undefined) {
+    const keys = ['clearNotepad', 'clearDirectives', 'clearResponseSettings'] as const
+    if (!input.resetOptions || keys.some(key => typeof input.resetOptions[key] !== 'boolean')) return null
+    resetOptions = Object.fromEntries(keys.map(key => [key, input.resetOptions[key]])) as unknown as ResetOptions
+  }
   const operationId = String(input.operationId || '').trim()
   const conversationId = String(input.conversationId || '').trim()
   const targetChatId = String(input.targetChatId || '').trim()
@@ -150,6 +163,7 @@ export function normalizeBackwardOperationEntry(
   ) return null
   return {
     version: BACKWARD_OPERATION_ENTRY_VERSION,
+    ...(resetOptions ? { resetOptions } : {}),
     operationId,
     conversationId,
     targetChatId,

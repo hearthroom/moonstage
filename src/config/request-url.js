@@ -31,6 +31,7 @@ export const requestUrl = {
 	// 劇情回溯。路由是通的（2026-09-03 對正式站實測回 400 missing_conversation_id，
 	// 不是 404）；缺的是使用者這一端的入口——原本的檢查點選單屬於對話歷史面板，
 	// 這個客戶端沒有那個面板。目前只有「伺服器回傳一個沒跑完的回溯」時才會走到。
+	resetConversation: `${V1}/conversation/reset`,
 	loadConversation: `${V1}/conversation/backward`,
 	chatWsTicket: `${V1}/conversation/ws-ticket`,
 	// 幫答：替玩家寫下一句，填進輸入框由玩家送出。

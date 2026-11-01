@@ -6,6 +6,18 @@
     `:first-child` 之類的規則就會上錯顆。
   -->
     <div class="confirm-content">{{ content }}</div>
+    <div v-if="options.length" class="confirm-options" role="group" :aria-label="optionsTitle">
+      <div class="confirm-options-title">{{ optionsTitle }}</div>
+      <div v-for="option in options" :key="option.key" class="confirm-option" role="checkbox" tabindex="0"
+           :aria-checked="option.checked ? 'true' : 'false'"
+           @click="$emit('toggle-option', option.key)"
+           @keydown.enter.prevent="$emit('toggle-option', option.key)"
+           @keydown.space.prevent="$emit('toggle-option', option.key)">
+        <span class="confirm-check-box" :class="{ 'is-on': option.checked }" aria-hidden="true">{{ option.checked ? '✓' : '' }}</span>
+        <span>{{ option.label }}</span>
+      </div>
+      <div class="confirm-options-hint">{{ optionsHint }}</div>
+    </div>
     <div class="confirm-bottom">
       <div class="ok-btn" role="button" tabindex="0"
            @click="$emit('ok')"
@@ -23,7 +35,10 @@ withDefaults(defineProps<{
   content?: string
   okText?: string
   cancelText?: string
-}>(), { content: '', okText: 'OK', cancelText: 'Cancel' })
+  optionsTitle?: string
+  optionsHint?: string
+  options?: Array<{ key: string; label: string; checked: boolean }>
+}>(), { content: '', okText: 'OK', cancelText: 'Cancel', optionsTitle: '', optionsHint: '', options: () => [] })
 
-defineEmits<{ (e: 'ok'): void; (e: 'cancel'): void }>()
+defineEmits<{ (e: 'ok'): void; (e: 'cancel'): void; (e: 'toggle-option', key: string): void }>()
 </script>

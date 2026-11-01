@@ -48,7 +48,7 @@ const EVENTS: Record<string, string[]> = {
   notepad: ['save', 'retry', 'close', 'toggle-templates', 'apply-template', 'save-template', 'update:code', 'preview-code', 'cancel-preview', 'confirm-import', 'share-template', 'delete-template', 'copy-share-code', 'revoke-share', 'close-share', 'toggle-copy', 'copy-from', 'update:draft'],
   'context-breakdown': ['close', 'retry', 'toggle-mod-details'],
   memory: ['close', 'retry', 'delete', 'toggle-expand'],
-  confirm: ['ok', 'cancel'],
+  confirm: ['ok', 'cancel', 'toggle-option'],
   assist: ['confirm','cancel','refresh','pick'],
   capacity: ['pick', 'cancel'],
 }

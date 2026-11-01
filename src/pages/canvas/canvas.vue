@@ -401,6 +401,8 @@
                  :close-label="t('main.cancel')" @close="onConfirmCancel">
       <CanvasConfirm
         :content="confirmSpec.content"
+        v-bind="resetConfirmProps"
+        @toggle-option="toggleResetOption"
         :ok-text="confirmSpec.okText"
         :cancel-text="t('main.cancel')"
         @ok="onConfirmOk"
@@ -702,8 +704,6 @@ import {
   type ChatOperationUIAction,
   type RewriteSnapshot,
   isOpeningIndex,
-  openingChatIdFromOldestHistoryRow,
-  openingChatIdFromLoadedList,
   canEditResendPlayerIndex,
   hasAIReplyAfterPlayerIndex,
   latestTerminalAIIndex,
@@ -3040,7 +3040,7 @@ function buildPanelsState() {
     case 'confirm':
       title = confirmSpec.value.title;
       heading = true;
-      props = { content: confirmSpec.value.content, okText: confirmSpec.value.okText, cancelText: closeLabel };
+      props = { content: confirmSpec.value.content, okText: confirmSpec.value.okText, cancelText: closeLabel, ...resetConfirmProps.value };
       break;
     default:
       break;
@@ -3151,7 +3151,7 @@ function onSandboxPanelUi(panelName: string, event: string, args: unknown[]) {
       else if (event === 'retry') loadMemory();
       return;
     case 'confirm':
-      if (event === 'ok') onConfirmOk(); else if (event === 'cancel') onConfirmCancel();
+      if (event === 'ok') onConfirmOk(); else if (event === 'cancel') onConfirmCancel(); else if (event === 'toggle-option') toggleResetOption(str());
       return;
   }
 }
@@ -5644,7 +5644,9 @@ function postPendingBackwardOperation(entry: any, legacyFallbackUsed = false): b
   if (backwardOperationRequestKey === requestKey) return true;
   backwardOperationRequestKey = requestKey;
   rollbackPending.value = true;
-  const data = legacyFallbackUsed
+  const data = entry.resetOptions
+    ? { conversationId: entry.conversationId, clientOperationID: entry.operationId, historyEpoch: entry.historyEpoch, nextSeq: entry.nextSeq, ...entry.resetOptions }
+    : legacyFallbackUsed
     ? {
       conversationId: entry.conversationId,
       chatId: entry.targetChatId,
@@ -5657,7 +5659,7 @@ function postPendingBackwardOperation(entry: any, legacyFallbackUsed = false): b
       historyEpoch: entry.historyEpoch,
       nextSeq: entry.nextSeq,
     };
-  _this.http.post(_this.requestUrl.loadConversation, {
+  _this.http.post(entry.resetOptions ? _this.requestUrl.resetConversation : _this.requestUrl.loadConversation, {
     header: { 'content-type': 'application/json' },
     showLoading: false,
     data,
@@ -5677,7 +5679,7 @@ function postPendingBackwardOperation(entry: any, legacyFallbackUsed = false): b
       schedulePendingBackwardOperation(entry, legacyFallbackUsed);
       return;
     }
-    if (outcome === 'legacy_fallback' && !legacyFallbackUsed) {
+    if (outcome === 'legacy_fallback' && !legacyFallbackUsed && !entry.resetOptions) {
       postPendingBackwardOperation(entry, true);
       return;
     }
@@ -5694,7 +5696,7 @@ function postPendingBackwardOperation(entry: any, legacyFallbackUsed = false): b
     if (!isPendingBackwardOperationCurrent(entry)) return;
     console.error('[Backward] operation request failed', error);
     const outcome = classifyBackwardOperationResponse(error?.statusCode, error?.data || {});
-    if (outcome === 'legacy_fallback' && !legacyFallbackUsed) {
+    if (outcome === 'legacy_fallback' && !legacyFallbackUsed && !entry.resetOptions) {
       postPendingBackwardOperation(entry, true);
       return;
     }
@@ -10679,6 +10681,7 @@ async function onShortcut(key: string) {
   if (key === 'background') { panel.value = openSheet(panel.value, 'background'); return }
   if (key === 'font') { panel.value = openSheet(panel.value, 'font'); return }
   if (key === 'reset-chat') {
+    resetChoices.value = { clearNotepad: false, clearDirectives: false, clearResponseSettings: false }
     askConfirm('reset-chat', t('canvas.panel.reset'), t('canvas.panel.resetConfirm'), t('canvas.panel.reset'))
     return
   }
@@ -10771,6 +10774,22 @@ async function onCapacityPick(key: CapacityChoiceKey) {
     resend: resendAfterCapacityChoice,
   })
   if (!done) capacitySpec.value = { ...capacitySpec.value, saving: false, error: t('canvas.capacity.saveFailed') }
+}
+
+const resetChoices = ref({ clearNotepad: false, clearDirectives: false, clearResponseSettings: false })
+const resetConfirmProps = computed(() => confirmSpec.value.kind === 'reset-chat' ? {
+  optionsTitle: t('canvas.panel.resetOptions'),
+  optionsHint: t('canvas.panel.resetHint'),
+  options: [
+    { key: 'clearNotepad', label: t('notepad.title'), checked: resetChoices.value.clearNotepad },
+    { key: 'clearDirectives', label: t('directive.title'), checked: resetChoices.value.clearDirectives },
+    { key: 'clearResponseSettings', label: t('responseSettings.title'), checked: resetChoices.value.clearResponseSettings },
+  ],
+} : { options: [] })
+function toggleResetOption(key: string) {
+  if (confirmSpec.value.kind !== 'reset-chat' || !Object.hasOwn(resetChoices.value, key)) return
+  const choice = key as keyof typeof resetChoices.value
+  resetChoices.value = { ...resetChoices.value, [choice]: !resetChoices.value[choice] }
 }
 
 // ── 一次性確認 ─────────────────────────────────────────────────────────
@@ -12845,74 +12864,33 @@ function onPickFont(key: string) {
 
 // ── 重置聊天 ───────────────────────────────────────────────────────────
 //
-// 重置＝倒回到開場白。劇情清空，但長期指令、手帳、記憶、當前會話人設都掛在對話上，留著。
-// 以前是把整段對話刪掉再開新的，那些一起沒了；而倒回到起點又要按兩次（先倒回第一句、
-// 再刪那一句），所以玩家寧可重置（玩家 2026-09-16）。沒有開場白可倒（玩家先講話的卡）
-// 才走刪除。
+// 重置使用同存檔的原子操作；開場白與沒有開場白都由伺服器判斷。
 function resetConversation() {
   const id = String(unref(conversationId) || '')
-  if (!id) return
-  if (isTimelineMutationBlocked()) {
-    notifyTimelineMutationBlocked()
-    return
+  if (!id || !stopRunningTurnForTimelineMutation()) return
+  const existing = readPendingBackwardOperation(id)
+  if (existing) { postPendingBackwardOperation(existing); return }
+  const snapshot = backwardHistorySnapshot.value
+  if (!snapshot || snapshot.conversationId !== id) {
+    unref(ajax).flag = true; unref(ajax).page = 1; getHistoryMsg(); return
   }
-  findOpeningChatId(id).then((openingId) => {
-    if (String(unref(conversationId) || '') !== id) return
-    if (openingId) {
-      // 只剩開場白：沒有東西可清，別為了一個空操作去打回溯。
-      const list = talkList.value as any[]
-      const last = list[list.length - 1]
-      if (list.length > 0 && last && String(last.chatId || last.id || '') === openingId && !ajax.value.hasNextPage) return
-      loadConversation(openingId)
-      return
-    }
-    deleteConversationAndRestart(id)
-  })
-}
-
-// 開場白那一則的 chatId。畫面上載齊了（沒有更舊的頁）就直接用；長對話只載了最新一頁，
-// 開場白在最舊那一頁——先問一筆拿總數，再拿最舊的那一筆（分頁是新的在前，最後一頁的
-// 那一筆就是最舊的）。
-async function findOpeningChatId(targetConversationId: string): Promise<string> {
-  const loadedId = openingChatIdFromLoadedList(talkList.value as any[], !!ajax.value.hasNextPage)
-  if (loadedId) return loadedId
-  try {
-    const page = (pageNum: number) => _this.http.get(_this.requestUrl.historyMessageList, {
-      data: { conversationId: targetConversationId, pageNum, pageSize: 1 },
-      showLoading: false,
-      quietTransport: true,
-      timeout: 10000,
-    })
-    const first: any = await page(1)
-    const total = Number(first?.data?.total) || 0
-    if (first.statusCode !== 200 || total <= 0) return ''
-    const oldest: any = total === 1 ? first : await page(total)
-    if (oldest.statusCode !== 200) return ''
-    return openingChatIdFromOldestHistoryRow(oldest?.data?.chats?.[0])
-  } catch (e) {
-    console.warn('找開場白失敗，重置改走刪除', e)
-    return ''
+  const entry = {
+    ...createBackwardOperationEntry({
+      conversationId: id, targetChatId: 'reset',
+      operationId: `reset-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      historyEpoch: snapshot.historyEpoch, nextSeq: snapshot.nextSeq, now: Date.now(),
+    }),
+    resetOptions: { ...resetChoices.value },
   }
-}
-
-function deleteConversationAndRestart(id: string) {
-  _this.http.post(_this.requestUrl.deleteConversation, {
-    header: { 'content-type': 'application/json' },
-    showLoading: false,
-    data: { conversationId: id },
-  }).then((res: any) => {
-    if (res.statusCode !== 200) {
-      message.error(resolveChatErrorMessage(resolveChatErrorTypeFromFailure(res), t))
-      return
-    }
-    restartConversationFromScratch()
-  }).catch((e: any) => {
-    console.error('重置聊天失敗', e)
-  })
+  if (!writePendingBackwardOperation(entry)) {
+    uni.showToast({ title: t('chat.rollbackFailed'), icon: 'error' }); return
+  }
+  rollbackPending.value = true
+  postPendingBackwardOperation(entry)
 }
 
 // 從頭再開一段：拆掉串流、清掉畫面、讓伺服器重新建對話並落開場白。
-// 重置聊天與「刪掉正在聊的那段存檔、又沒有別段可接手」都走這裡。
+// 刪掉正在聊的那段存檔、又沒有別段可接手時走這裡。
 function restartConversationFromScratch() {
   if (!canGenerate.value) return false;
   teardownStreamForConversationSwitch({ invalidateHistory: true })
