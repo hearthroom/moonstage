@@ -144,6 +144,11 @@ describe('人設彈層', () => {
       expect(hint(w).text()).toBe('沒填就用全局人設的稱呼：洛璃')
     })
 
+    it('名字裡的 $ 照字面顯示', () => {
+      const w = mountPersona({ userName: '', globalPersona: { ...global, userName: 'A$$B$&' } })
+      expect(hint(w).text()).toBe('沒填就用全局人設的稱呼：A$$B$&')
+    })
+
     it('有填就不提示；什麼名字都沒有也不提示', async () => {
       expect(hint(mountPersona({ userName: '小明', globalPersona: global })).exists()).toBe(false)
       expect(hint(mountPersona({ userName: '', globalPersona: null, cardUserName: '', nickName: '' })).exists()).toBe(false)

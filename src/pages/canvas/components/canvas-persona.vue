@@ -321,7 +321,7 @@ const nameFallbackHint = computed(() => {
     : source === 'author' ? props.labels.nameFromCard
     : source === 'nickname' ? props.labels.nameFromNickname
     : ''
-  return template ? template.replace('{name}', name) : ''
+  return template ? template.replace('{name}', () => name) : ''
 })
 
 const advancedOpen = ref(false)
