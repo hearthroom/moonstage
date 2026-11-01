@@ -43,7 +43,9 @@ it('resets on the first confirmation even when a fresh conversation has no histo
     _this: { requestUrl: { historyMessageList: '/messages' }, http: { get: async () => ({ statusCode: 200, data: { historyEpoch: 0, nextSeq: 2 } }) } },
     applyBackwardHistorySnapshot: (data: any) => { snapshot.value = { conversationId: 'c', ...data } },
   }
-  await new Function('deps', `const { ${Object.keys(deps).join(',')} } = deps; return (${fn})()`)(deps)
+  const pending = new Function('deps', `const { ${Object.keys(deps).join(',')} } = deps; return (${fn})()`)(deps)
+  deps.resetChoices.value = { clearNotepad: false, clearDirectives: false, clearResponseSettings: true }
+  await pending
   expect(post).toHaveBeenCalledOnce()
   expect(post.mock.calls[0][0].resetOptions).toEqual(choices)
 })

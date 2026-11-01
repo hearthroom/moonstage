@@ -12866,6 +12866,7 @@ function onPickFont(key: string) {
 //
 // 重置使用同存檔的原子操作；開場白與沒有開場白都由伺服器判斷。
 async function resetConversation() {
+  const confirmedChoices = { ...resetChoices.value }
   const id = String(unref(conversationId) || '')
   if (!id || !stopRunningTurnForTimelineMutation()) return
   const existing = readPendingBackwardOperation(id)
@@ -12898,7 +12899,7 @@ async function resetConversation() {
       operationId: `reset-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       historyEpoch: snapshot.historyEpoch, nextSeq: snapshot.nextSeq, now: Date.now(),
     }),
-    resetOptions: { ...resetChoices.value },
+    resetOptions: confirmedChoices,
   }
   if (!writePendingBackwardOperation(entry)) {
     uni.showToast({ title: t('chat.rollbackFailed'), icon: 'error' }); return
