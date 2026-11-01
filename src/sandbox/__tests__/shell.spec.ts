@@ -50,6 +50,40 @@ describe('殼：冷啟動與事件順序', () => {
     expect(s.refs.list.textContent).toContain('我是新稱呼')
   })
 
+  it('改名保留作者直接綁定的狀態欄節點、輸入與腳本建立的狀態', () => {
+    const html = '<button id="author-action">小明</button><input id="author-input" value="initial"><span id="counter">0</span>'
+    const s = boot(config({ card: { rules: [SCRIPT_RULE(`
+      window.__nameClicks = 0;
+      document.getElementById('author-action').addEventListener('click', function () { window.__nameClicks++; });
+      document.getElementById('counter').textContent = '7';
+      var extra = document.createElement('em'); extra.textContent = 'script state'; document.querySelector('[data-slot="statusbar"]').prepend(extra);
+    `)], statusbar: 'mount', statusbarHtml: html } }))
+    const button = document.getElementById('author-action')!
+    const input = document.getElementById('author-input') as HTMLInputElement
+    input.value = 'player draft'
+    button.click()
+    s.handle({ type: 'user', nickname: '新稱呼', statusbarHtml: html.replace('小明', '新稱呼') })
+    expect(document.getElementById('author-action')).toBe(button)
+    expect(button.textContent).toBe('新稱呼')
+    button.click()
+    expect((window as any).__nameClicks).toBe(2)
+    expect(document.getElementById('author-input')).toBe(input)
+    expect(input.value).toBe('player draft')
+    expect(document.getElementById('counter')!.textContent).toBe('7')
+    expect(s.refs.statusbar!.textContent).toContain('script state')
+  })
+
+  it('宿主有提供 view 時，改名不重掛舊 view；由新的 message.view 更新正文', async () => {
+    const s = boot(config())
+    s.handle({ type: 'messages', messages: [{ id: 'g', role: 'ai', content: '你好，{{user}}', serverId: null, state: 'done', view: { name: '露娜', html: '<p>你好，小明</p>', finished: true } }] })
+    const body = s.refs.list.querySelector('[data-chat="message-body"]')
+    s.handle({ type: 'user', nickname: '新稱呼' })
+    expect(s.refs.list.querySelector('[data-chat="message-body"]')).toBe(body)
+    s.handle({ type: 'message.view', id: 'g', view: { name: '露娜', html: '<p>你好，新稱呼</p>', finished: true } })
+    await nextTick()
+    expect(s.refs.list.textContent).toContain('你好，新稱呼')
+  })
+
   it('未提供宿主狀態欄 HTML 時，用新玩家名重算殼的狀態欄巨集', () => {
     const s = boot(config({ card: { rules: [], statusbar: '<b>{{user}}</b>' } }))
     s.handle({ type: 'user', nickname: '新稱呼' })

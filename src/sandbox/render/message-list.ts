@@ -121,7 +121,7 @@ export interface MessageList {
    * 渲染結果整體失效（例如簡繁字典載好了）：清掉快取，掛著的氣泡照虛擬化同一條路拆掉再重建——
    * 發 unmount／mount，卡片腳本才會重讀新的正文。沒掛著的等重建時自然用新結果。
    */
-  rerenderAll(): void
+  rerenderAll(options?: { localOnly?: boolean }): void
 }
 
 export function payloadOf(m: SandboxMessage): MessagePayload {
@@ -541,10 +541,10 @@ export function createMessageList(deps: MessageListDeps): MessageList {
         if (entry.message.state === 'done' && !pendingRules(entry)) nextTick(() => { if (entry.app) activate(entry) })
       }
     },
-    rerenderAll() {
+    rerenderAll(options = {}) {
       rendered.clear()
       for (const entry of order()) {
-        if (!entry.app) continue
+        if (!entry.app || (options.localOnly && entry.message.view)) continue
         hollow(entry)
         rebuild(entry)
       }

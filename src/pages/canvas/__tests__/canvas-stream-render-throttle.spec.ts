@@ -19,6 +19,7 @@ function extractBraced(source: string, head: string): string {
 
 function buildRenderMessage(clock: { now: number }) {
   const parts = [
+    extractBraced(SOURCE, 'function hudMessageHtml(item: any): string {'),
     extractBraced(SOURCE, 'function renderMemoKey(item) {'),
     extractBraced(SOURCE, 'function renderMemoHit(entry, key) {'),
     extractBraced(SOURCE, 'const renderMessage = (item) => {'),
@@ -29,6 +30,10 @@ function buildRenderMessage(clock: { now: number }) {
     authorRules: { provisional: 0 },
     authorRuleEpoch: { value: 0 },
     renderMemo: new WeakMap(),
+    hudHtmlCache: new Map(),
+    sandboxCard: { value: false },
+    userDisplayName: () => 'old',
+    renderIsProvisional: () => false,
     renderMarkdown: (item: any) => { rendered.push(item.content); return `html:${item.content}` },
     splitThinkingContent: (content: string) => ({ hasThinking: false, visibleContent: content }),
     cardHandlesTag: () => false,
@@ -45,9 +50,29 @@ function buildRenderMessage(clock: { now: number }) {
     roleView: { value: {} },
     setTimeout: () => 1, Date: FakeDate, console,
   })
-  const renderMessage = new vm.Script(`(function(){\n${parts}\nreturn renderMessage;\n})()`).runInContext(context)
-  return { renderMessage, rendered, context }
+  const compiled = parts.replace('function hudMessageHtml(item: any): string', 'function hudMessageHtml(item)')
+  const { renderMessage, hudMessageHtml } = new vm.Script(`(function(){\n${compiled}\nreturn {renderMessage, hudMessageHtml};\n})()`).runInContext(context)
+  return { renderMessage, hudMessageHtml, rendered, context }
 }
+
+describe('sandbox 宿主訊息的玩家名快取', () => {
+  it('內容相同而玩家名變更時，兩層快取失效並產生新 view HTML', () => {
+    let name = '舊名'
+    const { hudMessageHtml, context } = buildRenderMessage({ now: 1000 })
+    context.sandboxCard.value = true
+    context.userDisplayName = () => name
+    let renders = 0
+    context.renderMarkdown = (item: any) => { renders++; return item.content.replace('{{user}}', name) }
+    const item = { id: 'g', content: '你好，{{user}}', chatFinish: true }
+    expect(hudMessageHtml(item)).toBe('你好，舊名')
+    expect(hudMessageHtml(item)).toBe('你好，舊名')
+    expect(renders).toBe(1)
+    name = '新名'
+    expect(hudMessageHtml(item)).toBe('你好，新名')
+    expect(hudMessageHtml(item)).toBe('你好，新名')
+    expect(renders).toBe(2)
+  })
+})
 
 describe('串流中的那一則：節流看的是訊息身分，不是物件', () => {
   it('每個 chunk 都換成新物件時，150ms 內只排版一次', () => {

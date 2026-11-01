@@ -167,6 +167,8 @@ function buildRenderMessage(authorRules: unknown, renderMarkdown: (item: any) =>
     authorRules,
     authorRuleEpoch: epoch,
     renderMemo: new WeakMap(),
+    sandboxCard: { value: false },
+    userDisplayName: () => '',
     renderMarkdown,
     splitThinkingContent: (content: string) => ({ hasThinking: false, visibleContent: content }),
     cardHandlesTag: () => false,
