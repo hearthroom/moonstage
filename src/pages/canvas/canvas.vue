@@ -3202,6 +3202,17 @@ function destroySandboxHost() {
   sandboxShellReady.value = false;
 }
 
+function sandboxStatusbarHtml(): string {
+  return sandboxAsset?.mountTrigger
+    ? convertVisibleHtml(scopeCardHtml(applyTavernRules(String(sandboxAsset.mountTrigger), activeAuthorAsset.value.rules, authorRuleOptions()).html, cardFormat.value), displayScript)
+    : '';
+}
+
+// 人設可能比 hello 晚到，玩家也能在開局後改名。只追蹤解析後的稱呼，沒變不補送。
+watch(() => sandboxHostRef.value ? userDisplayName() : null, (name) => {
+  if (name !== null) sandboxHostRef.value?.postUserName(name, sandboxStatusbarHtml());
+});
+
 function mountSandbox(asset: any) {
   destroySandboxHost();
   sandboxAsset = asset;
@@ -3239,9 +3250,7 @@ function mountSandbox(asset: any) {
             statusbar: String(sandboxAsset?.mountTrigger || ''),
             // 狀態欄也用一般卡的管線算（跟訊息同一套規則引擎與範圍處理），殼直接掛。
             // 顯示字形跟訊息一樣在正則之後轉（只轉文字節點）：否則功能欄是原文、正文是玩家的簡繁，同一頁兩種字。
-            statusbarHtml: sandboxAsset?.mountTrigger
-              ? convertVisibleHtml(scopeCardHtml(applyTavernRules(String(sandboxAsset.mountTrigger), activeAuthorAsset.value.rules, authorRuleOptions()).html, cardFormat.value), displayScript)
-              : '',
+            statusbarHtml: sandboxStatusbarHtml(),
           },
           variants: sandboxAsset?.variants || null,
           composer: true,

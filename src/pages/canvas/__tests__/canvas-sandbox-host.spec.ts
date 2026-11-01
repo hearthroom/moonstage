@@ -78,6 +78,31 @@ describe('沙箱宿主橋', () => {
   beforeEach(() => { h = harness() })
   afterEach(() => { h.iframe.remove() })
 
+  it('玩家名只在 hello 後變更時補送；設定晚到、再次改名與銷毀都不重送舊值', async () => {
+    let name = '暱稱'
+    const { hud } = fakeHud({ current: makeState() })
+    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '1', hello: () => ({ ...hello(), user: { nickname: name, avatarUrl: '' } }) })
+    const users = () => h.posted.filter(p => p.type === 'user')
+    host.start()
+    host.postUserName(name, '<b>暱稱</b>')
+    expect(users()).toEqual([])
+    name = '全局稱呼'
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    expect(h.posted.find(p => p.type === 'hello')).toMatchObject({ config: { user: { nickname: name } } })
+    host.postUserName(name, '<b>全局稱呼</b>')
+    expect(users()).toEqual([])
+    name = '新稱呼'
+    host.postUserName(name, '<b>新稱呼</b>')
+    host.postUserName(name, '<b>新稱呼</b>')
+    expect(users()).toMatchObject([{ type: 'user', nickname: name, statusbarHtml: '<b>新稱呼</b>' }])
+    host.postUserName('另一稱呼', '<b>另一稱呼</b>')
+    expect(users()).toHaveLength(2)
+    host.destroy()
+    host.postUserName('已銷毀', '')
+    expect(users()).toHaveLength(2)
+  })
+
   // 宿主（站台）在殼畫好之前蓋著載入畫面：殼喊 ready 就要讓宿主知道，而且只認自己的殼。
   it('殼喊 ready 就通知宿主（別的來源喊的不算）', async () => {
     const onReady = vi.fn()

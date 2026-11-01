@@ -30,6 +30,32 @@ afterEach(() => { shell?.dispose(); shell = null; delete (window as unknown as R
 const SCRIPT_RULE = (code: string) => ({ id: 1, name: 'kit', find: '{{eg-kit}}', replace: `<script>${code}</script>` })
 
 describe('殼：冷啟動與事件順序', () => {
+  it('玩家名更新 SDK、狀態欄與既有／後續訊息巨集；重複訊息不重掛狀態欄', async () => {
+    const s = boot(config({ card: { rules: [], statusbar: '<b>{{user}}</b>', statusbarHtml: '<b>小明</b>' } }))
+    s.handle({ type: 'messages', messages: [{ id: 'g', role: 'ai', content: '你好，{{user}}', serverId: null }] })
+    s.handle({ type: 'user', nickname: '全局稱呼', statusbarHtml: '<b>全局稱呼</b>' })
+    await nextTick()
+    expect(s.sdk.user.get()).toEqual({ nickname: '全局稱呼', avatarUrl: '', locale: 'zh-Hant' })
+    expect(s.refs.statusbar!.textContent).toBe('全局稱呼')
+    expect(s.refs.list.textContent).toContain('你好，全局稱呼')
+    const status = s.refs.statusbar!.firstChild
+    s.handle({ type: 'user', nickname: '全局稱呼', statusbarHtml: '<b>全局稱呼</b>' })
+    expect(s.refs.statusbar!.firstChild).toBe(status)
+    s.handle({ type: 'user', nickname: '新稱呼', statusbarHtml: '<b>新稱呼</b>' })
+    s.handle({ type: 'message.new', message: { id: 'next', role: 'user', content: '我是{{user}}', serverId: null, state: 'done' } })
+    await nextTick()
+    expect(s.sdk.user.get().nickname).toBe('新稱呼')
+    expect(s.refs.statusbar!.textContent!.trim()).toBe('新稱呼')
+    expect(s.refs.list.textContent).toContain('你好，新稱呼')
+    expect(s.refs.list.textContent).toContain('我是新稱呼')
+  })
+
+  it('未提供宿主狀態欄 HTML 時，用新玩家名重算殼的狀態欄巨集', () => {
+    const s = boot(config({ card: { rules: [], statusbar: '<b>{{user}}</b>' } }))
+    s.handle({ type: 'user', nickname: '新稱呼' })
+    expect(s.refs.statusbar!.textContent!.trim()).toBe('新稱呼')
+  })
+
   it('腳本在 DOM 之前跑、sdk 掛在 window；冷啟動 new→mount→done，ready 最後；載荷恰好四鍵', () => {
     const s = boot(config({
       card: { rules: [SCRIPT_RULE(`

@@ -377,7 +377,7 @@ export function createShell(options: CreateShellOptions): Shell {
     strings,
     roleName: config.role.name,
     roleAvatar: config.role.avatarUrl,
-    userName: config.user.nickname,
+    get userName() { return config.user.nickname },
     userAvatar: config.user.avatarUrl,
     labels: config.labels,
     menuLabel: config.menuLabel,
@@ -753,6 +753,25 @@ export function createShell(options: CreateShellOptions): Shell {
         pending.delete(message.reqId)
         if (message.ok) waiter.resolve(message.value)
         else waiter.reject(sdkErrorFromHost(message.error))
+        return
+      }
+      case 'user': {
+        if (message.nickname === config.user.nickname) return
+        config.user.nickname = message.nickname
+        macros.user = message.nickname
+        if (message.statusbarHtml != null) config.card.statusbarHtml = message.statusbarHtml
+        if (refs.statusbar) {
+          if (config.card.statusbarHtml) {
+            statusbarPending = false
+            setStatusbarHtml(config.card.statusbarHtml)
+          } else {
+            const out = render(config.card.statusbar)
+            statusbarPending = typeof out !== 'string'
+            setStatusbarHtml(htmlOf(out))
+          }
+          mountFrontend(refs.statusbar)
+        }
+        list.rerenderAll()
         return
       }
       case 'theme':

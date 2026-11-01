@@ -128,6 +128,8 @@ export interface SandboxHost {
   postBackground(background: SandboxBackground): void
   /** 分享情境可能變了（推薦碼晚到）：跟上次送的不同才送。hello 之前不送：hello 會帶當下的值。 */
   postShare(): void
+  /** hello 之後玩家名變了才送；握手前由 hello 帶最新值。 */
+  postUserName(nickname: string, statusbarHtml?: string): void
   /** 宿主的返回鍵：殼處理了（關舞台）回 true；否則回 false 由宿主導頁。 */
   requestBack(): Promise<boolean>
   ready(): boolean
@@ -163,6 +165,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   let backWaiter: ((handled: boolean) => void) | null = null
   // 上次送給殼的分享情境；hello 送出之前是 null（那時不補送，hello 會帶當下的值）。
   let lastShareKey: string | null = null
+  let lastUserName: string | null = null
   let handshakeTimer: ReturnType<typeof setTimeout> | null = null
 
   let lastHistoryKey = ''
@@ -450,6 +453,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     const storageScope = await cardStorageScope(getAuthorRuleStorageScope(), deps.roleId)
     if (destroyed) return
     const base = deps.hello()
+    lastUserName = base.user.nickname
     const share = deps.share ? deps.share.read() : null
     lastShareKey = JSON.stringify(share)
     // 殼一開始的草稿是空的；宿主此刻的草稿若非空，第一次 sync 會送過去，空的就不必。
@@ -726,6 +730,11 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     postTheme: (theme, vars) => post({ type: 'theme', theme, vars }),
     postViewport: (height) => post({ type: 'viewport', height }),
     postBackground: (background) => { if (helloSent) post({ type: 'background', background }) },
+    postUserName: (nickname, statusbarHtml) => {
+      if (lastUserName === null || destroyed || nickname === lastUserName) return
+      lastUserName = nickname
+      post({ type: 'user', nickname, ...(statusbarHtml != null ? { statusbarHtml } : {}) })
+    },
     postShare: () => {
       if (lastShareKey === null || destroyed || !deps.share) return
       const share = deps.share.read()

@@ -304,6 +304,8 @@ export interface SandboxBackground {
 /** 宿主 → 殼 */
 export type HostToShell =
   | { type: 'hello'; config: SandboxHelloConfig }
+  /** hello 後生效的玩家名；狀態欄 HTML 與開機時走同一條宿主管線。 */
+  | { type: 'user'; nickname: string; statusbarHtml?: string }
   | { type: 'history.change'; subscriptionId: number; event: HistoryChange }
   | { type: 'history.capabilities'; capabilities: HistoryCapabilities }
   | { type: 'messages'; messages: SandboxMessage[] }
