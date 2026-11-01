@@ -84,6 +84,21 @@ describe('殼：冷啟動與事件順序', () => {
     expect(s.refs.list.textContent).toContain('你好，新稱呼')
   })
 
+  it('改名同步狀態欄 frontend 文件，只重新載入來源真的變更的 frame', () => {
+    const html = '<pre class="lt-frontend"><code>&lt;html&gt;&lt;body&gt;你好，小明&lt;/body&gt;&lt;/html&gt;</code></pre><pre class="lt-frontend"><code>&lt;html&gt;&lt;body&gt;static&lt;/body&gt;&lt;/html&gt;</code></pre>'
+    const s = boot(config({ card: { rules: [], statusbar: 'mount', statusbarHtml: html } }))
+    const [frame, stable] = Array.from(s.refs.statusbar!.querySelectorAll('iframe'))
+    expect(frame.srcdoc).toContain('你好，小明')
+    const stableDocument = stable.srcdoc
+    // 作者能搬動 frame，來源→frame 對應不能依賴更新時的鄰居位置。
+    s.refs.root.append(frame)
+    s.handle({ type: 'user', nickname: '新稱呼', statusbarHtml: html.replace('小明', '新稱呼') })
+    expect(frame.srcdoc).toContain('你好，新稱呼')
+    expect(frame.parentNode).toBe(s.refs.root)
+    expect(s.refs.statusbar!.querySelector('iframe')).toBe(stable)
+    expect(stable.srcdoc).toBe(stableDocument)
+  })
+
   it('未提供宿主狀態欄 HTML 時，用新玩家名重算殼的狀態欄巨集', () => {
     const s = boot(config({ card: { rules: [], statusbar: '<b>{{user}}</b>' } }))
     s.handle({ type: 'user', nickname: '新稱呼' })

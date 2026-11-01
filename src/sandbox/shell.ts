@@ -18,7 +18,7 @@ import { installCard, renderAppliedContent } from './rules'
 import { createLiveHtml } from './render/live-html'
 import { getAuthorRuleRunner, setAuthorRuleStorageScope, clearAuthorRuleStorage, type RuleRunner } from '@/common/author-rules'
 import { applyStylePolicyToHtml, stylePolicyFor } from '@/common/author-style-policy'
-import { mountFrontendBlocks } from '@/common/frontend-block'
+import { buildFrontendDocument, FRONTEND_BLOCK_CLASS, mountFrontendBlocks } from '@/common/frontend-block'
 import { runAuthorScripts, runInlineScript } from './author-scripts'
 import { createMessageList } from './render/message-list'
 import { createPanels } from './render/panels'
@@ -310,9 +310,28 @@ export function createShell(options: CreateShellOptions): Shell {
   // 先跑腳本會找不到、功能少一半（碧藍檔案那張：導覽 13 步變 9 步、開場白裡的檔案面板不出來）。
   // 舞台與訊息列容器也已經在上面掛好了，作者腳本啟動時看得到跟舊頁一樣的骨架。
   // 前端區塊協議：圍欄裝的整份 HTML 文件，定稿後各自掛成 iframe（跟酒館助手的渲染器同一套慣例）。
-  const mountFrontend = (root: HTMLElement) => { mountFrontendBlocks(root, { charAvatar: config.role.avatarUrl, userAvatar: config.user.avatarUrl, doc }) }
+  // 在作者腳本搬動節點前記住來源與 frame，更新時不靠相鄰位置猜。
+  const statusbarFrames = new Map<Element, HTMLIFrameElement>()
+  const frontendOptions = { charAvatar: config.role.avatarUrl, userAvatar: config.user.avatarUrl, doc }
+  const mountFrontend = (root: HTMLElement) => {
+    const pending = root === refs.statusbar ? Array.from(root.querySelectorAll(`pre.${FRONTEND_BLOCK_CLASS}:not([data-lt-frontend])`)) : []
+    mountFrontendBlocks(root, frontendOptions)
+    for (const pre of pending) {
+      const frame = pre.nextElementSibling
+      if (frame?.tagName === 'IFRAME') statusbarFrames.set(pre, frame as HTMLIFrameElement)
+    }
+  }
   const statusbarHtml = refs.statusbar ? createLiveHtml(refs.statusbar) : null
-  const setStatusbarHtml = (html: string) => statusbarHtml?.replace(html)
+  const setStatusbarHtml = (html: string) => { statusbarFrames.clear(); statusbarHtml?.replace(html) }
+  const updateStatusbarHtml = (html: string) => {
+    const before = Array.from(statusbarFrames, ([pre, frame]) => ({ pre, frame, text: pre.querySelector('code')?.textContent ?? pre.textContent ?? '' }))
+    statusbarHtml?.update(html)
+    for (const { pre, frame, text } of before) {
+      const next = pre.querySelector('code')?.textContent ?? pre.textContent ?? ''
+      // srcdoc 是可執行的完整文件；只有來源變了才重載該區塊，其餘 frame 與外層作者狀態保留。
+      if (next !== text) frame.srcdoc = buildFrontendDocument(next, frontendOptions)
+    }
+  }
 
 
   // 狀態欄的規則結果還沒回來：先畫暫時的，結果到了重畫一次（下面 onSettled）。
@@ -758,11 +777,11 @@ export function createShell(options: CreateShellOptions): Shell {
         if (refs.statusbar) {
           if (config.card.statusbarHtml) {
             statusbarPending = false
-            statusbarHtml?.update(config.card.statusbarHtml)
+            updateStatusbarHtml(config.card.statusbarHtml)
           } else {
             const out = render(config.card.statusbar)
             statusbarPending = typeof out !== 'string'
-            statusbarHtml?.update(htmlOf(out))
+            updateStatusbarHtml(htmlOf(out))
           }
           mountFrontend(refs.statusbar)
         }
