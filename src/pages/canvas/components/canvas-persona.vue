@@ -49,8 +49,8 @@
         @input="persona.userName = $event"
       />
       <div class="char-count">{{ persona.userName.length }}/{{ nameMaxLength }}</div>
-      <!-- 沒填稱呼時 AI 會用暱稱叫玩家——講出來，別讓他猜「空著會怎樣」。 -->
-      <div v-if="labels.nickNameHint && !persona.userName" class="nick-hint">{{ labels.nickNameHint }}</div>
+      <!-- 沒填稱呼時 AI 會用哪個名字、那個名字從哪來——講出來，別讓他猜「空著會怎樣」。 -->
+      <div v-if="nameFallbackHint && !persona.userName" class="nick-hint">{{ nameFallbackHint }}</div>
     </div>
 
     <!-- 性別是三選一，不是自由填：它進提示詞時是一個固定的詞。僅稱呼那一檔不帶它，就不畫。 -->
@@ -166,6 +166,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { CanvasInput, CanvasTextField } from './canvas-field'
 import { asPersonaMode, type PersonaMode } from '../canvas-role-settings'
+import { resolvePlayerNameSource } from '../canvas-rule-engine-core'
 
 interface PersonaFields { userName: string; userSex: string; userDefine: string }
 
@@ -179,8 +180,10 @@ const props = withDefaults(defineProps<{
   conversationPersona?: (Partial<PersonaFields> & { exists?: boolean }) | null
   /** 有對話才有「當前會話」可以掛；沒有時那一檔變灰並講出原因 */
   hasConversation?: boolean
-  /** 帳號暱稱；稱呼沒填時 AI 會用它 */
+  /** 帳號暱稱；稱呼、全局稱呼、作者取的名字都沒有時 AI 會用它 */
   nickName?: string
+  /** 作者在卡裡替玩家取的名字（「你」這類佔位不算）；排在全局稱呼之後、暱稱之前 */
+  cardUserName?: string
   userName?: string
   userSex?: string
   userDefine?: string
@@ -214,7 +217,10 @@ const props = withDefaults(defineProps<{
     modeConversationHint: string
     /** 還沒有對話時「當前會話」那一檔底下的原因 */
     modeConversationNeedsChat: string
-    nickNameHint: string
+    /** 稱呼沒填時的提示，依名字來源三選一；{name} 換成實際會用的名字 */
+    nameFromGlobal: string
+    nameFromCard: string
+    nameFromNickname: string
     nameLabel: string
     namePlaceholder: string
     sexLabel: string
@@ -228,7 +234,7 @@ const props = withDefaults(defineProps<{
     jailbreakReset: string
   }
 }>(), {
-  personaMode: '', globalPersona: null, conversationPersona: null, hasConversation: false, nickName: '',
+  personaMode: '', globalPersona: null, conversationPersona: null, hasConversation: false, nickName: '', cardUserName: '',
   showFrame: true,
   userName: '', userSex: '', userDefine: '', sandboxLevel: '', jailbreak: '',
   defaultJailbreak: '',
@@ -243,7 +249,7 @@ const props = withDefaults(defineProps<{
     title: '', cancel: 'Cancel', save: 'Save',
     modeLabel: '', modeNameOnly: '', modeGlobal: '', modeCustom: '', modeConversation: '',
     modeNameOnlyHint: '', modeGlobalHint: '', modeCustomHint: '', modeConversationHint: '', modeConversationNeedsChat: '',
-    nickNameHint: '',
+    nameFromGlobal: '', nameFromCard: '', nameFromNickname: '',
     nameLabel: '', namePlaceholder: '', sexLabel: '',
     defineLabel: '', definePlaceholder: '',
     sandboxLabel: '', sandboxDesc: '',
@@ -298,6 +304,24 @@ const persona = computed<PersonaFields>(() => {
   if (draft.personaMode === 'global') return globalDraft
   if (draft.personaMode === 'conversation') return conversationDraft
   return draft
+})
+
+/*
+  稱呼沒填時實際會用哪個名字——跟伺服器同一條鏈（resolvePlayerNameSource）。
+  全局人設那一檔編輯的就是全局稱呼，清空它不能再「繼承自己」，所以那一檔跳過全局這一步；
+  其他檔看的是已經存好的全局稱呼（全局那份草稿沒按儲存不算數）。
+*/
+const nameFallbackHint = computed(() => {
+  const { name, source } = resolvePlayerNameSource({
+    globalName: draft.personaMode === 'global' ? '' : props.globalPersona?.userName,
+    cardUserName: props.cardUserName,
+    nickName: props.nickName,
+  })
+  const template = source === 'global' ? props.labels.nameFromGlobal
+    : source === 'author' ? props.labels.nameFromCard
+    : source === 'nickname' ? props.labels.nameFromNickname
+    : ''
+  return template ? template.replace('{name}', name) : ''
 })
 
 const advancedOpen = ref(false)

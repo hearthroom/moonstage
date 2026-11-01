@@ -67,24 +67,40 @@ export function isPlayerNamePlaceholder(name: string | null | undefined): boolea
   return PLAYER_NAME_PLACEHOLDERS.has(String(name || '').trim().toLowerCase())
 }
 
+/** 名字是哪一步給的：這一檔的人設、全局人設、作者取的玩家名、帳號暱稱、兜底。 */
+export type PlayerNameSource = 'persona' | 'global' | 'author' | 'nickname' | 'fallback'
+
 /**
  * {{user}} 要換成誰。跟伺服器替換開場白與提示詞時同一條鏈：
- * 人設稱呼 → 作者取的玩家名（佔位不算）→ 帳號暱稱 → 兜底（呼叫端給「你」的翻譯）。
- * 三處一致，玩家在開場白、AI 回覆與正則美化裡看到的才是同一個名字。
+ * 人設稱呼 → 全局人設的稱呼（卡片層沒填時繼承它，owner 2026-11-02）→ 作者取的玩家名（佔位不算）
+ * → 帳號暱稱 → 兜底。三處一致，玩家在開場白、AI 回覆與正則美化裡看到的才是同一個名字。
+ * 兜底時 name 是空字串，由呼叫端換成「你」的翻譯。
  */
+export function resolvePlayerNameSource(input: {
+  personaName?: string | null
+  globalName?: string | null
+  cardUserName?: string | null
+  nickName?: string | null
+}): { name: string; source: PlayerNameSource } {
+  const persona = String(input.personaName || '').trim()
+  if (persona) return { name: persona, source: 'persona' }
+  const global = String(input.globalName || '').trim()
+  if (global) return { name: global, source: 'global' }
+  const card = String(input.cardUserName || '').trim()
+  if (card && !isPlayerNamePlaceholder(card)) return { name: card, source: 'author' }
+  const nick = String(input.nickName || '').trim()
+  if (nick) return { name: nick, source: 'nickname' }
+  return { name: '', source: 'fallback' }
+}
+
 export function resolvePlayerName(input: {
   personaName?: string | null
+  globalName?: string | null
   cardUserName?: string | null
   nickName?: string | null
   fallback: string
 }): string {
-  const persona = String(input.personaName || '').trim()
-  if (persona) return persona
-  const card = String(input.cardUserName || '').trim()
-  if (card && !isPlayerNamePlaceholder(card)) return card
-  const nick = String(input.nickName || '').trim()
-  if (nick) return nick
-  return input.fallback
+  return resolvePlayerNameSource(input).name || input.fallback
 }
 
 /**

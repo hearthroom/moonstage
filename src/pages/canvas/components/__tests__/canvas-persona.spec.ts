@@ -11,7 +11,8 @@ const labels = {
   title: '用戶人設', cancel: '取消', save: '確定',
   modeLabel: '人設來源', modeNameOnly: '僅使用稱呼', modeGlobal: '全局人設', modeCustom: '單獨設置', modeConversation: '當前會話',
   modeNameOnlyHint: '只帶名字', modeGlobalHint: '到處生效', modeCustomHint: '只在這張卡', modeConversationHint: '只在這個存檔',
-  modeConversationNeedsChat: '開始對話後才能設定', nickNameHint: '沒填就用你的暱稱：阿強',
+  modeConversationNeedsChat: '開始對話後才能設定',
+  nameFromGlobal: '沒填就用全局人設的稱呼：{name}', nameFromCard: '沒填就用角色卡設定的稱呼：{name}', nameFromNickname: '沒填就用你的暱稱：{name}',
   nameLabel: 'AI 怎麼稱呼你', namePlaceholder: '例如：小明', sexLabel: '性別',
   defineLabel: '你想讓 AI 知道的事', definePlaceholder: '', sandboxLabel: '沙盒', sandboxDesc: '',
   advanced: '進階', jailbreakLabel: '', jailbreakHint: '', jailbreakReset: '',
@@ -55,11 +56,11 @@ describe('人設彈層', () => {
     expect(saved.userDefine).toBe('全局的')
   })
 
-  it('僅使用稱呼：性別與自我介紹不畫；沒填稱呼時提示會用暱稱', async () => {
+  it('僅使用稱呼：性別與自我介紹不畫；沒填稱呼時提示會用全局人設的稱呼', async () => {
     const w = mountPersona({ personaMode: 'name_only', userName: '' })
     expect(w.find('.gender-box').exists()).toBe(false)
     expect(w.find('.textarea-wrapper:not(.advanced-body)').exists()).toBe(false)
-    expect(w.find('.nick-hint').text()).toContain('阿強')
+    expect(w.find('.nick-hint').text()).toBe('沒填就用全局人設的稱呼：阿強')
     await w.find('.complete-btn').trigger('click')
     const saved = w.emitted('save')![0][0] as any
     expect(saved.personaMode).toBe('name_only')
@@ -113,6 +114,40 @@ describe('人設彈層', () => {
     await w.find('.complete-btn').trigger('click')
     const saved = w.emitted('save')![0][0] as any
     expect(saved.userName).toBe('存檔二')
+  })
+
+  describe('稱呼沒填時，提示寫出實際會用的名字與來源', () => {
+    const global = { userName: '洛璃', userSex: 'women', userDefine: '全局的' }
+    const hint = (w: ReturnType<typeof mountPersona>) => w.find('.nick-hint')
+
+    it('單獨設置：先用全局人設的稱呼', () => {
+      const w = mountPersona({ userName: '', globalPersona: global, cardUserName: '林凡', nickName: '洛璃luoli' })
+      expect(hint(w).text()).toBe('沒填就用全局人設的稱呼：洛璃')
+    })
+
+    it('全局人設沒有稱呼：用作者取的名字；作者沒取（或只寫「你」）就用暱稱', () => {
+      const noName = { userName: '', userSex: '', userDefine: '全局的' }
+      expect(hint(mountPersona({ userName: '', globalPersona: noName, cardUserName: '林凡', nickName: '洛璃luoli' })).text())
+        .toBe('沒填就用角色卡設定的稱呼：林凡')
+      expect(hint(mountPersona({ userName: '', globalPersona: noName, cardUserName: '你', nickName: '洛璃luoli' })).text())
+        .toBe('沒填就用你的暱稱：洛璃luoli')
+    })
+
+    it('全局人設那一檔編輯的就是全局稱呼：清空時提示退到作者的名字或暱稱', async () => {
+      const w = mountPersona({ personaMode: 'global', globalPersona: { ...global, userName: '' }, cardUserName: '林凡' })
+      expect(hint(w).text()).toBe('沒填就用角色卡設定的稱呼：林凡')
+    })
+
+    it('當前會話：存檔那份沒填稱呼也繼承全局人設的稱呼', async () => {
+      const w = mountPersona({ hasConversation: true, globalPersona: global, conversationPersona: { userName: '', userSex: 'women', userDefine: '精靈', exists: true } })
+      await modeButton(w, '當前會話').trigger('click')
+      expect(hint(w).text()).toBe('沒填就用全局人設的稱呼：洛璃')
+    })
+
+    it('有填就不提示；什麼名字都沒有也不提示', async () => {
+      expect(hint(mountPersona({ userName: '小明', globalPersona: global })).exists()).toBe(false)
+      expect(hint(mountPersona({ userName: '', globalPersona: null, cardUserName: '', nickName: '' })).exists()).toBe(false)
+    })
   })
 
   // 回覆偏好打得開時，破甲強度與破限詞在那邊；這裡不重複，存出去的值也不變。

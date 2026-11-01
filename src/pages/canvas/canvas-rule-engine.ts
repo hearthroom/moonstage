@@ -3,7 +3,7 @@
  *
  * 同步 API（行為不變，實作在 canvas-rule-engine-core.ts）：
  *   applyTavernRules(text, rules, { macros?, variants?, pickRandom? }) → { html, rollbacks }
- *   以及 substituteMacros、rewriteNamedGroups、normalizeRules、resolvePlayerName、isPlayerNamePlaceholder。
+ *   以及 substituteMacros、rewriteNamedGroups、normalizeRules、resolvePlayerName、resolvePlayerNameSource、isPlayerNamePlaceholder。
  *   同步版在呼叫端的執行緒上跑：作者的正則若有災難性回溯，會卡住那條執行緒直到跑完。
  *
  * 非同步 API：

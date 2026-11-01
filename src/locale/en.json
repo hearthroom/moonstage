@@ -4154,6 +4154,8 @@
 	"canvas.panel.personaModeConversationHint": "Applies to this chat save only. Other saves of the same card keep their own. Starts from this card's persona until you change it.",
 	"canvas.panel.personaModeConversationNeedsChat": "Available once a chat has started. Each save can then have its own.",
 	"canvas.panel.personaNickNameHint": "Leave blank to use your nickname: {name}",
+	"canvas.panel.personaNameFromGlobal": "Leave blank to use your global persona name: {name}",
+	"canvas.panel.personaNameFromCard": "Leave blank to use the name this card gives you: {name}",
 	"canvas.panel.personaAdvanced": "Advanced",
 	"canvas.hud.notSupported": "This platform doesn't have this feature",
 	"canvas.hud.generating": "The AI is replying",

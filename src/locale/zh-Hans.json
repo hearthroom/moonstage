@@ -4154,6 +4154,8 @@
 	"canvas.panel.personaModeConversationHint": "只在这个对话存档生效；同一张卡的其他存档各用各的。还没设过时先沿用这张卡的人设。",
 	"canvas.panel.personaModeConversationNeedsChat": "开始对话后才能设置，之后每个存档可以各自不同。",
 	"canvas.panel.personaNickNameHint": "没填就用你的昵称：{name}",
+	"canvas.panel.personaNameFromGlobal": "没填就用全局人设的称呼：{name}",
+	"canvas.panel.personaNameFromCard": "没填就用角色卡设定的称呼：{name}",
 	"canvas.panel.personaAdvanced": "进阶",
 	"canvas.hud.notSupported": "这个平台没有这项功能",
 	"canvas.hud.generating": "AI 正在回复",

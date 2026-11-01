@@ -122,6 +122,16 @@ describe('{{user}} 換成誰', () => {
     expect(isPlayerNamePlaceholder('桐人')).toBe(false)
   })
 
+  it('這一檔沒填稱呼時先用全局人設的稱呼，排在作者取的名字前（跟伺服器同一條鏈）', async () => {
+    const { resolvePlayerName, resolvePlayerNameSource } = await import('../canvas-rule-engine')
+    expect(resolvePlayerName({ personaName: '', globalName: '洛璃', cardUserName: '桐人', nickName: '洛璃luoli', fallback: '你' })).toBe('洛璃')
+    expect(resolvePlayerName({ personaName: '小明', globalName: '洛璃', cardUserName: '桐人', nickName: '阿強', fallback: '你' })).toBe('小明')
+    expect(resolvePlayerNameSource({ personaName: '', globalName: ' ', cardUserName: '桐人', nickName: '阿強' })).toEqual({ name: '桐人', source: 'author' })
+    expect(resolvePlayerNameSource({ personaName: '', globalName: '洛璃', cardUserName: '', nickName: '' })).toEqual({ name: '洛璃', source: 'global' })
+    expect(resolvePlayerNameSource({ personaName: '', cardUserName: '你', nickName: '阿強' })).toEqual({ name: '阿強', source: 'nickname' })
+    expect(resolvePlayerNameSource({ personaName: '', cardUserName: '', nickName: '' })).toEqual({ name: '', source: 'fallback' })
+  })
+
   it('巨集不分大小寫、大括號裡有空白也認', async () => {
     const { substituteMacros } = await import('../canvas-rule-engine')
     expect(substituteMacros('{{USER}}／{{ char }}／{{random:A::B}}', { user: '阿強', char: '沈栀语' })).toBe('阿強／沈栀语／{{random:A::B}}')

@@ -236,6 +236,7 @@
         :conversation-persona="conversationPersona"
         :has-conversation="Boolean(unref(conversationId))"
         :nick-name="playerNickName"
+        :card-user-name="roleView.userName"
         :user-name="formData.userName"
         :user-sex="formData.userSex"
         :user-define="formData.userDefine"
@@ -3014,7 +3015,7 @@ function buildPanelsState() {
       break;
     case 'persona':
       title = t('canvas.panel.persona');
-      props = { supportedModes: stageHost.capabilities?.personaModes, personaMode: asPersonaMode(formData.personaMode), globalPersona: globalPersona.value, conversationPersona: conversationPersona.value, hasConversation: Boolean(unref(conversationId)), nickName: playerNickName.value, userName: formData.userName, userSex: formData.userSex, userDefine: formData.userDefine, showFrame: !responseSettingsOffered.value, sandboxLevel: formData.sandboxLevel, jailbreak: formData.jailbreak, defaultJailbreak: defaultJailbreak.value, sexOptions: personaSexOptions.value, sandboxOptions: personaSandboxOptions.value, saving: personaSaving.value, error: personaError.value, labels: personaLabels.value };
+      props = { supportedModes: stageHost.capabilities?.personaModes, personaMode: asPersonaMode(formData.personaMode), globalPersona: globalPersona.value, conversationPersona: conversationPersona.value, hasConversation: Boolean(unref(conversationId)), nickName: playerNickName.value, cardUserName: roleView.value.userName, userName: formData.userName, userSex: formData.userSex, userDefine: formData.userDefine, showFrame: !responseSettingsOffered.value, sandboxLevel: formData.sandboxLevel, jailbreak: formData.jailbreak, defaultJailbreak: defaultJailbreak.value, sexOptions: personaSexOptions.value, sandboxOptions: personaSandboxOptions.value, saving: personaSaving.value, error: personaError.value, labels: personaLabels.value };
       break;
     case 'directives':
       title = t('directive.title');
@@ -9953,12 +9954,13 @@ const introText = computed(() => {
 
 function userDisplayName(): string {
   const info: any = unref(userInfo) || {}
-  // {{user}} 換成誰，跟伺服器替換開場白時同一條鏈：人設稱呼 → 作者取的玩家名（「你」這種佔位不算）
-  // → 帳號暱稱 → 「你」。帳號的 userName 是登入帳號（例如 test-01），不在鏈裡。
+  // {{user}} 換成誰，跟伺服器替換開場白時同一條鏈：人設稱呼 → 全局人設的稱呼 → 作者取的玩家名
+  // （「你」這種佔位不算）→ 帳號暱稱 → 「你」。帳號的 userName 是登入帳號（例如 test-01），不在鏈裡。
   // 人設四檔：名字來自目前那一檔正在生效的那份（全局／這個存檔／這張卡）。
   const personaName = effectivePersonaFields().userName
   return resolvePlayerName({
     personaName,
+    globalName: globalPersona.value.userName,
     cardUserName: roleView.value.userName,
     nickName: info.nickName,
     fallback: t('canvas.you'),
@@ -11136,7 +11138,7 @@ const personaError = ref('')
 const globalPersona = ref({ userName: '', userSex: '', userDefine: '' })
 /** 這個存檔那份人設（當前會話）；exists=false＝還沒設過，那一檔從這張卡的人設起步。換存檔就重載。 */
 const conversationPersona = ref<{ userName: string; userSex: string; userDefine: string; exists: boolean }>({ userName: '', userSex: '', userDefine: '', exists: false })
-/** 帳號暱稱：「僅使用稱呼」沒填時 AI 會用它叫玩家，彈層要講出來。 */
+/** 帳號暱稱：稱呼、全局稱呼、作者取的名字都沒有時 AI 會用它叫玩家，彈層要講出來。 */
 const playerNickName = ref('')
 
 function readConversationPersona(raw: any) {
@@ -11257,7 +11259,10 @@ const personaLabels = computed(() => ({
   modeCustomHint: t('canvas.panel.personaModeCustomHint'),
   modeConversationHint: t('canvas.panel.personaModeConversationHint'),
   modeConversationNeedsChat: t('canvas.panel.personaModeConversationNeedsChat'),
-  nickNameHint: playerNickName.value ? t('canvas.panel.personaNickNameHint', { name: playerNickName.value }) : '',
+  // {name} 留給彈層換成實際會用的名字：來源跟著彈層裡正在選的那一檔變。
+  nameFromGlobal: t('canvas.panel.personaNameFromGlobal', { name: '{name}' }),
+  nameFromCard: t('canvas.panel.personaNameFromCard', { name: '{name}' }),
+  nameFromNickname: t('canvas.panel.personaNickNameHint', { name: '{name}' }),
   nameLabel: t('canvas.panel.personaName'),
   namePlaceholder: t('canvas.panel.personaNamePlaceholder'),
   sexLabel: t('canvas.panel.personaSex'),
