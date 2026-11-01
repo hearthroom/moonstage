@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { mount } from '@vue/test-utils'
 import CanvasConfirm from '../components/canvas-confirm.vue'
 import { createBackwardOperationEntry, normalizeBackwardOperationEntry } from '../chat-operation-ui-state'
@@ -24,4 +25,25 @@ describe('reset choices', () => {
     expect(normalizeBackwardOperationEntry(JSON.parse(JSON.stringify(entry)), 'c', 110)).toMatchObject(entry)
     expect(normalizeBackwardOperationEntry({ ...entry, resetOptions: { clearNotepad: 'false' } }, 'c', 110)).toBeNull()
   })
+})
+
+it('resets on the first confirmation even when a fresh conversation has no history snapshot yet', async () => {
+  const source = readFileSync('src/pages/canvas/canvas.vue', 'utf8')
+  const fn = source.match(/(?:async )?function resetConversation\(\) \{[\s\S]*?\n\}/)![0]
+  const snapshot = { value: null as any }, post = vi.fn()
+  const choices = { clearNotepad: true, clearDirectives: false, clearResponseSettings: false }
+  const deps = {
+    unref: (x: any) => x.value, conversationId: { value: 'c' },
+    stopRunningTurnForTimelineMutation: () => true, readPendingBackwardOperation: () => null,
+    backwardHistorySnapshot: snapshot, rollbackPending: { value: false },
+    resetChoices: { value: choices }, createBackwardOperationEntry,
+    writePendingBackwardOperation: () => true, postPendingBackwardOperation: post,
+    ajax: { value: {} }, getHistoryMsg: vi.fn(), t: (key: string) => key,
+    uni: { showToast: vi.fn() }, message: { error: vi.fn() },
+    _this: { requestUrl: { historyMessageList: '/messages' }, http: { get: async () => ({ statusCode: 200, data: { historyEpoch: 0, nextSeq: 2 } }) } },
+    applyBackwardHistorySnapshot: (data: any) => { snapshot.value = { conversationId: 'c', ...data } },
+  }
+  await new Function('deps', `const { ${Object.keys(deps).join(',')} } = deps; return (${fn})()`)(deps)
+  expect(post).toHaveBeenCalledOnce()
+  expect(post.mock.calls[0][0].resetOptions).toEqual(choices)
 })

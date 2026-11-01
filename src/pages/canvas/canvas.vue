@@ -12865,14 +12865,32 @@ function onPickFont(key: string) {
 // ── 重置聊天 ───────────────────────────────────────────────────────────
 //
 // 重置使用同存檔的原子操作；開場白與沒有開場白都由伺服器判斷。
-function resetConversation() {
+async function resetConversation() {
   const id = String(unref(conversationId) || '')
   if (!id || !stopRunningTurnForTimelineMutation()) return
   const existing = readPendingBackwardOperation(id)
   if (existing) { postPendingBackwardOperation(existing); return }
-  const snapshot = backwardHistorySnapshot.value
+  let snapshot = backwardHistorySnapshot.value
   if (!snapshot || snapshot.conversationId !== id) {
-    unref(ajax).flag = true; unref(ajax).page = 1; getHistoryMsg(); return
+    // A freshly created opening has no history page yet. Obtain its fence and
+    // continue this same confirmation instead of requiring a second click.
+    rollbackPending.value = true
+    try {
+      const res = await _this.http.get(_this.requestUrl.historyMessageList, {
+        showLoading: false, data: { conversationId: id, pageNum: 1, pageSize: 1 },
+      })
+      if (String(unref(conversationId) || '') !== id) return
+      if (res.statusCode === 200) applyBackwardHistorySnapshot(res.data, id, true)
+      snapshot = backwardHistorySnapshot.value
+      if (!snapshot || snapshot.conversationId !== id) {
+        uni.showToast({ title: t('chat.rollbackFailed'), icon: 'error' }); return
+      }
+    } catch {
+      if (String(unref(conversationId) || '') === id) uni.showToast({ title: t('chat.rollbackFailed'), icon: 'error' })
+      return
+    } finally {
+      if (String(unref(conversationId) || '') === id) rollbackPending.value = false
+    }
   }
   const entry = {
     ...createBackwardOperationEntry({
