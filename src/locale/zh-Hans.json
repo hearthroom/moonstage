@@ -4428,5 +4428,7 @@
   "responseSettings.preset.purpose.required": "选择用途",
   "responseSettings.preset.purpose.models.required": "至少选一个模型",
   "responseSettings.preset.purpose.tested": "已测试",
-  "responseSettings.preset.purpose.recommendation": "作者推荐用于：{models}"
+  "responseSettings.preset.purpose.recommendation": "作者推荐用于：{models}",
+	"systemMsg.filterSummaryPolicy": "整理剧情被这条线路拦下",
+	"systemMsg.filterSummaryPolicySub": "这条线路的服务商因内容限制，拒绝了要整理的前文，不是模型故障，也与刚发送的消息无关。换一条线路或换个模型，可能就能整理。"
 }

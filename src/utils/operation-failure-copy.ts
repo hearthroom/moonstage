@@ -1,5 +1,5 @@
 const FILTER_COPY: Record<string, string> = {
- input_policy: 'InputPolicy', safety: 'Safety', prohibited: 'Safety', blocklist: 'Safety',
+ input_policy: 'InputPolicy', summary_policy: 'SummaryPolicy', safety: 'Safety', prohibited: 'Safety', blocklist: 'Safety',
  privacy: 'Privacy', recitation: 'Recitation', refusal: 'Refusal', unknown: 'Unknown',
 }
 export function normalizeFilterReason(reason: unknown): string {
@@ -45,6 +45,7 @@ export function operationFailureTitle(cause: unknown, t: (key: string) => string
 export function operationFailureSub(cause: unknown, t: (key: string) => string, opts: { agent?: boolean; filterReason?: unknown; canSwitch?: boolean; actions?: string[]; settled?: boolean; chargeCredits?: number; hasReasoning?: boolean; offersStreamOff?: boolean; streamingOff?: boolean; switchedTo?: '' | 'lane' | 'model'; offersTraditional?: boolean; traditionalFailed?: boolean } = {}): string {
   if (opts.hasReasoning && ['no_final_answer', 'empty_response', 'no_answer'].includes(String(cause))) return t('chat.noFinalAnswerSub')
   const restricted = filterKey(cause, opts.filterReason)
+  if (restricted === 'systemMsg.filterSummaryPolicy' && opts.switchedTo) return t('systemMsg.filterInputPolicy' + (opts.switchedTo === 'lane' ? 'SubSwitchedLane' : 'SubSwitchedModel'))
   // 前置被擋後從卡上換了線路或模型、卡上有重送鍵：說明只講現在可以直接重送。
   if (restricted === 'systemMsg.filterInputPolicy' && opts.switchedTo) return t(restricted + (opts.switchedTo === 'lane' ? 'SubSwitchedLane' : 'SubSwitchedModel'))
   if (restricted === 'systemMsg.filterInputPolicy' && opts.offersTraditional) return t(restricted + 'SubTraditional')

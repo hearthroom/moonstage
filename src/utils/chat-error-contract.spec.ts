@@ -13,7 +13,7 @@ it('keeps the outcome-unconfirmed fallbacks consistent with the approved R26 cop
 })
 
 describe('bounded content restriction presentation', () => {
- for (const [reason, suffix] of Object.entries({input_policy:'InputPolicy',safety:'Safety',prohibited:'Safety',blocklist:'Safety',privacy:'Privacy',recitation:'Recitation',refusal:'Refusal',unknown:'Unknown'})) {
+ for (const [reason, suffix] of Object.entries({input_policy:'InputPolicy',summary_policy:'SummaryPolicy',safety:'Safety',prohibited:'Safety',blocklist:'Safety',privacy:'Privacy',recitation:'Recitation',refusal:'Refusal',unknown:'Unknown'})) {
   it(`retains ${reason} across status, history and recovery, with the same copy`, () => {
    const status = normalizeChatOperationStatus({operationId:'op',state:'failed_retryable',kind:'send',failureCause:'content_filter',filterReason:reason,outputDisposition:'none'})!
    expect(status.filterReason).toBe(reason)

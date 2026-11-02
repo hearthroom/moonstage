@@ -27,7 +27,7 @@ import {
 import { operationFailureSub, operationFailureTitle } from '@/utils/operation-failure-copy'
 import { findResumableAgentOperation } from '@/utils/agent-composer-action'
 import { allowsStageAction } from '@/host/capabilities'
-import { filterCardActions, isInputPolicyFilter } from '../canvas-filter-card'
+import { filterCardActions, isInputPolicyFilter, isPolicySwitchFilter } from '../canvas-filter-card'
 import { traditionalResendText } from '../canvas-traditional-resend'
 import { canEditResendPlayerIndex, latestTerminalAIIndex } from '../chat-operation-ui-state'
 import { isDeadLane } from '../canvas-model-lanes'
@@ -64,6 +64,7 @@ function resolver(timeline: any[], over: { capabilities?: unknown; operations?: 
   ], {
     filterCardActions,
     isInputPolicyFilter,
+    isPolicySwitchFilter,
     traditionalResendText,
     traditionalResendTried: { value: f.tried ?? [] },
     ownershipRevision: { value: 0 },
@@ -111,6 +112,21 @@ const failed = (over: Record<string, unknown> = {}) => ({
 })
 
 describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
+  it('keeps summary policy copy and lane/model actions consistent in every locale', () => {
+    const row = failed({ finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'summary_policy' })
+    const timeline = [user('u1'), row]
+    for (const locale of ['zh-Hant', 'zh-Hans', 'en', 'ja', 'ko']) {
+      const strings = JSON.parse(fs.readFileSync(`src/locale/${locale}.json`, 'utf8'))
+      const translate = (key: string) => strings[key] || ''
+      const notice = resolver(timeline, { translate, filter: { lanes: 3 } })(1)
+      expect(notice.label).toBe(translate('systemMsg.filterSummaryPolicy'))
+      expect(notice.sub).toBe(translate('systemMsg.filterSummaryPolicySub'))
+      expect(notice.actions.map(a => a.action)).toEqual(['switch_lane', 'switch_model'])
+    }
+    const switched = { itemId: row.id, from: 'm-lane0' }
+    expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'm-lane0' } })(1).actions.map(a => a.action)).toEqual(['switch_lane', 'switch_model'])
+    expect(resolver(timeline, { filter: { lanes: 3, switched, current: 'm-lane1' } })(1).actions.map(a => a.action)).toEqual(['switch_lane', 'switch_model', 'resend_filtered'])
+  })
   it('selects R06 with retry, omits it without retry, and preserves R04 only with reasoning in all locales', () => {
     for (const locale of ['zh-Hant','zh-Hans','en','ja','ko']) {
       const strings = JSON.parse(fs.readFileSync(`src/locale/${locale}.json`,'utf8'))

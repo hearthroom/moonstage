@@ -63,6 +63,10 @@ export function isInputPolicyFilter(item: any): boolean {
   return !!item && copyKey(item) === 'systemMsg.filterInputPolicy'
 }
 
+export function isPolicySwitchFilter(item: any): boolean {
+  return isInputPolicyFilter(item) || (!!item && copyKey(item) === 'systemMsg.filterSummaryPolicy')
+}
+
 // 舊紀錄可能 failureCause 是 content_filter、finishReason 卻被換成 content_filter_input（沒有產出的輸入端拒絕）：
 // 字照「原因未提供」，但分不出是不是中途截斷，保守地不給流式輸出出口。
 export function isUnknownOutputFilter(item: any): boolean {
@@ -78,6 +82,18 @@ export function cardRetryTarget(base: FilterCardEntry[]): string {
 export function filterCardActions(ctx: FilterCardContext): FilterCardResult {
   const { item, base, labels } = ctx
   const unchanged: FilterCardResult = { ctas: base, offersStreamOff: false, streamingOff: false, stacked: false, switched: '', offersTraditional: false, traditionalFailed: false }
+  if (copyKey(item) === 'systemMsg.filterSummaryPolicy') {
+    // The earlier story was rejected. Editing/converting the latest message or
+    // changing reply streaming cannot change that summary request.
+    const ctas: FilterCardEntry[] = []
+    if (base.some(entry => entry.action === 'switch_model')) {
+      if (ctx.hasOtherLanes) ctas.push({ action: 'switch_lane', label: labels.switchLane })
+      ctas.push(...base.filter(entry => entry.action === 'switch_model'))
+    }
+    const switched = ctx.switchedTo && cardRetryTarget(base) ? ctx.switchedTo : ''
+    if (switched) ctas.push({ action: 'resend_filtered', label: switched === 'lane' ? labels.resendLane : labels.resendModel })
+    return { ...unchanged, ctas, switched, stacked: ctas.length >= 3 }
+  }
   if (isInputPolicyFilter(item)) {
     const ctas: FilterCardEntry[] = []
     for (const entry of base) {

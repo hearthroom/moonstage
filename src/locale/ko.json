@@ -4428,5 +4428,7 @@
   "responseSettings.preset.purpose.required": "용도 선택",
   "responseSettings.preset.purpose.models.required": "모델을 하나 이상 선택",
   "responseSettings.preset.purpose.tested": "테스트됨",
-  "responseSettings.preset.purpose.recommendation": "작성자 추천: {models}"
+  "responseSettings.preset.purpose.recommendation": "작성자 추천: {models}",
+	"systemMsg.filterSummaryPolicy": "이 회선에서 스토리 요약 거부",
+	"systemMsg.filterSummaryPolicySub": "이 회선의 제공업체가 콘텐츠 제한 때문에 앞부분 스토리 요약을 거부했어요. 모델 장애나 방금 보낸 메시지 때문이 아니에요. 회선이나 모델을 바꾸면 요약될 수도 있어요."
 }

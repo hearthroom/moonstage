@@ -4428,5 +4428,7 @@
   "responseSettings.preset.purpose.required": "用途を選択",
   "responseSettings.preset.purpose.models.required": "モデルを1つ以上選択",
   "responseSettings.preset.purpose.tested": "テスト済み",
-  "responseSettings.preset.purpose.recommendation": "作者のおすすめ：{models}"
+  "responseSettings.preset.purpose.recommendation": "作者のおすすめ：{models}",
+	"systemMsg.filterSummaryPolicy": "この回線がストーリー要約を拒否",
+	"systemMsg.filterSummaryPolicySub": "この回線の提供元が、内容の制限により前のストーリーの要約を断りました。モデルの障害や直前のメッセージが原因ではありません。回線かモデルを切り替えると、要約できる場合があります。"
 }

@@ -12,7 +12,7 @@ import path from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
 import { readResponseSettings, responseBase, responsePatch } from '../canvas-response-settings'
-import { cardRetryTarget } from '../canvas-filter-card'
+import { cardRetryTarget, isPolicySwitchFilter } from '../canvas-filter-card'
 import { traditionalResendText } from '../canvas-traditional-resend'
 
 const CANVAS = fs.readFileSync(path.join(process.cwd(), 'src/pages/canvas/canvas.vue'), 'utf8')
@@ -228,12 +228,14 @@ describe('修改訊息、切換線路', () => {
     expect(env.filterCardSwitch.value).not.toBeNull()
   })
 
-  it('記住切換只對前置被擋卡：其他卡按切換模型不記', () => {
-    const env = { filterCardSwitch: { value: null as any }, selectedVariantValue: { value: 'm-a' }, isInputPolicyFilter: (i: any) => i.filterReason === 'input_policy',
+  it('remembers lane changes for input and summary policy cards, not unrelated errors', () => {
+    const env = { filterCardSwitch: { value: null as any }, selectedVariantValue: { value: 'm-a' }, isPolicySwitchFilter,
       unref: (v: any) => (v && typeof v === 'object' && 'value' in v ? v.value : v) }
     const { rememberFilterCardSwitch } = canvasFunctions(['rememberFilterCardSwitch'], env)
     rememberFilterCardSwitch({ id: 'c', filterReason: 'input_policy' })
     expect(env.filterCardSwitch.value).toEqual({ itemId: 'c', from: 'm-a' })
+    rememberFilterCardSwitch({ id: 's', failureCause: 'content_filter', filterReason: 'summary_policy' })
+    expect(env.filterCardSwitch.value).toEqual({ itemId: 's', from: 'm-a' })
     rememberFilterCardSwitch({ id: 'd', finishReason: 'server_error' })
     expect(env.filterCardSwitch.value).toBeNull()
   })

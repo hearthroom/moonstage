@@ -580,7 +580,7 @@ import { createCanvasBackClose } from './canvas-back-close'
 import { incompleteTerminalHistoryOperation } from './chat-history-snapshot'
 import { findVariant, resolveVariant, scoreParts, priceMeaning, balanceWarning } from './canvas-model-catalog'
 import { resolveStoredModel, composeModelDisplayName, isDeadLane } from './canvas-model-lanes'
-import { filterCardActions, isInputPolicyFilter, cardRetryTarget } from './canvas-filter-card'
+import { filterCardActions, isInputPolicyFilter, isPolicySwitchFilter, cardRetryTarget } from './canvas-filter-card'
 import { traditionalResendText } from './canvas-traditional-resend'
 import { readResponseSettings, responseBase, responsePatch } from './canvas-response-settings'
 import { presetModelsMatch, type PresetApi } from './canvas-preset'
@@ -3602,7 +3602,7 @@ function traditionalResendWasTried(item: any, index: number) {
 function filterCardReplaced(item: any) {
   void ownershipRevision.value;
   const pending = pendingChatTurn;
-  if (!pending || !isReplacementOperationKind(pending.operationKind) || !isInputPolicyFilter(item)) return false;
+  if (!pending || !isReplacementOperationKind(pending.operationKind) || !isPolicySwitchFilter(item)) return false;
   const source = pending.rewriteSnapshot?.aiBubble;
   return !!source && source.id != null && String(source.id) === String(item?.id ?? '');
 }
@@ -10585,7 +10585,7 @@ const filterCardSwitch = ref<{ itemId: string; from: string } | null>(null)
 // 轉成繁體再送出過的訊息（對話＋字，見 traditionalResendFor）。
 const traditionalResendTried = ref<string[]>([])
 function rememberFilterCardSwitch(item: any) {
-  filterCardSwitch.value = isInputPolicyFilter(item) ? { itemId: String(item?.id ?? ''), from: String(unref(selectedVariantValue) || '') } : null
+  filterCardSwitch.value = isPolicySwitchFilter(item) ? { itemId: String(item?.id ?? ''), from: String(unref(selectedVariantValue) || '') } : null
 }
 watch(conversationId, () => { filterCardSwitch.value = null })
 async function saveStreamingOff(id: string) {

@@ -4428,5 +4428,7 @@
   "responseSettings.preset.purpose.required": "Choose a use",
   "responseSettings.preset.purpose.models.required": "Pick at least one model",
   "responseSettings.preset.purpose.tested": "Tested",
-  "responseSettings.preset.purpose.recommendation": "Author recommends: {models}"
+  "responseSettings.preset.purpose.recommendation": "Author recommends: {models}",
+	"systemMsg.filterSummaryPolicy": "This lane blocked the recap",
+	"systemMsg.filterSummaryPolicySub": "This lane’s provider declined to recap the earlier story under its content restrictions, not because of a model outage or the latest message. Switching lane or model may let the recap go through."
 }

@@ -6,11 +6,28 @@ const retry = { action: 'retry', label: '重試' }
 const switchModel = { action: 'switch_model', label: '切換模型' }
 const unknown = { finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'unknown' }
 const input = { finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'input_policy' }
+const summary = { finishReason: 'content_filter', failureCause: 'content_filter', filterReason: 'summary_policy' }
 
 function ctx(over: Partial<FilterCardContext> = {}): FilterCardContext {
   return { item: unknown, base: [retry, switchModel], streaming: 'on', streamingApplies: true, canEditMessage: true, hasOtherLanes: true, switchedTo: '', labels, ...over }
 }
 const actions = (over: Partial<FilterCardContext> = {}) => filterCardActions(ctx(over)).ctas.map(e => e.action)
+
+describe('summary content restriction', () => {
+  it('offers a lane or model change without blaming or converting the new message', () => {
+    const result = filterCardActions(ctx({ item: summary, canResendTraditional: true }))
+    expect(result.ctas.map(e => e.action)).toEqual(['switch_lane', 'switch_model'])
+    expect(result).toMatchObject({ offersStreamOff: false, offersTraditional: false, traditionalFailed: false })
+    expect(actions({ item: summary, hasOtherLanes: false })).toEqual(['switch_model'])
+  })
+  it('allows explicit resend after choosing a different lane or model', () => {
+    for (const switchedTo of ['lane', 'model'] as const) {
+      const result = filterCardActions(ctx({ item: summary, switchedTo }))
+      expect(result.ctas.map(e => e.action)).toEqual(['switch_lane', 'switch_model', 'resend_filtered'])
+      expect(result).toMatchObject({ switched: switchedTo, offersTraditional: false, stacked: true })
+    }
+  })
+})
 
 describe('哪一種內容限制', () => {
   it('輸入端：伺服器標成 input_policy，或舊的 content_filter_input', () => {

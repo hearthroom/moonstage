@@ -4428,5 +4428,7 @@
   "responseSettings.preset.purpose.required": "選擇用途",
   "responseSettings.preset.purpose.models.required": "至少選一個模型",
   "responseSettings.preset.purpose.tested": "已測試",
-  "responseSettings.preset.purpose.recommendation": "作者推薦用於：{models}"
+  "responseSettings.preset.purpose.recommendation": "作者推薦用於：{models}",
+	"systemMsg.filterSummaryPolicy": "整理劇情被這條線路擋下",
+	"systemMsg.filterSummaryPolicySub": "這條線路的服務商因內容限制，拒絕了要整理的前文，不是模型故障，也與剛送出的訊息無關。換一條線路或換個模型，可能就能整理。"
 }
