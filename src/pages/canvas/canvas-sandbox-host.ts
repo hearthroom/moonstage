@@ -431,6 +431,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     for (const delay of [60, 300]) settleTimers.push(setTimeout(pushViewport, delay))
   }
   let stopViewport: (() => void) | undefined
+  let iframeResize: ResizeObserver | undefined
   // 登出（clearAuthorRuleStorage）：叫還開著的殼也清掉它那個子網域上的持久層。盡力而為，下次握手殼也會比對範圍。
   const stopStorageWatch = onStorageScopeChange((event) => {
     if (event.type === 'clear' && helloSent && !destroyed) { try { post({ type: 'storage.clear' }) } catch { /* iframe 可能已經拆了 */ } }
@@ -691,6 +692,12 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     start() {
       win.addEventListener('message', onMessage)
       stopViewport = observeViewport(win, onViewportEvent)
+      // Safe-area CSS can resize the iframe without changing the outer viewport.
+      // Keep the shell's explicit height inside its actual frame in that case too.
+      if (typeof ResizeObserver === 'function') {
+        iframeResize = new ResizeObserver(pushViewport)
+        iframeResize.observe(deps.iframe)
+      }
       const timeout = deps.handshakeTimeoutMs ?? 20_000
       if (deps.onHandshakeTimeout && timeout > 0) {
         handshakeTimer = setTimeout(() => { if (!helloSent && !destroyed) { handshakeTimedOut = true; deps.onHandshakeTimeout!() } }, timeout)
@@ -762,6 +769,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       destroyed = true
       win.removeEventListener('message', onMessage)
       stopViewport?.()
+      iframeResize?.disconnect()
       for (const timer of settleTimers.splice(0)) clearTimeout(timer)
       stopStorageWatch()
     },

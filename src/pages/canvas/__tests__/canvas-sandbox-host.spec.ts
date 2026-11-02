@@ -679,6 +679,48 @@ describe('視窗高度與連結', () => {
     Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true })
   })
 
+  it('iframe resizes without a window event: updates the shell, deduplicates, and disconnects on destroy', async () => {
+    let notify: ResizeObserverCallback | undefined
+    const observe = vi.fn(), disconnect = vi.fn()
+    class FakeResizeObserver {
+      constructor(callback: ResizeObserverCallback) { notify = callback }
+      observe = observe
+      disconnect = disconnect
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+    let top = 0
+    const height = window.innerHeight
+    vi.spyOn(h.iframe, 'getBoundingClientRect').mockImplementation(() => ({ top, bottom: height, height: height - top } as DOMRect))
+    let host: ReturnType<typeof createSandboxHost> | undefined
+    try {
+      host = await handshake()
+      expect(h.posted.find(m => m.type === 'hello')).toMatchObject({ config: { viewportHeight: height } })
+      top = 42
+      // ResizeObserver delivers the iframe's real layout change; no synthetic window.resize.
+      notify?.([], {} as ResizeObserver)
+      await settle()
+      expect(h.posted.filter(m => m.type === 'viewport')).toEqual([{ ms: 1, type: 'viewport', height: height - 42 }])
+      expect(observe).toHaveBeenCalledWith(h.iframe)
+      notify?.([], {} as ResizeObserver)
+      await settle()
+      expect(h.posted.filter(m => m.type === 'viewport')).toHaveLength(1)
+      top = 0
+      notify?.([], {} as ResizeObserver)
+      await settle()
+      expect(h.posted.filter(m => m.type === 'viewport').at(-1)).toEqual({ ms: 1, type: 'viewport', height })
+      host.destroy()
+      expect(disconnect).toHaveBeenCalledOnce()
+      top = 47
+      notify?.([], {} as ResizeObserver)
+      await settle()
+      expect(h.posted.filter(m => m.type === 'viewport')).toHaveLength(2)
+    } finally {
+      host?.destroy()
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+    }
+  })
+
   // 一般模式不送鍵盤幾何：殼的根維持 iframe 的 100%，鍵盤與工具列交給瀏覽器（iOS Safari 自己會捲頁；
   // 殼的根跟著縮會露出空白、拖到底被拉回——owner 2026-09-22 iOS 回報）。
   // 鍵盤開著時視覺視窗變矮：送可見的那一段給殼，殼的根跟著縮，輸入區才在鍵盤上方
