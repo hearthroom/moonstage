@@ -138,13 +138,12 @@ describe('接線', () => {
     expect(css.match(/max-width: 94%;/g)).toHaveLength(1)
   })
 
-  // 程式碼框裡的長行在框內左右滑，不把氣泡撐寬（否則每則帶程式碼的回覆都要靠上面的保底釘寬）。
-  // grid + minmax(0,1fr)：短程式碼照原寬、長的封頂在氣泡上限；width:0 那種寫法會把短訊息的框擠窄。
-  it('一般畫布與沙箱殼的程式碼框都在框內左右滑', () => {
+  // 2026-11-02 PM：狀態文字要換行、保留縮排，不再以橫捲作為平台預設。
+  it('一般畫布與沙箱殼的程式碼框都保留空白並自動換行', () => {
     const shellCss = readFileSync(resolve(process.cwd(), 'src/sandbox/shell.css'), 'utf8')
     for (const sheet of [css, shellCss]) {
-      expect(sheet).toMatch(/\.mes_text pre:not\(\.lt-frontend\) \{ display: grid; grid-template-columns: minmax\(0, 1fr\); \}/)
-      expect(sheet).toMatch(/\.mes_text pre:not\(\.lt-frontend\) > code \{ overflow-x: auto; \}/)
+      expect(sheet).toMatch(/\.mes_text pre:not\(\.lt-frontend\) \{[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*white-space: pre-wrap;/)
+      expect(sheet).toMatch(/\.mes_text pre:not\(\.lt-frontend\) > code \{[^}]*white-space: pre-wrap;[^}]*overflow-wrap: anywhere;/)
     }
   })
 
