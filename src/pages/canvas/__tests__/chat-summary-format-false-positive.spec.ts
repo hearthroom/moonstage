@@ -25,6 +25,7 @@ import { stripUnknownTags, wrapDialogue } from '../canvas-platform-defaults'
 // highlightText 也畫原生 [status]／[choices] 區塊（common/native-blocks）；跟頁面裡一樣是真實函式。
 import { drawNativeBlocks } from '../../../common/native-blocks'
 import { renderSummary } from '../../../utils/messageRenderer'
+import { createRandomSeeds } from '../canvas-random-seed'
 
 // 真實用戶回報（desktop 專屬，mobile 正常）：AI 回覆同時用 Markdown（## / **粗體**）
 // 與 <details><summary>…</summary></details> 摺疊塊時，整段 Markdown 不解析、
@@ -135,6 +136,7 @@ function buildRenderMarkdown(chatVueSource: string) {
     applyTavernRules, authorRuleOptions: () => ({ macros: { user: '小明', char: '星' } }),
     highlightText,
     renderSummary,
+    randomSeedFor: createRandomSeeds(),
     isSummaryFormat: LEGACY_IS_SUMMARY_FORMAT,
     nextTick: (_fn?: () => void) => {}, // 測試不驗證 script/style 副作用注入
     // 訊息腳本啟動（<script>／<style> 掛進 head）是 DOM 副作用，這裡不驗，給空殼。

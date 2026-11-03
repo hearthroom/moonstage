@@ -618,6 +618,7 @@ import {
 // #ifdef H5
 import { nextBubbleId } from '@/utils/bubble-id';
 // #endif
+import { createRandomSeeds, renderCacheKey } from './canvas-random-seed';
 
 
 import { dispatchSSEEvent, handleParsedChatSSEEventGate, type DispatchContext } from './chat-sse-dispatch';
@@ -2687,6 +2688,11 @@ onUnmounted(() => {
   offAuthorRuleSettled();
   if (authorRuleEpochTimer) { clearTimeout(authorRuleEpochTimer); authorRuleEpochTimer = null; }
 });
+// {{random}} 的種子：一則訊息一個（canvas-random-seed.ts）。新對話的開場白 id 都是 0，不能拿 id 當種子。
+const seedOfItem = createRandomSeeds();
+const randomSeedFor = (item: any): string => seedOfItem(toRaw(item));
+// 沙箱卡的 HTML 快取鍵：開場白（id 0）按這一則的種子記，換新對話時不會拿到上一段的開場白畫面。
+const hudCacheKey = (item: any): string => renderCacheKey(item, randomSeedFor);
 const authorRules = {
   provisional: 0,
   // 正在渲染的訊息 id（renderMarkdown 同步設定）：讓 {{random}} 在這則訊息裡固定，串流每一跳不重抽。
@@ -3475,7 +3481,7 @@ const hudBridgeRef = shallowRef<HudBridge | null>(null);
 const hudHtmlCache = new Map<string, { content: string; html: string; ruleEpoch: number | null; playerName: string | null }>();
 
 function hudMessageHtml(item: any): string {
-  const key = String(item.id);
+  const key = hudCacheKey(item);
   const content = String(item.content || '');
   const hit = hudHtmlCache.get(key);
   const playerName = sandboxCard.value ? userDisplayName() : null;
@@ -5017,7 +5023,7 @@ const renderMarkdown = (item) => {
   // 看的是套完規則的結果，不是原文（見 activateMessageScripts）。
   const cacheKey = (!item.chatFinish && item.id != null) ? (item.id + ':' + item.type + ':' + activeAuthorAsset.value.version) : null;
   // 腳本與前端區塊的啟動在 renderMessage：規則結果還沒回來的暫時畫面不啟動。
-  authorRules.seed = item.id != null ? String(item.id) : '';
+  authorRules.seed = randomSeedFor(item);
   try {
     return highlightText(processedContent, item.type, cacheKey);
   } finally {

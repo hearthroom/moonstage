@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import vm from 'node:vm'
 import { createStreamRenderThrottle, streamRenderKey, nextStreamRenderInterval, STREAM_RENDER_MIN_INTERVAL_MS, STREAM_RENDER_MAX_INTERVAL_MS } from '../canvas-stream-render'
+import { createRandomSeeds, renderCacheKey } from '../canvas-random-seed'
 
 const SOURCE = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
 
@@ -26,11 +27,14 @@ function buildRenderMessage(clock: { now: number }) {
   ].join('\n')
   const rendered: string[] = []
   const FakeDate = { now: () => clock.now }
+  const seedFor = createRandomSeeds()
   const context = vm.createContext({
     authorRules: { provisional: 0 },
     authorRuleEpoch: { value: 0 },
     renderMemo: new WeakMap(),
     hudHtmlCache: new Map(),
+    // 畫布裡的種子與快取鍵（canvas-random-seed）：用真的實作
+    randomSeedFor: seedFor, hudCacheKey: (item: any) => renderCacheKey(item, seedFor),
     sandboxCard: { value: false },
     userDisplayName: () => 'old',
     renderIsProvisional: () => false,
