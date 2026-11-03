@@ -41,7 +41,7 @@
             :key="item.key"
             class="shortcut-btn item"
             :class="{ 'is-disabled': item.disabled }"
-            :data-action="item.key"
+            :data-shortcut="item.key"
             :aria-disabled="item.disabled ? 'true' : undefined"
             role="button"
             tabindex="0"
@@ -92,14 +92,17 @@
             包裝本身 display: contents，不改我們的版面，作者要它成為一個盒子再自己寫 display。
           -->
           <AssistAnchor :wrap="chat">
+          <!-- 沙箱殼裡節點常駐（唯讀／關閉時標 is-off 藏起來）：照 MMD 寫的卡直接改這顆節點，
+               拿掉再放回來就是一顆新節點，作者的 inline 樣式沒了、燈泡又冒出來。一般畫布照舊。 -->
           <div
-            v-if="assistEnabled && !readOnly"
+            v-if="chat || (assistEnabled && !readOnly)"
             class="ai-assistant"
             data-chat="assistant"
             data-action="assistant"
-            :class="{ 'is-busy': assistBusy }"
+            :class="{ 'is-busy': assistBusy, 'is-off': assistOff }"
+            :aria-hidden="assistOff ? 'true' : undefined"
             role="button"
-            tabindex="0"
+            :tabindex="assistOff ? -1 : 0"
             :aria-label="labels.assist"
             :aria-busy="assistBusy ? 'true' : 'false'"
             @mousedown.prevent
@@ -680,8 +683,10 @@ function onPrimary() {
 }
 
 // 幫答：進行中不重複觸發（一次一筆點數）。
+const assistOff = computed(() => !props.assistEnabled || !!props.readOnly)
+
 function onAssist() {
-  if (props.readOnly) return;
+  if (assistOff.value) return
   if (props.assistBusy) return
   emit('assist')
 }

@@ -62,3 +62,35 @@ describe('幫答鍵', () => {
     expect(panels).toContain("assist: ['confirm','cancel','refresh','pick']")
   })
 })
+
+// 沙箱殼裡照 MMD 寫的卡會直接改這顆節點（藏起來、在旁邊插自己的鈕）。唯讀或關掉幫答時節點若被拿掉，
+// 回來的是一顆新節點：作者的 inline 樣式不見，平台燈泡又冒出來；唯讀時才跑的卡腳本則找不到它。
+describe('幫答鍵：沙箱殼裡節點常駐', () => {
+  it('chat 模式唯讀／關閉時節點仍在、標 is-off 且點了不動作；恢復後是同一顆節點，作者的 inline 樣式還在', async () => {
+    const wrapper = mountComposer({ chat: true, readOnly: true })
+    const btn = wrapper.element.querySelector<HTMLElement>('[data-chat="assistant"]')
+    expect(btn).not.toBeNull()
+    expect(btn!.classList.contains('is-off')).toBe(true)
+    btn!.style.setProperty('display', 'none', 'important')
+    btn!.click()
+    expect(wrapper.emitted('assist')).toBeUndefined()
+    await wrapper.setProps({ readOnly: false })
+    expect(wrapper.element.querySelector('[data-chat="assistant"]')).toBe(btn)
+    expect(btn!.classList.contains('is-off')).toBe(false)
+    expect(btn!.style.getPropertyPriority('display')).toBe('important')
+    await wrapper.setProps({ assistEnabled: false })
+    expect(wrapper.element.querySelector('[data-chat="assistant"]')).toBe(btn)
+    btn!.click()
+    expect(wrapper.emitted('assist')).toBeUndefined()
+  })
+
+  it('一般畫布維持原狀：唯讀時沒有這顆節點', () => {
+    const wrapper = mountComposer({ readOnly: true })
+    expect(wrapper.element.querySelector('.ai-assistant')).toBeNull()
+  })
+
+  it('is-off 在 lt-base 層藏起來（class 的 display 會蓋過 [hidden]，所以用 class）', () => {
+    const css = readFileSync(resolve(__dirname, '../canvas.css'), 'utf8')
+    expect(css).toMatch(/\.ai-assistant\.is-off\s*\{\s*display:\s*none;/)
+  })
+})

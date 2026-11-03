@@ -121,10 +121,12 @@ function nodeFacts() {
       mmdSandboxSelectors: CANVAS_SELECTOR_CONTRACT.filter((e) => e.origin === 'mmd-sandbox').map((e) => e.selector),
       absent: ['[data-chat=instruction-bar]', '[data-chat=instruction-chip]', '[data-chat=instruction-back]', '[data-chat=assistant-tip]'],
       differences: [
-        'shortcut buttons are div[role=button], not <button>; data-action is the platform feature key',
-        '.composer-field sits inside .uni-textarea, so .composer-row > .composer-field does not match',
+        'shortcut, assistant, send, model-chip and more are div[role=button], not <button>: button[...] and :disabled do not match',
+        'shortcut buttons carry the platform feature key in data-shortcut, so [data-action=model] is only the model chip',
+        '.composer-field sits inside .uni-textarea, the textarea two levels below .composer-field, more inside .more-options-scope: child and sibling combinators from MMD miss',
         'model-chip and send exist twice (collapsed and expanded rows); querySelector returns the collapsed one',
         '.assistant-anchor is display: contents until the card gives it a display',
+        'in the sandbox shell the assistant node stays mounted; while read-only or without assist it has .is-off (display: none)',
       ],
     },
   }

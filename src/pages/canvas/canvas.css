@@ -1403,6 +1403,11 @@
     cursor: pointer;
   }
 
+  /* 沙箱殼裡唯讀／沒有幫答時節點仍在（canvas-composer.vue），只是不顯示 */
+  .ai-assistant.is-off {
+    display: none;
+  }
+
   .ai-assistant.is-busy {
     opacity: 0.5;
     cursor: progress;

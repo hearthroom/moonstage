@@ -162,12 +162,13 @@ SDK 有 18 個鍵、54 個能力，其中 22 個為非同步；完整清單由 `
 
 ```
 footer[data-chat=composer]
-  .composer-shortcut-wrap > [data-chat=shortcut] > .shortcut-btn[data-action=<key>] × n
+  .composer-shortcut-wrap > [data-chat=shortcut] > .shortcut-btn[data-shortcut=<key>] × n
   .send-msg.composer-row
     .assistant-anchor > .ai-assistant[data-chat=assistant][data-action=assistant] > … + .beta-badge
+                                   （沙箱殼裡常駐；唯讀或沒有幫答時加 .is-off 藏起來）
     .uni-textarea > .chat-input-scope.composer-field[.is-expanded][.is-multiline]
       .chat-input-toolbar.composer-tools > [data-chat=paste] + [data-chat=clear]
-      textarea[data-chat=input]
+      .chatMsgTextarea > .uni-textarea-wrapper > textarea[data-chat=input]
       .mind-type[data-chat=model-chip][data-action=model]   （折疊列與展開列各一顆）
       .lt-send[data-chat=send]                               （同上）
     .more-options-scope > #options_button[data-action=more]
@@ -175,8 +176,9 @@ footer[data-chat=composer]
 ```
 
 跟 MMD 實機不同、作者要知道的：
-- 快捷鍵是 `div[role=button]` 不是 `<button>`，`[data-chat=shortcut] button` 打不到；`data-action` 是我們的功能名，不是 MMD 那六個。
-- `.composer-field` 不是 `.composer-row` 的直接子節點（中間隔一層 `.uni-textarea`），`.composer-row > .composer-field` 打不到。
+- 快捷鍵、燈泡、送出、模型膠囊、＋都是 `div[role=button]` 不是 `<button>`：`button[data-chat=send]`、`[data-chat=shortcut] button`、`:disabled`、`.disabled = true` 都打不到。
+- 快捷鍵的功能名在 `data-shortcut`（不是 MMD 那六個 `data-action`），所以 `[data-action=model]` 只會是模型膠囊。
+- 子選擇器打不到的層：`.composer-field` 在 `.uni-textarea` 裡（`.composer-row > .composer-field` 落空）；輸入框在 `.composer-field` 下兩層（`.composer-field > textarea`、`[data-chat=input] + [data-chat=model-chip]` 落空）；`[data-action=more]` 在 `.more-options-scope` 裡（`.composer-row > [data-action=more]` 落空）。
 - 模型膠囊與送出鍵各有兩顆（折疊／展開各一）；`querySelector` 拿到的是折疊列那顆。
 - 沒有指令欄（`instruction-bar`／`instruction-chip`／`instruction-back`）與 `assistant-tip`：平台沒有這兩個功能，節點不存在。
 - `.assistant-anchor` 只在沙箱殼裡有（一般頁的卡寫 `.send-msg > .ai-assistant`），預設 `display: contents`，作者要它成為盒子自己寫 `display`。
