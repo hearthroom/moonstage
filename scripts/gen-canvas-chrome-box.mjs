@@ -29,6 +29,14 @@ export const OUTPUT = path.resolve(here, '../src/pages/canvas/canvas-chrome-box.
 /** 訊息層：作者內容住在這裡，作者的重置在這裡本來就該贏，不搬。 */
 export const MESSAGE_LAYER = /(\.mes\b|\.mes_|#chat\b|\.content\b|\.touch-scope|\.item\.Ai|\.msg-|\.prologue|lt-frontend|\bpre\b|\.avatar\b|\.ch_name|\.name_text|\.mesAvatar|\.swipe|\.extraMes|\.lt-msg-regen|\.lt-context-chip|\.select-box|\.mes_buttons|\.hover-pill|\.lt-typing|\.thinking|\.summary|\.stream|\.canvas-root\s*$|\.canvas-root\s*\{)/
 
+/**
+ * 對話欄本身：它的左右內距是欄邊距加作者側欄的讓位（canvas-author-side-dock.ts），是平台的保護，
+ * 不是作者內容。`*` 重置把它清成 0 時，正文貼邊、算好的讓位也套不上，側欄整排壓在字上
+ * （2026-11-03 卡 100479）。只放行單獨的 `#chat`；它底下的後代選擇器仍是訊息層，不搬。
+ * 作者寫 `#chat{…}` 插得比我們晚、特異性一樣，照樣贏。
+ */
+const COLUMN = '#chat'
+
 const BOX_PROP = /^(margin|padding)(-(top|right|bottom|left|block|inline)(-(start|end))?)?$/
 
 export function generate(css) {
@@ -36,7 +44,7 @@ export function generate(css) {
   const out = postcss.root()
   root.walkAtRules('layer', (layer) => {
     layer.walkRules((rule) => {
-      if (rule.selectors.some((s) => MESSAGE_LAYER.test(s))) return
+      if (rule.selectors.some((s) => s.trim() !== COLUMN && MESSAGE_LAYER.test(s))) return
       const decls = []
       rule.each((node) => {
         if (node.type === 'decl' && BOX_PROP.test(node.prop) && !node.important) decls.push(node.clone())

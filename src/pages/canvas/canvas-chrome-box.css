@@ -13,6 +13,9 @@
 .preview-badge {
     padding: 4px 10px
 }
+#chat {
+    padding: 12px max(12px, var(--lt-canvas-dock-right, 0px)) var(--lt-chat-pad-bottom) max(12px, var(--lt-canvas-dock-left, 0px))
+}
 .lt-prep-live {
     padding: 10px 12px
 }
@@ -504,6 +507,11 @@
 }
 .mem-source {
     padding: 2px 8px
+}
+@media (max-width: 768px) {
+    #chat {
+      padding: 10px max(10px, var(--lt-canvas-dock-right, 0px)) var(--lt-chat-pad-bottom) max(10px, var(--lt-canvas-dock-left, 0px))
+    }
 }
 @media (max-width: 768px) {
     .u-popup__content {

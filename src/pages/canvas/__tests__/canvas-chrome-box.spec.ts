@@ -39,9 +39,36 @@ describe('canvas-chrome-box.css', () => {
   it('訊息層不搬：作者對氣泡裡 p／img 的重置本來就該贏', () => {
     const root = postcss.parse(generated)
     root.walkRules((r) => {
-      for (const s of r.selectors) expect(s, s).not.toMatch(MESSAGE_LAYER)
-      for (const s of r.selectors) expect(s).not.toMatch(/\.mes_text|\.mes\b|#chat\b/)
+      for (const s of r.selectors) {
+        if (s === '#chat') continue // 對話欄本身的內距是平台的欄邊距與側欄讓位，見下一條
+        expect(s, s).not.toMatch(MESSAGE_LAYER)
+        expect(s).not.toMatch(/\.mes_text|\.mes\b|#chat\b/)
+      }
     })
+  })
+
+  /*
+    症狀（2026-11-03，卡 100479，Android 手機）：卡的圖鑑規則開頭一條 `*{margin:0;padding:0}`，
+    把 #chat 的左右內距清成 0——正文貼螢幕邊，平台已經算好的側欄讓位（--lt-canvas-dock-*）也套不上，
+    作者畫在兩側的浮動鈕整排壓在字上。#chat 的內距是欄邊距加側欄讓位，屬於平台的保護，不是作者內容；
+    它底下的訊息仍是訊息層，不搬。只搬單獨的 `#chat`：ID 特異性贏過 `*`，作者自己寫 `#chat{…}`
+    插得比我們晚，照樣贏。
+  */
+  it('對話欄 #chat 本身的內距在層外：桌機與手機斷點都帶側欄讓位，後代選擇器不搬', () => {
+    const root = postcss.parse(generated)
+    const desktop: string[] = []
+    const phone: string[] = []
+    root.walkRules((r) => {
+      if (!r.selectors.includes('#chat')) {
+        for (const s of r.selectors) expect(s, s).not.toMatch(/#chat\b/)
+        return
+      }
+      expect(r.selectors, '#chat 不跟別的選擇器並列出層').toEqual(['#chat'])
+      const inPhone = r.parent?.type === 'atrule' && /max-width:\s*768px/.test((r.parent as postcss.AtRule).params)
+      r.walkDecls('padding', (d) => (inPhone ? phone : desktop).push(d.value))
+    })
+    expect(desktop).toEqual(['12px max(12px, var(--lt-canvas-dock-right, 0px)) var(--lt-chat-pad-bottom) max(12px, var(--lt-canvas-dock-left, 0px))'])
+    expect(phone).toEqual(['10px max(10px, var(--lt-canvas-dock-right, 0px)) var(--lt-chat-pad-bottom) max(10px, var(--lt-canvas-dock-left, 0px))'])
   })
 
   it('只搬 margin／padding，別的屬性不跟著出層', () => {
