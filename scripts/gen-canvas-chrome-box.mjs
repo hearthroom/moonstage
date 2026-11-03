@@ -34,11 +34,14 @@ export const MESSAGE_LAYER = /(\.mes\b|\.mes_|#chat\b|\.content\b|\.touch-scope|
  * 不是作者內容。`*` 重置把它清成 0 時，正文貼邊、算好的讓位也套不上，側欄整排壓在字上
  * （2026-11-03 卡 100479）。只放行單獨的 `#chat`；它底下的後代選擇器仍是訊息層，不搬。
  * 作者寫 `#chat{…}` 插得比我們晚、特異性一樣，照樣贏。
+ * box-sizing 跟著出層：內距回來了，卡片若同時寫 `*{box-sizing:content-box}`，100% 寬加內距會撐出欄外。
  */
 const COLUMN = '#chat'
+const COLUMN_PROP = /^box-sizing$/
 
 const BOX_PROP = /^(margin|padding)(-(top|right|bottom|left|block|inline)(-(start|end))?)?$/
 
+/** `css` 是含 @layer 的原始碼；測試用小片段直接呼叫。 */
 export function generate(css) {
   const root = postcss.parse(css)
   const out = postcss.root()
@@ -46,8 +49,10 @@ export function generate(css) {
     layer.walkRules((rule) => {
       if (rule.selectors.some((s) => s.trim() !== COLUMN && MESSAGE_LAYER.test(s))) return
       const decls = []
+      const column = rule.selector.trim() === COLUMN
       rule.each((node) => {
-        if (node.type === 'decl' && BOX_PROP.test(node.prop) && !node.important) decls.push(node.clone())
+        if (node.type !== 'decl' || node.important) return
+        if (BOX_PROP.test(node.prop) || (column && COLUMN_PROP.test(node.prop))) decls.push(node.clone())
       })
       if (!decls.length) return
       const twin = postcss.rule({ selector: rule.selector })

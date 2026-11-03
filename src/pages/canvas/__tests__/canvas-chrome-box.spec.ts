@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import postcss from 'postcss'
-import { render, OUTPUT, MESSAGE_LAYER } from '../../../../scripts/gen-canvas-chrome-box.mjs'
+import { render, generate, OUTPUT, MESSAGE_LAYER } from '../../../../scripts/gen-canvas-chrome-box.mjs'
 
 /**
  * 殼的 margin／padding 在 @layer 外要有一份副本。
@@ -71,9 +71,27 @@ describe('canvas-chrome-box.css', () => {
     expect(phone).toEqual(['10px max(10px, var(--lt-canvas-dock-right, 0px)) var(--lt-chat-pad-bottom) max(10px, var(--lt-canvas-dock-left, 0px))'])
   })
 
-  it('只搬 margin／padding，別的屬性不跟著出層', () => {
+  it('只搬 margin／padding，別的屬性不跟著出層（#chat 另帶 box-sizing）', () => {
     const root = postcss.parse(generated)
-    root.walkDecls((d) => { expect(d.prop, d.prop).toMatch(/^(margin|padding)/) })
+    root.walkDecls((d) => {
+      if ((d.parent as postcss.Rule).selector === '#chat' && d.prop === 'box-sizing') return
+      expect(d.prop, d.prop).toMatch(/^(margin|padding)/)
+    })
+  })
+
+  it('產生器只放行單獨的 #chat：後代、偽類、並列訊息層的選擇器都留在層內', () => {
+    const out = generate(`@layer x {
+      #chat { padding: 1px; box-sizing: border-box; color: red }
+      #chat .mes { padding: 2px; box-sizing: border-box }
+      #chat, .mes { padding: 3px }
+      #chat:hover { padding: 4px }
+      #chat-input-scope { padding: 5px }
+      .shortcut-btn { padding: 6px; box-sizing: border-box }
+    }`)
+    const root = postcss.parse(out)
+    const rules: string[] = []
+    root.walkRules((r) => { rules.push(`${r.selector} { ${r.nodes.map((d) => (d as postcss.Declaration).prop + ':' + (d as postcss.Declaration).value).join('; ')} }`) })
+    expect(rules).toEqual(['#chat { padding:1px; box-sizing:border-box }', '.shortcut-btn { padding:6px }'])
   })
 
   it('保留 @media 包裹：手機版的內距差異照舊', () => {
