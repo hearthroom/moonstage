@@ -25,6 +25,7 @@ import { shellStrings } from '../strings'
 import { SANDBOX_PROTOCOL_VERSION, SANDBOX_SUPPORTED_PROTOCOLS } from '../protocol'
 import { MESSAGE_SCOPE, stylePolicyFor } from '@/common/author-style-policy'
 import { STANDARD_HTML_TAGS } from '@/pages/canvas/canvas-platform-defaults'
+import { CANVAS_SELECTOR_CONTRACT } from '@/pages/canvas/canvas-dom-contract'
 import {
   applyDisplayRules, DISPLAY_RULE_MIN_BUDGET,
   ROLLBACK_BAD_REGEX, ROLLBACK_EMPTY_MATCH, ROLLBACK_REPLACEMENT_ALONE, ROLLBACK_VOLUME,
@@ -114,6 +115,18 @@ function nodeFacts() {
     chrome: ['standard', 'host', 'shell'],
     legacySelectorsAlsoPresent: ['.mes', '.mes_text', '#msglistview', '#scrollview', '.chat-scope-box', '#chat'],
     prologue: { scope: '.prologue-scope[data-lt="prologue"]', item: '.prologue-content' },
+    // chrome: 'standard'（正式站）的輸入區是站上的 canvas-composer，MMD 新版沙盒的名字掛在對應節點上；
+    // 清單直接取畫布契約表的 mmd-sandbox 條目（那邊的 spec 逐條掛載查詢）。
+    standardComposer: {
+      mmdSandboxSelectors: CANVAS_SELECTOR_CONTRACT.filter((e) => e.origin === 'mmd-sandbox').map((e) => e.selector),
+      absent: ['[data-chat=instruction-bar]', '[data-chat=instruction-chip]', '[data-chat=instruction-back]', '[data-chat=assistant-tip]'],
+      differences: [
+        'shortcut buttons are div[role=button], not <button>; data-action is the platform feature key',
+        '.composer-field sits inside .uni-textarea, so .composer-row > .composer-field does not match',
+        'model-chip and send exist twice (collapsed and expanded rows); querySelector returns the collapsed one',
+        '.assistant-anchor is display: contents until the card gives it a display',
+      ],
+    },
   }
 }
 

@@ -1381,6 +1381,12 @@
     min-width: 0;
   }
 
+  /* 沙箱殼裡燈泡鈕外那層 MMD 名的包裝（canvas-composer.vue 的 AssistAnchor）：不佔盒子，版面跟一般畫布一樣。
+     照 MMD 寫的卡要它成為一個盒子時自己寫 display，未分層的規則本來就贏過這裡。 */
+  .assistant-anchor {
+    display: contents;
+  }
+
   /* 幫答鍵：輸入框左側的一顆圓鈕，右上角掛每次點數。tooltip 只在 hover／聚焦時露出。 */
   .ai-assistant {
     position: relative;

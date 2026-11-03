@@ -7,6 +7,7 @@
  *
  * 三組別名同時掛在同一個節點上：
  *   primary  MMD 名（卡片實際打得到宿主 chrome 的那一套，作者的期待在這裡）
+ *   mmd-sandbox  MMD 新版沙盒頁的名字（`[data-chat=…]`、`.composer-row`…）；照沙盒寫的卡只認這套
  *   alias    SillyTavern 名（訊息層是作者的語彙；chrome 層只服務主題移植）
  *   data-lt  我方穩定鉤子（改版不動，class 名不做承諾）
  *
@@ -24,6 +25,8 @@ export type CanvasRegion =
   | 'message-user'
   | 'prologue'
   | 'composer'
+  /** 沙箱殼裡的輸入區（canvas-composer chat 模式）：MMD 新版沙盒才有的包裝節點 */
+  | 'composer-sandbox'
   | 'menu'
   /** 「＋」呼出的功能面板（住在 .chat-bottom 裡，跟輸入區同一個元件） */
   | 'panel'
@@ -56,7 +59,7 @@ export interface CanvasSelectorEntry {
   /** 屬於哪個區塊 */
   region: CanvasRegion
   /** 這條是誰的語彙 */
-  origin: 'mmd' | 'st' | 'lt'
+  origin: 'mmd' | 'mmd-sandbox' | 'st' | 'lt'
   /** 為什麼要有它（給改動的人看，spec 不讀） */
   why: string
 }
@@ -183,6 +186,7 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '#send_form', region: 'composer', origin: 'st', why: '酒館輸入區外框' },
   { selector: '[data-lt="composer"]', region: 'composer', origin: 'lt', why: '我方穩定鉤子' },
   { selector: '.ai-assistant', region: 'composer', origin: 'mmd', why: '作者整顆隱藏；節點必須在' },
+  { selector: '.send-msg > .ai-assistant', region: 'composer', origin: 'mmd', why: '舊頁的卡寫子選擇器；沙箱殼才有的 .assistant-anchor 包裝不能出現在一般畫布' },
   { selector: '.beta-badge', region: 'composer', origin: 'mmd', why: '同上；幫答每次的點數' },
   { selector: '.ai-assistant .tooltip', region: 'composer', origin: 'mmd', why: '幫答提示「不知道怎么回答？让AI来帮你吧」；卡片改它的底色' },
   { selector: '.ai-assistant .tooltip-arrow', region: 'composer', origin: 'mmd', why: '提示框的小箭頭' },
@@ -216,6 +220,20 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '.chat-input-scope .btn-icon div', region: 'composer', origin: 'mmd', why: '送出鍵的圖示盒，同上' },
   { selector: '#chat-input-scope .lt-send img[src*="ico_send"]', region: 'composer', origin: 'mmd', why: 'MMD 的送出鍵是 uni-image.btn-icon > img[src*=ico_send]；新一代 HUD 腳本（void v6）先找可見的 .chat-send-proxy（兩邊都藏著）、再找 img[src*=ico_send] 的最近按鈕祖先，要求可見且唯一。我們的圖示是 inline SVG，補這顆 0×0 的 img 標記讓它找得到 .lt-send' },
   { selector: '#options_button', region: 'composer', origin: 'st', why: '酒館更多選項鍵' },
+  // MMD 新版沙盒頁的輸入區（實機結構：footer[data-chat=composer] > .composer-shortcut-wrap > [data-chat=shortcut]；
+  // .composer-row > .assistant-anchor > [data-chat=assistant] ＋ .composer-field > input／model-chip／send ＋ [data-action=more]）。
+  // 照沙盒寫的卡（例：先找 [data-chat=assistant]，找到才換掉燈泡鈕）只認這套名字；掛在舊頁同一批節點上，兩頁都查得到。
+  { selector: '.composer-shortcut-wrap', region: 'composer', origin: 'mmd-sandbox', why: '快捷欄外框；卡片改高度' },
+  { selector: '[data-chat="shortcut"]', region: 'composer', origin: 'mmd-sandbox', why: '快捷欄；卡片改間距與捲動' },
+  { selector: '.composer-row', region: 'composer', origin: 'mmd-sandbox', why: '輸入列（燈泡｜輸入框｜＋）；卡片改對齊與內距' },
+  { selector: '[data-chat="assistant"][data-action="assistant"]', region: 'composer', origin: 'mmd-sandbox', why: '幫答燈泡鈕；卡片腳本先找它，找到才把它藏起來、換成自己的按鈕' },
+  { selector: '.chat-input-scope.composer-field', region: 'composer', origin: 'mmd-sandbox', why: '有邊框的那個輸入框（內含輸入、模型膠囊、送出鍵），跟 MMD 的 .composer-field 同一個盒子；狀態 class is-expanded／is-multiline 也在這層。不掛在外層 .uni-textarea：作者替它畫的邊框會跟我們的疊成兩圈' },
+  { selector: '.composer-field [data-chat="input"]', region: 'composer', origin: 'mmd-sandbox', why: '輸入框本體；卡片改字型、邊框、內距' },
+  { selector: '.composer-field [data-chat="model-chip"][data-action="model"]', region: 'composer', origin: 'mmd-sandbox', why: '模型膠囊（每輪點數）；卡片改字級顏色' },
+  { selector: '.composer-field [data-chat="send"]', region: 'composer', origin: 'mmd-sandbox', why: '送出鍵；卡片改尺寸顏色' },
+  { selector: '.composer-tools', region: 'composer', origin: 'mmd-sandbox', why: '展開態的貼上／清空列' },
+  { selector: '.composer-row > .more-options-scope [data-action="more"]', region: 'composer', origin: 'mmd-sandbox', why: '右側＋；卡片改對齊' },
+  { selector: '.composer-row > .assistant-anchor > [data-chat="assistant"]', region: 'composer-sandbox', origin: 'mmd-sandbox', why: '卡片腳本把自己的按鈕插進燈泡鈕的父節點（e.parentNode）並替它加 class；父節點必須是這一層包裝，不能是整列。舊頁的卡寫 .send-msg > .ai-assistant，所以包裝只在沙箱殼出現' },
 
   // ── 訊息選單／編輯 ──────────────────────────────────────────────────
   { selector: '.msg-option-scope', region: 'menu', origin: 'mmd', why: '長按／三個點呼出的覆蓋層' },
@@ -242,6 +260,7 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   // 作者的卡寫的是 `.chat .chat-bottom .more-scope .item .item-icon`——`.chat`
   // 在頁面根節點上，元件自己掛載時查不到，所以這裡登記到 .chat-bottom 為止。
   { selector: '.more-scope', region: 'panel', origin: 'mmd', why: '功能面板本體' },
+  { selector: '[data-chat="more-panel"]', region: 'panel', origin: 'mmd-sandbox', why: 'MMD 新版沙盒的＋面板名' },
   { selector: '.more-scope .item', region: 'panel', origin: 'mmd', why: '一格功能' },
   { selector: '.more-scope .item-icon', region: 'panel', origin: 'mmd', why: '卡片改格子圖示的尺寸與底色' },
   { selector: '.more-scope .item-title', region: 'panel', origin: 'mmd', why: '格子文字' },

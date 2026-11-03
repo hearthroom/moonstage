@@ -526,6 +526,8 @@ export function createShell(options: CreateShellOptions): Shell {
       render: () => h(CanvasComposer as unknown as Parameters<typeof h>[0], {
         ref: composerVm,
         ...chromeState.composer,
+        // MMD 新版沙盒頁的輸入區結構（燈泡鈕外的 .assistant-anchor）：照沙盒寫的卡靠它換掉燈泡鈕
+        chat: true,
         value: inputValue.value,
         readOnly: historyReadOnly.value,
         sendState: historyReadOnly.value ? 'send-disabled' : chromeState.composer?.sendState,

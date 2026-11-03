@@ -63,6 +63,16 @@
   }
 
   const post = (m) => frame.contentWindow.postMessage({ ms: PROTOCOL, ...m }, '*')
+  const chromeState = () => ({
+    header: { roleName: state.name, avatar: '', badge: '', backLabel: 'Back' },
+    composer: {
+      placeholder: '说点什么…', sendState: 'send-disabled', generating: false, enterSends: true,
+      shortcuts: [{ key: 'persona', label: '人设' }, { key: 'memory', label: '记忆' }, { key: 'notes', label: '手帐' }],
+      moreOpen: false, moreItems: [], modelScore: '562-593', contextRing: null, balanceHint: '', meterHint: null,
+      modelName: 'Preview Model', assistBusy: false, assistCost: 10,
+      labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'AI reply', perTurn: 'Credits per turn' },
+    },
+  })
   const hello = () => ({
     theme: document.getElementById('theme').value,
     locale: params.get('locale') || 'zh-Hant',
@@ -73,6 +83,8 @@
     capabilities: { saves: true, edit: false, send: true, archive: true },
     composer: true,
     chrome: document.getElementById('chrome').value === 'host' ? 'host' : 'shell',
+    // standard：正式站的樣子——宿主送 chromeState，殼掛站上同一套頁首與輸入區（canvas-header／canvas-composer）。
+    ...(document.getElementById('chrome').value === 'standard' ? { chromeState: chromeState() } : {}),
     saves: {},
     // 殼的 debug 訊息（sdk.debug.log、腳本錯誤）不開面板也會轉送到這一頁的記錄；?debug=1 才把殼內面板與幾何疊層打開。
     debug: params.get('debug') === '1',

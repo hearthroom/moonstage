@@ -112,6 +112,10 @@ function mountRegion(region: string) {
           contextRing: { percent: 37, level: 'low', label: '上下文已用 37%' },
         },
       })
+    case 'composer-sandbox':
+      return mount(CanvasComposer, {
+        props: { chat: true, value: '', placeholder: '說點什麼', sendState: 'send', generating: false },
+      })
     case 'menu':
       return mount(CanvasMessageMenu, {
         props: {

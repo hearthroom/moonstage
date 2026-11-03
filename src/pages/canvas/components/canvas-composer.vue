@@ -32,13 +32,16 @@
       <!-- 快捷功能欄。卡片實際寫的是 `.shortcut-button-scope .item`（舊名），
            MMD 現在的 DOM 是 `.shortcut-bar > .shortcut-btn`——兩套都要在，
            否則作者手上那張卡的規則會落空。 -->
-      <div ref="shortcutBarEl" class="shortcut-bar-wrapper shortcut-button-scope toolbar" data-lt="function-bar">
-        <div class="shortcut-bar">
+      <!-- MMD 新版沙盒頁的名字（.composer-shortcut-wrap > [data-chat=shortcut]）掛在同一批節點上：
+           照沙盒寫的卡只認那一套。完整對照見 canvas-dom-contract.ts 的 mmd-sandbox 條目。 -->
+      <div ref="shortcutBarEl" class="shortcut-bar-wrapper shortcut-button-scope toolbar composer-shortcut-wrap" data-lt="function-bar">
+        <div class="shortcut-bar" data-chat="shortcut">
           <div
             v-for="item in shortcuts"
             :key="item.key"
             class="shortcut-btn item"
             :class="{ 'is-disabled': item.disabled }"
+            :data-action="item.key"
             :aria-disabled="item.disabled ? 'true' : undefined"
             role="button"
             tabindex="0"
@@ -55,7 +58,7 @@
       </div>
 
       <div class="chat-bottom-wapper">
-        <div id="send_form" class="send-msg" data-lt="composer">
+        <div id="send_form" class="send-msg composer-row" data-lt="composer">
           <!--
             輸入區的兩態，節點名與狀態 class 照 MMD 的 DOM（2026-09-04 實測某張公開卡）：
 
@@ -82,9 +85,18 @@
             .ai-assistant > .tooltip(.tooltip-arrow) + 圖示 + .beta-badge（每次的點數）。
             點了只把 AI 替玩家寫的一句填進輸入框，不代送。
           -->
+          <!--
+            MMD 新版沙盒：.composer-row > .assistant-anchor > [data-chat=assistant][data-action=assistant]。
+            照沙盒寫的卡會在燈泡鈕的父節點（e.parentNode）插自己的按鈕、替它加 class，父節點必須是
+            這一層包裝而不是整列。舊頁的卡寫 `.send-msg > .ai-assistant`，所以包裝只在沙箱殼（chat）出現；
+            包裝本身 display: contents，不改我們的版面，作者要它成為一個盒子再自己寫 display。
+          -->
+          <AssistAnchor :wrap="chat">
           <div
             v-if="assistEnabled && !readOnly"
             class="ai-assistant"
+            data-chat="assistant"
+            data-action="assistant"
             :class="{ 'is-busy': assistBusy }"
             role="button"
             tabindex="0"
@@ -103,6 +115,7 @@
             </span>
             <span class="beta-badge">{{ assistCost }}</span>
           </div>
+          </AssistAnchor>
 
           <!--
             `.uni-textarea` 只包住輸入欄位本身，不包旁邊那兩顆鍵。
@@ -117,7 +130,7 @@
           <div class="uni-textarea" :class="stateClass">
             <div
               id="chat-input-scope"
-              class="chat-input-scope has-toolbar"
+              class="chat-input-scope has-toolbar composer-field"
               :class="stateClass"
               @pointerdown="onScopePointerDown"
             >
@@ -149,14 +162,14 @@
                 @click="onPrimary"
               ></div>
 
-              <div v-show="expanded && !readOnly" class="chat-input-toolbar">
-                <div class="chat-input-tool-btn" role="button" tabindex="0"
+              <div v-show="expanded && !readOnly" class="chat-input-toolbar composer-tools">
+                <div class="chat-input-tool-btn" data-chat="paste" role="button" tabindex="0"
                      @mousedown.prevent
                      @click="onPaste"
                      @keydown.enter.prevent="onPaste">
                   <span>{{ labels.paste }}</span>
                 </div>
-                <div class="chat-input-tool-btn" role="button" tabindex="0"
+                <div class="chat-input-tool-btn" data-chat="clear" role="button" tabindex="0"
                      @mousedown.prevent
                      @click="onClear"
                      @keydown.enter.prevent="onClear">
@@ -171,6 +184,7 @@
                     ref="textareaEl"
                     el-id="send_textarea"
                     el-class="uni-textarea-textarea"
+                    data-chat="input"
                     :value="value"
                     :read-only="readOnly"
                     :tabindex="expanded ? 0 : -1"
@@ -209,6 +223,8 @@
                     </div>
                     <div
                       class="mind-type"
+                      data-chat="model-chip"
+                      data-action="model"
                       role="button"
                       tabindex="0"
                       :title="scoreHint || labels.perTurn"
@@ -238,6 +254,7 @@
                 <div class="chat-input-row-tail">
                   <div
                     class="btn-icon lt-send"
+                    data-chat="send"
                     :class="'is-' + sendState"
                     role="button"
                     tabindex="0"
@@ -277,6 +294,8 @@
                     </div>
                     <div
                       class="mind-type"
+                      data-chat="model-chip"
+                      data-action="model"
                       role="button"
                       tabindex="0"
                       :title="scoreHint || labels.perTurn"
@@ -295,6 +314,7 @@
                 <div class="chat-input-row-tail">
                   <div
                     class="btn-icon lt-send"
+                    data-chat="send"
                     :class="'is-' + sendState"
                     role="button"
                     tabindex="0"
@@ -316,6 +336,7 @@
             <div
               id="options_button"
               class="btn-icon"
+              data-action="more"
               role="button"
               tabindex="0"
               :aria-expanded="moreOpen ? 'true' : 'false'"
@@ -343,7 +364,7 @@
         節點常駐：作者的卡對 `.chat .chat-bottom .more-scope .item .item-icon`
         寫了圖示外觀，v-if 拿掉節點等於那套外觀從沒存在過。
       -->
-      <div class="more-scope expand-area" :data-open="moreOpen ? 'on' : 'off'" :hidden="!moreOpen">
+      <div class="more-scope expand-area" data-chat="more-panel" :data-open="moreOpen ? 'on' : 'off'" :hidden="!moreOpen">
         <div
           v-for="item in moreItems"
           :key="item.key"
@@ -370,7 +391,7 @@ import { panelIconImage, panelIconMarkup } from '../canvas-panel-icons'
 import { attachDragScroll } from '../canvas-drag-scroll'
 import { syncChromeTone } from '../canvas-chrome-tone'
 import { fixSolidClippedText } from '../canvas-composer-text-paint'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CanvasTextarea from './canvas-textarea'
 import CanvasSendIcon from './canvas-send-icon.vue'
 
@@ -390,8 +411,19 @@ import CanvasSendIcon from './canvas-send-icon.vue'
 const SEND_MARK_SRC = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' data-icon='ico_send'><path d='M12 19V5M5 12L12 5L19 12' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>"
 import { leaveTopLayer, raiseToTopLayer } from '../canvas-top-layer'
 
+/** chat 模式（沙箱殼）才包一層 .assistant-anchor；一般畫布原樣輸出，舊頁卡的 `.send-msg > .ai-assistant` 仍然打得到。 */
+const AssistAnchor = defineComponent({
+  name: 'AssistAnchor',
+  props: { wrap: { type: Boolean, default: false } },
+  setup(p, { slots }) {
+    return () => (p.wrap ? h('div', { class: 'assistant-anchor' }, slots.default?.()) : slots.default?.())
+  },
+})
+
 const props = withDefaults(defineProps<{
   value: string
+  /** 掛在沙箱殼裡（MMD 新版沙盒頁的結構）：燈泡鈕外多一層 .assistant-anchor */
+  chat?: boolean
   readOnly?: boolean
   placeholder: string
   /** send | send-disabled | continue | pending — 停止不佔這顆鍵，它有自己的節點 */
@@ -421,6 +453,7 @@ const props = withDefaults(defineProps<{
   /** continue：Agent 暫停時送出鍵變成「繼續」的那個名字（讀屏念的）；沒給就念送出。 */
   labels?: { stop: string; more: string; send: string; paste: string; clear: string; model: string; assist: string; perTurn: string; continue?: string }
 }>(), {
+  chat: false,
   enterSends: true,
   shortcuts: () => [],
   moreOpen: false,

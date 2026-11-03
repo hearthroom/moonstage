@@ -248,6 +248,39 @@ describe('殼：冷啟動與事件順序', () => {
     expect(s.refs.header.textContent).toContain('Updated')
   })
 
+  it('standard chrome composer carries the MMD sandbox node names, so a card can swap the assist button the way it does on MMD', async () => {
+    const header = { roleName: 'Example', avatar: '', badge: '', backLabel: 'Back' }
+    const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [{ key: 'persona', label: 'Persona' }], moreOpen: false, moreItems: [], modelScore: '6', assistBusy: false, assistCost: 10, labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Assist', perTurn: 'Per turn' } }
+    // 照 MMD 沙盒寫的卡（卡 100616 的做法）：找到 [data-chat=assistant] 才動手——替父節點加 class、
+    // 在它前面插自己的按鈕、把平台的燈泡藏起來；找不到就整段不做。
+    const s = boot(config({ chromeState: { header, composer }, card: { rules: [SCRIPT_RULE(`
+      sdk.on('ready', function () {
+        var c = document.body.querySelector('[data-chat="composer"]');
+        var e = c && c.querySelector('[data-chat="assistant"]');
+        if (!e) return;
+        e.parentNode.classList.add('author-anchor');
+        var b = document.createElement('button'); b.className = 'author-assist'; b.textContent = 'Helper';
+        e.parentNode.insertBefore(b, e);
+        e.style.setProperty('display', 'none', 'important');
+      });
+    `)], statusbar: '' } }))
+    s.handle({ type: 'messages', messages: [] })
+    const root = s.refs.composer
+    const assist = root.querySelector<HTMLElement>('[data-chat="assistant"][data-action="assistant"]')
+    expect(assist).not.toBeNull()
+    expect(assist!.parentElement!.matches('.composer-row > .assistant-anchor.author-anchor')).toBe(true)
+    expect(assist!.style.getPropertyValue('display')).toBe('none')
+    expect(root.querySelector('.assistant-anchor > .author-assist')).not.toBeNull()
+    for (const sel of ['.composer-shortcut-wrap > [data-chat="shortcut"]', '.composer-row .composer-field [data-chat="input"]', '.composer-field [data-chat="model-chip"]', '.composer-field [data-chat="send"]', '.composer-row [data-action="more"]']) {
+      expect(root.querySelector(sel), sel).not.toBeNull()
+    }
+    // 宿主更新輸入區（點數、生成中…）後，作者插進去的按鈕還在
+    s.handle({ type: 'chrome', state: { header, composer: { ...composer, generating: true, modelScore: '8' } } })
+    await nextTick()
+    expect(root.querySelector('.assistant-anchor > .author-assist')).not.toBeNull()
+    s.dispose()
+  })
+
   it('sdk.model.get() reports the current model and next-turn cost; model:change fires when either changes', async () => {
     const header = { roleName: 'Example', avatar: '', badge: '', backLabel: 'Back' }
     const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '127–251', modelName: 'Claude Sonnet 4.5 · Ripple', assistBusy: false, assistCost: '', labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Assist', perTurn: 'Per turn' } }

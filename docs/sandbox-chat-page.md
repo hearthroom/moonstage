@@ -155,8 +155,32 @@ SDK 有 18 個鍵、54 個能力，其中 22 個為非同步；完整清單由 `
 節點：`style:author-css`、`div:root[data-theme][data-composer]`、`header:header`（`header-back`、
 `header-title`、`header-actions`）、`main:messages > div:list > div:message-frame > article:message
 [data-from][data-state][data-msg-id] > message-avatar / message-body`、開場選項 `div.prologue-scope[data-lt="prologue"] > .prologue-title + .prologue-content×n`（在 `list` 之後；點一條發 `ui { event: 'prologue', key: 第幾條 }`，宿主填輸入框、不送出）、`div:list-spacer`、
-`div:author-stage[data-stage]`、`footer:composer`（`shortcut`、`instruction-bar`、`assistant`、
-`textarea:input`、`model-chip`、`send`）。殼裡的模型鍵是輸入區的 `.mind-type`（點它開宿主的模型清單）；模型名與點數請用 `sdk.model.get()`，別讀 DOM。插槽：`header-extra`、`statusbar`、`left`、`right`、`toolbar`。
+`div:author-stage[data-stage]`、`footer:composer`。殼裡的模型鍵是輸入區的 `.mind-type`（點它開宿主的模型清單）；模型名與點數請用 `sdk.model.get()`，別讀 DOM。插槽：`header-extra`、`statusbar`、`left`、`right`、`toolbar`。
+
+輸入區（標準外觀＝正式站）是站上同一個 `canvas-composer.vue`，MMD 新版沙盒頁的名字掛在對應的節點上
+（逐條見 `src/pages/canvas/canvas-dom-contract.ts` 的 `mmd-sandbox` 條目，契約 spec 逐條掛載查詢）：
+
+```
+footer[data-chat=composer]
+  .composer-shortcut-wrap > [data-chat=shortcut] > .shortcut-btn[data-action=<key>] × n
+  .send-msg.composer-row
+    .assistant-anchor > .ai-assistant[data-chat=assistant][data-action=assistant] > … + .beta-badge
+    .uni-textarea > .chat-input-scope.composer-field[.is-expanded][.is-multiline]
+      .chat-input-toolbar.composer-tools > [data-chat=paste] + [data-chat=clear]
+      textarea[data-chat=input]
+      .mind-type[data-chat=model-chip][data-action=model]   （折疊列與展開列各一顆）
+      .lt-send[data-chat=send]                               （同上）
+    .more-options-scope > #options_button[data-action=more]
+  .more-scope[data-chat=more-panel]
+```
+
+跟 MMD 實機不同、作者要知道的：
+- 快捷鍵是 `div[role=button]` 不是 `<button>`，`[data-chat=shortcut] button` 打不到；`data-action` 是我們的功能名，不是 MMD 那六個。
+- `.composer-field` 不是 `.composer-row` 的直接子節點（中間隔一層 `.uni-textarea`），`.composer-row > .composer-field` 打不到。
+- 模型膠囊與送出鍵各有兩顆（折疊／展開各一）；`querySelector` 拿到的是折疊列那顆。
+- 沒有指令欄（`instruction-bar`／`instruction-chip`／`instruction-back`）與 `assistant-tip`：平台沒有這兩個功能，節點不存在。
+- `.assistant-anchor` 只在沙箱殼裡有（一般頁的卡寫 `.send-msg > .ai-assistant`），預設 `display: contents`，作者要它成為盒子自己寫 `display`。
+- `chrome: 'shell'`（殼自己畫的備用輸入區）仍是上面舊版骨架（`composer-row` 屬性 + `more`／`input`／`send`）。
 
 `header-extra` 在標準頁首更新時仍保留於文件，作者掛載的控制項不會被標準元件清除。
 `statusbar` 是功能欄的作者資產掛載點：流內 HUD 取得完整寬度及內容高度，預設最多佔殼高度 30%，

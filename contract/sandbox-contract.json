@@ -699,6 +699,34 @@
     "prologue": {
       "scope": ".prologue-scope[data-lt=\"prologue\"]",
       "item": ".prologue-content"
+    },
+    "standardComposer": {
+      "mmdSandboxSelectors": [
+        ".composer-shortcut-wrap",
+        "[data-chat=\"shortcut\"]",
+        ".composer-row",
+        "[data-chat=\"assistant\"][data-action=\"assistant\"]",
+        ".chat-input-scope.composer-field",
+        ".composer-field [data-chat=\"input\"]",
+        ".composer-field [data-chat=\"model-chip\"][data-action=\"model\"]",
+        ".composer-field [data-chat=\"send\"]",
+        ".composer-tools",
+        ".composer-row > .more-options-scope [data-action=\"more\"]",
+        ".composer-row > .assistant-anchor > [data-chat=\"assistant\"]",
+        "[data-chat=\"more-panel\"]"
+      ],
+      "absent": [
+        "[data-chat=instruction-bar]",
+        "[data-chat=instruction-chip]",
+        "[data-chat=instruction-back]",
+        "[data-chat=assistant-tip]"
+      ],
+      "differences": [
+        "shortcut buttons are div[role=button], not <button>; data-action is the platform feature key",
+        ".composer-field sits inside .uni-textarea, so .composer-row > .composer-field does not match",
+        "model-chip and send exist twice (collapsed and expanded rows); querySelector returns the collapsed one",
+        ".assistant-anchor is display: contents until the card gives it a display"
+      ]
     }
   },
   "nativeBlocks": {
