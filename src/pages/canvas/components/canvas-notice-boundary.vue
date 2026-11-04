@@ -2,7 +2,7 @@
   <span ref="anchor" hidden aria-hidden="true" data-lt-notice-anchor></span>
   <slot />
   <Teleport v-if="floating" :to="portalTarget">
-    <div ref="fallback" class="canvas-notice-fallback" data-lt="notice-fallback" popover="manual" :style="theme" :lang="language">
+    <div ref="fallback" class="canvas-notice-fallback" data-lt="notice-fallback" popover="manual" :style="[theme, placement]" :lang="language">
       <slot />
     </div>
   </Teleport>
@@ -18,8 +18,10 @@ const fallback = ref<HTMLElement | null>(null)
 const floating = ref(false)
 const theme = ref<Record<string, string>>({})
 const language = ref('')
+const placement = ref<Record<string, string>>({})
 const portalTarget = ref<Element | string>('body')
 let observer: MutationObserver | undefined
+let resizeObserver: ResizeObserver | undefined
 let frame = 0
 let disposed = false
 let original: HTMLElement | null = null
@@ -51,11 +53,33 @@ function obscured(source: HTMLElement): boolean {
   return false
 }
 
+function placeAboveComposer(source: HTMLElement) {
+  const doc = source.ownerDocument
+  const win = doc.defaultView!
+  const scope = source.closest('.canvas-root') || doc
+  const viewport = win.visualViewport
+  const visibleTop = viewport?.offsetTop || 0
+  let bottomEdge = Math.min(win.innerHeight, visibleTop + (viewport?.height || win.innerHeight))
+  // Keep the input and its shortcut row available. Reserve their layout lane
+  // even if an author book temporarily hides the composer without removing it.
+  for (const composer of scope.querySelectorAll('.composer-scope, [data-chat="composer"]')) {
+    resizeObserver?.observe(composer)
+    const rect = composer.getBoundingClientRect()
+    if (rect.width > 0 && rect.height > 0 && rect.top >= visibleTop && rect.top < bottomEdge) bottomEdge = rect.top
+  }
+  const next = {
+    bottom: `${Math.max(12, win.innerHeight - bottomEdge + 12)}px`,
+    maxHeight: `${Math.max(0, bottomEdge - visibleTop - 24)}px`,
+  }
+  if (JSON.stringify(placement.value) !== JSON.stringify(next)) placement.value = next
+}
+
 async function measure() {
   if (disposed || !anchor.value) return
   const source = anchor.value.nextElementSibling as HTMLElement | null
   const show = !!source && props.enabled && obscured(source)
   if (show) {
+    placeAboveComposer(source)
     const cs = source.ownerDocument.defaultView!.getComputedStyle(source)
     const tokens: Record<string, string> = {}
     for (let i = 0; i < cs.length; i++) {
@@ -95,17 +119,24 @@ function schedule() {
 }
 function observe(enabled: boolean) {
   observer?.disconnect()
+  resizeObserver?.disconnect()
   const doc = ownerDoc
   if (!doc) return
   doc.removeEventListener('scroll', schedule, true)
   doc.removeEventListener('toggle', schedule, true)
   doc.defaultView?.removeEventListener('resize', schedule)
+  doc.defaultView?.visualViewport?.removeEventListener('resize', schedule)
+  doc.defaultView?.visualViewport?.removeEventListener('scroll', schedule)
   if (enabled) {
+    const Resize = doc.defaultView?.ResizeObserver
+    if (Resize) resizeObserver ||= new Resize(schedule)
     observer ||= new MutationObserver(schedule)
     observer.observe(doc.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style', 'hidden', 'open'] })
     doc.addEventListener('scroll', schedule, true)
     doc.addEventListener('toggle', schedule, true)
     doc.defaultView?.addEventListener('resize', schedule)
+    doc.defaultView?.visualViewport?.addEventListener('resize', schedule)
+    doc.defaultView?.visualViewport?.addEventListener('scroll', schedule)
   }
   schedule()
 }
@@ -115,11 +146,14 @@ watch(() => props.enabled, observe)
 onUnmounted(() => {
   disposed = true
   observer?.disconnect()
+  resizeObserver?.disconnect()
   cancelAnimationFrame(frame)
   const doc = ownerDoc
   doc?.removeEventListener('scroll', schedule, true)
   doc?.removeEventListener('toggle', schedule, true)
   doc?.defaultView?.removeEventListener('resize', schedule)
+  doc?.defaultView?.visualViewport?.removeEventListener('resize', schedule)
+  doc?.defaultView?.visualViewport?.removeEventListener('scroll', schedule)
   leaveTopLayer(fallback.value)
   restoreSource()
 })

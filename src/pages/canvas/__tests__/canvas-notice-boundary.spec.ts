@@ -94,4 +94,27 @@ describe('最新系統失敗卡被作者書本畫面遮住', () => {
     expect(source.hasAttribute('inert')).toBe(false)
   })
 
+  it('恢復卡讓開整組輸入列，輸入框展開後也更新保留高度', async () => {
+    start()
+    const root = document.querySelector('.canvas-root')!
+    const composer = document.createElement('div')
+    composer.className = 'composer-scope'
+    root.append(composer)
+    let composerTop = 620
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function () {
+      return this === composer
+        ? { ...box, top: composerTop, bottom: innerHeight, height: innerHeight - composerTop }
+        : box
+    })
+    cover = document.createElement('div'); cover.style.position = 'fixed'; document.body.append(cover)
+    await settle()
+    const fallback = document.querySelector('[data-lt="notice-fallback"]') as HTMLElement
+    expect(fallback.style.bottom).toBe(`${innerHeight - composerTop + 12}px`)
+    composerTop = 520
+    composer.style.height = '248px'
+    await settle()
+    expect(fallback.style.bottom).toBe(`${innerHeight - composerTop + 12}px`)
+    expect(parseFloat(fallback.style.maxHeight)).toBeLessThan(composerTop)
+  })
+
 })
