@@ -79,6 +79,7 @@
           沙箱卡的殼畫同一張卡，資料由 systemNoticeFor() 用同一組運算式算好送過去：
           這裡的閘或屬性改了，那裡要一起改。
         -->
+        <CanvasNoticeBoundary :enabled="index === talkList.length - 1">
         <chat-system-message
           v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason) && !filterCardReplaced(item)"
           :kind="getSystemMsgKind(item.finishReason)"
@@ -92,6 +93,7 @@
           :stacked-primary="filterCardFor(item, index).stacked"
           @cta="onSystemMsgCta($event, item, index)"
         ></chat-system-message>
+        </CanvasNoticeBoundary>
       </CanvasMessage>
       </template>
 
@@ -559,6 +561,7 @@ import CanvasDirectives from './components/canvas-directives.vue'
 import CanvasResponseSettings from './components/canvas-response-settings.vue'
 import CanvasPresetDrawer from './components/canvas-preset-drawer.vue'
 import ChatSystemMessage from '@/components/chat-system-message/chat-system-message.vue'
+import CanvasNoticeBoundary from './components/canvas-notice-boundary.vue'
 import CanvasNotepad from './components/canvas-notepad.vue'
 import { notepadLength, notepadSourceRowsOf } from './canvas-notepad-sources'
 import CanvasContextBreakdown from './components/canvas-context-breakdown.vue'

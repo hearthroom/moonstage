@@ -28,6 +28,7 @@
 import { createApp, h, nextTick, reactive, type App } from 'vue'
 import CanvasMessage from '@/pages/canvas/components/canvas-message.vue'
 import ChatSystemMessage from '@/components/chat-system-message/chat-system-message.vue'
+import CanvasNoticeBoundary from '@/pages/canvas/components/canvas-notice-boundary.vue'
 import type { MessageLabels, MessageMenuAnchor, MessageView, SandboxMessage, SandboxMessageRole, SandboxRole } from '../protocol'
 import type { EventBus } from '../sdk/events'
 
@@ -243,7 +244,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
         default: () => {
           const notice = state.view.systemNotice
           if (!notice) return null
-          return h(ChatSystemMessage as unknown as Parameters<typeof h>[0], {
+          return h(CanvasNoticeBoundary, { enabled: state.view.latest === true }, { default: () => h(ChatSystemMessage as unknown as Parameters<typeof h>[0], {
             kind: notice.kind,
             label: notice.label,
             sub: notice.sub,
@@ -252,7 +253,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
             busy: notice.busy === true,
             stackedPrimary: notice.stackedPrimary === true,
             onCta: (action: string) => { if (deps.onUi) deps.onUi(id, { kind: 'action', key: `sys:${action}` }) },
-          } as Record<string, unknown>)
+          } as Record<string, unknown>) })
         },
       }),
     })
