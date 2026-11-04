@@ -303,6 +303,14 @@
   box-sizing: content-box;
 }
 
+/* MMD 沒有全域重置，但原生 button 的 UA 預設仍是 border-box。
+   不讓上面的通用還原把 width:100% 的按鈕再加上 padding 撐出欄寬。
+   同樣維持零特異性，作者明確指定的盒模型仍優先。 */
+:where([data-stage-author-layer][data-stage-author-format="mmd"] button),
+:where(.canvas-root.lt-format-mmd .lt-bubble-body button) {
+  box-sizing: revert;
+}
+
 /*
   氣泡裡的圖片跟著氣泡寬走，高度自動。
 
