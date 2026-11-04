@@ -54,8 +54,7 @@ function obscured(source: HTMLElement): boolean {
 async function measure() {
   if (disposed || !anchor.value) return
   const source = anchor.value.nextElementSibling as HTMLElement | null
-  if (!source) return
-  const show = props.enabled && obscured(source)
+  const show = !!source && props.enabled && obscured(source)
   if (show) {
     const cs = source.ownerDocument.defaultView!.getComputedStyle(source)
     const tokens: Record<string, string> = {}

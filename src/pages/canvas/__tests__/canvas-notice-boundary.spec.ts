@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { h, nextTick } from 'vue'
+import { h, nextTick, ref } from 'vue'
 import Boundary from '../components/canvas-notice-boundary.vue'
 import ChatSystemMessage from '@/components/chat-system-message/chat-system-message.vue'
 
+const showNotice = ref(true)
 let cover: HTMLElement | null
 let wrapper: ReturnType<typeof mount> | undefined
 const box = { left: 20, top: 120, right: 380, bottom: 220, width: 360, height: 100, x: 20, y: 120, toJSON() {} }
@@ -14,17 +15,17 @@ function start(enabled = true, busy = false) {
   document.body.append(root)
   wrapper = mount(Boundary, {
     attachTo: root, props: { enabled },
-    slots: { default: () => h(ChatSystemMessage, {
+    slots: { default: () => showNotice.value ? h(ChatSystemMessage, {
       kind: 'server-error', label: '回覆中斷', sub: '請稍後重試。',
       ctas: [{ action: 'retry', label: '重試' }], busy,
       onCta: action => actions.push(action),
-    }) },
+    }) : null },
   })
   return wrapper
 }
 let actions: string[]
 beforeEach(() => {
-  cover = null; actions = []
+  cover = null; actions = []; showNotice.value = true
   const computed = window.getComputedStyle.bind(window)
   vi.spyOn(window, 'getComputedStyle').mockImplementation(el => computed(el))
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(box as DOMRect)
@@ -81,4 +82,16 @@ describe('最新系統失敗卡被作者書本畫面遮住', () => {
     await settle()
     expect(document.querySelector('[data-lt="notice-fallback"]')).toBeNull()
   })
+  it('重試開始令原slot清空但boundary仍存在時，撤掉恢復副本並解除舊節點inert', async () => {
+    start()
+    cover = document.createElement('div'); cover.style.position = 'fixed'; document.body.append(cover)
+    await settle()
+    expect(document.querySelector('[data-lt="notice-fallback"]')).not.toBeNull()
+    const source = document.querySelector('[data-lt-notice-anchor]')!.nextElementSibling!
+    showNotice.value = false
+    await settle()
+    expect(document.querySelector('[data-lt="notice-fallback"]')).toBeNull()
+    expect(source.hasAttribute('inert')).toBe(false)
+  })
+
 })
