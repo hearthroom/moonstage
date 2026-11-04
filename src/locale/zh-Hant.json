@@ -3986,6 +3986,8 @@
 	"canvas.you": "你",
 	"canvas.send": "送出",
 	"canvas.composer.paste": "貼上",
+	"canvas.composer.pasteFailed": "無法讀取剪貼簿，長按輸入框即可貼上",
+	"canvas.composer.pasteEmpty": "剪貼簿沒有文字",
 	"canvas.composer.clear": "清空",
 	"canvas.assist.tip": "不知道怎麼回？讓 AI 幫你起個頭",
 	"canvas.assist.another": "換一句（會再扣 10 點）",

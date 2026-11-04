@@ -364,6 +364,25 @@ describe('殼：冷啟動與事件順序', () => {
     s.dispose()
   })
 
+  it.each([
+    ['failed', undefined],
+    ['empty', { readText: async () => '' }],
+  ])('標準輸入區貼上 %s 回宿主顯示既有 toast', async (reason, clipboard) => {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: clipboard })
+    try {
+      const header = { roleName: 'Example', avatar: '', badge: '', backLabel: 'Back' }
+      const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Assist', perTurn: 'Per turn' } }
+      const s = boot(config({ chromeState: { header, composer }, card: { rules: [], statusbar: '' } }))
+      ;(s.refs.root.querySelector('.chat-input-tool-btn') as HTMLElement).click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(sent).toContainEqual({ type: 'ui', event: 'paste-feedback', key: reason })
+    } finally {
+      if (original) Object.defineProperty(navigator, 'clipboard', original)
+      else delete (navigator as any).clipboard
+    }
+  })
+
   it('殼一掛好就回報頁首底色；作者換了 html 的 class 之後再量一次', async () => {
     const header = { roleName: '露娜', avatar: '', badge: '', backLabel: '返回' }
     const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: '停止', more: '更多', send: '送出', paste: '貼上', clear: '清除', model: '模型', assist: '幫答', perTurn: '每輪' } }

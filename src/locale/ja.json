@@ -3986,6 +3986,8 @@
 	"canvas.you": "あなた",
 	"canvas.send": "送信",
 	"canvas.composer.paste": "貼り付け",
+	"canvas.composer.pasteFailed": "クリップボードを読み取れません。入力欄を長押しすると貼り付けできます",
+	"canvas.composer.pasteEmpty": "クリップボードにテキストがありません",
 	"canvas.composer.clear": "クリア",
 	"canvas.assist.tip": "返事に迷ったら AI に下書きしてもらう",
 	"canvas.assist.another": "別の一言にする（さらに 10 ポイント）",

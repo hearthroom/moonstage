@@ -542,6 +542,7 @@ export function createShell(options: CreateShellOptions): Shell {
         onContext: () => sendUi('context'),
         onMeterHintDone: () => sendUi('meter-hint-done'),
         onShortcut: (key: string) => sendUi('shortcut', key),
+        onPasteFeedback: (reason: 'failed' | 'empty') => sendUi('paste-feedback', reason),
       } as Record<string, unknown>),
     })
     composerApp.config.warnHandler = () => {}

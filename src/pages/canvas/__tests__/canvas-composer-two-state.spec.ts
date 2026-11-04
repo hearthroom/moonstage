@@ -10,7 +10,7 @@
  * 少一個狀態就有一半的美化落空。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import CanvasComposer from '../components/canvas-composer.vue'
 
 function mountComposer(value = '') {
@@ -27,6 +27,7 @@ function visible(el: Element | null): boolean {
 afterEach(() => {
   document.body.innerHTML = ''
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
 describe('輸入區兩態', () => {
@@ -160,6 +161,46 @@ describe('輸入區兩態', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(wrapper.emitted('update:value')).toHaveLength(1)
     wrapper.unmount()
+  })
+
+  describe('貼上結果', () => {
+    it.each([
+      ['沒有 Clipboard API', undefined],
+      ['沒有 readText', {}],
+      ['權限拒絕', { readText: () => Promise.reject(new DOMException('denied', 'NotAllowedError')) }],
+      ['同步失敗', { readText: () => { throw new Error('unavailable') } }],
+    ])('%s：告知失敗，保留草稿並聚焦輸入框', async (_name, clipboard) => {
+      vi.stubGlobal('navigator', { clipboard })
+      const wrapper = mountComposer('原稿')
+      await wrapper.get('.chat-input-tool-btn').trigger('click')
+      await flushPromises()
+      expect(wrapper.emitted('paste-feedback')).toEqual([['failed']])
+      expect(wrapper.emitted('update:value')).toBeUndefined()
+      expect(document.activeElement).toBe(wrapper.get('textarea.uni-textarea-textarea').element)
+      wrapper.unmount()
+    })
+
+    it('空剪貼簿與失敗分開提示', async () => {
+      vi.stubGlobal('navigator', { clipboard: { readText: async () => '' } })
+      const wrapper = mountComposer('原稿')
+      await wrapper.get('.chat-input-tool-btn').trigger('click')
+      await flushPromises()
+      expect(wrapper.emitted('paste-feedback')).toEqual([['empty']])
+      expect(wrapper.emitted('update:value')).toBeUndefined()
+      wrapper.unmount()
+    })
+
+    it('成功時接上原稿，保留空白與換行，不顯示失敗提示', async () => {
+      const readText = vi.fn(async () => '  新文字\n')
+      vi.stubGlobal('navigator', { clipboard: { readText } })
+      const wrapper = mountComposer('原稿')
+      await wrapper.get('.chat-input-tool-btn').trigger('click')
+      await flushPromises()
+      expect(readText).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('update:value')).toEqual([['原稿  新文字\n']])
+      expect(wrapper.emitted('paste-feedback')).toBeUndefined()
+      wrapper.unmount()
+    })
   })
 
   /*

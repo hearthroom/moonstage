@@ -3986,6 +3986,8 @@
 	"canvas.you": "你",
 	"canvas.send": "发送",
 	"canvas.composer.paste": "粘贴",
+	"canvas.composer.pasteFailed": "无法读取剪贴板，长按输入框即可粘贴",
+	"canvas.composer.pasteEmpty": "剪贴板没有文字",
 	"canvas.composer.clear": "清空",
 	"canvas.assist.tip": "不知道怎么回？让 AI 帮你起个头",
 	"canvas.assist.another": "换一句（会再扣 10 点）",

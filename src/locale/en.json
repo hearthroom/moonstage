@@ -3986,6 +3986,8 @@
 	"canvas.you": "You",
 	"canvas.send": "Send",
 	"canvas.composer.paste": "Paste",
+	"canvas.composer.pasteFailed": "Can't read the clipboard. Long-press the text box to paste.",
+	"canvas.composer.pasteEmpty": "The clipboard is empty.",
 	"canvas.composer.clear": "Clear",
 	"canvas.assist.tip": "Stuck? Let AI draft a reply",
 	"canvas.assist.another": "Try another line (costs 10 more)",

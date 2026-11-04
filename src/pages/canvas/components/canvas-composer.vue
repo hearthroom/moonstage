@@ -486,6 +486,7 @@ const emit = defineEmits<{
   (e: 'shortcut', key: string): void
   (e: 'focus'): void
   (e: 'blur'): void
+  (e: 'paste-feedback', reason: 'failed' | 'empty'): void
 }>()
 
 const stopEl = ref<HTMLElement | null>(null)
@@ -644,12 +645,18 @@ async function onPaste() {
   if (props.readOnly) return;
   try {
     const clip = typeof navigator !== 'undefined' ? navigator.clipboard : undefined
-    const text = clip && typeof clip.readText === 'function' ? await clip.readText() : ''
+    if (!clip || typeof clip.readText !== 'function') {
+      emit('paste-feedback', 'failed')
+      return
+    }
+    const text = await clip.readText()
     if (text) emit('update:value', props.value + text)
-  } catch (e) {
-    // 瀏覽器不給讀剪貼簿就算了：焦點還在輸入框，使用者自己 Ctrl+V。
+    else emit('paste-feedback', 'empty')
+  } catch {
+    emit('paste-feedback', 'failed')
+  } finally {
+    focusTextarea()
   }
-  focusTextarea()
 }
 
 function onClear() {

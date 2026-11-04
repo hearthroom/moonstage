@@ -140,6 +140,7 @@
       @context="openContextBreakdownSheet()"
       @meter-hint-done="onMeterHintDone"
       @shortcut="onShortcut"
+      @paste-feedback="onPasteFeedback"
     />
     </template>
 
@@ -2899,6 +2900,11 @@ function openComments() {
 }
 
 // 頁首與輸入區的呈現資料：跟模板上綁給 CanvasHeader／CanvasComposer 的是同一批值，殼那邊用同一套元件畫。
+function onPasteFeedback(reason: string) {
+  if (reason !== 'failed' && reason !== 'empty') return;
+  stageHost.ui.toast(t(reason === 'empty' ? 'canvas.composer.pasteEmpty' : 'canvas.composer.pasteFailed'), 'info');
+}
+
 function buildChromeState() {
   return {
     header: {
@@ -3307,6 +3313,7 @@ function mountSandbox(asset: any) {
           case 'favorite': void toggleFavorite(); return;
           case 'comments': openComments(); return;
           case 'shortcut': onShortcut(String(key || '')); return;
+          case 'paste-feedback': onPasteFeedback(String(key || '')); return;
           case 'back': goBackToEntry(); return;
           case 'prologue': onProloguePick(Number(key)); return;
         }

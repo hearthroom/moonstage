@@ -277,7 +277,7 @@ export interface PanelsState {
 }
 
 /** 標準頁首與輸入區上的按鍵，交給宿主做。 */
-export type ChromeUiEvent = 'send' | 'stop' | 'continue' | 'more' | 'assist' | 'more-pick' | 'model' | 'context' | 'meter-hint-done' | 'shortcut' | 'back' | 'fullscreen' | 'favorite' | 'comments' | 'prologue'
+export type ChromeUiEvent = 'send' | 'stop' | 'continue' | 'more' | 'assist' | 'more-pick' | 'model' | 'context' | 'meter-hint-done' | 'shortcut' | 'back' | 'fullscreen' | 'favorite' | 'comments' | 'prologue' | 'paste-feedback'
 
 /** 三個點選單從哪裡呼出（座標是 iframe 內的；宿主自己換算）。 */
 export type MessageMenuAnchor =
