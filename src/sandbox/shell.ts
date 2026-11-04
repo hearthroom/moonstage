@@ -321,7 +321,7 @@ export function createShell(options: CreateShellOptions): Shell {
       if (frame?.tagName === 'IFRAME') statusbarFrames.set(pre, frame as HTMLIFrameElement)
     }
   }
-  const statusbarHtml = refs.statusbar ? createLiveHtml(refs.statusbar) : null
+  const statusbarHtml = refs.statusbar ? createLiveHtml(refs.statusbar, { dropBareText: true }) : null
   const setStatusbarHtml = (html: string) => { statusbarFrames.clear(); statusbarHtml?.replace(html) }
   const updateStatusbarHtml = (html: string) => {
     const before = Array.from(statusbarFrames, ([pre, frame]) => ({ pre, frame, text: pre.querySelector('code')?.textContent ?? pre.textContent ?? '' }))

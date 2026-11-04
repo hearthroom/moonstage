@@ -30,6 +30,16 @@ afterEach(() => { shell?.dispose(); shell = null; delete (window as unknown as R
 const SCRIPT_RULE = (code: string) => ({ id: 1, name: 'kit', find: '{{eg-kit}}', replace: `<script>${code}</script>` })
 
 describe('殼：冷啟動與事件順序', () => {
+  it.each([true, false])('功能欄掛載與更新清除最外層殘字、保留作者元素（宿主 HTML=%s）', (hostHtml) => {
+    const html = '<div><button>BGM</button><span>{{user}}《控2》</span></div>《播2》《播3》《控2》'
+    const s = boot(config({ card: { rules: [], statusbar: html, ...(hostHtml ? { statusbarHtml: html.replace('{{user}}', '小明') } : {}) } }))
+    expect(s.refs.statusbar!.textContent).toBe('BGM小明《控2》')
+    const button = s.refs.statusbar!.querySelector('button')
+    s.handle({ type: 'user', nickname: '新稱呼', ...(hostHtml ? { statusbarHtml: html.replace('{{user}}', '新稱呼') } : {}) })
+    expect(s.refs.statusbar!.textContent).toBe('BGM新稱呼《控2》')
+    expect(s.refs.statusbar!.querySelector('button')).toBe(button)
+  })
+
   it('玩家名更新 SDK、狀態欄與既有／後續訊息巨集；重複訊息不重掛狀態欄', async () => {
     const s = boot(config({ card: { rules: [], statusbar: '<b>{{user}}</b>', statusbarHtml: '<b>小明</b>' } }))
     s.handle({ type: 'messages', messages: [{ id: 'g', role: 'ai', content: '你好，{{user}}', serverId: null }] })
@@ -819,14 +829,15 @@ describe('原生區塊：沒有規則的卡也有面板與選項', () => {
 })
 
 describe('功能欄掛載檔案的格式字元', () => {
-  it('不讓頂層獨立 BOM 排出一條空行；保留正常功能欄、行內空格與內容中的字元', () => {
-    const s=boot(config({card:{rules:[],statusbar:'mount',statusbarHtml:'\n\ufeff<div class="rail" style="position:fixed">Rail</div><span>A</span> <span>B\ufeffC</span>'}}))
+  it('不讓頂層 BOM 或空白排出空行；保留元素內空格與字元', () => {
+    const s=boot(config({card:{rules:[],statusbar:'mount',statusbarHtml:'\n\ufeff<div class="rail" style="position:fixed">Rail</div><span>A B</span> <span>B\ufeffC</span>'}}))
     const slot=s.refs.statusbar!
     const stray=Array.from(slot.childNodes).filter(n=>n.nodeType===3&&n.textContent?.includes('\ufeff')&&!n.textContent.trim())
     expect(stray).toHaveLength(0)
     expect(slot.querySelector('.rail')).not.toBeNull()
+    expect(slot.querySelectorAll('span')[0].textContent).toBe('A B')
     expect(slot.querySelectorAll('span')[1].textContent).toBe('B\ufeffC')
-    expect(Array.from(slot.childNodes).some(n=>n.nodeType===3&&n.textContent===' ')).toBe(true)
+    expect(Array.from(slot.childNodes).some(n=>n.nodeType===3)).toBe(false)
   })
 })
 

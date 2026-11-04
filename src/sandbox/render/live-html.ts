@@ -3,7 +3,7 @@
  * 比對的是前後兩份來源；來源沒改的節點、屬性與文字不重設。
  * 來源節點用 reference 對回 live 節點，所以作者插入／搬動節點不會讓索引錯位。
  */
-export function createLiveHtml(root: HTMLElement) {
+export function createLiveHtml(root: HTMLElement, options: { dropBareText?: boolean } = {}) {
   const doc = root.ownerDocument
   let source: Node
   let live = new WeakMap<Node, Node>()
@@ -11,14 +11,16 @@ export function createLiveHtml(root: HTMLElement) {
     live.set(template, target)
     Array.from(template.childNodes).forEach((child, i) => bind(child, target.childNodes[i]))
   }
-  const trimBom = (node: Node) => {
+  const prepareSource = (node: Node) => {
     for (const child of Array.from(node.childNodes)) {
-      if (child.nodeType === 3 && child.textContent?.includes('\uFEFF') && !child.textContent.trim()) child.remove()
+      // 功能欄沿用 classic 掛載邊界：最外層裸文字是未替換的觸發詞或殘渣。
+      // 只清來源，不掃 live DOM；元素內文字及作者腳本後加的節點都保留。
+      if (child.nodeType === 3 && (options.dropBareText || (child.textContent?.includes('\uFEFF') && !child.textContent.trim()))) child.remove()
     }
   }
   const replace = (html: string) => {
     root.innerHTML = html
-    trimBom(root)
+    prepareSource(root)
     source = root.cloneNode(true)
     live = new WeakMap()
     bind(source, root)
@@ -71,7 +73,7 @@ export function createLiveHtml(root: HTMLElement) {
     update(html: string) {
       const next = source.cloneNode(false) as HTMLElement
       next.innerHTML = html
-      trimBom(next)
+      prepareSource(next)
       patch(source, next)
       source = next
     },
