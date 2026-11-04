@@ -1,9 +1,9 @@
 /** Public author history values contain opaque keys, never host credentials. */
 export interface HistoryCapabilities { version: 1; available: boolean; reason: string }
 export interface HistoryOptions { cursor?: string; revision?: string; limit?: number; content?: boolean }
-export interface HistoryItem { id: string; order: string; role: 'user'|'ai'; kind: 'opening'|'message'; state: 'streaming'|'complete'|'partial'|'failed'; complete: boolean; contentVersion: string; content?: string }
+export interface HistoryItem { id: string; order: string; role: 'user'|'ai'; kind: 'opening'|'message'; state: 'streaming'|'complete'|'partial'|'failed'; complete: boolean; contentVersion: string; replyTo: string|null; content?: string }
 export interface HistoryPage { conversationKey: string; revision: string; items: HistoryItem[]; complete: boolean; cursor: string|null }
-export interface HistoryChangeItem { op: 'add'|'update'|'remove'; id: string; replacementId?: string }
+export interface HistoryChangeItem { op: 'add'|'update'|'remove'; id: string; replyTo: string|null; replacementId?: string }
 export interface HistoryChange { conversationKey: string|null; previousRevision: string|null; revision: string|null; kind: 'append'|'update'|'remove'|'truncate'|'replace'|'reset'|'unavailable'; changes: HistoryChangeItem[]; part: number; final: boolean }
 export interface HistoryApi { capabilities(): HistoryCapabilities; list(options?: HistoryOptions): Promise<HistoryPage>; onChange(callback: (event: HistoryChange)=>void): ()=>void }
 export interface HistoryChangesPage { conversationKey: string; revision: string; events: HistoryChange[]; reset: boolean; complete: boolean; cursor: string|null }

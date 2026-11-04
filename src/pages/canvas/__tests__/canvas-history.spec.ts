@@ -1,9 +1,35 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createHistoryAdapter } from '../canvas-history'
+import type { HistoryChange, HistoryItem } from '../../../common/history'
 
 const flush = async () => { for(let n=0;n<12;n++) await Promise.resolve() }
 afterEach(()=>vi.useRealTimers())
 describe('author history adapter',()=>{
+ it('preserves authoritative reply targets in classic lists and change invalidations',async()=>{
+  const items:HistoryItem[]=[
+   {id:'opening',order:'1',role:'ai',kind:'opening',state:'complete',complete:true,contentVersion:'1',replyTo:null},
+   {id:'choice',order:'2',role:'user',kind:'message',state:'complete',complete:true,contentVersion:'1',replyTo:null},
+   {id:'extra',order:'3',role:'user',kind:'message',state:'complete',complete:true,contentVersion:'1',replyTo:null},
+   {id:'answer',order:'4',role:'ai',kind:'message',state:'complete',complete:true,contentVersion:'1',replyTo:'choice'},
+  ]
+  const event:HistoryChange={conversationKey:'opaque',previousRevision:'1',revision:'2',kind:'update',changes:[
+   {op:'update',id:'answer',replyTo:'choice'},
+   {op:'remove',id:'old-answer',replyTo:null},
+  ],part:0,final:true}
+  let revision='1'
+  const a=createHistoryAdapter({scope:()=>({roleId:'card',conversationId:'conversation',identity:'owner'}),request:async(op)=>op==='index'
+   ? {conversationKey:'opaque',revision,items,complete:true,cursor:null}
+   : {conversationKey:'opaque',revision,events:[event],reset:false,complete:true,cursor:null}})
+  const page=await a.list()
+  expect(page.items.map(item=>item.replyTo)).toEqual([null,null,null,'choice'])
+  const changed=vi.fn();a.onChange(changed);await flush();revision='2';await a.check()
+  const delivered=changed.mock.calls.find(([change])=>change.kind==='update')?.[0]
+  expect(delivered?.changes).toEqual(event.changes)
+  // Author code cannot mutate the host's subsequent response or another listener's event.
+  page.items[3].replyTo='extra';delivered.changes[0].replyTo='extra'
+  expect(items[3].replyTo).toBe('choice');expect(event.changes[0].replyTo).toBe('choice')
+  a.dispose()
+ })
  it('keeps the shared watermark when another listener joins and drops viewport noise',async()=>{
   vi.useFakeTimers()
   let revision='1'

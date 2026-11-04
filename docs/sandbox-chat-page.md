@@ -348,9 +348,13 @@ JSON、WASM 等檔案（含 `WebAssembly.instantiateStreaming`），別的外站
 
 `history.capabilities()` 回 `{version:1,available,reason}`。`list({cursor?,revision?,limit?,content?})` 讀目前玩家、目前卡、目前會話的已提交訊息，最多 200 則一頁，依 `order` 舊到新；回 `{conversationKey,revision,items,complete,cursor}`。ID 是此會話內穩定的不透明鍵，與既有 `lN/h…/serverId` 不同，不能拼接或作玩家身分。revision/order/contentVersion 都是十進位字串，不轉成 Number。每列的 `role` 是 user/ai，`kind` 是 opening/message，`state` 是 streaming/complete/partial/failed，`complete` 只有完整 user 或成功 AI 才 true。`content:true` 可讀已終止列的可見原文，不回 thinking、生成中文字或被 moderation 隱藏的內容；字形轉換仍是呈現工作。
 
+每列另有 `replyTo: string | null`：AI 回覆填入精確觸發該回覆的玩家訊息 ID，與同份 history 的 `item.id` 使用同一種不透明鍵；不保證玩家訊息與回覆相鄰。玩家訊息、開場白，以及無法核實對應的 AI 回覆都填 `null`。重新生成若建立新的玩家訊息，新的 AI 回覆指向該新 ID；編輯原訊息保留原關聯；退回後被刪除的項目從清單消失。一般續寫目前未開放；Agent 中斷後繼續執行沿用原玩家訊息的關聯。缺少可核實 operation 的舊紀錄或分叉複製紀錄可能為 `null`，不要用順序猜補；舊宿主未提供此新增欄位時也視為未知。SDK 只轉送這份關聯，不自行重算。
+
 第一頁不必傳 revision；續頁沿用首包 revision 與 cursor。只有最後頁 complete=true，cursor=null；空的完整會話也帶會話鍵與 revision。HISTORY_STALE 表示歷史在讀取中變了，必須丟掉已累積頁再讀，不得把不同版本拼成完整。錯誤不是空歷史。
 
 `history.onChange(callback)` 回取消訂閱函式。每位新訂閱者先收到 reset，之後收到同會話 revision 的 append/update/remove/truncate/replace；訊息從未 mount、已 hollow 都會有真歷史變更，viewport unmount 不會。每個 revision 可分多包，part 從 0 連號、final=true 才完整。事件到第一包就應使衍生狀態失效，再用完整 list 重算；不要把事件當作對話寫入或重複結算依據。reset 是斷鏈／保留期不足／換會話，unavailable 是無權限／登出等，兩者都不能解讀為「刪光」。同頁提交後檢查；其他裝置在前景每 15 秒與回前景時檢查，不承諾秒級跨端廣播。切會話與 dispose 會丟棄舊成功／失敗。
+
+事件的 `changes` 項目也帶 `replyTo`，表示讀取事件時仍可核實的關聯；`op: 'remove'` 固定為 `null`。事件仍是失效通知，並非該 revision 的完整訊息快照；應重新讀完 `list` 取得目前項目與關聯。
 
 一般卡的頁級作者入口是 `window.stage.history`，與 sandbox 的 `sdk.history` 相同；訊息內 frontend-block iframe 不因此多出一份 SDK。預覽和舊宿主必須先探測能力；不得把預覽注入的 30 則清單當真實全歷史。此能力不收任意 roleId/conversationId，不授予生成、改寫、讀其他玩家或其他存檔的權限，不消耗生成 credits。
 

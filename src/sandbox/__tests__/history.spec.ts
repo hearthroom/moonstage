@@ -1,8 +1,30 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRemoteHistory } from '../sdk/history'
+import type { HistoryChange, HistoryPage } from '../../common/history'
 const flush=async()=>{for(let n=0;n<8;n++)await Promise.resolve()}
-const event={conversationKey:'opaque',previousRevision:'1',revision:'2',kind:'remove' as const,changes:[{op:'remove' as const,id:'opaque-message'}],part:0,final:true}
+const event={conversationKey:'opaque',previousRevision:'1',revision:'2',kind:'remove' as const,changes:[{op:'remove' as const,id:'opaque-message',replyTo:null}],part:0,final:true}
 describe('remote history facade',()=>{
+ it('preserves opaque reply targets and null values through sandbox list and onChange',async()=>{
+  const page:HistoryPage={conversationKey:'opaque',revision:'2',items:[
+   {id:'opening',order:'1',role:'ai',kind:'opening',state:'complete',complete:true,contentVersion:'1',replyTo:null},
+   {id:'choice',order:'2',role:'user',kind:'message',state:'complete',complete:true,contentVersion:'1',replyTo:null},
+   {id:'answer',order:'3',role:'ai',kind:'message',state:'complete',complete:true,contentVersion:'1',replyTo:'choice'},
+  ],complete:true,cursor:null}
+  const change:HistoryChange={conversationKey:'opaque',previousRevision:'1',revision:'2',kind:'update',changes:[
+   {op:'update',id:'answer',replyTo:'choice'},
+   {op:'remove',id:'old-answer',replyTo:null},
+  ],part:0,final:true}
+  const request=vi.fn(async()=>page)
+  const h=createRemoteHistory(true,{version:1,available:true,reason:'ready'},request)
+  expect((await h.api.list()).items.map(item=>item.replyTo)).toEqual([null,null,'choice'])
+  expect(request).toHaveBeenCalledWith('history.list',[{}])
+  const first=vi.fn(),second=vi.fn();h.api.onChange(first);h.api.onChange(second);await flush()
+  h.receive(1,change);h.receive(2,change)
+  expect(first.mock.calls[0][0].changes).toEqual(change.changes)
+  first.mock.calls[0][0].changes[0].replyTo='changed-by-author'
+  expect(second.mock.calls[0][0].changes[0].replyTo).toBe('choice')
+  expect(change.changes[0].replyTo).toBe('choice');h.dispose()
+ })
  it('subscribes independently and unsubscribes only the selected listener',async()=>{
   const request=vi.fn(async()=>null)
   const h=createRemoteHistory(true,{version:1,available:true,reason:'ready'},request)
