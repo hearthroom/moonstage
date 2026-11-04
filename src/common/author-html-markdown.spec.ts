@@ -52,4 +52,22 @@ describe('scripted author HTML provenance', () => {
     expect(convertVisibleHtml(renderAuthorMarkdown(md, '<div>状态：穿着</div>'), convert))
       .toContain('<div>狀態：穿著</div>')
   })
+  it('preserves multiline authored HTML data after a later newline-to-BR string pass', () => {
+    const source = '<div class="data">1. Alpha\n2. Beta\n3. Gamma</div>'
+    const root = document.createElement('div')
+    root.innerHTML = renderAuthorMarkdown(md, source, true).replace(/\n/g, '<br>')
+    expect(root.querySelector('.data')?.textContent).toBe('1. Alpha\n2. Beta\n3. Gamma')
+  })
+  it('leaves multiline attributes, raw text and layout-only whitespace unchanged', () => {
+    const source = '<div title="Alpha\nBeta">value</div>\n<div>next</div>\n<script>const x = `a\nb`;</script>\n<style>.a {\ncolor:red\n}</style>'
+    expect(renderAuthorMarkdown(md, source, true).replace(/ translate="no"/g, '')).toBe(md.render(source))
+  })
+  it('does not change non-scripted HTML line rendering or Markdown lists', () => {
+    const source = '<div>1. Alpha\n2. Beta</div>\n\n1. First\n2. Second'
+    expect(renderAuthorMarkdown(md, source, false)).toBe(md.render(source))
+    const root = document.createElement('div')
+    root.innerHTML = renderAuthorMarkdown(md, source, true)
+    expect([...root.querySelectorAll('li')].map(li => li.textContent)).toEqual(['First', 'Second'])
+  })
+
 })

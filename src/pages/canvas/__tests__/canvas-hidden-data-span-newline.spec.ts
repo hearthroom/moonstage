@@ -1,5 +1,6 @@
 import { renderAuthorMarkdown } from '@/common/author-html-markdown'
 import { applyTavernRules } from '../canvas-rule-engine'
+import { scopeCardHtml } from '../canvas-style-scope'
 // highlightText 現在也綁這兩支（圍欄保護與前端區塊標記），跟頁面裡一樣是真實函式。
 import { withFencesProtected } from '../../../common/markdown-fences'
 import { tagFrontendBlocks } from '../../../common/frontend-block'
@@ -69,11 +70,11 @@ function extractHighlightTextSource(): string {
   return source.slice(startIdx, i)
 }
 
-function buildHighlightText(): (content: string, type?: number, cacheKey?: string | null) => string {
+function buildHighlightText(rules: any[] = []): (content: string, type?: number, cacheKey?: string | null) => string {
   const fnSource = extractHighlightTextSource()
   const wrapped = `(function () {\n${fnSource}\nreturn highlightText;\n})()`
   const context = vm.createContext({
-    renderAuthorMarkdown,
+    renderAuthorMarkdown, scopeCardHtml,
     applyTavernRules, authorRuleOptions: () => ({ macros: { user: '小明', char: '星' } }),
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml,
@@ -91,8 +92,8 @@ function buildHighlightText(): (content: string, type?: number, cacheKey?: strin
     convertVisibleHtml: (html: string) => html,
     displayScript: (text: string) => text,
     applyDisplayRules: (text: string) => ({ html: text, rollbacks: [] }),
-    activeAuthorAsset: { value: { rules: [], version: 0, crossLine: false } },
-    authorRules: { provisional: 0, display: (text: string) => text },
+    activeAuthorAsset: { value: { rules, version: 0, crossLine: false } },
+    authorRules: { provisional: 0, display: (text: string) => applyTavernRules(text, rules).html },
     console,
   })
   const script = new vm.Script(wrapped, { filename: 'chat-vue-highlightText-hidden-data-extract.js' })
@@ -160,5 +161,24 @@ describe('畫布渲染管線：display:none 機讀資料 span 不得被 markdown
     container.innerHTML = html
     expect(container.querySelector('strong')).not.toBeNull()
     expect(html).toContain('粗體後續')
+  })
+})
+
+
+describe('scripted choice HTML keeps the line separators read by author scripts', () => {
+  const rules = [
+    { enabled: true, find: '/【選項】\\s*([\\s\\S]*)/g', replace: '<div class="choices-source">$1</div>' },
+    { enabled: true, find: 'unused-bootstrap', replace: '<script>/* author UI */</script>' },
+  ]
+  it.each(['\n', '\r\n'])('keeps three numbered choices through display rules and heavy rendering (%j)', newline => {
+    const choices = ['去港口尋找嚮導', '留在旅館詢問消息', '先到市集補充物資']
+    const source = '【選項】' + newline + choices.map((text, i) => `${i + 1}. ${text}`).join(newline)
+    const root = document.createElement('div')
+    root.innerHTML = buildHighlightText(rules)(source, 0, null)
+    const authored = root.querySelector('.choices-source')!
+    expect(authored).not.toBeNull()
+    // The card reads textContent, not innerText: BR elements alone lose delimiters.
+    const parsed = authored.textContent!.split(/(?:^|\n)\s*\d+[.、．]\s*/).map(s => s.trim()).filter(Boolean)
+    expect(parsed).toEqual(choices)
   })
 })
