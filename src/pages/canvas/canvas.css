@@ -1026,25 +1026,45 @@
     opacity: var(--lt-canvas-actions-opacity-hover);
   }
 
+  /*
+    「⋯」是每則訊息唯一的操作入口（改字、倒回、複製、刪除都在裡面）。先前是透明底上的三個淡點，
+    在作者的插圖背景上幾乎找不到（站方 2026-11-05 紅圈回報）。現在是一顆常駐的小膠囊：
+    底色與點用同一組畫布前景／背景色，不借整列的 currentColor——那是作者給名字的字色，
+    在作者的背景圖上不保證讀得到；畫布自己的前景配背景一定讀得到。
+    看得到的大小跟「重新生成」同高；點擊區用偽元素上下各擴 6px（34px），左右不擴，免得壓到旁邊的鍵。
+    沙箱殼不載 canvas-theme-vars.css，那裡的一對是殼自己的 --chat-bg／--chat-text（跟著 [data-theme]）。
+  */
   .extraMesButtonsHint {
+    --lt-msg-hint-fg: var(--lt-canvas-fg, var(--chat-text, #e8eaed));
+    --lt-msg-hint-bg: var(--lt-canvas-bg, var(--chat-bg, #0f1217));
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: var(--lt-canvas-actions-size);
-    height: var(--lt-canvas-actions-size);
+    width: calc(var(--lt-canvas-actions-size, 22px) + 10px);
+    height: var(--lt-canvas-actions-size, 22px);
     border-radius: 9999px;
+    border: 1px solid color-mix(in srgb, var(--lt-msg-hint-fg) 22%, transparent);
+    background: color-mix(in srgb, var(--lt-msg-hint-bg) 72%, transparent);
+    box-sizing: border-box;
     cursor: pointer;
-    color: inherit;
+    color: var(--lt-msg-hint-fg);
+  }
+
+  .extraMesButtonsHint::after {
+    content: '';
+    position: absolute;
+    inset: -6px 0;
   }
 
   .extraMesButtonsHint:hover,
   .extraMesButtonsHint:focus-visible {
-    background: color-mix(in srgb, currentColor 14%, transparent);
+    background: color-mix(in srgb, var(--lt-msg-hint-bg) 92%, var(--lt-msg-hint-fg));
   }
 
   .extraMesButtonsHint > svg {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
   }
 
   /*

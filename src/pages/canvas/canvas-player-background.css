@@ -118,4 +118,10 @@
   [data-lt-player-tone=light] .swipes-counter {
     color: #16191E !important;
   }
+
+  /* ⋯ 自帶畫布色的底；深字配上深色主題的底會看不見，淺色色票上改墊淺底。 */
+  [data-lt-player-tone=light] .extraMesButtonsHint {
+    background-color: rgba(255, 255, 255, 0.72) !important;
+    border-color: rgba(22, 25, 30, 0.18) !important;
+  }
 }

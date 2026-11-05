@@ -343,3 +343,32 @@ describe('長按放開不會誤點到選單', () => {
    await w.find('.agent-resume-card__btn').trigger('click')
    expect(w.emitted('action')).toEqual([['resume-agent']])
  })
+
+describe('⋯ 看得見、點得到（站方 2026-11-05：插圖背景上找不到那三個點）', () => {
+  const read = (p: string) => readFileSync(resolve(__dirname, p), 'utf8')
+  const block = (css: string, selector: string) => {
+    const at = css.indexOf(selector + ' {')
+    expect(at).toBeGreaterThan(-1)
+    return css.slice(at, css.indexOf('}', at))
+  }
+
+  it('自帶畫布前景與背景配成的底，不靠整列的字色', () => {
+    const hint = block(read('../canvas.css'), '.extraMesButtonsHint')
+    expect(hint).toMatch(/background:\s*color-mix\(in srgb, var\(--lt-msg-hint-bg\)/)
+    expect(hint).toMatch(/[^-]color:\s*var\(--lt-msg-hint-fg\)/)
+    expect(hint).not.toMatch(/color:\s*inherit/)
+    // 一般畫布用 --lt-canvas-*；沙箱殼沒載那份變數，退到殼自己的 --chat-*
+    expect(hint).toMatch(/--lt-msg-hint-fg:\s*var\(--lt-canvas-fg, var\(--chat-text/)
+    expect(hint).toMatch(/--lt-msg-hint-bg:\s*var\(--lt-canvas-bg, var\(--chat-bg/)
+  })
+
+  it('點擊區上下擴到 34px（不小於 30），左右不擴', () => {
+    const hit = block(read('../canvas.css'), '.extraMesButtonsHint::after')
+    expect(hit).toMatch(/inset:\s*-6px 0;/)
+  })
+
+  it('淺色色票把字改深時，底也改淺', () => {
+    const light = block(read('../canvas-player-background.css'), '[data-lt-player-tone=light] .extraMesButtonsHint')
+    expect(light).toMatch(/background-color:\s*rgba\(255, 255, 255/)
+  })
+})
