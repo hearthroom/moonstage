@@ -667,8 +667,8 @@
 	const optionValues = (options) => (options || []).map(item => item.value);
 
 	// DeepSeek defaults follow the catalog unless the player explicitly chose a depth.
-	const normalizeThinkingDepthForSelectedModel = (keepChoice = true) => {
-        const keep = isDeepSeekV4PlusVariant(selectItem.value) ? formData.thinkingDepthManual : keepChoice;
+	const normalizeThinkingDepthForSelectedModel = (keepChoice = true, selectionChanged = false) => {
+        const keep = selectionChanged && isDeepSeekV4PlusVariant(selectItem.value) ? formData.thinkingDepthManual : keepChoice;
         const previous = formData.thinkingDepth;
         formData.thinkingDepth = pickThinkingDepth(
             optionValues(thinkingDepthOptions.value),
@@ -678,13 +678,13 @@
         if (!keep || formData.thinkingDepth !== previous) formData.thinkingDepthManual = false;
     };
 
-	const normalizeContextForSelectedModel = (keepThinkingChoice = true) => {
+	const normalizeContextForSelectedModel = (keepThinkingChoice = true, selectionChanged = false) => {
 		if (!selectItem.value) return;
 		const nextContext = normalizeContextValue(formData.context, selectItem.value);
 		if (nextContext !== formData.context) {
 			formData.context = nextContext;
 		}
-		normalizeThinkingDepthForSelectedModel(keepThinkingChoice);
+		normalizeThinkingDepthForSelectedModel(keepThinkingChoice, selectionChanged);
 		normalizeShowThinkingProcessForSelectedModel();
 	};
 
@@ -1866,9 +1866,10 @@ const truncationText = (completionRate: number) => {
 
 	const selectVariant = (family, variant) => {
 		const sameFamily = Boolean(selectItem.value) && selectItem.value.family === family.family;
+        const selectionChanged = formData.selectModel !== variant.value;
 		formData.selectModel = variant.value;
 		selectItem.value = { ...variant, family: family.family };
-		normalizeContextForSelectedModel(sameFamily);
+		normalizeContextForSelectedModel(sameFamily, selectionChanged);
 		activatedFamilies.value.add(family.family);
 	};
 

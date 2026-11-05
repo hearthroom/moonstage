@@ -16,7 +16,7 @@ const lane = (value: string, channel: string) => ({
   billingType: 'dynamic', estMinScore: 1, estMaxScore: 10, contextBudgetOptions: [],
 })
 
-async function mountOnGemini(thinkingDepth: string) {
+async function mountOnGemini(thinkingDepth: string, selectModel = 'fixture-gemini-dew') {
   const live = JSON.parse(JSON.stringify((await import('../../pages/canvas/__tests__/fixtures/model-catalog-live.json')).default))
   live[0].families.unshift({
     family: 'Gemini 3.8 Flash', description: '',
@@ -28,11 +28,18 @@ async function mountOnGemini(thinkingDepth: string) {
       thinkingDepthOptions: [{ value: 'off' }, { value: 'high' }, { value: 'max' }], defaultThinkingDepth: 'max',
     }],
   })
+  for (const [family, value, defaultThinkingDepth] of [
+    ['DeepSeek V4 Flash','deepseek-v4-flash-fixture','high'],
+    ['DeepSeek V4 Pro','deepseek-v4-pro-fixture','max'],
+  ]) live[0].families.unshift({family,description:'',variants:[{
+    ...lane(value,'lane:fixture'), name:family, thinkingControl:'toggleable',
+    thinkingDepthOptions:[{value:'off'},{value:'high'},{value:'max'}], defaultThinkingDepth,
+  }]})
   const get = vi.fn(async (url: string) => url === '/models'
     ? { statusCode: 200, data: live }
     : { statusCode: 200, data: [] })
   const wrapper = shallowMount(ModelSelectPanel, {
-    props: { open: true, roleId: 'fixture-role', selectModel: 'fixture-gemini-dew', thinkingDepth },
+    props: { open: true, roleId: 'fixture-role', selectModel, thinkingDepth },
     global: { config: { globalProperties: { http: { get }, requestUrl: { playerAgentMode: '/agent-mode', getModelListV2: '/models' } } } },
   })
   await flushPromises()
@@ -101,3 +108,16 @@ describe('DeepSeek 手動來源', () => {
     } finally { wrapper.unmount() }
   })
 })
+
+
+it.each([['deepseek-v4-flash-fixture','max'],['deepseek-v4-pro-fixture','high']])(
+  '同模型開面板不改舊來源未知的非預設深度 %s/%s', async (code, depth) => {
+    const {wrapper,vm}=await mountOnGemini(depth,code)
+    try {
+      expect(vm.formData.thinkingDepth).toBe(depth)
+      vm.formData.context=3
+      await vm.saveUserDefine()
+      expect(wrapper.emitted('select')?.at(-1)?.[0]).toMatchObject({thinkingDepth:depth,thinkingDepthManual:false})
+    } finally {wrapper.unmount()}
+  }
+)
