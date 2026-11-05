@@ -5862,7 +5862,8 @@
     line-height: 1.6;
   }
 
-  .mem-retry {
+  .mem-retry,
+  .mem-enable-agent {
     min-height: 36px;
     display: inline-flex;
     align-items: center;
@@ -5874,6 +5875,22 @@
     font-weight: 600;
     color: inherit;
     cursor: pointer;
+  }
+
+  /* 副標下面那顆靠左，不要被 heading 的 flex column 拉成整行寬。 */
+  .mem-enable-agent {
+    align-self: flex-start;
+  }
+
+  .mem-empty .mem-enable-agent {
+    align-self: center;
+  }
+
+  .mem-retry:hover,
+  .mem-retry:focus-visible,
+  .mem-enable-agent:hover,
+  .mem-enable-agent:focus-visible {
+    background: var(--lt-canvas-sheet-item-bg-hover);
   }
 
   .mem-list {

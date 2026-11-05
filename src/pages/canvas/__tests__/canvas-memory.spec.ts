@@ -1,5 +1,5 @@
 /**
- * AI 筆記／永久記憶彈窗——mobile 那一頁搬到畫布之後，玩家看得到的東西還在不在。
+ * AI 記事本彈窗——mobile 那一頁搬到畫布之後，玩家看得到的東西還在不在。
  *
  * 元件不打 API：資料由頁面餵進來，文案也由頁面翻好餵進來，這裡只問畫出來的東西：
  * 列表、來源標籤、相對時間、長內容收行與展開、刪除事件、空／載入／失敗三態，
@@ -178,7 +178,7 @@ describe('記憶：畫出來的東西', () => {
     wrapper.unmount()
   })
 
-  it('標題與副標由頁面決定（Agent 開著是 AI 記事本，沒開是永久記憶）；關閉鍵發 close', () => {
+  it('標題與副標由頁面決定（副標依 Agent 模式開關而不同）；關閉鍵發 close', () => {
     const wrapper = memory()
     const el = wrapper.element as HTMLElement
     expect(el.querySelector('.mem-title')!.textContent).toBe('AI 記事本')
@@ -229,5 +229,28 @@ describe('記憶：吃得到作者的美化', () => {
     const end = css.indexOf('/* ── 手機')
     const block = css.slice(start, end)
     expect(block).toMatch(/@media \(pointer: coarse\)[\s\S]*\.mem-delete/)
+  })
+})
+
+describe('記憶：沒開 Agent 時的前往開啟鍵', () => {
+  it('頁面給了鍵名才畫；空態與有記錄時都在，按下去發 enable-agent', () => {
+    const labels = { ...LABELS, enableAgent: '開啟 Agent 模式' }
+    for (const atoms of [[], ATOMS]) {
+      const wrapper = mount(CanvasMemory, { props: { atoms, labels } })
+      const el = wrapper.element as HTMLElement
+      const btn = el.querySelector<HTMLElement>('.mem-enable-agent')
+      expect(btn, `atoms=${atoms.length}`).not.toBeNull()
+      expect(btn!.getAttribute('role')).toBe('button')
+      expect(btn!.textContent).toContain('開啟 Agent 模式')
+      btn!.click()
+      expect(wrapper.emitted('enable-agent')?.length).toBe(1)
+      wrapper.unmount()
+    }
+  })
+
+  it('Agent 開著（沒給鍵名）時不畫這顆鍵', () => {
+    const wrapper = memory()
+    expect((wrapper.element as HTMLElement).querySelector('.mem-enable-agent')).toBeNull()
+    wrapper.unmount()
   })
 })

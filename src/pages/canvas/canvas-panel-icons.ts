@@ -18,7 +18,7 @@ const ICONS: Record<string, string> = {
   directives: '<path d="M4 7h10M4 12h10M4 17h7"/><path d="M16 15.5l2 2 3.5-4"/>',
   // 手帳：筆記本
   notepad: '<rect x="5" y="3.5" width="14" height="17" rx="2"/><line x1="9" y1="3.5" x2="9" y2="20.5"/><path d="M12.5 8.5h3M12.5 12h3"/>',
-  // AI 筆記／永久記憶：便條
+  // AI 記事本：便條
   memory: '<path d="M5 4h11l3 3v13H5z"/><path d="M16 4v3h3"/><path d="M8.5 11h7M8.5 14.5h7"/>',
   // 存檔並開新對話：存檔
   'new-chat': '<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><rect x="8" y="13" width="8" height="4"/>',

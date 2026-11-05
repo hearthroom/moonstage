@@ -47,7 +47,7 @@ const EVENTS: Record<string, string[]> = {
     'sets-open', 'sets-save-as-open', 'sets-upgrade', 'sets-dismiss', 'sets-retry', 'sets-back', 'sets-scope', 'sets-pick', 'sets-apply', 'sets-manage', 'update:set-name', 'sets-bind', 'sets-save-as'],
   notepad: ['save', 'retry', 'close', 'toggle-templates', 'apply-template', 'save-template', 'update:code', 'preview-code', 'cancel-preview', 'confirm-import', 'share-template', 'delete-template', 'copy-share-code', 'revoke-share', 'close-share', 'toggle-copy', 'copy-from', 'update:draft'],
   'context-breakdown': ['close', 'retry', 'toggle-mod-details'],
-  memory: ['close', 'retry', 'delete', 'toggle-expand'],
+  memory: ['close', 'retry', 'delete', 'toggle-expand', 'enable-agent'],
   confirm: ['ok', 'cancel', 'toggle-option'],
   assist: ['confirm','cancel','refresh','pick'],
   capacity: ['pick', 'cancel'],

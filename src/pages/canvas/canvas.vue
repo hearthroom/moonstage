@@ -386,6 +386,7 @@
         @toggle-expand="onToggleMemoryExpand"
         @delete="askDeleteMemoryAtom"
         @retry="loadMemory"
+        @enable-agent="onMemoryEnableAgent"
         @close="closeCanvasSheet"
       />
     </CanvasPopup>
@@ -767,8 +768,8 @@ const multiPassUpdating = ref(false)
 
 // 這三個開關由伺服器宣告。先前這一頁只宣告了 ref 卻沒有人去讀，deepPrepOn 永遠是假；
 // 真正讀它的是模型選單那個元件，撥開關時會廣播 multiPassPreferenceUpdated。
-// 這裡自己讀一次（同 mobile memoryPage），再聽廣播——記憶彈窗的身分（AI 記事本／永久記憶）
-// 要在玩家沒開過模型選單時也是對的。
+// 這裡自己讀一次（同 mobile memoryPage），再聽廣播——AI 記事本的說明與空態（要不要提示
+// 開 Agent 模式）要在玩家沒開過模型選單時也是對的。
 function applyMultiPassPreference(pref: any) {
   multiPassEnabled.value = pref?.multiPassEnabled === true
   multiPassRuntimeEnabled.value = pref?.runtimeEnabled === true
@@ -801,7 +802,7 @@ async function loadMultiPassPreference(retryLeft = 1) {
       await new Promise((r) => setTimeout(r, 800))
       return loadMultiPassPreference(retryLeft - 1)
     }
-    // 拿不到就當作沒開——退回「永久記憶」比顯示一個講錯身分的彈窗安全。
+    // 拿不到就當作沒開：AI 記事本會提示要開 Agent 模式，但不給前往開啟的鍵（runtime 未知）。
     console.warn('[Canvas] 讀取 Agent 模式狀態失敗:', e)
   }
 }
@@ -3173,6 +3174,7 @@ function onSandboxPanelUi(panelName: string, event: string, args: unknown[]) {
       if (event === 'toggle-expand') onToggleMemoryExpand(str());
       else if (event === 'delete') askDeleteMemoryAtom(str());
       else if (event === 'retry') loadMemory();
+      else if (event === 'enable-agent') onMemoryEnableAgent();
       return;
     case 'confirm':
       if (event === 'ok') onConfirmOk(); else if (event === 'cancel') onConfirmCancel(); else if (event === 'toggle-option') toggleResetOption(str());
@@ -10674,8 +10676,8 @@ const moreItems = computed(() => previewOnly.value ? [
   { key: 'notepad', label: t('notepad.entry') },
   ...(responseSettingsOffered.value ? [{ key: 'response-settings', label: t('responseSettings.title') }] : []),
   // AI 自己每輪記下的記錄（owner 2026-09-05：「AI 自己記的記錄，我們都看不到」）。
-  // 身分跟 mobile 同一條判準：Agent 開著是「AI 記事本」，沒開是「永久記憶」。
-  { key: 'memory', label: deepPrepOn.value ? t('chat.aiNotebookEntry') : t('chat.permanentMemory') },
+  // 名字不分模式（owner 2026-11-06）：記錄只有 Agent 模式會寫，沒開時另由彈窗說明。
+  { key: 'memory', label: t('chat.aiNotebookEntry') },
   // owner 2026-09-13：開新對話、切換、改名、刪除全在「對話存檔」一個視窗裡（玩家回報
   // 存檔跟讀檔分兩顆不統一）。開新的不會動到舊的那段，所以清單頂上那顆不再跳確認框。
   // 分叉屬於訊息那一層（每則的「⋯」），不放這裡。
@@ -11850,12 +11852,13 @@ function onToggleContextBreakdownModDetails() {
   contextBreakdown.value = { ...contextBreakdown.value, modDetailsExpanded: !contextBreakdown.value.modDetailsExpanded }
 }
 
-// ── AI 記事本／永久記憶 ────────────────────────────────────────────────
+// ── AI 記事本 ──────────────────────────────────────────────────────────
 //
 // AI 自己每輪記下的記錄（記憶原子）。mobile memoryPage 那一頁的彈窗版：看得到、能刪、
-// 長的能收合。身分跟 mobile 同一條判準（deepPrepOn）：Agent 開著是「AI 記事本」
-// （角色自己記的，關不掉），沒開是「永久記憶」（背景整理的）。mobile 那一頁在
-// 非 Agent 模式還有一顆 VIP 開關，那是角色設定的一部分，這裡不放——畫布另有設定入口。
+// 長的能收合。伺服器唯一的寫入點是 Agent 模式的記事本工具，一般模式不抽取也不讀它
+// （先前沒開 Agent 時叫「永久記憶」、說明寫「會自動提取」，玩家聊了 59 輪仍是空的，
+// 以為壞掉；owner 2026-11-06 改成一律叫 AI 記事本）。所以 deepPrepOn 只決定說明與空態：
+// 沒開時講清楚要開 Agent 模式，開得了就給一顆鍵去既有的模型面板（Agent 開關在那裡）。
 //
 // 展開狀態與正在刪哪一條都放在頁面：元件只畫。刪除走畫布自己的確認框（askConfirm），
 // 確認框會把這一片換掉，所以確認後要再把它開回來（見 onConfirmOk）。
@@ -11870,15 +11873,26 @@ const memory = ref({
   conversationId: '',
 })
 
+// 前往開啟 Agent 模式的鍵：只在按下去真的找得到開關時給。全站關掉、這個宿主不提供
+// Agent 模式、模型面板不開放、純預覽，都不給——那顆鍵會帶玩家到一個沒有開關的地方。
+const memoryCanEnableAgent = computed(() =>
+  !deepPrepOn.value
+  && multiPassRuntimeEnabled.value
+  && stageHost.capabilities?.agentMode !== false
+  && allowsStagePanel(stageHost.capabilities, 'model')
+  && !previewOnly.value
+)
+
 const memoryLabels = computed(() => ({
-  title: deepPrepOn.value ? t('chat.aiNotebookTitle') : t('chat.permanentMemory'),
-  // mobile 的 aiNotebookTip 講的是「向左滑刪除」，那是手機手勢；這裡用不帶手勢的那句。
-  subtitle: deepPrepOn.value ? t('chat.aiNotebookDesc') : t('chat.memoryTip'),
+  title: t('chat.aiNotebookTitle'),
+  subtitle: deepPrepOn.value ? t('chat.aiNotebookDesc') : t('chat.aiNotebookAgentOffDesc'),
+  // 空字串＝不畫這顆鍵（元件只看有沒有字）。
+  enableAgent: memoryCanEnableAgent.value ? t('chat.aiNotebookEnableAgent') : '',
   close: t('main.cancel'),
   loading: t('canvas.panel.loading'),
   loadFailed: t('notepad.loadFailed'),
   retry: t('notepad.retry'),
-  empty: deepPrepOn.value ? t('chat.aiNotebookEmpty') : t('chat.memoryEmpty'),
+  empty: deepPrepOn.value ? t('chat.aiNotebookEmpty') : t('chat.aiNotebookAgentOffEmpty'),
   delete: t('main.delete'),
   expand: t('chat.memoryExpand'),
   collapse: t('chat.memoryCollapse'),
@@ -11897,6 +11911,11 @@ function memoryUrl(template: string, params: Record<string, string>) {
   let url = String(template || '')
   for (const [key, value] of Object.entries(params)) url = url.replace(`{${key}}`, encodeURIComponent(value))
   return url
+}
+
+// Agent 開關住在模型面板底部；換成那一片，不另造一個開關。
+function onMemoryEnableAgent() {
+  openModelSelect()
 }
 
 function openMemorySheet() {
@@ -11950,13 +11969,8 @@ function onToggleMemoryExpand(atomId: string) {
 function askDeleteMemoryAtom(atomId: string) {
   if (!atomId || memory.value.deletingId) return
   memory.value = { ...memory.value, pendingDeleteId: atomId }
-  // 確認語意照 mobile：Agent 模式講「角色之後就不會再記得這件事」，一般模式講「可能會再次被提取」。
-  askConfirm(
-    'delete-memory',
-    t('main.delete'),
-    deepPrepOn.value ? t('chat.aiNotebookDeleteConfirm') : t('chat.memoryDeleteConfirm'),
-    t('main.delete'),
-  )
+  // 不分模式：沒有任何背景抽取會把它再寫回來，刪掉就是角色不再記得。
+  askConfirm('delete-memory', t('main.delete'), t('chat.aiNotebookDeleteConfirm'), t('main.delete'))
 }
 
 async function deleteMemoryAtom(atomId: string) {

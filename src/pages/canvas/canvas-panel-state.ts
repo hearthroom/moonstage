@@ -29,7 +29,7 @@ export type CanvasSheet =
   | 'notepad'
   /** 這則回覆的組成（上下文 chip 點開的那一片） */
   | 'context-breakdown'
-  /** AI 記事本／永久記憶（AI 自己每輪記下的記錄） */
+  /** AI 記事本（Agent 模式下 AI 自己每輪記下的記錄） */
   | 'memory'
   /** 更換背景 */
   | 'background'

@@ -50,7 +50,7 @@ export type CanvasRegion =
   | 'notepad'
   /** 這則回覆的組成 */
   | 'context-breakdown'
-  /** AI 記事本／永久記憶 */
+  /** AI 記事本 */
   | 'memory'
 
 export interface CanvasSelectorEntry {
@@ -378,7 +378,7 @@ export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '.cb-foot', region: 'context-breakdown', origin: 'lt', why: '模型回報的實際輸入、快取命中率、本輪消耗' },
   { selector: '.cb-note', region: 'context-breakdown', origin: 'lt', why: '「各部分是估算」那句話' },
 
-  // ── AI 記事本／永久記憶 ───────────────────────────────────────────
+  // ── AI 記事本 ─────────────────────────────────────────────────────
   // mobile memoryPage 搬過來的彈窗版；MMD 沒有這個功能，名字是我們自己的。
   // 殼仍是 `.u-popup__content`，作者的底色與圓角照樣生效；裡面的字色全部 inherit。
   { selector: '.memory-scope', region: 'memory', origin: 'lt', why: '我方的記憶面板；MMD 無對應功能' },

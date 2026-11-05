@@ -500,7 +500,8 @@
   .mem-error {
     padding: 32px 16px
 }
-.mem-retry {
+.mem-retry,
+  .mem-enable-agent {
     padding: 0 16px
 }
 .mem-card {
