@@ -47,6 +47,7 @@
         :select-model-name="modelName"
         :context="contextValue"
         :thinking-depth="thinkingDepth"
+        :thinking-depth-manual="thinkingDepthManual"
         :show-thinking-process="showThinkingProcess"
         :focus="focus"
         v-model:search-query="searchQuery"
@@ -120,6 +121,7 @@ const props = withDefaults(defineProps<{
   scoreLabel?: string
   contextValue?: number
   thinkingDepth?: string
+  thinkingDepthManual?: boolean
   showThinkingProcess?: boolean
   /** 'lanes'：打開時直接停在目前這顆模型的線路清單 */
   focus?: '' | 'lanes'
@@ -142,6 +144,7 @@ const props = withDefaults(defineProps<{
   contextValue: 1,
   focus: '',
   thinkingDepth: '',
+  thinkingDepthManual: false,
   showThinkingProcess: true,
   labels: () => ({ close: 'Close', done: 'Done', perTurn: '/turn' }),
 })
