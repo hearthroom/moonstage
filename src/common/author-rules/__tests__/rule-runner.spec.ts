@@ -355,3 +355,22 @@ describe('random CG ledger crosses the real worker adapter', () => {
     expect(new Set(worker.slice(3, 6)).size).toBe(3)
   })
 })
+
+describe('queued random CG history follows first appearance order', () => {
+  it('eight concurrent messages and repeated redraw requests deal exactly as inline rendering', async () => {
+    const rules = [{ id: 'cg', find: '/<pic>/g', replace: '<b>{{random:A::B::C}}</b>' }]
+    const requests = Array.from({ length: 8 }, (_, i) => ({ engine: 'tavern' as const, text: '<pic>', rules, options: { seed: `history-${i}`, randomScope: 'queued-history' } }))
+    const inline = createRuleRunner({ executor: null })
+    const expected = requests.map(req => inline.display(req).html)
+    inline.dispose()
+    const worker = createRuleRunner({ executor: createWorkerExecutor({ createWorker: () => fakeWorker(), size: 2 }) })
+    const pending = requests.map(req => worker.apply(req))
+    // A settle/redraw asks pending rows again, in natural reading order.
+    for (const req of requests) worker.display(req)
+    const actual = (await Promise.all(pending)).map(result => result.html)
+    expect(actual).toEqual(expected)
+    expect(new Set(actual.slice(0, 3)).size).toBe(3)
+    expect(new Set(actual.slice(3, 6)).size).toBe(3)
+    worker.dispose()
+  })
+})

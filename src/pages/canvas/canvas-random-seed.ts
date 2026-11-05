@@ -3,17 +3,16 @@
  *
  * 種子的用途是讓同一則訊息裡的隨機選擇不跟著串流每一跳重抽（common/author-rules/rule-job.ts）。
  * 以前直接拿畫布上的訊息 id：新對話的開場白一律是 id 0，每一段新對話的開場白就都抽到同一張
- * （2026-11-04 卡 100256）。沒有自己 id 的（開場白）每一則給一個新的隨機鹽；有 id 的照用 id，
- * 重整後同一則還是同一張。鹽記在那個訊息物件上：開場白重畫幾次都是同一張；換一則（新對話、
- * 換開場白）才重抽。開場白存進對話後帶上自己的 id，重整時改用那個 id，可能換一次。
+ * （2026-11-04 卡 100256）。已建立對話的開場白用對話身分，重整後即使取得自己的訊息 id 也不換圖；
+ * 還沒建立對話的預覽才使用物件上的隨機鹽。其餘訊息用自己的 id。
  */
 export function createRandomSeeds(salt: () => string = () => Math.random().toString(36).slice(2)) {
   const seeds = new WeakMap<object, string>()
-  return (item: { id?: unknown }): string => {
+  return (item: { id?: unknown }, openingScope = ''): string => {
     let seed = seeds.get(item)
     if (seed) return seed
     const id = item.id
-    seed = id == null || id === 0 || id === '0' || id === '' ? `o:${salt()}` : String(id)
+    seed = openingScope ? `o:${openingScope}` : id == null || id === 0 || id === '0' || id === '' ? `o:${salt()}` : String(id)
     seeds.set(item, seed)
     return seed
   }

@@ -2696,7 +2696,12 @@ onUnmounted(() => {
 });
 // {{random}} 的種子：一則訊息一個（canvas-random-seed.ts）。新對話的開場白 id 都是 0，不能拿 id 當種子。
 const seedOfItem = createRandomSeeds();
-const randomSeedFor = (item: any): string => seedOfItem(toRaw(item));
+const randomSeedFor = (item: any): string => {
+  // A known oldest AI row is the opening; the first row of a later history page is not.
+  const opening = item.randomOpening === true || item.id === 0 || item.id === '0'
+    || (!ajax.value.hasNextPage && isOpeningIndex(talkList.value, talkList.value.indexOf(item)));
+  return seedOfItem(toRaw(item), opening ? String(unref(conversationId) || '') : '');
+};
 // 沙箱卡的 HTML 快取鍵：開場白（id 0）按這一則的種子記，換新對話時不會拿到上一段的開場白畫面。
 const hudCacheKey = (item: any): string => renderCacheKey(item, randomSeedFor);
 const authorRules = {
@@ -5860,6 +5865,7 @@ function adoptStartedConversation(started: any) {
   const welcomeContent = started.defaultRelay;
   let data: any = {
     "id": nextBubbleId(),
+    randomOpening: true,
     "content": welcomeContent,
     "type": 0,
     "pic": pic.value,

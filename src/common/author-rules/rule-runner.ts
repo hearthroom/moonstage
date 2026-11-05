@@ -149,6 +149,8 @@ interface Job extends Keyed {
   waiters: Waiter[]
   /** 最近一次被要的序號：越大越先跑（串流另外優先）。 */
   seq: number
+  /** First request order survives redraws and queued stream coalescing. */
+  firstRequested: number
   /** 'probe'：正在查持久層；'queued'：可以跑；'running'：在執行器上。 */
   phase: 'probe' | 'queued' | 'running'
 }
@@ -364,6 +366,9 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
     let best: Job | null = null
     for (const j of queue) {
       if (sameMessageRunning(j)) continue
+      // Keep only the head of each conversation eligible. Comparing with the current
+      // best alone is insufficient when unrelated conversations are interleaved.
+      if (j.drawKey && queue.some(other => other !== j && other.drawKey === j.drawKey && other.firstRequested < j.firstRequested)) continue
       if (!best) { best = j; continue }
       const js = j.streaming && !j.final
       const bs = best.streaming && !best.final
@@ -397,15 +402,16 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
       existing.seq = ++seqCounter
       return existing
     }
+    let firstRequested = seqCounter + 1
     if (streaming) {
       // 合併：還在排隊、沒人等結果的串流請求，若只是這一版的前綴（同一則訊息的舊版本），直接拿掉。
       queue = queue.filter((j) => {
         const superseded = j.streaming && !j.final && !j.waiters.length && j.prefixKey === k.prefixKey && k.text.startsWith(j.text)
-        if (superseded) jobs.delete(j.key)
+        if (superseded) { firstRequested = Math.min(firstRequested, j.firstRequested); jobs.delete(j.key) }
         return !superseded
       })
     }
-    const job: Job = { ...k, streaming, final: !streaming, waiters: [], seq: ++seqCounter, phase: 'probe' }
+    const job: Job = { ...k, streaming, final: !streaming, waiters: [], seq: ++seqCounter, firstRequested, phase: 'probe' }
     jobs.set(job.key, job)
     if (!streaming && persist && !job.drawKey) {
       // 先查持久層（不佔 worker、各自並行）；沒有才排進去跑。

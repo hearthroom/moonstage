@@ -57,3 +57,12 @@ describe('畫布接線', () => {
     expect(body).toMatch(/const key = hudCacheKey\(item\);/)
   })
 })
+
+describe('opening identity within an established conversation', () => {
+  it('uses the conversation identity before and after the opening has a persisted message id', () => {
+    const first = createRandomSeeds()({ id: 0 }, 'conversation-A')
+    const reload = createRandomSeeds()({ id: 'saved-opening' }, 'conversation-A')
+    expect(reload).toBe(first)
+    expect(createRandomSeeds()({ id: 0 }, 'conversation-B')).not.toBe(first)
+  })
+})
