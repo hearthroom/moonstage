@@ -262,7 +262,9 @@ export function isNewFamily(f: any): boolean {
   return Array.isArray(f && f.badges) && f.badges.indexOf('new') !== -1
 }
 
-function claudeOrderOf(f: Family): { series: number; version: number[] } | null {
+type FamilyOrder = { series: number; version: number[] }
+
+function claudeOrderOf(f: Family): FamilyOrder | null {
   const match = /^Claude\s+(Opus|Sonnet|Haiku)\s+(\d+(?:\.\d+)*)(?:\b|$)/i.exec(String(f?.family || ''))
   if (!match) return null
   return {
@@ -271,18 +273,26 @@ function claudeOrderOf(f: Family): { series: number; version: number[] } | null 
   }
 }
 
+function versionOrderOf(f: Family, brand: 'Gemini' | 'Grok'): FamilyOrder | null {
+  const match = /^(Gemini|Grok)[\s-]+(\d+(?:\.\d+)*)(?:\b|$)/i.exec(String(f?.family || ''))
+  if (!match || match[1].toLowerCase() !== brand.toLowerCase()) return null
+  return {
+    series: brand === 'Gemini' && /flash[\s-]*lite/i.test(String(f.family)) ? 1 : 0,
+    version: match[2].split('.').map(Number),
+  }
+}
+
 /**
- * 預設瀏覽時 Claude 固定為 Opus → Sonnet → Haiku，同系列按數字版本遞減。
- * 只交換 Claude 原本佔用的位置，保留其他品牌的新品／熱門次序；不能把這個規則
+ * 只交換同品牌原本佔用的位置，保留其他品牌的新品／熱門次序；不能把這個規則
  * 混進熱門 comparator，否則跨品牌比較會失去傳遞性。
  */
-function orderClaudeFamilies(families: Family[]): Family[] {
-  const claudes = families.flatMap((f, i) => {
-    const order = claudeOrderOf(f)
+function orderFamilySlots(families: Family[], orderOf: (f: Family) => FamilyOrder | null): Family[] {
+  const slots = families.flatMap((f, i) => {
+    const order = orderOf(f)
     return order ? [{ f, i, ...order }] : []
   })
-  if (claudes.length < 2) return families
-  claudes.sort((a, b) => {
+  if (slots.length < 2) return families
+  slots.sort((a, b) => {
     if (a.series !== b.series) return a.series - b.series
     for (let i = 0; i < Math.max(a.version.length, b.version.length); i++) {
       const diff = (b.version[i] || 0) - (a.version[i] || 0)
@@ -291,7 +301,7 @@ function orderClaudeFamilies(families: Family[]): Family[] {
     return a.i - b.i
   })
   let next = 0
-  return families.map(f => claudeOrderOf(f) ? claudes[next++].f : f)
+  return families.map(f => orderOf(f) ? slots[next++].f : f)
 }
 
 export function sortFamilies(families: Family[], mode: string, ctx: SortContext = {}): Family[] {
@@ -317,7 +327,12 @@ export function sortFamilies(families: Family[], mode: string, ctx: SortContext 
     return x.i - y.i
   })
   const sorted = indexed.map(x => x.f)
-  return mode === 'popular' ? orderClaudeFamilies(sorted) : sorted
+  if (mode !== 'popular') return sorted
+  // owner 2026-11-06：Gemini 一般系列在 Flash Lite 前，兩組各按版本遞減；
+  // Grok 按版本遞減。Claude 沿用 Opus → Sonnet → Haiku 的既有規則。
+  return orderFamilySlots(
+    orderFamilySlots(orderFamilySlots(sorted, claudeOrderOf), f => versionOrderOf(f, 'Gemini')),
+    f => versionOrderOf(f, 'Grok'))
 }
 
 /**
@@ -416,8 +431,9 @@ export function pinFamilyToTop(families: any[], selectedModelValue: string | nul
   const idx = list.findIndex(f =>
     Array.isArray(f && f.variants) && f.variants.some((v: any) => v && v.value === selectedModelValue))
   if (idx <= 0) return list
-  // 預設 Claude 系列順序優先於目前使用釘頂；手動排序及其他品牌沿用既有行為。
-  if (mode === 'popular' && claudeOrderOf(list[idx])) return list
+  // 指定的預設品牌順序優先於目前使用釘頂；手動排序及其他品牌沿用既有行為。
+  if (mode === 'popular' && (claudeOrderOf(list[idx])
+    || versionOrderOf(list[idx], 'Gemini') || versionOrderOf(list[idx], 'Grok'))) return list
   return [list[idx]].concat(list.slice(0, idx)).concat(list.slice(idx + 1))
 }
 
@@ -568,11 +584,11 @@ export function detailMetrics(family: Family | null | undefined): DetailMetrics 
  * Claude 在用量榜上排得後面是因為它在別處貴，不是因為它不好用——這裡價格低，
  * 所以照玩家實際會想找的順序放在前面，而不是照榜單。
  *
- * owner 2026-10-18：前四家改為 DeepSeek、Claude、Grok、Gemini，MiMo 固定最後。
+ * owner 2026-11-06：MiMo 移到 Gemini 與 GLM 中間，其他分類相對次序不變。
  * 其餘分類照「旗下最好的那個模型在全球角色扮演用量的名次」排，越前面越靠前；
- * 沒有名次的放在有名次的後面，彼此維持伺服器原順序，仍排在 MiMo 之前。
+ * 沒有名次的放在有名次的後面，彼此維持伺服器原順序。
  */
-export const PINNED_MODEL_GROUPS = ['deepseek', 'claude', 'grok', 'gemini', 'glm', 'kimi', 'minimax']
+export const PINNED_MODEL_GROUPS = ['deepseek', 'claude', 'grok', 'gemini', 'mimo', 'glm', 'kimi', 'minimax']
 
 export function orderModelGroups<T extends { group?: string; families?: Array<{ usageRank?: unknown }> }>(groups: T[]): T[] {
   const bestRank = (g: T) => {
@@ -587,11 +603,9 @@ export function orderModelGroups<T extends { group?: string; families?: Array<{ 
     .map((g, index) => ({
       g, index,
       pin: PINNED_MODEL_GROUPS.indexOf(String(g.group || '').trim().toLowerCase()),
-      last: String(g.group || '').trim().toLowerCase() === 'mimo',
       rank: bestRank(g),
     }))
     .sort((a, b) => {
-      if (a.last !== b.last) return a.last ? 1 : -1
       if (a.pin !== -1 || b.pin !== -1) {
         if (a.pin === -1) return 1
         if (b.pin === -1) return -1

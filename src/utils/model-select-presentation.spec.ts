@@ -63,11 +63,12 @@ describe('Claude 在預設熱門序中依系列與版本排列', () => {
     expect(original).toEqual(before)
   })
 
-  it('熱門模式不把進頁時使用中的 Haiku 搬到 Opus 前；非 Claude 仍釘頂', () => {
+  it('熱門模式不把進頁時使用中的 Haiku 搬到 Opus 前；其他品牌仍釘頂', () => {
     const sorted = sortFamilies(input(), 'popular')
     expect(pinFamilyToTop(sorted, 'Claude Haiku 5.5', 'popular')).toEqual(sorted)
-    const pinned = pinFamilyToTop(sorted, 'Grok 4.7', 'popular')
-    expect(pinned[0].family).toBe('Grok 4.7')
+    const withDeepSeek = [...sorted, family('DeepSeek V4 Flash', [fixedVariant('ds', 1)])]
+    const pinned = pinFamilyToTop(withDeepSeek, 'ds', 'popular')
+    expect(pinned[0].family).toBe('DeepSeek V4 Flash')
     expect(pinned.filter(x => x.family.startsWith('Claude ')).map(x => x.family)).toEqual(expected)
   })
 
@@ -79,6 +80,64 @@ describe('Claude 在預設熱門序中依系列與版本排列', () => {
     expect(sortFamilies(input(), 'default')).toEqual(input())
     expect(pinFamilyToTop(sortFamilies(input(), 'price'), 'Claude Haiku 5.5', 'price')[0].family)
       .toBe('Claude Haiku 5.5')
+  })
+})
+
+describe('Gemini／Grok 預設版本順序（owner 2026-11-06）', () => {
+  const f = (name: string, i: number) => family(name, [fixedVariant(name, i + 1)], {
+    usageShare: 100 - i, badges: i === 0 ? ['new'] : [],
+  })
+  const gemini = ['Gemini 3.5 Flash Lite', 'Gemini 2.5 Flash', 'Gemini 3 Flash',
+    'Gemini 2.5 Flash Lite', 'Gemini 3.8 Flash', 'Gemini 4']
+  const grok = ['Grok 4', 'Grok 4.3', 'Grok 4.5', 'Grok 4.6']
+  const names = (list: any[]) => list.map(x => x.family)
+  const expectedGemini = ['Gemini 4', 'Gemini 3.8 Flash', 'Gemini 3 Flash',
+    'Gemini 2.5 Flash', 'Gemini 3.5 Flash Lite', 'Gemini 2.5 Flash Lite']
+
+  it('Gemini 一般系列先按版本遞減，Flash Lite 最後按版本遞減；不受新品與熱門度覆蓋', () => {
+    const input = gemini.map(f)
+    const before = input.slice()
+    expect(names(sortFamilies(input, 'popular'))).toEqual(expectedGemini)
+    expect(input).toEqual(before)
+  })
+
+  it('Grok 按數字版本遞減，同版本維持目錄次序', () => {
+    const input = [...grok, 'Grok 4.10', 'Grok 4.6 Fast', 'Grok 4.6 Beta'].map(f)
+    expect(names(sortFamilies(input, 'popular'))).toEqual([
+      'Grok 4.10', 'Grok 4.6', 'Grok 4.6 Fast', 'Grok 4.6 Beta', 'Grok 4.5', 'Grok 4.3', 'Grok 4',
+    ])
+  })
+
+  it('Flash-Lite 連字號與大小寫也辨識，不改同版本子型號次序', () => {
+    expect(names(sortFamilies(['gemini 3.5 Flash-Lite', 'Gemini 3.8 Flash High',
+      'Gemini-4-Argon(Test)', 'Gemini 3.8 Flash', 'Gemini 2.5 Flash-Lite'].map(f), 'popular')))
+      .toEqual(['Gemini-4-Argon(Test)', 'Gemini 3.8 Flash High', 'Gemini 3.8 Flash',
+        'gemini 3.5 Flash-Lite', 'Gemini 2.5 Flash-Lite'])
+  })
+
+  it('只交換各品牌佔用的位置，DeepSeek 與其他家族維持熱門序', () => {
+    const input = ['Grok 4', 'DeepSeek V4 Flash', 'Gemini 2.5 Flash', 'MiMo V2.5',
+      'Grok 4.6', 'Gemini 4', 'Unknown Model'].map(f)
+    expect(names(sortFamilies(input, 'popular'))).toEqual([
+      'Grok 4.6', 'DeepSeek V4 Flash', 'Gemini 4', 'MiMo V2.5',
+      'Grok 4', 'Gemini 2.5 Flash', 'Unknown Model',
+    ])
+  })
+
+  it('明確指定價格等排序仍照原指標；default 仍沿用目錄順序', () => {
+    const input = [...gemini, ...grok].map(f)
+    expect(sortFamilies(input, 'price')).toEqual(input)
+    expect(sortFamilies(input, 'default')).toEqual(input)
+  })
+
+  it('目前使用的舊版 Gemini／Grok 不覆蓋預設次序；手動價格排序仍可釘頂', () => {
+    for (const input of [gemini.map(f), grok.map(f)]) {
+      const sorted = sortFamilies(input, 'popular')
+      const selected = input[0].variants[0].value
+      expect(pinFamilyToTop(sorted, selected, 'popular')).toEqual(sorted)
+      const price = sortFamilies(input, 'price')
+      expect(pinFamilyToTop(price, input.at(-1)!.variants[0].value, 'price')[0]).toBe(input.at(-1))
+    }
   })
 })
 
@@ -891,8 +950,8 @@ describe('orderModelGroups — 分類列的順序', () => {
       g('Ling'), g('Kimi', 38), g('GLM', 7), g('MiMo', 13), g('Claude', 43), g('MiniMax'),
       g('Gemini', 9), g('DeepSeek', 1), g('Hunyuan', 4), g('Grok', 90),
     ]).map(x => x.group)
-    expect(out.slice(0, 7)).toEqual(['DeepSeek', 'Claude', 'Grok', 'Gemini', 'GLM', 'Kimi', 'MiniMax'])
-    expect(out[out.length - 1]).toBe('MiMo')
+    expect(out.slice(0, 8)).toEqual(['DeepSeek', 'Claude', 'Grok', 'Gemini', 'MiMo', 'GLM', 'Kimi', 'MiniMax'])
+    expect(out.slice(8)).toEqual(['Hunyuan', 'Ling'])
   })
 
   it('其餘照旗下最好的名次排；沒有名次的放最後、維持原順序', () => {
@@ -903,10 +962,10 @@ describe('orderModelGroups — 分類列的順序', () => {
     expect(out).toEqual(['Hunyuan', 'Gemma', 'GPT', 'Qwen', 'Ling', 'Nemotron', 'Seed', 'NewBrand'])
   })
 
-  it('MiMo 固定在所有分類之後，即使用量第一或新增分類沒有名次', () => {
+  it('MiMo 固定在非釘選分類之前，即使用量第一或新增分類沒有名次', () => {
     expect(orderModelGroups([
       g(' MiMo ', 1), g('NewBrand'), g('Ling', 2), g('Unknown'),
-    ]).map(x => x.group)).toEqual(['Ling', 'NewBrand', 'Unknown', ' MiMo '])
+    ]).map(x => x.group)).toEqual([' MiMo ', 'Ling', 'NewBrand', 'Unknown'])
   })
 
   it('分類名大小寫與前後空白不影響', () => {
