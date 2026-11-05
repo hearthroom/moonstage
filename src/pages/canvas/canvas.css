@@ -802,13 +802,18 @@
      先前用彈層的深色底（--lt-canvas-sheet-bg），在亮色卡上就是一塊黑膏藥
      （owner 2026-09-05：「正在回想先前的劇情」那格沒吃到美化）。
   */
+  /*
+     沒量到作者的塊（沙箱卡、沒有掛載內容的卡）時，退到跟 AI 氣泡同一組 token：上下兩顆氣泡換了色，
+     夾在中間的思考過程不能還是一片透明淡框（owner 2026-11-06：「只有思考過程的 bubble 吃不到美化」）。
+     字色跟著底一起取，不 inherit：作者把氣泡漆成白底深字時，inherit 拿到的是站台深色模式的淺字。
+  */
   .mes_reasoning_details {
     font-size: 13px;
     padding: 8px 12px;
-    border-radius: var(--lt-canvas-block-radius, var(--lt-canvas-radius));
+    border-radius: var(--lt-canvas-block-radius, var(--lt-canvas-bubble-radius, var(--lt-canvas-radius)));
     border: var(--lt-canvas-block-border, 1px solid color-mix(in srgb, currentColor 22%, transparent));
-    background: var(--lt-canvas-block-bg, color-mix(in srgb, currentColor 7%, transparent));
-    color: inherit;
+    background: var(--lt-canvas-block-bg, var(--lt-canvas-bubble-ai-bg, color-mix(in srgb, currentColor 7%, transparent)));
+    color: var(--lt-canvas-block-fg, var(--lt-canvas-bubble-fg, inherit));
   }
 
   .mes_reasoning_details > summary {
@@ -828,10 +833,10 @@
     flex-direction: column;
     gap: 6px;
     padding: 10px 12px;
-    border-radius: var(--lt-canvas-block-radius, var(--lt-canvas-radius));
+    border-radius: var(--lt-canvas-block-radius, var(--lt-canvas-bubble-radius, var(--lt-canvas-radius)));
     border: var(--lt-canvas-block-border, 1px solid color-mix(in srgb, currentColor 22%, transparent));
-    background: var(--lt-canvas-block-bg, color-mix(in srgb, currentColor 7%, transparent));
-    color: inherit;
+    background: var(--lt-canvas-block-bg, var(--lt-canvas-bubble-ai-bg, color-mix(in srgb, currentColor 7%, transparent)));
+    color: var(--lt-canvas-block-fg, var(--lt-canvas-bubble-fg, inherit));
     font-size: 13px;
     line-height: 1.5;
   }
@@ -1031,9 +1036,14 @@
     在作者的插圖背景上幾乎找不到（站方 2026-11-05 紅圈回報）。現在是一顆常駐的小膠囊：
     底色與點用同一組畫布前景／背景色，不借整列的 currentColor——那是作者給名字的字色，
     在作者的背景圖上不保證讀得到；畫布自己的前景配背景一定讀得到。
-    看得到的大小跟「重新生成」同高；點擊區用偽元素上下各擴 6px（34px），左右不擴，免得壓到旁邊的鍵。
     沙箱殼不載 canvas-theme-vars.css，那裡的一對是殼自己的 --chat-bg／--chat-text（跟著 [data-theme]）。
+
+    「重新生成」跟它是同一列的兩顆鍵，外觀一模一樣：同一對顏色、同一個描邊、同高、同一種點擊區
+    （owner 2026-11-06：⋯ 變深色了，重新生成還是淡框，兩顆不一樣大、沒對齊）。先前重新生成照快捷鍵
+    取色、沒寫 box-sizing，殼裡沒有宿主的 border-box 重置，就比 ⋯ 高出上下兩條邊框（24 對 22）。
+    看得到的高度是 22px；點擊區用偽元素上下各擴 6px（34px），左右不擴，免得兩顆的點擊區疊在一起。
   */
+  .lt-msg-regen,
   .extraMesButtonsHint {
     --lt-msg-hint-fg: var(--lt-canvas-fg, var(--chat-text, #e8eaed));
     --lt-msg-hint-bg: var(--lt-canvas-bg, var(--chat-bg, #0f1217));
@@ -1041,22 +1051,28 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: calc(var(--lt-canvas-actions-size, 22px) + 10px);
+    box-sizing: border-box;
     height: var(--lt-canvas-actions-size, 22px);
     border-radius: 9999px;
     border: 1px solid color-mix(in srgb, var(--lt-msg-hint-fg) 22%, transparent);
     background: color-mix(in srgb, var(--lt-msg-hint-bg) 72%, transparent);
-    box-sizing: border-box;
-    cursor: pointer;
     color: var(--lt-msg-hint-fg);
+    cursor: pointer;
   }
 
+  .extraMesButtonsHint {
+    width: calc(var(--lt-canvas-actions-size, 22px) + 10px);
+  }
+
+  .lt-msg-regen::after,
   .extraMesButtonsHint::after {
     content: '';
     position: absolute;
     inset: -6px 0;
   }
 
+  .lt-msg-regen:hover,
+  .lt-msg-regen:focus-visible,
   .extraMesButtonsHint:hover,
   .extraMesButtonsHint:focus-visible {
     background: color-mix(in srgb, var(--lt-msg-hint-bg) 92%, var(--lt-msg-hint-fg));
@@ -1067,33 +1083,14 @@
     height: 18px;
   }
 
-  /*
-     重新生成：只有最新一則 AI 有這顆。藥丸形，跟其他 chip 同一個高度。
-
-     顏色一律從 currentColor 來，不寫死自己的灰：這一列的文字色是作者的卡在設的
-     （亮色主題設深色字），寫死淺灰等於在白底上畫白字——BA 卡上看不見（2026-09-05
-     owner 回報）。邊框與底色也用 currentColor 調出來，卡片換色就一起換。
-  */
+  /* 重新生成：只有最新一則 AI 有這顆。字與圖示排在同一顆膠囊裡。 */
   .lt-msg-regen {
-    display: inline-flex;
-    align-items: center;
     gap: 4px;
-    height: var(--lt-canvas-actions-size);
     padding: 0 10px;
-    border-radius: var(--lt-canvas-pill-radius, 9999px);
-    border: var(--lt-canvas-pill-border, 1px solid color-mix(in srgb, currentColor 32%, transparent));
-    background: var(--lt-canvas-pill-bg, color-mix(in srgb, currentColor 7%, transparent));
-    color: var(--lt-canvas-pill-fg, inherit);
     font-size: 12px;
     line-height: 1;
     white-space: nowrap;
-    cursor: pointer;
     user-select: none;
-  }
-
-  .lt-msg-regen:hover,
-  .lt-msg-regen:focus-visible {
-    background: color-mix(in srgb, currentColor 14%, transparent);
   }
 
   .lt-msg-regen > svg {

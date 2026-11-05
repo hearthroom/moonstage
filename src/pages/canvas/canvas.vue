@@ -550,7 +550,7 @@ import CanvasPrologue from './components/canvas-prologue.vue'
 import { captureBodySnapshot, restoreBodySnapshot, sweepForeignNodes } from './canvas-body-snapshot'
 import CanvasPopup from './components/canvas-popup.vue'
 import CanvasModelPanel from './components/canvas-model-panel.vue'
-import { computeCardThemeVars, CARD_THEME_VAR_NAMES } from './canvas-card-theme'
+import { computeCardThemeVars, readCardThemeSample, writeCardThemeVars } from './canvas-card-theme'
 import { chromeTopColor, syncChromeTone } from './canvas-chrome-tone'
 import CanvasConfirm from './components/canvas-confirm.vue'
 import CanvasCapacityChoice from './components/canvas-capacity-choice.vue'
@@ -4111,22 +4111,7 @@ function syncCardTheme() {
   if (typeof document === 'undefined') return
   const root = document.querySelector('.canvas-root') as HTMLElement | null
   if (!root) return
-  const bubble = document.querySelector('.mes[data-lt-role="ai"] .mes_text') as HTMLElement | null
-  const pill = document.querySelector('.shortcut-btn') as HTMLElement | null
-  const b = bubble ? getComputedStyle(bubble) : null
-  const p = pill ? getComputedStyle(pill) : null
-  const vars = computeCardThemeVars({
-    bubbleBorderColor: b?.borderTopColor, bubbleBorderWidth: b?.borderTopWidth, bubbleBorderStyle: b?.borderTopStyle,
-    bubbleBackground: b?.backgroundColor, bubbleRadius: b?.borderTopLeftRadius,
-    accentColor: p?.borderTopColor,
-    pillBorderColor: p?.borderTopColor, pillBorderWidth: p?.borderTopWidth, pillBorderStyle: p?.borderTopStyle,
-    pillBackground: p?.backgroundColor, pillColor: p?.color, pillRadius: p?.borderTopLeftRadius,
-  })
-  for (const name of CARD_THEME_VAR_NAMES) {
-    const value = vars[name]
-    if (value) root.style.setProperty(name, value)
-    else root.style.removeProperty(name)
-  }
+  writeCardThemeVars(root, computeCardThemeVars(readCardThemeSample(document)))
   // 作者宣告了頁面色：快捷列與輸入區改透明，跟頁面連成一片（canvas-theme-vars.css 的 [data-lt-page-color]）。
   // 用屬性不用 class：根節點的 class 由模板綁定，重繪時會被整串覆寫。
   if (getComputedStyle(root).getPropertyValue('--background-color').trim()) root.setAttribute('data-lt-page-color', '')

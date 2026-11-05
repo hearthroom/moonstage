@@ -8,6 +8,7 @@
  */
 import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, RequestOp, SandboxBackground, SandboxHelloConfig, SandboxMessage, ShellToHost, StageState } from './protocol'
 import { createThemeBridge } from './theme-bridge'
+import { bindCardBlockTheme } from './card-block-theme'
 import { createEventBus } from './sdk/events'
 import { createRemoteHistory } from './sdk/history'
 import { createSdk, type Sdk, type SdkHost } from './sdk/create-sdk'
@@ -138,6 +139,8 @@ export function createShell(options: CreateShellOptions): Shell {
   const listMount = doc.createElement('div')
   listMount.setAttribute('data-chat', 'list')
   if (listAnchor) listHost.insertBefore(listMount, listAnchor); else listHost.appendChild(listMount)
+  // 思考過程、準備軌跡跟著作者漆好的 AI 氣泡走（一般畫布在 canvas.vue 的 syncCardTheme 做同一件事）。
+  const disposeCardBlockTheme = bindCardBlockTheme(refs.root, listMount)
   refs.list.remove()
   refs.list = listMount
   if (config.viewportHeight) setViewportHeight(refs, config.viewportHeight)
@@ -836,6 +839,7 @@ export function createShell(options: CreateShellOptions): Shell {
     sdk: controller.sdk,
     dispose() {
       themeBridge.dispose()
+      disposeCardBlockTheme()
       historyRemote.dispose()
       disposed = true
       offRuleSettled()

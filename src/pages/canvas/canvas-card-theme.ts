@@ -17,6 +17,8 @@ export interface CardThemeSample {
   bubbleBorderStyle?: string
   bubbleBackground?: string
   bubbleRadius?: string
+  /** 氣泡的字色：塊拿了氣泡的底，字也要跟著拿，不然淺底配上站台的淺字 */
+  bubbleColor?: string
   accentColor?: string
   /** 快捷鍵（.shortcut-btn）：卡片已經漆好的一顆藥丸，動作列那兩顆照它長 */
   pillBorderColor?: string
@@ -30,6 +32,7 @@ export interface CardThemeSample {
 export interface CardThemeVars {
   '--lt-canvas-block-border'?: string
   '--lt-canvas-block-bg'?: string
+  '--lt-canvas-block-fg'?: string
   '--lt-canvas-block-radius'?: string
   '--lt-canvas-accent'?: string
   '--lt-canvas-accent-fg'?: string
@@ -89,6 +92,10 @@ export function computeCardThemeVars(sample: CardThemeSample): CardThemeVars {
   }
   const bg = parseCssColor(sample.bubbleBackground)
   if (bg && bg.a > 0.05) out['--lt-canvas-block-bg'] = rgba(bg)
+  // 底跟著氣泡走時字也一起：作者把氣泡漆成白底深字，塊若只拿到白底、字仍是站台深色模式的淺字，
+  // 整段就讀不到（2026-11-06 量到：白底上 rgb(242,242,245) 的字）。
+  const fg = parseCssColor(sample.bubbleColor)
+  if (out['--lt-canvas-block-bg'] && fg && fg.a > 0.5) out['--lt-canvas-block-fg'] = rgba({ ...fg, a: 1 })
   const radius = parseFloat(String(sample.bubbleRadius || '')) || 0
   if (radius > 0) out['--lt-canvas-block-radius'] = `${Math.min(radius, 24)}px`
 
@@ -136,8 +143,41 @@ function pickAccent(candidates: Array<RGBA | null>): RGBA | null {
   return best
 }
 
+export const CARD_BLOCK_VAR_NAMES: Array<keyof CardThemeVars> = [
+  '--lt-canvas-block-border', '--lt-canvas-block-bg', '--lt-canvas-block-fg', '--lt-canvas-block-radius',
+]
+
 export const CARD_THEME_VAR_NAMES: Array<keyof CardThemeVars> = [
-  '--lt-canvas-block-border', '--lt-canvas-block-bg', '--lt-canvas-block-radius',
+  ...CARD_BLOCK_VAR_NAMES,
   '--lt-canvas-accent', '--lt-canvas-accent-fg', '--lt-canvas-accent-bg',
   '--lt-canvas-pill-border', '--lt-canvas-pill-bg', '--lt-canvas-pill-fg', '--lt-canvas-pill-radius',
 ]
+
+/** 量卡片已經漆好的 AI 氣泡與快捷鍵。一般畫布與沙箱殼共用同一組選擇器。 */
+export function readCardThemeSample(doc: Document): CardThemeSample {
+  const view = doc.defaultView
+  if (!view) return {}
+  const bubble = doc.querySelector('.mes[data-lt-role="ai"] .mes_text') as HTMLElement | null
+  const pill = doc.querySelector('.shortcut-btn') as HTMLElement | null
+  const b = bubble ? view.getComputedStyle(bubble) : null
+  const p = pill ? view.getComputedStyle(pill) : null
+  return {
+    bubbleBorderColor: b?.borderTopColor, bubbleBorderWidth: b?.borderTopWidth, bubbleBorderStyle: b?.borderTopStyle,
+    bubbleBackground: b?.backgroundColor, bubbleRadius: b?.borderTopLeftRadius, bubbleColor: b?.color,
+    accentColor: p?.borderTopColor,
+    pillBorderColor: p?.borderTopColor, pillBorderWidth: p?.borderTopWidth, pillBorderStyle: p?.borderTopStyle,
+    pillBackground: p?.backgroundColor, pillColor: p?.color, pillRadius: p?.borderTopLeftRadius,
+  }
+}
+
+/** 把量到的值寫在根節點上；這次沒量到的就拿掉，退回 CSS 的預設。只動 names 列的那幾個。 */
+export function writeCardThemeVars(root: HTMLElement, vars: CardThemeVars, names: Array<keyof CardThemeVars> = CARD_THEME_VAR_NAMES): void {
+  for (const name of names) {
+    const value = vars[name]
+    if (value) {
+      if (root.style.getPropertyValue(name) !== value) root.style.setProperty(name, value)
+    } else if (root.style.getPropertyValue(name)) {
+      root.style.removeProperty(name)
+    }
+  }
+}

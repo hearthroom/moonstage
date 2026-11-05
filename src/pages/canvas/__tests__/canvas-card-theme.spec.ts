@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { computeCardThemeVars, parseCssColor } from '../canvas-card-theme'
+import { CARD_BLOCK_VAR_NAMES, computeCardThemeVars, parseCssColor, writeCardThemeVars } from '../canvas-card-theme'
 
 describe('從卡片量到的外觀', () => {
   it('BA 卡日間：氣泡藍邊、半透明白底、8px 圓角，快捷鍵藍邊 → 邊框、底色、主色都跟著來', () => {
@@ -34,6 +34,24 @@ describe('從卡片量到的外觀', () => {
     const vars = computeCardThemeVars({ bubbleBorderColor: 'rgb(245, 197, 66)', bubbleBorderWidth: '1px', bubbleBorderStyle: 'solid' })
     expect(vars['--lt-canvas-accent']).toBe('rgb(245, 197, 66)')
     expect(vars['--lt-canvas-accent-fg']).toBe('#0F1419')
+  })
+
+  it('塊拿了氣泡的底，字也跟著拿氣泡的字色（白底深字的卡在深色站台上不能變成白底白字）', () => {
+    const vars = computeCardThemeVars({ bubbleBackground: 'rgb(255, 255, 255)', bubbleColor: 'rgb(59, 36, 20)' })
+    expect(vars['--lt-canvas-block-bg']).toBe('rgb(255, 255, 255)')
+    expect(vars['--lt-canvas-block-fg']).toBe('rgb(59, 36, 20)')
+    // 沒量到底色就不給字色：字色單獨換掉，會跟我們預設的底撞在一起
+    expect(computeCardThemeVars({ bubbleBackground: 'rgba(0, 0, 0, 0)', bubbleColor: 'rgb(59, 36, 20)' })['--lt-canvas-block-fg']).toBeUndefined()
+  })
+
+  it('只寫指定的那幾個變數，沒量到的拿掉', () => {
+    const root = document.createElement('div')
+    root.style.setProperty('--lt-canvas-block-bg', 'rgb(1, 2, 3)')
+    root.style.setProperty('--lt-canvas-pill-bg', 'rgb(4, 5, 6)')
+    writeCardThemeVars(root, { '--lt-canvas-block-fg': 'rgb(7, 8, 9)', '--lt-canvas-pill-bg': 'rgb(9, 9, 9)' }, CARD_BLOCK_VAR_NAMES)
+    expect(root.style.getPropertyValue('--lt-canvas-block-bg')).toBe('')
+    expect(root.style.getPropertyValue('--lt-canvas-block-fg')).toBe('rgb(7, 8, 9)')
+    expect(root.style.getPropertyValue('--lt-canvas-pill-bg')).toBe('rgb(4, 5, 6)')
   })
 
   it('看得懂三種寫法的顏色', () => {

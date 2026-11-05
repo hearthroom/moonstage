@@ -169,16 +169,18 @@ describe('動作列的顏色跟著卡片走', () => {
     expect(w.find('[data-lt="message-regenerate"]').classes()).toContain('hover-pill')
   })
 
-  it('重新生成鍵的文字色與邊框都從 currentColor 來，不寫死自己的灰', () => {
+  // owner 2026-11-06：⋯ 換成畫布前景／背景色那顆深色膠囊之後，重新生成還是照快捷鍵的淡框——兩顆要一樣。
+  // 取色不寫死、也不借整列的 currentColor（作者給名字的字色），理由見 canvas.css 的說明。
+  it('重新生成鍵與 ⋯ 共用同一組外觀宣告，不寫死自己的灰', () => {
     const css = readFileSync(resolve(__dirname, '../canvas.css'), 'utf8')
-    for (const sel of ['.lt-msg-regen {']) {
-      const start = css.indexOf(sel)
-      expect(start, sel).toBeGreaterThan(-1)
-      const body = css.slice(start, css.indexOf('}', start))
-      expect(body).toMatch(/color: var\(--lt-canvas-pill-fg, inherit\);/)
-      expect(body).toMatch(/border: var\(--lt-canvas-pill-border, 1px solid color-mix\(in srgb, currentColor/)
-      expect(body).not.toMatch(/--lt-canvas-muted/)
-    }
+    const start = css.indexOf('.lt-msg-regen,\n  .extraMesButtonsHint {')
+    expect(start).toBeGreaterThan(-1)
+    const body = css.slice(start, css.indexOf('}', start))
+    expect(body).toMatch(/[^-]color:\s*var\(--lt-msg-hint-fg\)/)
+    expect(body).toMatch(/box-sizing:\s*border-box/)
+    expect(body).toMatch(/height:\s*var\(--lt-canvas-actions-size, 22px\)/)
+    expect(body).not.toMatch(/--lt-canvas-muted|--lt-canvas-pill-/)
+    expect(css).toMatch(/\.lt-msg-regen::after,\s*\.extraMesButtonsHint::after \{/)
   })
 })
 
@@ -237,8 +239,9 @@ describe('氣泡文流裡的三塊跟著卡片文字色走', () => {
       const start = css.indexOf(sel)
       expect(start, sel).toBeGreaterThan(-1)
       const body = css.slice(start, css.indexOf('}', start))
-      expect(body).toMatch(/color: inherit;/)
-      expect(body).toMatch(/background: var\(--lt-canvas-block-bg, color-mix\(in srgb, currentColor/)
+      // 2026-11-06 起沒量到作者的塊時退到 AI 氣泡的 token（字與底一起），不再是 inherit＋currentColor 淡框
+      expect(body).toMatch(/color: var\(--lt-canvas-block-fg, var\(--lt-canvas-bubble-fg, inherit\)\);/)
+      expect(body).toMatch(/background: var\(--lt-canvas-block-bg, var\(--lt-canvas-bubble-ai-bg, color-mix\(in srgb, currentColor/)
       expect(body).not.toMatch(/--lt-canvas-sheet-bg|--lt-canvas-sheet-fg/)
     }
   })
