@@ -3,7 +3,7 @@
   <!--
     AI 記事本：AI 自己每輪記下的記錄（記憶原子），玩家看得到、刪得掉。只有 Agent 模式會寫；
     沒開時頁面給 enableAgent 鍵名，這裡畫一顆「前往開啟」的鍵（空態時放在空態裡，
-    有記錄時放在副標下面），按了發 enable-agent，由頁面打開既有的模型面板。
+    有記錄時放在副標下面；載入中與載入失敗都不畫，免得載完從副標跳到空態），按了發 enable-agent，由頁面打開既有的模型面板。
     mobile 的 memoryPage 搬過來的，同一份規則（重要度排序、來源標籤、相對時間、
     長內容收行）。
 
@@ -22,7 +22,7 @@
       <div class="mem-heading">
         <div class="mem-title">{{ labels.title }}</div>
         <div class="mem-subtitle">{{ labels.subtitle }}</div>
-        <span v-if="labels.enableAgent && !showEmpty" class="mem-enable-agent" role="button" tabindex="0"
+        <span v-if="labels.enableAgent && sorted.length" class="mem-enable-agent" role="button" tabindex="0"
               @click="$emit('enable-agent')"
               @keydown.enter.prevent="$emit('enable-agent')">{{ labels.enableAgent }}</span>
       </div>
@@ -155,8 +155,6 @@ const emit = defineEmits<{
 }>()
 
 const sorted = computed(() => sortMemoryAtoms(props.atoms))
-// 跟模板上空態那一支同一個判準：空態裡已經有這顆鍵，副標下面就不再畫一次。
-const showEmpty = computed(() => !sorted.value.length && !props.loading && !props.loadFailed)
 
 function isAgent(atom: MemoryAtom) { return isAgentMemoryAtom(atom) }
 function isLong(atom: MemoryAtom) { return isLongMemoryAtom(atom) }

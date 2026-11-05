@@ -248,6 +248,15 @@ describe('記憶：沒開 Agent 時的前往開啟鍵', () => {
     }
   })
 
+  it('清單還沒載到（載入中或失敗）時不畫，載完才出現在該在的位置，不會從副標跳到空態', () => {
+    const labels = { ...LABELS, enableAgent: '開啟 Agent 模式' }
+    for (const extra of [{ loading: true }, { loadFailed: true }]) {
+      const wrapper = mount(CanvasMemory, { props: { atoms: [], labels, ...extra } })
+      expect((wrapper.element as HTMLElement).querySelector('.mem-enable-agent'), JSON.stringify(extra)).toBeNull()
+      wrapper.unmount()
+    }
+  })
+
   it('Agent 開著（沒給鍵名）時不畫這顆鍵', () => {
     const wrapper = memory()
     expect((wrapper.element as HTMLElement).querySelector('.mem-enable-agent')).toBeNull()
