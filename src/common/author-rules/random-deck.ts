@@ -1,5 +1,6 @@
 /** Local draw ledger: the same pool deals without replacement; a slot is dealt only once. */
 export interface RandomDrawState {
+  messages?: Record<string, string>
   pools: Record<string, { drawn: number; slots: Record<string, number> }>
 }
 
@@ -22,8 +23,18 @@ export function randomKey(text: string): string {
   return (4294967296 * (2097151 & b) + (a >>> 0)).toString(36)
 }
 
-export function createRandomDeck(scope: string, message: string, previous?: RandomDrawState) {
+/** Bind provisional bubble ids and durable ids to one opaque message identity. */
+export function bindRandomMessage(state: RandomDrawState, message: string, aliases: string[] = []): string {
+  const keys = [...new Set([message, ...aliases].filter(Boolean))].map(randomKey)
+  const messages = state.messages || (state.messages = {})
+  const identity = keys.map(key => messages[key]).find(Boolean) || keys[0]
+  for (const key of keys) messages[key] = identity
+  return identity
+}
+
+export function createRandomDeck(scope: string, message: string, previous?: RandomDrawState, aliases: string[] = []) {
   const state: RandomDrawState = previous ? JSON.parse(JSON.stringify(previous)) : { pools: {} }
+  const identity = bindRandomMessage(state, message, aliases)
   const decks = new Map<string, number[]>()
   const journal: { entry: RandomDrawState['pools'][string]; slot: string }[] = []
   const pick: RandomPicker = (choices, position) => {
@@ -32,7 +43,7 @@ export function createRandomDeck(scope: string, message: string, previous?: Rand
     if (!pool.length) return ''
     const key = randomKey(JSON.stringify(pool))
     const entry = state.pools[key] || (state.pools[key] = { drawn: 0, slots: {} })
-    const slot = randomKey(JSON.stringify([message, position.ruleIndex, position.matchIndex, position.tokenIndex]))
+    const slot = randomKey(JSON.stringify([identity, position.ruleIndex, position.matchIndex, position.tokenIndex]))
     let dealt = entry.slots[slot]
     if (dealt === undefined) {
       dealt = entry.drawn++

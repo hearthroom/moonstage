@@ -196,11 +196,16 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
     }
     // 種子只在規則裡有 {{random}} 時才影響產物；沒有就不進鍵，定稿快取與持久層照舊跨訊息共用。
     const seeded = typeof opts.seed === 'string' && opts.seed !== '' && !!rules.hasRandom
-    if (seeded) jobOptions.seed = opts.seed
+    if (seeded) {
+      jobOptions.seed = opts.seed
+      if (Array.isArray(opts.seedAliases)) jobOptions.seedAliases = opts.seedAliases.filter(v => typeof v === 'string' && v !== '')
+    }
     const randomScope = seeded && typeof opts.randomScope === 'string' ? opts.randomScope : ''
     if (randomScope) jobOptions.randomScope = randomScope
     const drawKey = randomScope ? draws.key(randomScope) : undefined
     const drawEpoch = randomScope ? draws.epoch : undefined
+    // Bind before cache lookup: terminal metadata may add the durable id without changing HTML.
+    if (drawKey) draws.bind(drawKey, opts.seed!, jobOptions.seedAliases || [])
     const text = typeof req.text === 'string' ? req.text : ''
     const prefixKey = `${drawKey ? `${drawKey}:${drawEpoch}\u0001` : ''}${engineVersion}\u0001${engine}\u0001${rules.key}\u0001${variants.key}\u0001${macroKey}${seeded ? `\u0001s${opts.seed}` : ''}`
     return { prefixKey, key: `${prefixKey}\u0001${text}`, text, engine, rulesKey: rules.key, rules: rules.plain, options: jobOptions, drawKey, drawEpoch }
@@ -285,7 +290,11 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
     if (k.drawKey) k.options.randomState = draws.read(k.drawKey)
   }
   const commitDraws = (k: Keyed, result: RuleResult) => {
-    if (k.drawKey && k.drawEpoch === draws.epoch && result.randomState) draws.write(k.drawKey, result.randomState)
+    if (k.drawKey && k.drawEpoch === draws.epoch && result.randomState) {
+      // A terminal alias can be learned while this worker is still drawing an older chunk.
+      result.randomState.messages = { ...result.randomState.messages, ...draws.read(k.drawKey)?.messages }
+      draws.write(k.drawKey, result.randomState)
+    }
     // The ledger lives once in the store, not in every historical HTML cache entry.
     delete result.randomState
   }

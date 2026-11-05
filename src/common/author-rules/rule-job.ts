@@ -22,6 +22,8 @@ export interface RuleJobOptions {
   variants?: Record<string, string> | null
   /** 同一則訊息固定的字串（訊息 id）：有就讓 {{random}} 在這則訊息裡穩定。 */
   seed?: string
+  /** Provisional and durable identities for this same message. */
+  seedAliases?: string[]
   /** Local conversation draw scope; omitted for isolated message jobs. */
   randomScope?: string
   randomState?: RandomDrawState
@@ -44,7 +46,7 @@ export function executeRuleJob(
   rules: TavernRule[],
   options: RuleJobOptions = {},
 ): RuleResult {
-  const deck = options.seed ? createRandomDeck(options.randomScope || options.seed, options.seed, options.randomState) : null
+  const deck = options.seed ? createRandomDeck(options.randomScope || options.seed, options.seed, options.randomState, options.seedAliases) : null
   const randomState = deck && options.randomScope ? { randomState: deck.state } : {}
   if (engine === 'display') {
     const out = applyDisplayRules(text, rules, { variants: options.variants || null, pickRandom: deck?.pick }) as RuleResult

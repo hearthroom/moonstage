@@ -73,3 +73,39 @@ describe('conversation draw ledger in the real runner', () => {
     runner.dispose()
   })
 })
+
+describe('live bubble to durable history draw identity', () => {
+  it('binds the canonical alias even on a cache hit, then reloads the same four cards without spending more', () => {
+    const runner = createRuleRunner({ executor: null })
+    const text = '<pic> <pic> <pic> <pic>'
+    const live = { ...request('local-bubble', text), options: { seed: 'local-bubble', randomScope: 'conversation', seedAliases: ['local-bubble'] } }
+    const first = runner.display(live).html
+    runner.display({ ...live, options: { ...live.options, seedAliases: ['local-bubble', 'saved-message'] } })
+    const saved = { ...request('saved-message', text), options: { seed: 'saved-message', randomScope: 'conversation', seedAliases: ['saved-message'] } }
+    expect(runner.display(saved).html).toBe(first)
+    runner.dispose()
+    const reload = createRuleRunner({ executor: null })
+    expect(reload.display(saved).html).toBe(first)
+    const states = Object.entries(localStorage).filter(([k]) => k.startsWith('lt-random-deck:') && !k.endsWith(':owner')).map(([,v]) => JSON.parse(v))
+    expect(Object.values(states[0].pools).reduce((sum: number, pool: any) => sum + pool.drawn, 0)).toBe(4)
+    reload.dispose()
+  })
+})
+
+describe('canonical alias while a worker is in flight', () => {
+  it('does not overwrite a newly learned alias with the older worker snapshot', async () => {
+    const started: { job: ExecutorJob; resolve: (r: RuleResult) => void }[] = []
+    const executor: RuleExecutor = { available: () => true, run: job => new Promise(resolve => started.push({ job: structuredClone(job), resolve })) }
+    const runner = createRuleRunner({ executor })
+    const req = { ...request('local-inflight'), options: { seed: 'local-inflight', randomScope: 'conversation', seedAliases: ['local-inflight'] } }
+    const done = runner.apply(req)
+    runner.display({ ...req, options: { ...req.options, seedAliases: ['local-inflight', 'saved-inflight'] } })
+    const active = started.shift()!
+    active.resolve(executeRuleJob(active.job.engine, active.job.text, active.job.rules as any[], active.job.options))
+    const first = await done
+    runner.dispose()
+    const reload = createRuleRunner({ executor: null })
+    expect(reload.display(request('saved-inflight')).html).toBe(first.html)
+    reload.dispose()
+  })
+})

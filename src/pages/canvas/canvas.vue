@@ -2708,9 +2708,10 @@ const authorRules = {
   provisional: 0,
   // 正在渲染的訊息 id（renderMarkdown 同步設定）：讓 {{random}} 在這則訊息裡固定，串流每一跳不重抽。
   seed: '',
+  aliases: [] as string[],
   display(text: string, streaming: boolean): string {
     if (!activeAuthorAsset.value.rules.length) return substituteMacros(text, authorRuleOptions().macros);
-    const options = authorRules.seed ? { ...authorRuleOptions(), seed: authorRules.seed, randomScope: String(unref(conversationId) || authorRules.seed) } : authorRuleOptions();
+    const options = authorRules.seed ? { ...authorRuleOptions(), seed: authorRules.seed, seedAliases: authorRules.aliases, randomScope: String(unref(conversationId) || authorRules.seed) } : authorRuleOptions();
     const out = authorRuleRunner.display(
       { engine: 'tavern', text, rules: activeAuthorAsset.value.rules, options },
       { streaming },
@@ -5043,10 +5044,13 @@ const renderMarkdown = (item) => {
   const cacheKey = (!item.chatFinish && item.id != null) ? (item.id + ':' + item.type + ':' + activeAuthorAsset.value.version) : null;
   // 腳本與前端區塊的啟動在 renderMessage：規則結果還沒回來的暫時畫面不啟動。
   authorRules.seed = randomSeedFor(item);
+  authorRules.aliases = [item.id, item.chatId, item.assistantChatId, item.operationBubbleId]
+    .filter((id) => id != null && id !== '').map(String);
   try {
     return highlightText(processedContent, item.type, cacheKey);
   } finally {
     authorRules.seed = '';
+    authorRules.aliases = [];
   }
 
 };
