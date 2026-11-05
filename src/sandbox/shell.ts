@@ -34,7 +34,7 @@ import { bindBubbleFit } from '@/pages/canvas/canvas-bubble-fit'
 import { createFollowBottom, growToBottom } from './render/follow-bottom'
 import { mountGeometryDebug, rectText } from '@/common/geometry-debug'
 import { reactive, ref } from 'vue'
-import { cssUrl } from '@/pages/canvas/canvas-player-background'
+import { cssUrl, isLightBackground } from '@/pages/canvas/canvas-player-background'
 // 標準播放器的樣式表整份帶進殼：訊息區的每一條規則跟一般卡同一份。頁首與輸入區的規則在殼裡沒有對應節點，不礙事。
 import '@/pages/canvas/canvas.css'
 import '@/pages/canvas/canvas-player-background.css'
@@ -99,6 +99,11 @@ export function createShell(options: CreateShellOptions): Shell {
     else refs.root.style.removeProperty('background-image')
     if (bg.mode === 'card' && !bg.pending) refs.root.removeAttribute('data-lt-player-bg')
     else refs.root.setAttribute('data-lt-player-bg', bg.pending ? 'pending' : bg.mode)
+    // 淺色色票也要標在根上：canvas-player-background.css 的深底規則是
+    // `[data-lt-player-bg=color]:not([data-lt-player-tone=light]) …`，根只標了 color 沒標 tone，
+    // 就會從根命中、蓋過舞台上的淺底規則（特異度較高），玩家選淺灰時動作列變深底淺字（QA 2026-11-06）。
+    if (isLightBackground(bg)) refs.root.setAttribute('data-lt-player-tone', 'light')
+    else refs.root.removeAttribute('data-lt-player-tone')
   }
   applyRootBackground(stageBackground.value)
   // 殼的根不准被內部捲動：iOS Safari 為了露出聚焦的輸入框會捲 overflow:hidden 的祖先且不捲回

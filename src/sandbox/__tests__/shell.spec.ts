@@ -801,6 +801,19 @@ describe('殼：舞台背景', () => {
     expect((document.querySelector('.lt-stage-bg') as HTMLElement).style.getPropertyValue('--lt-player-bg-color')).toBe('#18202E')
   })
 
+  it('玩家換成淺色純色：根與舞台都標成淺色調，深底規則不會從根命中（QA 2026-11-06：淺灰時動作列成了深底淺字）', async () => {
+    const s = boot(config({ background: { mode: 'card', portrait: 'https://cdn/p.jpg', landscape: '', color: '' } }))
+    s.handle({ type: 'background', background: { mode: 'color', portrait: '', landscape: '', color: '#F2F3F5' } } as any)
+    await nextTick()
+    const stage = document.querySelector('.chat-scope-box') as HTMLElement
+    expect(stage.getAttribute('data-lt-player-tone')).toBe('light')
+    expect(s.refs.root.getAttribute('data-lt-player-tone')).toBe('light')
+    expect(s.refs.root.matches('[data-lt-player-bg=color]:not([data-lt-player-tone=light])')).toBe(false)
+    s.handle({ type: 'background', background: { mode: 'color', portrait: '', landscape: '', color: '#18202E' } } as any)
+    await nextTick()
+    expect(s.refs.root.hasAttribute('data-lt-player-tone')).toBe(false)
+  })
+
   it('開機就帶模糊：第一幀就是糊的那一層', () => {
     boot(config({ backgroundUrl: 'https://cdn/p.jpg', background: { mode: 'blur', portrait: 'https://cdn/p.jpg', landscape: '', color: '#16191E' } }))
     expect(document.querySelector('.lt-stage-bg.is-blur')).not.toBeNull()
