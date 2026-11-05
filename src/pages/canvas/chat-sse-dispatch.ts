@@ -75,6 +75,8 @@ export interface DispatchContext {
   discardPendingChatOperationCandidate?: () => boolean
   commitPendingChatOperationAfterVisibleDone?: () => boolean
   onOperationStatus?: (data: any) => void
+  // A non-empty body/thinking delta means the retry has resumed output.
+  onReplyOutput?: () => void
   onOperationRecoveryRequired?: (reason: 'sessionExpired' | 'resumeUnavailable') => boolean
 
   // utils
@@ -270,6 +272,7 @@ function handleThinking(ev: SSEEvent, ctx: DispatchContext): void {
   const rawDelta = thinkingData?.choices?.[0]?.delta?.reasoning_content
   if (!rawDelta) return
 
+  ctx.onReplyOutput?.()
   const delta: string = ctx.getLocale() === 'zh-Hant' ? ctx.tify(String(rawDelta)) : String(rawDelta)
   ctx.thinkingContent.value += delta
 
@@ -298,6 +301,7 @@ function handleAnswer(ev: SSEEvent, ctx: DispatchContext): void {
     }
     if (answerData?.choices?.[0]?.delta?.content) {
       if (answerData.choices[0].delta.content.length > 0) {
+        ctx.onReplyOutput?.()
         const rawDelta: string = answerData.choices[0].delta.content
         // 正文先保留原文給作者規則；可見字形由渲染管線最後轉換。
         ctx.replyContent.value += rawDelta

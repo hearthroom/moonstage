@@ -6263,6 +6263,15 @@ const dispatchCtx: DispatchContext = {
   discardPendingChatOperationCandidate,
   commitPendingChatOperationAfterVisibleDone,
   onOperationStatus: handleOperationStatusEvent,
+  onReplyOutput: () => {
+    // 首個 thinking 或正文 token 已到，上一段退讓倒數就不再是當前狀態。
+    // 空幀、metadata、失敗事件不走這裡，也不改 terminal／失敗卡片。
+    if (prepStepStage.value !== 'retrying') return;
+    prepStepStage.value = '';
+    prepRetryAttempt.value = 0;
+    prepRetryMax.value = 0;
+    prepRetryInSeconds.value = 0;
+  },
   onOperationRecoveryRequired: reason => requestPendingOperationReconciliation(reason),
   // 繁體介面的串流舊路徑會先簡轉繁；卡片本身就是繁體時不轉（同字形不轉，見 displayScriptDirection）。
   tify: (s: string) => (displayScriptDirection.value === 'none' ? s : _this.fui.tify(s)),
@@ -6545,7 +6554,9 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
           // 等氣泡建出來時再接上（跟思考內容走同一條 pendingPrepTrail 路徑）。
           if (prepSteps.value.length) pendingPrepTrail.value = prepSteps.value.slice();
           prepSteps.value = [];
-        } else {
+        } else if (stage !== 'retrying') {
+          // 退讓倒數是暫時狀態，不是準備成果；只由 messageProps 在等待時附上。
+          // 否則 done 把倒數一起存進 prepTrail，恢復輸出後仍會說「稍後再試」。
           const line = prepStepText.value;
           // 同一句不重複追加：重複的行看起來像卡住，比不顯示更糟。
           if (line && line !== prepSteps.value[prepSteps.value.length - 1]) {
@@ -10044,7 +10055,9 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
   const role = isSystemOnly ? 'system' : (isUser ? 'user' : 'ai')
   // 等回覆時不畫內容，畫指示器：那顆氣泡還不是一則訊息。
   // 準備階段的軌跡拿最後一步當標籤——等待期間不能有兩個東西同時在動。
-  const lines = (unref(prepSteps) || []) as string[]
+  const steps = (unref(prepSteps) || []) as string[]
+  const lines = unref(prepStepStage) === 'retrying'
+    ? [...steps, unref(prepStepText)] : steps
   // 這一輪那一列拿到整份軌跡（照 mobile：每一步都留著，做過的壓暗、當下這步亮著），
   // 指示器就不再重複最後一步。Agent 跑得慢，玩家唯一能判斷「有沒有在幹活」的
   // 依據就是這份一直在長的清單（owner 2026-09-04）。
