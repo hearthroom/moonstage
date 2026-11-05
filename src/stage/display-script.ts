@@ -6,5 +6,5 @@
  * 單獨成一個入口，是為了讓宿主不必為了幾個標題載入整個舞台；字典仍是 chinese-dictionary
  * 那一塊，跟對話頁共用同一個檔，玩家下載一次就兩邊都用。
  */
-export { directionForLocale, directionFor, createDisplayScriptConverter, convertPlainText } from '@/pages/canvas/canvas-display-script'
+export { directionForLocale, directionFor, createDisplayScriptConverter, convertPlainText, convertVisibleHtml } from '@/pages/canvas/canvas-display-script'
 export type { ScriptDirection } from '@/pages/canvas/canvas-display-script'

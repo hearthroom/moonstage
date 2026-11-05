@@ -25,7 +25,8 @@ import {
 import { stripUnknownTags, wrapDialogue } from '../canvas-platform-defaults'
 // highlightText 也畫原生 [status]／[choices] 區塊（common/native-blocks）；跟頁面裡一樣是真實函式。
 import { drawNativeBlocks } from '../../../common/native-blocks'
-import { convertVisibleHtml } from '../canvas-display-script'
+import { convertVisibleHtml, createDisplayScriptConverter, directionFor } from '../canvas-display-script'
+import { scopeCardHtml } from '../canvas-style-scope'
 
 /*
   重 HTML（訊息以區塊 tag 開頭）也要過 Markdown。
@@ -53,10 +54,10 @@ function extractHighlightTextSource(): string {
   return source.slice(startIdx, i)
 }
 
-function buildHighlightText(): (content: string, type?: number, cacheKey?: string | null) => string {
+function buildHighlightText(displayScript = (text: string) => text, rules: any[] = []): (content: string, type?: number, cacheKey?: string | null) => string {
   const wrapped = `(function () {\n${extractHighlightTextSource()}\nreturn highlightText;\n})()`
   const context = vm.createContext({
-    renderAuthorMarkdown,
+    renderAuthorMarkdown, scopeCardHtml,
     applyTavernRules, authorRuleOptions: () => ({ macros: { user: '小明', char: '星' } }),
     withFencesProtected, tagFrontendBlocks, stylePolicyFor,
     isHeavyHtml, sanitizeHtml, getMarkdownIt, renderTaskLists, dedentHtmlBlockLines,
@@ -64,10 +65,10 @@ function buildHighlightText(): (content: string, type?: number, cacheKey?: strin
     stripUnknownTags, wrapDialogue, drawNativeBlocks,
     cardFormat: { value: 'tavern' },
     convertVisibleHtml,
-    displayScript: (text: string) => text,
+    displayScript,
     applyDisplayRules: (text: string) => ({ html: text, rollbacks: [] }),
-    activeAuthorAsset: { value: { rules: [], version: 0, crossLine: false } },
-    authorRules: { provisional: 0, display: (text: string) => text },
+    activeAuthorAsset: { value: { rules, version: 0, crossLine: false } },
+    authorRules: { provisional: 0, display: (text: string) => applyTavernRules(text, rules).html },
     console,
   })
   return new vm.Script(wrapped, { filename: 'canvas-highlightText-heavy-markdown.js' }).runInContext(context)
@@ -186,4 +187,48 @@ describe('attribute quotes through the complete classic renderer', () => {
       expect(el.querySelector('img')?.getAttribute('src')).toBe('https://example.com/a.png')
     },
   )
+})
+
+
+describe('opening display script regression', () => {
+  function openingRow(source: string) {
+    const page = fs.readFileSync(CHAT_VUE_PATH, 'utf8')
+    const start = page.indexOf('function renderGreetingPreview() {')
+    const end = page.indexOf('function onGreetingSwipe(', start)
+    if (start < 0 || end < 0) throw new Error('renderGreetingPreview source anchors missing')
+    const context = vm.createContext({ greeting: { list: [source], index: 0 }, talkList: { value: [] }, pic: { value: '' }, unref: (value: any) => value.value })
+    vm.runInContext(page.slice(start, end) + '\nrenderGreetingPreview();', context)
+    return (context as any).talkList.value[0]
+  }
+
+  it.each(['zh-Hant', 'zh-Hans', 'en', 'ja', 'ko'])('%s: ordinary opening stays raw in the timeline and converts only for display', (locale) => {
+    const source = '她穿着校服，读取存档。'
+    const row = openingRow(source)
+    const out = document.createElement('div')
+    out.innerHTML = buildHighlightText(createDisplayScriptConverter(directionFor('zh-Hans', locale)))(row.content, row.type, null)
+    expect(out.textContent?.trim()).toBe(locale === 'zh-Hant' ? '她穿著校服，讀取存檔。' : source)
+    expect(row.content).toBe(source)
+  })
+
+  it('converts ordinary HTML opening while preserving hidden data and attributes', () => {
+    const source = '<div class="opening" title="读取存档">状态：她穿着校服</div><span style="display:none">状态=穿着</span>'
+    const row = openingRow(source)
+    const out = document.createElement('div')
+    out.innerHTML = buildHighlightText(createDisplayScriptConverter('s2t'))(row.content, row.type, null)
+    expect(out.querySelector('.opening')?.textContent).toBe('狀態：她穿著校服')
+    expect(out.querySelector('.opening')?.getAttribute('title')).toBe('读取存档')
+    expect(out.querySelector('span')?.textContent).toBe('状态=穿着')
+    expect(row.content).toBe(source)
+  })
+
+  it('keeps scripted opening HTML raw while adjacent Markdown prose converts', () => {
+    const source = '她穿着校服。\n\n<div class="data">状态：穿着</div>'
+    const rules = [{ find: '/NEVER/g', replace: '<script>const field="状态"</script>' }]
+    const row = openingRow(source)
+    const out = document.createElement('div')
+    out.innerHTML = buildHighlightText(createDisplayScriptConverter('s2t'), rules)(row.content, row.type, null)
+    expect(out.querySelector('p')?.textContent).toBe('她穿著校服。')
+    expect(out.querySelector('.data')?.textContent).toBe('状态：穿着')
+    expect(row.content).toBe(source)
+  })
 })
