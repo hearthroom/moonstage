@@ -27,7 +27,16 @@ export function bindCardBlockTheme(root: HTMLElement, list: HTMLElement): () => 
     if (disposed || frame) return
     frame = view.setTimeout(sync, 32)
   }
-  const observer = new view.MutationObserver(schedule)
+  // 串流時每個字塊都會改到氣泡裡的節點，但取樣的是第一則 AI 氣泡，它不會因此換樣子。
+  // 只在換了訊息、換了樣式表、日夜切換時才量：多一則訊息（.mes／訊息框）、<style>／<link> 進出或改字、屬性變了。
+  const SAMPLE_INPUTS = '.mes, [data-chat="message-frame"], style, link[rel="stylesheet"]'
+  const touchesSample = (node: Node) => node.nodeType === 1 &&
+    ((node as Element).matches(SAMPLE_INPUTS) || !!(node as Element).querySelector(SAMPLE_INPUTS))
+  const observer = new view.MutationObserver((records) => {
+    if (records.some((r) => r.type === 'attributes' ||
+      r.target.nodeName === 'STYLE' || r.target.parentElement?.nodeName === 'STYLE' ||
+      Array.from(r.addedNodes).some(touchesSample) || Array.from(r.removedNodes).some(touchesSample))) schedule()
+  })
   // 氣泡長出來（訊息框裡的元件晚一拍才掛上，所以要聽子樹）、作者換樣式、日夜切換。
   observer.observe(list, { childList: true, subtree: true })
   if (doc.head) observer.observe(doc.head, { childList: true, subtree: true, characterData: true })

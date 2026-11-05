@@ -69,8 +69,16 @@ function render(bind: boolean) {
       const painted=read();
       document.getElementById('author').remove();await pause();
       const unpainted=read();
+      // 日夜切換：作者的白天配色掛在 data-theme 上，殼切主題後要重量
+      const day=document.createElement('style');day.textContent='[data-chat=root][data-theme=light] .mes_text{background:rgb(250, 240, 230);color:rgb(30, 20, 10)}';document.head.appendChild(day);
+      await pause();root.setAttribute('data-theme','light');await pause();
+      const themed=read();
+      // 漸層當底：量到的底色是透明，塊用淡框，不是預設的深色氣泡底
+      day.textContent='[data-chat=root] .mes_text{background:linear-gradient(rgb(250, 240, 230), rgb(240, 220, 200));color:rgb(30, 20, 10)}';
+      await pause();
+      const gradient=read();
       dispose();
-      document.querySelector('pre').textContent=JSON.stringify({painted,unpainted});
+      document.querySelector('pre').textContent=JSON.stringify({painted,unpainted,themed,gradient});
     })();</script>`)
   const run = spawnSync(chrome!, ['--headless=new', '--no-first-run', '--no-default-browser-check', `--user-data-dir=${join(dir, 'profile')}`, '--window-size=800,900', '--dump-dom', '--virtual-time-budget=2000', `file://${file}`], { encoding: 'utf8', timeout: 20000, maxBuffer: 4 * 1024 * 1024 })
   expect(run.error, run.stderr).toBeUndefined(); expect(run.status, run.stderr).toBe(0)
@@ -105,5 +113,19 @@ describe('沙箱殼的訊息列', () => {
     expect(painted.bubbleLook.bg).toBe('rgb(58, 31, 77)')
     expect(unpainted.reasoningLook.bg).toBe('rgb(26, 26, 31)')
     expect(unpainted.reasoningLook.fg).toBe('rgb(242, 242, 245)')
+  })
+
+  it('作者的配色掛在 data-theme 上：殼切了日夜，思考過程跟著重量', () => {
+    const { themed } = render(true)
+    expect(themed.bubbleLook.bg).toBe('rgb(250, 240, 230)')
+    expect(themed.reasoningLook.bg).toBe('rgb(250, 240, 230)')
+    expect(themed.reasoningLook.fg).toBe('rgb(30, 20, 10)')
+  })
+
+  it('氣泡用漸層當底（量到透明）：思考過程是淡框配氣泡的字色，不是一塊深色', () => {
+    const { gradient } = render(true)
+    expect(gradient.reasoningLook.bg).not.toBe('rgb(26, 26, 31)')
+    expect(gradient.reasoningLook.bg).toMatch(/\/ 0\.07\)$/)
+    expect(gradient.reasoningLook.fg).toBe('rgb(30, 20, 10)')
   })
 })

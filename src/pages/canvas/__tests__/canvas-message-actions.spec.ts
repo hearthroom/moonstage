@@ -371,7 +371,10 @@ describe('⋯ 看得見、點得到（站方 2026-11-05：插圖背景上找不�
   })
 
   it('淺色色票把字改深時，底也改淺', () => {
-    const light = block(read('../canvas-player-background.css'), '[data-lt-player-tone=light] .extraMesButtonsHint')
+    const css = read('../canvas-player-background.css')
+    const light = block(css, '[data-lt-player-tone=light] .extraMesButtonsHint')
     expect(light).toMatch(/background-color:\s*rgba\(255, 255, 255/)
+    // 重新生成跟 ⋯ 同一組底（2026-11-06），淺色色票上一起墊淺底
+    expect(css).toMatch(/\[data-lt-player-tone=light\] \.lt-msg-regen,\s*\[data-lt-player-tone=light\] \.extraMesButtonsHint \{/)
   })
 })

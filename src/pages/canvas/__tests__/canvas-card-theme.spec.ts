@@ -21,13 +21,19 @@ describe('從卡片量到的外觀', () => {
     expect(vars['--lt-canvas-accent-bg']).toContain('rgb(0, 174, 239) 16%')
   })
 
-  it('沒有邊框、透明底、灰色主色 → 一個都不給，留我們的預設', () => {
+  it('沒有邊框、透明底、灰色主色 → 邊框與主色不給；塊照透明氣泡用淡框，不退到預設的深色氣泡底', () => {
     const vars = computeCardThemeVars({
       bubbleBorderColor: 'rgba(0, 0, 0, 0)', bubbleBorderWidth: '0px', bubbleBorderStyle: 'none',
       bubbleBackground: 'rgba(0, 0, 0, 0)', bubbleRadius: '0px', accentColor: 'rgba(255, 255, 255, 0.1)',
     })
-    expect(vars).toEqual({})
+    expect(vars).toEqual({ '--lt-canvas-block-bg': 'color-mix(in srgb, currentColor 7%, transparent)' })
     expect(computeCardThemeVars({ accentColor: 'rgb(120, 120, 120)' })).toEqual({})
+  })
+
+  it('透明氣泡（漸層或圖片當底）：塊用淡框，字色跟氣泡', () => {
+    const vars = computeCardThemeVars({ bubbleBackground: 'rgba(0, 0, 0, 0)', bubbleColor: 'rgb(40, 20, 10)' })
+    expect(vars['--lt-canvas-block-bg']).toBe('color-mix(in srgb, currentColor 7%, transparent)')
+    expect(vars['--lt-canvas-block-fg']).toBe('rgb(40, 20, 10)')
   })
 
   it('沒有快捷鍵可量時，主色退回氣泡的邊框色；亮色主色配深色字', () => {
@@ -40,8 +46,8 @@ describe('從卡片量到的外觀', () => {
     const vars = computeCardThemeVars({ bubbleBackground: 'rgb(255, 255, 255)', bubbleColor: 'rgb(59, 36, 20)' })
     expect(vars['--lt-canvas-block-bg']).toBe('rgb(255, 255, 255)')
     expect(vars['--lt-canvas-block-fg']).toBe('rgb(59, 36, 20)')
-    // 沒量到底色就不給字色：字色單獨換掉，會跟我們預設的底撞在一起
-    expect(computeCardThemeVars({ bubbleBackground: 'rgba(0, 0, 0, 0)', bubbleColor: 'rgb(59, 36, 20)' })['--lt-canvas-block-fg']).toBeUndefined()
+    // 沒量到氣泡就不給字色：字色單獨換掉，會跟我們預設的底撞在一起
+    expect(computeCardThemeVars({ bubbleColor: 'rgb(59, 36, 20)' })['--lt-canvas-block-fg']).toBeUndefined()
   })
 
   it('只寫指定的那幾個變數，沒量到的拿掉', () => {
