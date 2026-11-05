@@ -541,7 +541,7 @@ import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
 import type { ArchiveRow } from './canvas-archives'
 import { convertVisibleHtml, convertPlainText, createDisplayScriptConverter, directionFor } from './canvas-display-script'
 import { renderAuthorMarkdown } from '@/common/author-html-markdown'
-import { convertAuthorMountHtml } from './canvas-author-mount-content'
+import { convertAuthorMountHtml, hasAuthorMountCode } from './canvas-author-mount-content'
 import { roleLoadFailureIsOurs, whenRoleDetail } from './canvas-role-ready'
 import { guestDraftStorage, saveGuestDraft, takeGuestDraft } from './canvas-guest'
 import CanvasPrologue from './components/canvas-prologue.vue'
@@ -3998,7 +3998,7 @@ function applyAuthorAsset(asset) {
       const mounted = convertAuthorMountHtml(scopeCardHtml(
         applyTavernRules(res.data.mountTrigger, activeAuthorAsset.value.rules, authorRuleOptions()).html,
         cardFormat.value,
-      ), displayScript, activeAuthorAsset.value.rules.some((r) => r.enabled !== false && /<script\b/i.test(String(r.replace || ''))));
+      ), displayScript, activeAuthorAsset.value.rules.some((r) => r.enabled !== false && hasAuthorMountCode(String(r.replace || ''))));
       // 接管清單要在掛載之前算好：宿主那一層一旦畫出來再收，玩家會看到閃一下。
       authorOwnedRegions.value = detectAuthorOwnedRegions(mounted).join(' ');
       // 掛載層的名字要在掛載前記好：掛載腳本當下往 body 塞的 fixed 節點也要搬進同一個容器
