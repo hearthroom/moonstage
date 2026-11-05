@@ -6554,7 +6554,9 @@ const handlerMessage = (res, eventGeneration: number, socketToken: number) => {
           // 等氣泡建出來時再接上（跟思考內容走同一條 pendingPrepTrail 路徑）。
           if (prepSteps.value.length) pendingPrepTrail.value = prepSteps.value.slice();
           prepSteps.value = [];
-        } else if (stage !== 'retrying') {
+        } else if (stage === 'retrying') {
+          nextTick(() => scrollToBottom());
+        } else {
           // 退讓倒數是暫時狀態，不是準備成果；只由 messageProps 在等待時附上。
           // 否則 done 把倒數一起存進 prepTrail，恢復輸出後仍會說「稍後再試」。
           const line = prepStepText.value;

@@ -73,6 +73,13 @@ function fixture() {
 }
 
 describe('retry notice lifetime', () => {
+  it('scrolls the transient retry notice into view even without preparation work', () => {
+    const f = fixture()
+    f.prep('retrying')
+    expect(f.scope.scrollToBottom).toHaveBeenCalledOnce()
+    expect(f.view().prepSteps).toEqual(['模型暫時不穩定，2 秒後再試'])
+  })
+
   it.each(['thinking', 'answer'])('clears the active retry on first %s token, keeping actual preparation work', event => {
     const f = fixture()
     f.prep('reading')
