@@ -133,3 +133,21 @@ describe('變速：排版越貴，間隔越長', () => {
     expect(throttle.cached('k', 1)).toBeNull()
   })
 })
+
+describe('canonical metadata reaches random draw binding through render caches', () => {
+  it('a durable message id invalidates memo and sandbox HTML caches even when a finished body is unchanged', () => {
+    const { hudMessageHtml, context } = buildRenderMessage({ now: 1000 })
+    context.sandboxCard.value = true
+    context.activeAuthorAsset.value.random = true
+    let renders = 0
+    context.renderMarkdown = (item: any) => { renders++; return `html:${item.content}` }
+    const item: any = { id: 'local-user', type: 1, content: '<pic>', chatFinish: true }
+    expect(hudMessageHtml(item)).toBe('html:<pic>')
+    expect(renders).toBe(1)
+    item.chatId = 'saved-user'
+    expect(hudMessageHtml(item)).toBe('html:<pic>')
+    expect(renders).toBe(2)
+    expect(hudMessageHtml(item)).toBe('html:<pic>')
+    expect(renders).toBe(2)
+  })
+})

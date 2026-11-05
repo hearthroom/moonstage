@@ -205,9 +205,9 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
     const drawKey = randomScope ? draws.key(randomScope) : undefined
     const drawEpoch = randomScope ? draws.epoch : undefined
     // Bind before cache lookup: terminal metadata may add the durable id without changing HTML.
-    if (drawKey) draws.bind(drawKey, opts.seed!, jobOptions.seedAliases || [])
+    const drawIdentity = drawKey ? draws.bind(drawKey, opts.seed!, jobOptions.seedAliases || []) : undefined
     const text = typeof req.text === 'string' ? req.text : ''
-    const prefixKey = `${drawKey ? `${drawKey}:${drawEpoch}\u0001` : ''}${engineVersion}\u0001${engine}\u0001${rules.key}\u0001${variants.key}\u0001${macroKey}${seeded ? `\u0001s${opts.seed}` : ''}`
+    const prefixKey = `${drawKey ? `${drawKey}:${drawEpoch}\u0001` : ''}${engineVersion}\u0001${engine}\u0001${rules.key}\u0001${variants.key}\u0001${macroKey}${seeded ? `\u0001s${drawIdentity || opts.seed}` : ''}`
     return { prefixKey, key: `${prefixKey}\u0001${text}`, text, engine, rulesKey: rules.key, rules: rules.plain, options: jobOptions, drawKey, drawEpoch }
   }
 

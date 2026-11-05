@@ -109,3 +109,22 @@ describe('canonical alias while a worker is in flight', () => {
     reload.dispose()
   })
 })
+
+describe('canonical history reuses the live rendered result immediately', () => {
+  it('returns settled HTML without a provisional raw frame or another worker job', async () => {
+    const started: { job: ExecutorJob; resolve: (r: RuleResult) => void }[] = []
+    const executor: RuleExecutor = { available: () => true, run: job => new Promise(resolve => started.push({ job: structuredClone(job), resolve })) }
+    const runner = createRuleRunner({ executor })
+    const live = { ...request('live-cache'), options: { seed: 'live-cache', randomScope: 'conversation', seedAliases: ['live-cache'] } }
+    const pending = runner.apply(live)
+    const active = started.shift()!
+    active.resolve(executeRuleJob(active.job.engine, active.job.text, active.job.rules as any[], active.job.options))
+    const first = await pending
+    runner.display({ ...live, options: { ...live.options, seedAliases: ['live-cache', 'saved-cache'] } })
+    const history = runner.display(request('saved-cache'))
+    expect(history.provisional).toBe(false)
+    expect(history.html).toBe(first.html)
+    expect(started).toHaveLength(0)
+    runner.dispose()
+  })
+})

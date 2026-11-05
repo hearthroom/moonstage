@@ -3496,21 +3496,22 @@ function hostOutsideAuthorScope(host, scope) {
 // 狀態一變就叫 bridge.refresh()（bridge 自己比對內容，沒變不發事件）。
 const hudBridgeRef = shallowRef<HudBridge | null>(null);
 // 每則訊息的 HTML 只在內容變了才重算：串流時每個 token 都會觸發 read()，不能每次重畫整串。
-const hudHtmlCache = new Map<string, { content: string; html: string; ruleEpoch: number | null; playerName: string | null }>();
+const hudHtmlCache = new Map<string, { content: string; html: string; ruleEpoch: number | null; playerName: string | null; identity: string }>();
 
 function hudMessageHtml(item: any): string {
   const key = hudCacheKey(item);
   const content = String(item.content || '');
   const hit = hudHtmlCache.get(key);
   const playerName = sandboxCard.value ? userDisplayName() : null;
+  const identity = activeAuthorAsset.value.random ? String(item.chatId || item.assistantChatId || item.id || '') : '';
   // 暫時的規則結果（還在等 worker）只記到下一次 epoch：沙箱殼要換上完整套用的結果。
-  if (hit && hit.content === content && hit.playerName === playerName && (hit.ruleEpoch == null || hit.ruleEpoch === authorRuleEpoch.value)) return hit.html;
+  if (hit && hit.content === content && hit.playerName === playerName && hit.identity === identity && (hit.ruleEpoch == null || hit.ruleEpoch === authorRuleEpoch.value)) return hit.html;
   let html = '';
   try { html = String(renderMessage(item) || ''); } catch (e) { html = ''; }
   // 串流中的那一則交給 renderMessage 自己節流：它在間隔內回的是上一版畫面，記在這裡的話，
   // 間隔到期、字沒再變的那一次會一直拿到舊畫面。
   if (item.chatFinish || item.chatLoading) {
-    hudHtmlCache.set(key, { content, html, playerName, ruleEpoch: renderIsProvisional(item) ? authorRuleEpoch.value : null });
+    hudHtmlCache.set(key, { content, html, playerName, identity, ruleEpoch: renderIsProvisional(item) ? authorRuleEpoch.value : null });
   }
   return html;
 }
@@ -4826,6 +4827,7 @@ let streamRenderTimer = 0
 function renderMemoKey(item) {
   return {
     content: item.content,
+    identity: activeAuthorAsset.value.random ? String(item.chatId || item.assistantChatId || item.id || '') : '',
     thinking: item.thinkingContent,
     finish: !!item.chatFinish,
     summary: !!item.isSummary,
@@ -4839,6 +4841,7 @@ function renderMemoKey(item) {
 function renderMemoHit(entry, key) {
   return !!entry
     && entry.key.content === key.content
+    && entry.key.identity === key.identity
     && entry.key.thinking === key.thinking
     && entry.key.finish === key.finish
     && entry.key.summary === key.summary

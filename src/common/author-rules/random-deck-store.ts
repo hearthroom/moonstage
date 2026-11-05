@@ -70,6 +70,7 @@ export function createRandomDrawStore() {
       const before = keys.map(alias => state.messages?.[alias])
       const identity = bindRandomMessage(state, message, aliases)
       if (before.some(value => value !== identity)) write(key, state)
+      return identity
     },
     dispose() { off(); memory.clear() },
   }
