@@ -11,7 +11,7 @@
  *
  * 沒有逾時：一條規則再慢也跑到完。
  */
-import { executeRuleJob, type RuleEngineKind, type RuleJobOptions, type RuleRollback } from './rule-job'
+import { executeRuleJob, type RuleEngineKind, type RuleJobOptions, type RuleResult } from './rule-job'
 
 export type ToRuleWorker =
   | { t: 'rules'; key: string; rules: unknown[] }
@@ -19,7 +19,7 @@ export type ToRuleWorker =
 
 export type FromRuleWorker =
   | { t: 'ready' }
-  | { t: 'done'; id: number; html: string; rollbacks: RuleRollback[] }
+  | ({ t: 'done'; id: number } & RuleResult)
   | { t: 'error'; id: number; message: string }
 
 /** worker 記得的規則組數上限：換卡、改草稿會換 key，舊的留幾組就夠。 */
@@ -43,7 +43,7 @@ export function createRuleWorkerHandler(post: (message: FromRuleWorker) => void)
       }
       try {
         const out = executeRuleJob(message.engine, message.text, rules, message.options || {})
-        post({ t: 'done', id: message.id, html: out.html, rollbacks: out.rollbacks })
+        post({ t: 'done', id: message.id, ...out })
       } catch (e) {
         post({ t: 'error', id: message.id, message: String((e && (e as Error).message) || e) })
       }

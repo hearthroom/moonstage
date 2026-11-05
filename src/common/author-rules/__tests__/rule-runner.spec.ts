@@ -334,3 +334,24 @@ describe('正文玩家名稱：非同步規則', () => {
   runner.dispose()
  })
 })
+
+describe('random CG ledger crosses the real worker adapter', () => {
+  it('returns worker deals to the runner before the next message and can fall back inline', async () => {
+    const rules = [{ id: 'cg', find: '/<pic>/g', replace: '<b>{{random:A::B::C}}</b>' }]
+    const run = async (executor: RuleExecutor | null) => {
+      const runner = createRuleRunner({ executor })
+      const outputs: string[] = []
+      for (let i = 0; i < 8; i++) {
+        const result = await runner.apply({ engine: 'tavern', text: '<pic>', rules, options: { seed: `m${i}`, randomScope: 'worker-deck' } })
+        outputs.push(result.html)
+      }
+      runner.dispose()
+      return outputs
+    }
+    const inline = await run(null)
+    const worker = await run(createWorkerExecutor({ createWorker: () => fakeWorker(), size: 2 }))
+    expect(worker).toEqual(inline)
+    expect(new Set(worker.slice(0, 3)).size).toBe(3)
+    expect(new Set(worker.slice(3, 6)).size).toBe(3)
+  })
+})

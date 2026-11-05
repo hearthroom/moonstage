@@ -2600,7 +2600,7 @@ const ajax = ref({
 // 拉出去單獨 eval），每多一個自由變數就得在那兩個測試的 vm context 裡多宣告一個。
 // 一個物件比三個 ref 好維護，也讓「這兩支熱函式依賴什麼」一眼看得完。
 // crossLine 只在資產變動時算一次，不必每次渲染都判。
-const activeAuthorAsset = ref({ rules: [], version: 0, crossLine: false, variants: null });
+const activeAuthorAsset = ref({ rules: [], version: 0, crossLine: false, random: false, variants: null });
 
 // ── 作者預覽 ─────────────────────────────────────────────────────────
 //
@@ -2658,6 +2658,7 @@ function setActiveAuthorAsset(asset) {
     rules: rules,
     version: (asset && asset.version) || 0,
     crossLine: hasCrossLineRule(rules),
+    random: rules.some((rule) => String(rule.replace || '').includes('{{random:')),
     // 伺服器算好的簡繁對照表：規則寫簡體、玩家看到繁體時仍要命中。
     variants: (asset && asset.variants) || null,
   };
@@ -2704,7 +2705,7 @@ const authorRules = {
   seed: '',
   display(text: string, streaming: boolean): string {
     if (!activeAuthorAsset.value.rules.length) return substituteMacros(text, authorRuleOptions().macros);
-    const options = authorRules.seed ? { ...authorRuleOptions(), seed: authorRules.seed } : authorRuleOptions();
+    const options = authorRules.seed ? { ...authorRuleOptions(), seed: authorRules.seed, randomScope: String(unref(conversationId) || authorRules.seed) } : authorRuleOptions();
     const out = authorRuleRunner.display(
       { engine: 'tavern', text, rules: activeAuthorAsset.value.rules, options },
       { streaming },
@@ -4318,7 +4319,9 @@ const highlightText = (content, type, cacheKey, streaming) => {
 
   // streaming render cache 短路 (issue #5 · O(N²) 解法 · mirror mobile chat.vue)
   // 細節見 rich-text-renderer.js 的 stream cache 區塊註解
-  if (cacheKey && !isHeavyHtml(content)) {
+  // Random slots are numbered over the full message. Splitting at a new paragraph would restart
+  // those numbers and assign a different draw when the final message is rendered in one piece.
+  if (cacheKey && !activeAuthorAsset.value.random && !isHeavyHtml(content)) {
     // 人設名稱變了，已展開成舊名字的 HTML 必須失效。
     cacheKey = JSON.stringify([cacheKey, authorRuleOptions().macros]);
     const boundary = findStableBoundary(content, activeAuthorAsset.value.crossLine);

@@ -1,12 +1,8 @@
 /**
  * 顯示層替換引擎。
  *
- * 純函式，不碰 DOM、不碰網路、不 import 任何東西——所以 desktop（Vite/vitest）與
- * mobile（webpack/jest）可以用同一份檔案。
- *
- * 這份檔案在兩端**必須逐位元組相同**，由
- * 雙端等價檢查擋著。rich-text-renderer.js
- * 就是各寫一份的下場：兩端已經差了 189 行，而漂移的那天沒有任何測試會紅。
+ * 純函式，不碰 DOM、不碰網路、不 import 任何東西；一般畫布與沙盒共用。
+ * pickRandom 可接收命中位置，讓 worker 工作依同一份對話帳本抽樣。
  *
  * 鐵律：本引擎只作用在「玩家看到的內容」。送給模型的原文不經過這裡，
  * 呼叫端也不得把它的產物寫回訊息。作者用規則「刪掉」一段字，只是玩家看不到，
@@ -159,14 +155,15 @@ function parseFieldTable(capture) {
   return table
 }
 
-function expandRandom(text, pickRandom) {
+function expandRandom(text, pickRandom = defaultPickRandom, position = {}) {
+  let tokenIndex = 0
   return text.replace(RANDOM_TOKEN, (whole, body) => {
     const options = String(body)
       .split('::')
       .map((option) => option.trim())
       .filter((option) => option !== '')
     if (!options.length) return ''
-    return pickRandom(options)
+    return pickRandom(options, { ...position, tokenIndex: tokenIndex++ })
   })
 }
 
@@ -176,7 +173,7 @@ function expandRandom(text, pickRandom) {
  * 順序刻意是：先 $欄位名（資料來源固定是第一個捕獲組），再 $1..$9，最後
  * {{random}}。$欄位名 先做，否則 `$hp` 會被 `$1` 那一輪的解析吃掉一部分。
  */
-function expandReplacement(replace, args, pickRandom) {
+function expandReplacement(replace, args, pickRandom, position) {
   const capture1 = args.length > 1 ? args[1] : undefined
   const table = parseFieldTable(capture1)
 
@@ -212,7 +209,7 @@ function expandReplacement(replace, args, pickRandom) {
     return value === undefined ? whole : value
   })
 
-  return expandRandom(out, pickRandom)
+  return expandRandom(out, pickRandom, position)
 }
 
 function defaultPickRandom(options) {
@@ -273,12 +270,14 @@ function applyDisplayRules(text, rules, options) {
     }
     regex.lastIndex = 0
 
+    const undoDraws = pickRandom.checkpoint?.()
     let produced = 0
     let overBudget = false
+    let matchIndex = 0
     const next = current.replace(regex, function () {
       if (overBudget) return ''
       const args = Array.prototype.slice.call(arguments)
-      const expanded = expandReplacement(replace, args, pickRandom)
+      const expanded = expandReplacement(replace, args, pickRandom, { ruleIndex: i, matchIndex: matchIndex++ })
       produced += expanded.length
       if (produced > budget) {
         overBudget = true
@@ -289,6 +288,7 @@ function applyDisplayRules(text, rules, options) {
 
     if (overBudget || next.length > budget) {
       // 整條回滾：不做部分套用。半套的版面比沒有版面更難查。
+      undoDraws?.()
       rollbacks.push({ ruleId: ruleId, reason: ROLLBACK_VOLUME })
       continue
     }
@@ -419,6 +419,7 @@ function hasCrossLineRule(rules) {
 
 export {
   applyDisplayRules,
+  expandRandom,
   neutralizeRelativeMediaSources,
   classifyPattern,
   matchesEmptyString,

@@ -81,7 +81,7 @@ function buildHighlightText(rules: any[], authorRules: unknown, crossLine = fals
     cardFormat: { value: 'tavern' },
     convertVisibleHtml: (html: string) => html,
     displayScript: (text: string) => text,
-    activeAuthorAsset: { value: { rules, version: 0, crossLine } },
+    activeAuthorAsset: { value: { rules, version: 0, crossLine, random: rules.some((r) => String(r.replace || '').includes('{{random:')) } },
     console,
   })
   return new vm.Script(`(function(){\n${fnSource}\nreturn highlightText;\n})()`).runInContext(context)
@@ -220,5 +220,28 @@ describe('沙箱卡：殼的定稿等規則的完整結果', () => {
     // html 一格排在 finished 之前：同一個物件字面裡先算畫面，renderIsProvisional 才讀得到這一趟的結果
     const read = extractBraced(SOURCE, 'messages: list.flatMap((item, index) => {')
     expect(read.indexOf('html: item.chatLoading')).toBeLessThan(read.indexOf('finished: !!item.chatFinish'))
+  })
+})
+
+describe('random CG across streaming paragraph boundaries', () => {
+  it('each occurrence stays identical when the stream cache advances and when the final message reloads', () => {
+    const choices = Array.from({ length: 100 }, (_, i) => `https://example.test/${i}.png`)
+    const rules = [{ id: 'cg', find: '/<pic>/g', replace: `<img src="{{random:${choices.join('::')}}}">` }]
+    const runner = createRuleRunner({ executor: null })
+    const authorRules = {
+      provisional: 0,
+      display: (text: string) => runner.display({ engine: 'tavern', text, rules, options: { seed: 'paragraph-message' } }).html,
+    }
+    const highlight = buildHighlightText(rules, authorRules)
+    const urls = (html: string) => [...html.matchAll(/src="([^"]+)"/g)].map((m) => m[1])
+    const first = '<pic>\n\n'
+    const full = first + '<pic>\n\n<pic>'
+    const firstDraw = urls(highlight(first, 0, 'cg-stream'))
+    const streamed = urls(highlight(full, 0, 'cg-stream'))
+    expect(streamed).toHaveLength(3)
+    expect(new Set(streamed).size).toBeGreaterThan(1)
+    expect(streamed.slice(0, 1)).toEqual(firstDraw)
+    clearStreamCache()
+    expect(urls(highlight(full, 0, null))).toEqual(streamed)
   })
 })

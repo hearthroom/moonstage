@@ -19,6 +19,18 @@ const picks = (html: string) => {
 
 describe('seeded {{random}}', () => {
   for (const engine of ['tavern', 'display'] as const) {
+    it(`${engine}: each hit in one message draws independently and survives append and reload`, () => {
+      const text = Array.from({ length: 20 }, () => '<pic>').join('\n\n')
+      const first = picks(executeRuleJob(engine, text, rules as any, { seed: 'same-message' }).html)
+      expect(first).toHaveLength(20)
+      expect(new Set(first).size).toBeGreaterThan(5)
+      expect(picks(executeRuleJob(engine, text + ' 後續文字 <pic>', rules as any, { seed: 'same-message' }).html).slice(0, 20)).toEqual(first)
+      // Fresh runners have no memory or persisted HTML to mask a changing draw.
+      const render = () => createRuleRunner({ executor: null }).display({ engine, text, rules, options: { seed: 'same-message' } }).html
+      expect(picks(render())).toEqual(first)
+      expect(render()).toBe(render())
+    })
+
     it(`${engine}: same seed keeps the pick while the message grows`, () => {
       const seen = new Set<string>()
       let text = '<pic>'
@@ -56,4 +68,62 @@ describe('seeded {{random}}', () => {
     expect(draws.size).toBeGreaterThan(5)
     expect(runner.display({ engine: 'tavern', text: '<pic>', rules, options: { seed: 'a' } }).html).toBe(a)
   })
+})
+
+describe('seeded random worker parity', () => {
+  it('tavern and display workers produce the same per-hit draws as inline execution', async () => {
+    const { createRuleWorkerHandler } = await import('../rule-worker-protocol')
+    const replies: any[] = []
+    const handle = createRuleWorkerHandler((reply: any) => replies.push(reply))
+    const text = '<pic> <pic> <pic>'
+    for (const engine of ['tavern', 'display'] as const) {
+      handle({ t: 'rules', key: 'cg', rules })
+      handle({ t: 'job', id: 1, engine, text, rulesKey: 'cg', options: { seed: 'worker-message' } })
+      const reply = replies.pop()
+      expect(reply.html).toBe(executeRuleJob(engine, text, rules as any, { seed: 'worker-message' }).html)
+      expect(new Set(picks(reply.html)).size).toBeGreaterThan(1)
+    }
+  })
+})
+
+describe('conversation random pool without replacement', () => {
+  for (const engine of ['tavern', 'display'] as const) {
+    it(`${engine}: one pool is shared across tokens, rules and messages, and reshuffled after exhaustion`, () => {
+      const pool = ['one', 'two', 'three']
+      const pair = `<b class="pick">{{random:${pool.join('::')}}}</b>`
+      const cardRules = [
+        { id: 'a', find: '/<a>/g', replace: pair + pair },
+        { id: 'b', find: '/<b>/g', replace: pair },
+      ]
+      const first = executeRuleJob(engine, '<a> <b>', cardRules, { seed: 'm1', randomScope: 'conv-pool' } as any) as any
+      const firstPicks = picks(first.html)
+      expect(new Set(firstPicks).size).toBe(3)
+      const second = executeRuleJob(engine, '<a> <b>', cardRules, { seed: 'm2', randomScope: 'conv-pool', randomState: first.randomState } as any) as any
+      expect(new Set(picks(second.html)).size).toBe(3)
+      const replay = executeRuleJob(engine, '<a> <b>', cardRules, { seed: 'm1', randomScope: 'conv-pool', randomState: JSON.parse(JSON.stringify(second.randomState)) } as any)
+      expect(replay.html).toBe(first.html)
+    })
+
+    it(`${engine}: later chunks keep earlier slots even when an earlier rule gains a hit`, () => {
+      const first = executeRuleJob(engine, '<next> <pic>', [...rules, { ...rules[0], id: 'next', find: '/<next>/g' }], { seed: 'm1', randomScope: 'conv-grow' } as any) as any
+      const grown = executeRuleJob(engine, '<next> <pic> <pic>', [...rules, { ...rules[0], id: 'next', find: '/<next>/g' }], { seed: 'm1', randomScope: 'conv-grow', randomState: first.randomState } as any)
+      expect(picks(grown.html)[0]).toBe(picks(first.html)[0])
+    })
+  }
+})
+
+describe('rolled-back rules do not spend random cards', () => {
+  for (const engine of ['tavern', 'display'] as const) {
+    it(`${engine}: rolls the draw ledger back with an over-volume replacement`, () => {
+      const token = '{{random:A::B::C}}'
+      const cardRules = [
+        { id: 'too-large', find: '/<big>/g', replace: 'x'.repeat(150000) + token },
+        { id: 'small', find: '/<small>/g', replace: `<b class="pick">${token}</b>` },
+      ]
+      const out = executeRuleJob(engine, '<big><big><small><small><small>', cardRules, { seed: 'm1', randomScope: 'rollback-deck' })
+      expect(out.rollbacks).toContainEqual({ ruleId: 'too-large', reason: 'volume' })
+      expect(new Set(picks(out.html)).size).toBe(3)
+      expect(Object.values(out.randomState!.pools)[0].drawn).toBe(3)
+    })
+  }
 })

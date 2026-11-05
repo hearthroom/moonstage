@@ -30,6 +30,7 @@
  *   display／apply 直接在呼叫端同步套用，跟改動前的行為一樣。
  */
 import { substituteMacros, type TavernRule } from '@/pages/canvas/canvas-rule-engine-core'
+import { createRandomDrawStore } from './random-deck-store'
 import { executeRuleJob, type RuleEngineKind, type RuleJobOptions, type RuleResult } from './rule-job'
 
 export interface RuleRequest {
@@ -135,6 +136,8 @@ interface Keyed {
   rulesKey: string
   rules: unknown[]
   options: RuleJobOptions
+  drawKey?: string
+  drawEpoch?: number
 }
 
 interface Waiter { resolve: (r: RuleResult) => void; reject: (e: unknown) => void }
@@ -155,6 +158,7 @@ interface Completed { prefixKey: string; text: string; result: RuleResult }
 const RECENT_LIMIT = 24
 
 export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
+  const draws = createRandomDrawStore()
   const executor = options.executor
   const engineVersion = typeof options.engineVersion === 'string' ? options.engineVersion : ''
   const persist = engineVersion ? options.persist || null : null
@@ -191,9 +195,13 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
     // 種子只在規則裡有 {{random}} 時才影響產物；沒有就不進鍵，定稿快取與持久層照舊跨訊息共用。
     const seeded = typeof opts.seed === 'string' && opts.seed !== '' && !!rules.hasRandom
     if (seeded) jobOptions.seed = opts.seed
+    const randomScope = seeded && typeof opts.randomScope === 'string' ? opts.randomScope : ''
+    if (randomScope) jobOptions.randomScope = randomScope
+    const drawKey = randomScope ? draws.key(randomScope) : undefined
+    const drawEpoch = randomScope ? draws.epoch : undefined
     const text = typeof req.text === 'string' ? req.text : ''
-    const prefixKey = `${engineVersion}\u0001${engine}\u0001${rules.key}\u0001${variants.key}\u0001${macroKey}${seeded ? `\u0001s${opts.seed}` : ''}`
-    return { prefixKey, key: `${prefixKey}\u0001${text}`, text, engine, rulesKey: rules.key, rules: rules.plain, options: jobOptions }
+    const prefixKey = `${drawKey ? `${drawKey}:${drawEpoch}\u0001` : ''}${engineVersion}\u0001${engine}\u0001${rules.key}\u0001${variants.key}\u0001${macroKey}${seeded ? `\u0001s${opts.seed}` : ''}`
+    return { prefixKey, key: `${prefixKey}\u0001${text}`, text, engine, rulesKey: rules.key, rules: rules.plain, options: jobOptions, drawKey, drawEpoch }
   }
 
   // ── 定稿快取（LRU） ──
@@ -248,7 +256,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
 
   const persistKey = (k: Keyed) => `${k.prefixKey}\u0001${hash(k.text)}.${k.text.length}`
   const persistGet = async (k: Keyed): Promise<RuleResult | undefined> => {
-    if (!persist) return undefined
+    if (!persist || k.drawKey) return undefined
     try {
       const hit = await persist.get(persistKey(k))
       if (hit && hit.p === k.prefixKey && hit.text === k.text && typeof hit.html === 'string') {
@@ -258,7 +266,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
     return undefined
   }
   const persistSet = (k: Keyed, result: RuleResult) => {
-    if (!persist) return
+    if (!persist || k.drawKey) return
     try { persist.set(persistKey(k), { p: k.prefixKey, text: k.text, html: result.html, rollbacks: result.rollbacks }) } catch { /* 寫不進去就算了 */ }
   }
   /** 定稿：進 LRU、寫持久層。 */
@@ -271,10 +279,21 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
   const listeners = new Set<() => void>()
   let disposed = false
 
+  const prepareDraws = (k: Keyed) => {
+    if (k.drawKey) k.options.randomState = draws.read(k.drawKey)
+  }
+  const commitDraws = (k: Keyed, result: RuleResult) => {
+    if (k.drawKey && k.drawEpoch === draws.epoch && result.randomState) draws.write(k.drawKey, result.randomState)
+    // The ledger lives once in the store, not in every historical HTML cache entry.
+    delete result.randomState
+  }
   const runInline = (k: Keyed): RuleResult => {
     stats.inline++
     try {
-      return executeRuleJob(k.engine, k.text, k.rules as TavernRule[], k.options)
+      prepareDraws(k)
+      const result = executeRuleJob(k.engine, k.text, k.rules as TavernRule[], k.options)
+      commitDraws(k, result)
+      return result
     } catch (e) {
       // 引擎本身丟例外（今天會一路丟到渲染層）：顯示原文，不讓整頁壞掉。
       console.error('[author-rules] rule engine threw', e)
@@ -298,6 +317,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
 
   const complete = (job: Job, result: RuleResult, fromPersist = false) => {
     if (!disposed) {
+      commitDraws(job, result)
       inflight.delete(job)
       jobs.delete(job.key)
       remember(job, result)
@@ -316,6 +336,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
 
   const execute = (job: Job) => {
     if (inlineMode()) { complete(job, runInline(job)); return }
+    prepareDraws(job)
     stats.jobs++
     executor!.run({ engine: job.engine, text: job.text, rulesKey: job.rulesKey, rules: job.rules, options: job.options }).then(
       (result) => complete(job, result),
@@ -330,6 +351,8 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
    */
   const sameMessageRunning = (job: Job): boolean => {
     for (const r of inflight) {
+      // A conversation's next job must see the previous deal before it can draw.
+      if (job.drawKey && r.drawKey === job.drawKey) return true
       if (r.prefixKey !== job.prefixKey) continue
       if (!job.streaming && !r.streaming) continue
       if (job.text.startsWith(r.text) || r.text.startsWith(job.text)) return true
@@ -384,7 +407,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
     }
     const job: Job = { ...k, streaming, final: !streaming, waiters: [], seq: ++seqCounter, phase: 'probe' }
     jobs.set(job.key, job)
-    if (!streaming && persist) {
+    if (!streaming && persist && !job.drawKey) {
       // 先查持久層（不佔 worker、各自並行）；沒有才排進去跑。
       persistGet(job).then((hit) => {
         if (hit) { stats.persistHits++; complete(job, hit, true); return }
@@ -447,6 +470,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
 
     dispose() {
       disposed = true
+      draws.dispose()
       listeners.clear()
       queue = []
       jobs.clear()

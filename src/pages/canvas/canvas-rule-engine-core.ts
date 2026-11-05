@@ -1,8 +1,7 @@
 /**
  * 酒館規則的顯示側相容層。
  *
- * 顯示引擎（display-rule-engine.js）兩端逐位元組相同，不動它——動了就得同步
- * 另一個客戶端，而畫布只活在這裡。所以酒館特有的那幾個欄位在這一層處理，
+ * 顯示引擎（display-rule-engine.js）由一般畫布與沙盒共用。酒館特有的那幾個欄位在這一層處理，
  * 處理完再把「引擎看得懂的規則」交下去。
  *
  * 處理的是四件事：
@@ -14,8 +13,11 @@
  *                所以帶 trimStrings 的規則在這一層自己跑一次替換。
  */
 
+import type { RandomPicker, RandomPickPosition } from '@/common/author-rules/random-deck'
+
 import {
   applyDisplayRules,
+  expandRandom,
   classifyPattern,
   DISPLAY_RULE_MIN_BUDGET,
   ROLLBACK_BAD_REGEX,
@@ -144,6 +146,8 @@ function applyTrimRule(
   text: string,
   rule: TavernRule,
   rollbacks: Array<{ ruleId: string; reason: string }>,
+  pickRandom?: RandomPicker,
+  ruleIndex = 0,
 ): string {
   const ruleId = String(rule.id == null ? '' : rule.id)
   const classified: any = classifyPattern(rule.find)
@@ -169,8 +173,10 @@ function applyTrimRule(
   const trims = (rule.trimStrings || []).filter((s) => typeof s === 'string' && s !== '')
   const budget = Math.max(DISPLAY_RULE_MIN_BUDGET, text.length * 4)
   const replace = String(rule.replace == null ? '' : rule.replace)
+  const undoDraws = pickRandom?.checkpoint?.()
   let produced = 0
   let over = false
+  let matchIndex = 0
 
   const next = text.replace(regex, function () {
     if (over) return ''
@@ -188,7 +194,7 @@ function applyTrimRule(
       for (const trim of trims) value = value.split(trim).join('')
       return value
     }
-    const out = replace.replace(/\$([0-9][0-9]?)/g, (whole, digits: string) => {
+    let out = replace.replace(/\$([0-9][0-9]?)/g, (whole, digits: string) => {
       if (digits.length === 2) {
         const two = groupValue(Number(digits))
         if (two !== undefined) return two
@@ -198,6 +204,7 @@ function applyTrimRule(
       const value = groupValue(Number(digits))
       return value === undefined ? whole : value
     })
+    out = expandRandom(out, pickRandom, { ruleIndex, matchIndex: matchIndex++ })
     produced += out.length
     if (produced > budget) {
       over = true
@@ -207,6 +214,7 @@ function applyTrimRule(
   })
 
   if (over || next.length > budget) {
+    undoDraws?.()
     rollbacks.push({ ruleId, reason: ROLLBACK_VOLUME })
     return text
   }
@@ -246,14 +254,15 @@ export function normalizeRules(rules: TavernRule[], macros: MacroContext) {
 export function applyTavernRules(
   text: string,
   rules: TavernRule[],
-  options: { macros?: MacroContext; variants?: any; pickRandom?: (o: string[]) => string } = {},
+  options: { macros?: MacroContext; variants?: any; pickRandom?: RandomPicker } = {},
 ) {
   const macros = options.macros || {}
   const rollbacks: Array<{ ruleId: string; reason: string }> = []
   let current = typeof text === 'string' ? text : ''
 
-  for (const raw of Array.isArray(rules) ? rules : []) {
-    const rule = raw || {}
+  const list = Array.isArray(rules) ? rules : []
+  for (let ruleIndex = 0; ruleIndex < list.length; ruleIndex++) {
+    const rule = list[ruleIndex] || {}
     if (rule.enabled === false) continue
     if (rule.promptOnly === true) {
       reportSkipped(rule)
@@ -262,12 +271,15 @@ export function applyTavernRules(
     const replace = rewriteNamedGroups(String(rule.find || ''), String(rule.replace == null ? '' : rule.replace))
     const prepared = { ...rule, replace }
     if (Array.isArray(rule.trimStrings) && rule.trimStrings.length) {
-      current = applyTrimRule(current, prepared, rollbacks)
+      current = applyTrimRule(current, prepared, rollbacks, options.pickRandom, ruleIndex)
       continue
     }
     const out = applyDisplayRules(current, [prepared], {
       variants: options.variants,
-      pickRandom: options.pickRandom,
+      pickRandom: options.pickRandom ? Object.assign(
+        (choices: string[], position: RandomPickPosition) => options.pickRandom!(choices, { ...position, ruleIndex }),
+        { checkpoint: options.pickRandom.checkpoint },
+      ) : undefined,
     })
     current = out.html
     for (const rb of out.rollbacks) rollbacks.push(rb)

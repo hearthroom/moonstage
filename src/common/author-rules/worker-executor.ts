@@ -91,7 +91,7 @@ export function createWorkerExecutor(options: WorkerExecutorOptions = {}): RuleE
     if (!waiter) return
     pending.delete(message.id)
     waiter.slot.busy--
-    if (message.t === 'done') waiter.resolve({ html: message.html, rollbacks: message.rollbacks })
+    if (message.t === 'done') waiter.resolve({ html: message.html, rollbacks: message.rollbacks, ...(message.randomState ? { randomState: message.randomState } : {}) })
     else waiter.reject(new Error(message.message))
   }
 

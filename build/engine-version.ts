@@ -12,6 +12,7 @@ export const AUTHOR_RULE_ENGINE_SOURCES = [
   'src/pages/canvas/canvas-rule-engine-core.ts',
   'src/utils/display-rule-engine.js',
   'src/common/author-rules/rule-job.ts',
+  'src/common/author-rules/random-deck.ts',
 ]
 
 /** stageRoot：舞台 repo 的根目錄（含 src/）。 */
