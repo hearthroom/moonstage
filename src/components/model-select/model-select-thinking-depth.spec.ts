@@ -83,3 +83,21 @@ describe('換線路時的思考深度', () => {
     } finally { wrapper.unmount() }
   })
 })
+
+
+describe('DeepSeek 手動來源', () => {
+  it('手動選 instant 後切到 DeepSeek，保留選擇並交回來源', async () => {
+    const { wrapper, vm } = await mountOnGemini('')
+    try {
+      const other = vm.displayFamilies.find((f: any) => f.family === 'Fixture Deep')
+      vm.selectVariant(other, other.variants[0])
+      vm.thinkingDepthChange('off')
+      const another = { ...other, family: 'DeepSeek V4.1 Flash' }
+      vm.selectVariant(another, { ...other.variants[0], value: 'deepseek-v4.1-flash-ripple' })
+      await flushPromises()
+      expect(vm.formData.thinkingDepth).toBe('off')
+      await vm.saveUserDefine()
+      expect(wrapper.emitted('select')?.at(-1)?.[0]).toMatchObject({ thinkingDepth: 'off', thinkingDepthManual: true })
+    } finally { wrapper.unmount() }
+  })
+})

@@ -371,3 +371,9 @@ export const normalizeContextValue = (
   }
   return options[0]?.value || 1
 }
+
+/** DeepSeek V4 and later only. V3 and other model families keep their policy. */
+export function isDeepSeekV4PlusVariant(variant: any): boolean {
+  const match = /^(?:official-)?deepseek-v(\d+)(?:[.-]|$)/i.exec(String(variant?.value || ''))
+  return Boolean(match && Number(match[1]) >= 4)
+}

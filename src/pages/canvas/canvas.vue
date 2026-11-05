@@ -180,6 +180,7 @@
         :score-label="modelScoreLabel"
         :context-value="formData.context"
         :thinking-depth="formData.thinkingDepth"
+        :thinking-depth-manual="formData.thinkingDepthManual"
         :show-thinking-process="formData.showThinkingProcess !== false"
         :labels="modelPanelLabels"
         :focus="modelPanelFocus"
@@ -11039,9 +11040,12 @@ function onApplyModelSettings(payload: any) {
   if (Number.isFinite(Number(next.context))) formData.context = Number(next.context)
   if (typeof next.thinkingDepth === 'string') {
     formData.thinkingDepth = next.thinkingDepth
+    formData.thinkingDepthManual = next.thinkingDepthManual === true
   } else if (modelChanged) {
     // 只交回模型（沙盒卡的 HUD）：深度按新模型換算，跟模型一起存，免得舊深度對新模型沒意義。
-    formData.thinkingDepth = thinkingDepthForVariant(variant, formData.thinkingDepth || '')
+    const previousDepth = formData.thinkingDepth || ''
+    formData.thinkingDepth = thinkingDepthForVariant(variant, previousDepth, formData.thinkingDepthManual === true)
+    if (formData.thinkingDepth !== previousDepth) formData.thinkingDepthManual = false
   }
   persistRoleSettings()
   // 目錄的標價是按上下文檔位算的，換了檔位就重抓一次，否則玩家在決定的那一刻
@@ -11071,6 +11075,7 @@ function currentRoleSettings(): RoleSettings {
     selectModel: formData.selectModel || '',
     context: Number(formData.context) || 1,
     thinkingDepth: formData.thinkingDepth || '',
+    thinkingDepthManual: formData.thinkingDepthManual === true,
     sandboxLevel: formData.sandboxLevel || '',
     jailbreak: formData.jailbreak || '',
     trimConstantLore: formData.trimConstantLore === true,

@@ -122,7 +122,7 @@ describe('只送動到的欄位', () => {
 
   it('這一頁只認這幾個欄位', () => {
     expect(ROLE_SETTING_KEYS).toEqual([
-      'personaMode', 'userName', 'userSex', 'userDefine', 'selectModel', 'context', 'thinkingDepth',
+      'personaMode', 'userName', 'userSex', 'userDefine', 'selectModel', 'context', 'thinkingDepth', 'thinkingDepthManual',
       'sandboxLevel', 'jailbreak', 'trimConstantLore',
     ])
   })
@@ -209,4 +209,13 @@ describe('自訂指令的兩個名字', () => {
     expect(readRoleSettings({ customInstructions: '別跳出角色' }).jailbreak).toBe('別跳出角色')
     expect(readRoleSettings({ jailbreak: '舊名字' }).jailbreak).toBe('舊名字')
   })
+})
+
+
+it('手動點選同一深度仍送值與來源，重新讀回保留布林意圖', () => {
+ const before = { ...ROLE_SETTINGS_DEFAULTS, thinkingDepth: 'off' }
+ const next = { ...before, thinkingDepthManual: true }
+ expect(buildRoleSettingsSavePayload('r1',before,next)).toEqual({roleId:'r1',thinkingDepth:'off',thinkingDepthManual:true})
+ expect(readRoleSettings(next).thinkingDepthManual).toBe(true)
+ expect(readRoleSettings({...next,thinkingDepthManual:'true'}).thinkingDepthManual).toBe(false)
 })

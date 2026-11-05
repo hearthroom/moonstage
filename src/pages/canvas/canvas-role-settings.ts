@@ -13,7 +13,7 @@
  * 過去。所以差異比對不能拿 falsy 當「沒動」。
  */
 
-import { pickThinkingDepth } from '@/utils/model-context-options'
+import { pickThinkingDepth, isDeepSeekV4PlusVariant } from '@/utils/model-context-options'
 
 /** 伺服器認得、而這一頁真的會動到的欄位。 */
 export const ROLE_SETTING_KEYS = [
@@ -24,6 +24,7 @@ export const ROLE_SETTING_KEYS = [
   'selectModel',
   'context',
   'thinkingDepth',
+  'thinkingDepthManual',
   'sandboxLevel',
   'jailbreak',
   'trimConstantLore',
@@ -40,6 +41,7 @@ export interface RoleSettings {
   selectModel: string
   context: number
   thinkingDepth: string
+  thinkingDepthManual: boolean
   /** 虛構框架的強度：light / standard / immersive / deep。'' ＝跟著平台預設 */
   sandboxLevel: string
   /** 玩家自訂的內容範圍框架。'' ＝用這張卡（或平台）的預設 */
@@ -63,6 +65,7 @@ export const ROLE_SETTINGS_DEFAULTS: RoleSettings = {
   selectModel: '',
   context: 1,
   thinkingDepth: '',
+  thinkingDepthManual: false,
   sandboxLevel: '',
   jailbreak: '',
   trimConstantLore: false,
@@ -109,6 +112,7 @@ export function readRoleSettings(raw: any): RoleSettings {
     selectModel: asText(src.selectModel),
     context: asContext(src.context),
     thinkingDepth: asText(src.thinkingDepth),
+    thinkingDepthManual: src.thinkingDepthManual === true,
     sandboxLevel: asText(src.sandboxLevel),
     // 舊主站叫 jailbreak；Harbor 回的是 customInstructions。兩個都讀，寫的時候照舊送 jailbreak（兩邊都收）。
     jailbreak: asText(src.jailbreak ?? src.customInstructions),
@@ -141,7 +145,7 @@ export function diffRoleSettings(
       any = true
       continue
     }
-    if (key === 'trimConstantLore') {
+    if (key === 'trimConstantLore' || key === 'thinkingDepthManual') {
       if ((prevValue === true) === (nextValue === true)) continue
       changed[key] = nextValue === true
       any = true
@@ -169,6 +173,11 @@ export function buildRoleSettingsSavePayload(
     const mode = asText(next?.personaMode)
     if (mode) (changed as any).personaMode = mode
   }
+  // Value and source are one intent, including a click on the already selected depth.
+  if ('thinkingDepth' in changed || 'thinkingDepthManual' in changed) {
+    changed.thinkingDepth = asText(next?.thinkingDepth)
+    changed.thinkingDepthManual = next?.thinkingDepthManual === true
+  }
   return { roleId, ...changed }
 }
 
@@ -192,6 +201,7 @@ export function settingsRoleFor(pageRoleId: string, conversationRole: string): s
 }
 
 interface DepthVariantLike {
+  value?: unknown
   thinkingDepthOptions?: Array<{ value?: unknown }> | null
   defaultThinkingDepth?: unknown
 }
@@ -201,9 +211,9 @@ interface DepthVariantLike {
  * 新模型支援原本的深度就留著；不支援就用它自己的預設；
  * 沒有思考檔位的模型一律空字串。查不到線路時不動——猜一個比留著原值更糟。
  */
-export function thinkingDepthForVariant(variant: DepthVariantLike | null | undefined, current: string): string {
+export function thinkingDepthForVariant(variant: DepthVariantLike | null | undefined, current: string, manual = false): string {
   if (!variant) return current
   const options = (Array.isArray(variant.thinkingDepthOptions) ? variant.thinkingDepthOptions : [])
     .map((o) => asText(o && o.value))
-  return pickThinkingDepth(options, current, variant.defaultThinkingDepth)
+  return pickThinkingDepth(options, isDeepSeekV4PlusVariant(variant) && !manual ? null : current, variant.defaultThinkingDepth)
 }

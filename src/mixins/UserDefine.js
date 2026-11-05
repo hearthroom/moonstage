@@ -90,6 +90,7 @@ export const useUserDefine = () => {
 		selectModel: "", // 目前選擇的模型；空值＝還沒從伺服器讀到設定，送出前會補讀
 		selectModelName: "", // 目前選擇的模型顯示名
 		thinkingDepth: "", //模型思考深度
+		thinkingDepthManual: false,
 		showThinkingProcess: true, //adaptive 模型「顯示思考過程」顯示層開關（邊界 7），純本地偏好，不經 server
 		permanentMemory: false, //永久记忆
 		statusBarMode: false, //状态栏模式

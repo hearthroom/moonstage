@@ -494,6 +494,7 @@
 	};
 	import {
 		getContextBudgetLevelOptions,
+		isDeepSeekV4PlusVariant,
 		getContextBudgetOptions,
 		getNoLimitCoverageState,
 		getThinkingControl,
@@ -548,6 +549,7 @@
 		selectModelName?: string
 		context?: number
 		thinkingDepth?: string
+		thinkingDepthManual?: boolean
 		showThinkingProcess?: boolean
 		autoCompactEnabled?: boolean
 		compactExtraInstruction?: string
@@ -565,7 +567,7 @@
 		focus?: '' | 'lanes'
 	}>(), {
 		roleId: '', open: true, selectModel: '', selectModelName: '', context: 1,
-		thinkingDepth: '', showThinkingProcess: true, autoCompactEnabled: false,
+		thinkingDepth: '', thinkingDepthManual: false, showThinkingProcess: true, autoCompactEnabled: false,
 		compactExtraInstruction: '', searchQuery: '', dockChips: null, dockPanel: null, costDialogHost: null, focus: '',
 	});
 
@@ -582,6 +584,7 @@
 		selectModelName: props.selectModelName,
 		context: props.context,
 		thinkingDepth: props.thinkingDepth,
+		thinkingDepthManual: props.thinkingDepthManual === true,
 		showThinkingProcess: props.showThinkingProcess !== false,
 		autoCompactEnabled: Boolean(props.autoCompactEnabled),
 		compactExtraInstruction: props.compactExtraInstruction || '',
@@ -605,6 +608,7 @@
 			selectModelName: formData.selectModelName,
 			context: formData.context,
 			thinkingDepth: formData.thinkingDepth,
+			thinkingDepthManual: formData.thinkingDepthManual,
 			autoCompactEnabled: isAutoCompactForced.value ? true : formData.autoCompactEnabled,
 			compactExtraInstruction: (formData.compactExtraInstruction || '').trim(),
 		});
@@ -662,16 +666,17 @@
 
 	const optionValues = (options) => (options || []).map(item => item.value);
 
-	// keepChoice：同一個模型換線路時，新線路有玩家原本選的深度就留著，沒有才退回預設。
-	// 換了模型就一律用新模型的預設——存下來的值分不出是玩家選的還是上一個模型的預設，
-	// 帶過去會把預設「關閉」的思考帶到預設最深的模型上（反過來則是悄悄變慢變貴）。
+	// DeepSeek defaults follow the catalog unless the player explicitly chose a depth.
 	const normalizeThinkingDepthForSelectedModel = (keepChoice = true) => {
-		formData.thinkingDepth = pickThinkingDepth(
-			optionValues(thinkingDepthOptions.value),
-			keepChoice ? formData.thinkingDepth : null,
-			selectItem.value && selectItem.value.defaultThinkingDepth,
-		);
-	};
+        const keep = isDeepSeekV4PlusVariant(selectItem.value) ? formData.thinkingDepthManual : keepChoice;
+        const previous = formData.thinkingDepth;
+        formData.thinkingDepth = pickThinkingDepth(
+            optionValues(thinkingDepthOptions.value),
+            keep ? previous : null,
+            selectItem.value && selectItem.value.defaultThinkingDepth,
+        );
+        if (!keep || formData.thinkingDepth !== previous) formData.thinkingDepthManual = false;
+    };
 
 	const normalizeContextForSelectedModel = (keepThinkingChoice = true) => {
 		if (!selectItem.value) return;
@@ -1675,12 +1680,13 @@ const truncationText = (completionRate: number) => {
 		formData.selectModelName = props.selectModelName;
 		formData.context = props.context;
 		formData.thinkingDepth = props.thinkingDepth;
+		formData.thinkingDepthManual = props.thinkingDepthManual === true;
 		formData.showThinkingProcess = props.showThinkingProcess !== false;
 		formData.autoCompactEnabled = Boolean(props.autoCompactEnabled);
 		formData.compactExtraInstruction = props.compactExtraInstruction || '';
 	}
 
-	watch(() => [props.roleId, props.selectModel, props.context, props.thinkingDepth].join('|'), () => {
+	watch(() => [props.roleId, props.selectModel, props.context, props.thinkingDepth, props.thinkingDepthManual].join('|'), () => {
 		if (!props.open) syncFromProps();
 	});
 
@@ -1795,6 +1801,7 @@ const truncationText = (completionRate: number) => {
 	const thinkingDepthChange = (value) => {
 		if (!thinkingDepthOptions.value.some(item => item.value === value)) return;
 		formData.thinkingDepth = value;
+		formData.thinkingDepthManual = true;
 	};
 
 	const getThinkingOptionLabel = (option) => {
@@ -1887,7 +1894,9 @@ const truncationText = (completionRate: number) => {
 		if (selectItem.value && variant.value === selectItem.value.value) {
 			return formData.thinkingDepth;
 		}
-		return pickThinkingDepth(optionValues(variant.thinkingDepthOptions), null, variant.defaultThinkingDepth);
+		return pickThinkingDepth(optionValues(variant.thinkingDepthOptions),
+            isDeepSeekV4PlusVariant(variant) && formData.thinkingDepthManual ? formData.thinkingDepth : null,
+            variant.defaultThinkingDepth);
 	};
 
 	// 每輪點數的算法只有一份（canvas-model-catalog.ts 的 variantPrice）：面板的線路列、
