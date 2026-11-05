@@ -30,7 +30,14 @@ describe('從卡片量到的外觀', () => {
     expect(computeCardThemeVars({ accentColor: 'rgb(120, 120, 120)' })).toEqual({})
   })
 
-  it('透明氣泡（漸層或圖片當底）：塊用淡框，字色跟氣泡', () => {
+  it('漸層氣泡：漸層原樣給塊；圖片當底不搬，用淡框', () => {
+    const g = 'linear-gradient(rgb(250, 240, 230), rgb(240, 220, 200))'
+    expect(computeCardThemeVars({ bubbleBackground: 'rgba(0, 0, 0, 0)', bubbleBackgroundImage: g })['--lt-canvas-block-bg']).toBe(g)
+    expect(computeCardThemeVars({ bubbleBackground: 'rgba(0, 0, 0, 0)', bubbleBackgroundImage: 'url("https://x/y.png")' })['--lt-canvas-block-bg'])
+      .toBe('color-mix(in srgb, currentColor 7%, transparent)')
+  })
+
+  it('透明氣泡（文字直接壓背景）：塊用淡框，字色跟氣泡', () => {
     const vars = computeCardThemeVars({ bubbleBackground: 'rgba(0, 0, 0, 0)', bubbleColor: 'rgb(40, 20, 10)' })
     expect(vars['--lt-canvas-block-bg']).toBe('color-mix(in srgb, currentColor 7%, transparent)')
     expect(vars['--lt-canvas-block-fg']).toBe('rgb(40, 20, 10)')

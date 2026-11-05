@@ -16,6 +16,8 @@ export interface CardThemeSample {
   bubbleBorderWidth?: string
   bubbleBorderStyle?: string
   bubbleBackground?: string
+  /** 氣泡的 background-image：作者用漸層當底時，量到的底色是透明，漸層在這裡 */
+  bubbleBackgroundImage?: string
   bubbleRadius?: string
   /** 氣泡的字色：塊拿了氣泡的底，字也要跟著拿，不然淺底配上站台的淺字 */
   bubbleColor?: string
@@ -92,8 +94,12 @@ export function computeCardThemeVars(sample: CardThemeSample): CardThemeVars {
   }
   const bg = parseCssColor(sample.bubbleBackground)
   if (bg && bg.a > 0.05) out['--lt-canvas-block-bg'] = rgba(bg)
-  // 氣泡量到了、底卻是透明的（作者要文字直接壓在背景上，或用漸層／圖片當底，量到的底色是透明）：
-  // 塊也用淡框，不能退到我們預設的深色氣泡底——那會在透明的兩顆氣泡中間夾一塊深色（owner 2026-09-05 的「黑膏藥」）。
+  // 氣泡用漸層當底：量到的底色是透明，漸層原樣給塊（--chat-bubble-ai-bg 設成漸層的沙箱卡也走這裡）。
+  else if (/^(repeating-)?(linear|radial|conic)-gradient\(/.test(String(sample.bubbleBackgroundImage || '').trim())) {
+    out['--lt-canvas-block-bg'] = String(sample.bubbleBackgroundImage).trim()
+  }
+  // 氣泡量到了、底卻是透明的（文字直接壓在背景上，或用圖片當底）：塊也用淡框，不能退到我們預設的深色氣泡底——
+  // 那會在透明的兩顆氣泡中間夾一塊深色（owner 2026-09-05 的「黑膏藥」）。圖片不搬：塊的尺寸跟氣泡不同，搬了會裁壞。
   else if (bg) out['--lt-canvas-block-bg'] = 'color-mix(in srgb, currentColor 7%, transparent)'
   // 底跟著氣泡走時字也一起：作者把氣泡漆成白底深字，塊若只拿到白底、字仍是站台深色模式的淺字，
   // 整段就讀不到（2026-11-06 量到：白底上 rgb(242,242,245) 的字）。
@@ -160,13 +166,13 @@ export const CARD_THEME_VAR_NAMES: Array<keyof CardThemeVars> = [
 export function readCardThemeSample(doc: Document): CardThemeSample {
   const view = doc.defaultView
   if (!view) return {}
-  const bubble = doc.querySelector('.mes[data-lt-role="ai"]:not([is_system="true"]) .mes_text') as HTMLElement | null
+  const bubble = doc.querySelector('.mes[data-lt-role="ai"] .mes_text') as HTMLElement | null
   const pill = doc.querySelector('.shortcut-btn') as HTMLElement | null
   const b = bubble ? view.getComputedStyle(bubble) : null
   const p = pill ? view.getComputedStyle(pill) : null
   return {
     bubbleBorderColor: b?.borderTopColor, bubbleBorderWidth: b?.borderTopWidth, bubbleBorderStyle: b?.borderTopStyle,
-    bubbleBackground: b?.backgroundColor, bubbleRadius: b?.borderTopLeftRadius, bubbleColor: b?.color,
+    bubbleBackground: b?.backgroundColor, bubbleBackgroundImage: b?.backgroundImage, bubbleRadius: b?.borderTopLeftRadius, bubbleColor: b?.color,
     accentColor: p?.borderTopColor,
     pillBorderColor: p?.borderTopColor, pillBorderWidth: p?.borderTopWidth, pillBorderStyle: p?.borderTopStyle,
     pillBackground: p?.backgroundColor, pillColor: p?.color, pillRadius: p?.borderTopLeftRadius,

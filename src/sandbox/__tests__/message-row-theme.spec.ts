@@ -53,7 +53,7 @@ function render(bind: boolean) {
     const list=root.querySelector('[data-chat=list]');
     const dispose=Block.bindCardBlockTheme(root,list);
     const box=el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom,h:r.height,cy:r.top+r.height/2}};
-    const look=el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,fg:s.color,border:s.borderTopColor,bw:s.borderTopWidth}};
+    const look=el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,img:s.backgroundImage,fg:s.color,border:s.borderTopColor,bw:s.borderTopWidth}};
     const pause=()=>new Promise(r=>setTimeout(r,120));
     (async()=>{
       await pause();
@@ -77,8 +77,12 @@ function render(bind: boolean) {
       day.textContent='[data-chat=root] .mes_text{background:linear-gradient(rgb(250, 240, 230), rgb(240, 220, 200));color:rgb(30, 20, 10)}';
       await pause();
       const gradient=read();
+      // 透明底（文字直接壓在背景上）：塊用淡框
+      day.textContent='[data-chat=root] .mes_text{background:transparent;color:rgb(30, 20, 10)}';
+      await pause();
+      const clear=read();
       dispose();
-      document.querySelector('pre').textContent=JSON.stringify({painted,unpainted,themed,gradient});
+      document.querySelector('pre').textContent=JSON.stringify({painted,unpainted,themed,gradient,clear});
     })();</script>`)
   const run = spawnSync(chrome!, ['--headless=new', '--no-first-run', '--no-default-browser-check', `--user-data-dir=${join(dir, 'profile')}`, '--window-size=800,900', '--dump-dom', '--virtual-time-budget=2000', `file://${file}`], { encoding: 'utf8', timeout: 20000, maxBuffer: 4 * 1024 * 1024 })
   expect(run.error, run.stderr).toBeUndefined(); expect(run.status, run.stderr).toBe(0)
@@ -122,10 +126,17 @@ describe('沙箱殼的訊息列', () => {
     expect(themed.reasoningLook.fg).toBe('rgb(30, 20, 10)')
   })
 
-  it('氣泡用漸層當底（量到透明）：思考過程是淡框配氣泡的字色，不是一塊深色', () => {
+  it('氣泡用漸層當底：思考過程拿同一個漸層與字色，不是一塊深色', () => {
     const { gradient } = render(true)
-    expect(gradient.reasoningLook.bg).not.toBe('rgb(26, 26, 31)')
-    expect(gradient.reasoningLook.bg).toMatch(/\/ 0\.07\)$/)
+    expect(gradient.bubbleLook.img).toMatch(/^linear-gradient\(/)
+    expect(gradient.reasoningLook.img).toBe(gradient.bubbleLook.img)
     expect(gradient.reasoningLook.fg).toBe('rgb(30, 20, 10)')
+  })
+
+  it('氣泡是透明底：思考過程是淡框配氣泡的字色，不是一塊深色', () => {
+    const { clear } = render(true)
+    expect(clear.reasoningLook.bg).not.toBe('rgb(26, 26, 31)')
+    expect(clear.reasoningLook.bg).toMatch(/\/ 0\.07\)$/)
+    expect(clear.reasoningLook.fg).toBe('rgb(30, 20, 10)')
   })
 })

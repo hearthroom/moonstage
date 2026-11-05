@@ -33,12 +33,17 @@ export function bindCardBlockTheme(root: HTMLElement, list: HTMLElement): () => 
   const touchesSample = (node: Node) => node.nodeType === 1 &&
     ((node as Element).matches(SAMPLE_INPUTS) || !!(node as Element).querySelector(SAMPLE_INPUTS))
   const observer = new view.MutationObserver((records) => {
-    if (records.some((r) => r.type === 'attributes' ||
+    if (records.some((r) => (r.type === 'attributes' && (r.target === root || r.target === doc.documentElement || r.target === doc.body ||
+      (r.target as Element).matches?.('.mes, .mes_text'))) ||
       r.target.nodeName === 'STYLE' || r.target.parentElement?.nodeName === 'STYLE' ||
       Array.from(r.addedNodes).some(touchesSample) || Array.from(r.removedNodes).some(touchesSample))) schedule()
   })
   // 氣泡長出來（訊息框裡的元件晚一拍才掛上，所以要聽子樹）、作者換樣式、日夜切換。
-  observer.observe(list, { childList: true, subtree: true })
+  // 訊息定稿、作者切換氣泡的 class 時要重量：聽清單子樹的 class，回呼裡只認 .mes／.mes_text 本身。
+  observer.observe(list, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+  // <link rel=stylesheet> 插進來時樣式表還沒到，載完再量一次。
+  const onLoad = (event: Event) => { if ((event.target as Element | null)?.nodeName === 'LINK') schedule() }
+  doc.addEventListener('load', onLoad, true)
   if (doc.head) observer.observe(doc.head, { childList: true, subtree: true, characterData: true })
   observer.observe(root, { attributes: true, attributeFilter: ['class', 'data-theme'] })
   observer.observe(doc.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] })
@@ -47,6 +52,7 @@ export function bindCardBlockTheme(root: HTMLElement, list: HTMLElement): () => 
   return () => {
     disposed = true
     observer.disconnect()
+    doc.removeEventListener('load', onLoad, true)
     if (frame) view.clearTimeout(frame)
     frame = 0
   }
