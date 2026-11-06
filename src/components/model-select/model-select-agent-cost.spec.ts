@@ -3,22 +3,30 @@ import { shallowMount, flushPromises } from '@vue/test-utils'
 import ModelSelectPanel from './ModelSelectPanel.vue'
 import { normalizeMultiPassPreference } from '@/utils/multi-pass'
 import { updateStorageScope } from '@/common/author-rules/storage-scope'
+import { browserHost, setStageHost } from '@/host/stage-host'
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string, vars?: any) => vars ? `${key} ${Object.values(vars).join(' ')}` : key, locale: { value: 'en' } }) }))
 const quote = (key = 'selection-a', high = 1500) => ({ status: 'estimated', typicalCredits: 700, highCredits: high, normalTypicalCredits: 200, reason: 'bootstrap', presentation: high >= 1000 ? 'confirm' : 'inline', selectionKey: key, ruleVersion: 'v1', generatedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(), sampleCount: 0 })
 const pref = (estimate = quote()) => ({ multiPassEnabled: false, runtimeEnabled: true, modelSupported: true, costWarning: estimate.presentation === 'confirm', costEstimate: estimate })
 const mounted: any[] = []
 beforeEach(() => { vi.stubGlobal('uni', { showToast: vi.fn(), $emit: vi.fn() }) })
-afterEach(() => { mounted.splice(0).forEach(w => w.unmount()); updateStorageScope(null); vi.unstubAllGlobals() })
-async function setup(options: { enabled?: boolean; estimate?: any; save?: any } = {}) {
+afterEach(() => { mounted.splice(0).forEach(w => w.unmount()); updateStorageScope(null); setStageHost(null); vi.unstubAllGlobals() })
+async function setup(options: { enabled?: boolean; estimate?: any; save?: any; agentStatus?: number; agentCapability?: boolean } = {}) {
   const catalog = JSON.parse(JSON.stringify((await import('../../pages/canvas/__tests__/fixtures/model-catalog-live.json')).default))
   const selected = catalog[0].families[0].variants[0].value
-  const get = vi.fn(async (url: string) => url === '/models' ? { statusCode: 200, data: catalog } : { statusCode: 200, data: { ...pref(options.estimate || quote()), multiPassEnabled: options.enabled === true } })
-  const post = vi.fn(async (url: string) => url === '/settings' ? options.save || { statusCode: 200, data: { multiPassEnabled: true } } : { statusCode: 200, data: {} })
-  const w = shallowMount(ModelSelectPanel, { props: { open: true, roleId: 'fixture-role', selectModel: selected }, global: { config: { globalProperties: { http: { get, post }, requestUrl: { playerAgentMode: '/agent', playerRoleSettingsSave: '/settings', playerAgentCostAction: '/action', getModelListV2: '/models' } } } } })
+  const stored = { multiPassEnabled: options.enabled === true }
+  const get = vi.fn(async (url: string) => url === '/models' ? { statusCode: 200, data: catalog } : { statusCode: options.agentStatus || 200, data: { ...pref(options.estimate || quote()), multiPassEnabled: stored.multiPassEnabled } })
+  const post = vi.fn(async (url: string, request: any) => {
+    if (url !== '/settings') return { statusCode: 200, data: {} }
+    if (options.save) return options.save
+    if (typeof request.data?.multiPassEnabled === 'boolean') stored.multiPassEnabled = request.data.multiPassEnabled
+    return { statusCode: 200, data: { ...stored } }
+  })
+  if (typeof options.agentCapability === 'boolean') setStageHost(browserHost({ capabilities: { agentMode: options.agentCapability } }))
+  const w = shallowMount(ModelSelectPanel, { props: { open: true, roleId: 'fixture-role', selectModel: selected }, global: { stubs: { Teleport: false }, config: { globalProperties: { http: { get, post }, requestUrl: { playerAgentMode: '/agent', playerRoleSettingsSave: '/settings', playerAgentCostAction: '/action', getModelListV2: '/models' } } } } })
   mounted.push(w)
   await flushPromises()
-  return { w, vm: w.vm as any, get, post }
+  return { w, vm: w.vm as any, get, post, stored }
 }
 
 describe('Agent cost estimate contract', () => {
@@ -222,6 +230,50 @@ describe('pending Agent settings and confirmation', () => {
     vm.settleCostModal(false)
     await retry
     expect(repeated).toBe(true)
+  })
+
+  it.each(['unavailable', 'host-disabled'])('preserves stored Agent ON when preference is %s', async (reason) => {
+    const { w, vm, post, stored } = await setup({ enabled: true, ...(reason === 'unavailable' ? { agentStatus: 503 } : { agentCapability: false }) })
+    vm.formData.selectModel = 'fixture-next-lane'
+    vm.formData.context = 3
+    await flushPromises()
+    await vm.sure()
+    const saved = post.mock.calls.find(([url]) => url === '/settings')?.[1]?.data
+    expect(saved).toMatchObject({ selectModel: 'fixture-next-lane', context: 3 })
+    expect(saved).not.toHaveProperty('multiPassEnabled')
+    expect(saved).not.toHaveProperty('agentCostSelectionKey')
+    expect(stored.multiPassEnabled).toBe(true)
+    const payload = w.emitted('select')?.[0]?.[0]
+    expect(payload).toMatchObject({ persisted: true })
+    expect(payload).not.toHaveProperty('multiPassEnabled')
+    expect(payload).not.toHaveProperty('agentCostSelectionKey')
+    expect(uni.$emit).not.toHaveBeenCalledWith('multiPassPreferenceUpdated', expect.anything())
+  })
+  it('does not reuse the prior open-panel initialization after a failed preference read', async () => {
+    const { w, vm, get, post } = await setup({ enabled: false })
+    await w.setProps({ open: false })
+    get.mockImplementation(async (url: string) => url === '/models' ? { statusCode: 200, data: JSON.parse(JSON.stringify(vm.modelTabs)) } : { statusCode: 503, data: {} })
+    await w.setProps({ open: true })
+    await flushPromises()
+    await vm.sure()
+    const saved = post.mock.calls.find(([url]) => url === '/settings')?.[1]?.data
+    expect(saved).not.toHaveProperty('multiPassEnabled')
+    expect(saved).not.toHaveProperty('agentCostSelectionKey')
+    expect(w.emitted('select')?.[0]?.[0]).not.toHaveProperty('multiPassEnabled')
+  })
+  it('shows the finalized failure and inline retry when apply cannot revalidate pending Agent ON', async () => {
+    const { w, vm, get, post } = await setup({ enabled: true })
+    get.mockRejectedValueOnce(new Error('network'))
+    await vm.sure()
+    expect(vm.dockOpen).toBe('agent')
+    expect(vm.agentCostText).toBe('modelSelect.agentCostLoadFailed')
+    const agentPanel = w.findAll('.ms-dock-panel').find(panel => panel.text().includes('modelSelect.deepPrepLabel'))!
+    expect(agentPanel.attributes('style') || '').not.toContain('display: none')
+    expect(agentPanel.find('button').text()).toBe('modelSelect.agentCostReload')
+    expect(agentPanel.find('button').attributes('disabled')).toBeUndefined()
+    expect(post.mock.calls.filter(([url]) => url === '/settings')).toHaveLength(0)
+    expect(w.emitted('select')).toBeUndefined()
+    expect(w.emitted('close')).toBeUndefined()
   })
 
 })

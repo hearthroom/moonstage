@@ -2206,13 +2206,19 @@ function composeModelDisplayName(variant, familyName) {
 	const sure = async () => {
 		if (isSure.value || costConfirming.value || deepPrepSaving.value) return;
 		costConfirming.value = true;
+		// An unread preference is unknown, never an instruction to turn Agent off.
+		const saveAgentPreference = deepPrepInitialized;
 		const selection = pendingAgentSelection();
 		let estimate = null;
 		let accepted = false;
 		try {
-			if (deepPrepEnabled.value) {
+			if (saveAgentPreference && deepPrepEnabled.value) {
 				const pref = await loadDeepPrepPreference();
-				if (!pref || !props.open || selection !== pendingAgentSelection()) return;
+				if (!pref) {
+					if (props.open && selection === pendingAgentSelection() && deepPrepQuoteFailed.value) dockOpen.value = 'agent';
+					return;
+				}
+				if (!props.open || selection !== pendingAgentSelection()) return;
 				const canUseAgent = pref.modelSupported && pref.runtimeEnabled;
 				estimate = canUseAgent ? pref.costEstimate : null;
 				if ((estimate && !panelAcceptedCost(estimate) && needsAgentCostConfirmation(estimate)) || (canUseAgent && !estimate && pref.costWarning)) {
@@ -2232,7 +2238,8 @@ function composeModelDisplayName(variant, familyName) {
 				}
 			}
 			deepPrepSaving.value = true;
-			const data = { roleId: formData.roleId, ...(formData.selectModel !== props.selectModel ? { selectModel: formData.selectModel } : {}), context: formData.context, thinkingDepth: formData.thinkingDepth, thinkingDepthManual: formData.thinkingDepthManual, multiPassEnabled: deepPrepEnabled.value, agentCostSelectionKey: estimate?.selectionKey || '' };
+			const agentPreference = saveAgentPreference ? { multiPassEnabled: deepPrepEnabled.value, agentCostSelectionKey: estimate?.selectionKey || '' } : {};
+			const data = { roleId: formData.roleId, ...(formData.selectModel !== props.selectModel ? { selectModel: formData.selectModel } : {}), context: formData.context, thinkingDepth: formData.thinkingDepth, thinkingDepthManual: formData.thinkingDepthManual, ...agentPreference };
 			const res = await _this.http.post(_this.requestUrl.playerRoleSettingsSave, { data, showLoading: false });
 			if (!res || res.statusCode !== 200) {
 				if (res?.statusCode === 409) { deepPrepQuoteChanged.value = true; dockOpen.value = 'agent'; await loadDeepPrepPreference(); }
@@ -2241,8 +2248,8 @@ function composeModelDisplayName(variant, familyName) {
 			}
 			if (estimate && (accepted || panelAcceptedCost(estimate))) rememberAgentCostConfirmation(estimate);
 			isSure.value = true;
-			uni.$emit('multiPassPreferenceUpdated', { roleId: formData.roleId, multiPassEnabled: deepPrepEnabled.value, runtimeEnabled: deepPrepRuntimeEnabled.value, modelSupported: deepPrepModelSupported.value });
-			await saveUserDefine({ multiPassEnabled: deepPrepEnabled.value, agentCostSelectionKey: estimate?.selectionKey || '', persisted: true });
+			if (saveAgentPreference) uni.$emit('multiPassPreferenceUpdated', { roleId: formData.roleId, multiPassEnabled: deepPrepEnabled.value, runtimeEnabled: deepPrepRuntimeEnabled.value, modelSupported: deepPrepModelSupported.value });
+			await saveUserDefine({ ...agentPreference, persisted: true });
 		} catch (error) {
 			message.error(t('main.save_failed'));
 			console.warn('[ModelSelect] 儲存模型設定失敗');

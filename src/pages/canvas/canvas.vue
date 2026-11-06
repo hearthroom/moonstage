@@ -799,7 +799,7 @@ async function loadMultiPassPreference(retryLeft = 1) {
       showLoading: false,
       quietTransport: true,
     })
-    if (String(unref(settingsRoleId) || '') !== id) return
+    if (String(unref(settingsRoleId) || '') !== id || res?.statusCode !== 200) return
     applyMultiPassPreference(normalizeMultiPassPreference(res))
   } catch (e) {
     if (retryLeft > 0 && isTransportFailure(e)) {
@@ -11049,7 +11049,7 @@ function onApplyModelSettings(payload: any) {
   if (next.persisted === true) {
     roleSettingsSnapshot = { ...roleSettingsSnapshot, ...currentRoleSettings() }
     modelCostQuoteChanged.value = false
-    applyMultiPassPreference({ multiPassEnabled: next.multiPassEnabled === true, runtimeEnabled: multiPassRuntimeEnabled.value, modelSupported: multiPassModelSupported.value })
+    if (typeof next.multiPassEnabled === 'boolean') applyMultiPassPreference({ multiPassEnabled: next.multiPassEnabled, runtimeEnabled: multiPassRuntimeEnabled.value, modelSupported: multiPassModelSupported.value })
   } else persistRoleSettings()
   // 目錄的標價是按上下文檔位算的，換了檔位就重抓一次，否則玩家在決定的那一刻
   // 看到的是舊價。
