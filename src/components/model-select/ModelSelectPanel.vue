@@ -127,6 +127,13 @@
 				<span class="ms-hint">{{ t('modelSelect.agentCostCompactNote') }}</span>
 				<span v-if="deepPrepQuoteChanged" class="ms-hint" role="status">{{ t('modelSelect.agentCostChanged') }}</span>
 			</div>
+
+			<!-- 偏好一次都沒讀到時 Agent 那一塊根本不會出現（全站開關未知），
+				 所以「讀不到、存不了」不能只寫在那一塊裡：這裡單獨給一句錯誤和重試。 -->
+			<div v-if="agentPreferenceRetryVisible" class="ms-dock-panel ms-agent-pref-failed">
+				<span class="ms-hint" role="alert">{{ deepPrepQuoteLoading ? t('modelSelect.agentCostLoading') : t('modelSelect.agentCostLoadFailed') }}</span>
+				<button type="button" class="ms-pill" :disabled="deepPrepQuoteLoading" @click="loadDeepPrepPreference">{{ t('modelSelect.agentCostReload') }}</button>
+			</div>
 		</Teleport>
 
 		<!-- 排序鍵排在分類列第一顆，寫著現在怎麼排；點了才在列底下攤開選項。
@@ -1565,7 +1572,16 @@ const truncationText = (completionRate: number) => {
 	const deepPrepQuoteChanged = ref(props.agentCostChanged === true);
 	let deepPrepRequest = 0;
 	let deepPrepInitialized = false;
-	const pendingAgentSelection = () => JSON.stringify([formData.roleId, props.conversationId, formData.selectModel, formData.context, formData.thinkingDepth, deepPrepEnabled.value]);
+	// 套用時偏好仍讀不到、又因此擋下了儲存：要在 Agent 那一塊之外給出錯誤與重試。
+	const agentPreferenceRetryVisible = ref(false);
+	// 這次打開時的選擇（模型目錄校正過檔位、思考深度之後）。用來分辨「玩家改了什麼」
+	// 與「只是按確定」：改了模型／檔位／思考深度，存著的 Agent 偏好與它的報價就不再對應。
+	let openedSelection = null;
+	const selectionShape = (model, context, thinkingDepth) => JSON.stringify([model, context, thinkingDepth]);
+	const selectionChangedSinceOpen = () => formData.selectModel !== props.selectModel
+		|| selectionShape(formData.selectModel, formData.context, formData.thinkingDepth)
+			!== (openedSelection ?? selectionShape(props.selectModel, props.context, props.thinkingDepth));
+	const pendingAgentSelection =() => JSON.stringify([formData.roleId, props.conversationId, formData.selectModel, formData.context, formData.thinkingDepth, deepPrepEnabled.value]);
 	const agentCostText = computed(() => {
 		const estimate = deepPrepCostEstimate.value;
 		if (deepPrepQuoteLoading.value) return t('modelSelect.agentCostLoading');
@@ -1626,6 +1642,7 @@ const truncationText = (completionRate: number) => {
 			deepPrepModelSupported.value = pref.modelSupported;
 			deepPrepCostWarning.value = pref.costWarning;
 			deepPrepCostEstimate.value = pref.costEstimate;
+			agentPreferenceRetryVisible.value = false;
 			return pref;
 		} catch (error) {
 			if (request === deepPrepRequest) { deepPrepCostEstimate.value = null; deepPrepCostWarning.value = false; deepPrepQuoteFailed.value = true; }
@@ -1699,6 +1716,8 @@ const truncationText = (completionRate: number) => {
 	watch(() => props.open, async (open) => {
 		if (!open) { panelCostAccepted.value = null; ++modelCatalogRequest; ++deepPrepRequest; deepPrepCostEstimate.value = null; settleCostModal(false); return; }
 		deepPrepInitialized = false;
+		agentPreferenceRetryVisible.value = false;
+		openedSelection = null;
 		deepPrepQuoteChanged.value = props.agentCostChanged === true;
 		// 這一份掛上去就一直在（彈層不是頁面）：上一次按過確認留下的 isSure 會讓第二次
 		// 確認直接被擋掉——重新整理後只有第一次有效（owner 2026-09-05）。每次打開歸零。
@@ -2100,6 +2119,7 @@ const truncationText = (completionRate: number) => {
 					if (!resumedBrowsedCategory) updateTabFromSelectedModel();
 					// Sync selectItem
 					syncSelectItem();
+					openedSelection = selectionShape(formData.selectModel, formData.context, formData.thinkingDepth);
 					isLoading.value = false;
 					if (focusLanes) focusCurrentLanes();
 				});
@@ -2207,13 +2227,28 @@ function composeModelDisplayName(variant, familyName) {
 		if (isSure.value || costConfirming.value || deepPrepSaving.value) return;
 		costConfirming.value = true;
 		// An unread preference is unknown, never an instruction to turn Agent off.
-		const saveAgentPreference = deepPrepInitialized;
-		const selection = pendingAgentSelection();
+		let saveAgentPreference = deepPrepInitialized;
+		let selection = pendingAgentSelection();
 		let estimate = null;
 		let accepted = false;
 		try {
+			// 偏好沒讀到、玩家又改了模型／檔位／思考深度：存著的可能是 Agent 開著，
+			// 而它的報價對新選擇已經不算數。不知道就存，等於讓下一輪用貴的設定卻沒被問過。
+			// 先重讀；讀到了就走下面同一條確認路徑，讀不到就不存、不關，給錯誤與重試。
+			let freshPreference = null;
+			if (!saveAgentPreference && stageHost.capabilities?.agentMode !== false && formData.roleId && selectionChangedSinceOpen()) {
+				freshPreference = await loadDeepPrepPreference();
+				if (!freshPreference) {
+					if (props.open && selection === pendingAgentSelection() && deepPrepQuoteFailed.value) agentPreferenceRetryVisible.value = true;
+					return;
+				}
+				if (!props.open) return;
+				saveAgentPreference = deepPrepInitialized;
+				// 讀到的偏好剛把開關定下來，待套用的選擇以它為準。
+				selection = pendingAgentSelection();
+			}
 			if (saveAgentPreference && deepPrepEnabled.value) {
-				const pref = await loadDeepPrepPreference();
+				const pref = freshPreference || await loadDeepPrepPreference();
 				if (!pref) {
 					if (props.open && selection === pendingAgentSelection() && deepPrepQuoteFailed.value) dockOpen.value = 'agent';
 					return;

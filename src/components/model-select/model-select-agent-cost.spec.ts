@@ -232,8 +232,71 @@ describe('pending Agent settings and confirmation', () => {
     expect(repeated).toBe(true)
   })
 
-  it.each(['unavailable', 'host-disabled'])('preserves stored Agent ON when preference is %s', async (reason) => {
-    const { w, vm, post, stored } = await setup({ enabled: true, ...(reason === 'unavailable' ? { agentStatus: 503 } : { agentCapability: false }) })
+  it('an unavailable preference blocks a changed selection with a visible error and retry', async () => {
+    const { w, vm, get, post, stored } = await setup({ enabled: true, agentStatus: 503 })
+    vm.formData.selectModel = 'fixture-next-lane'
+    vm.formData.context = 3
+    await flushPromises()
+    const agentReads = () => get.mock.calls.filter(([url]) => url === '/agent').length
+    const readsBefore = agentReads()
+    await vm.sure()
+    await flushPromises()
+    expect(agentReads()).toBe(readsBefore + 1)
+    expect(post.mock.calls.filter(([url]) => url === '/settings')).toHaveLength(0)
+    expect(w.emitted('select')).toBeUndefined()
+    expect(w.emitted('close')).toBeUndefined()
+    expect(vm.isSure).toBe(false)
+    // The Agent dock is not rendered while the preference was never read.
+    expect(vm.deepPrepVisible).toBe(false)
+    const failure = w.find('.ms-agent-pref-failed')
+    expect(failure.exists()).toBe(true)
+    expect(failure.text()).toContain('modelSelect.agentCostLoadFailed')
+    expect(failure.find('button').text()).toBe('modelSelect.agentCostReload')
+    expect(failure.find('button').attributes('disabled')).toBeUndefined()
+    await failure.find('button').trigger('click')
+    await flushPromises()
+    await vm.sure()
+    await flushPromises()
+    expect(w.find('.ms-agent-pref-failed').exists()).toBe(true)
+    expect(post.mock.calls.filter(([url]) => url === '/settings')).toHaveLength(0)
+    expect(stored.multiPassEnabled).toBe(true)
+    expect(uni.$emit).not.toHaveBeenCalledWith('multiPassPreferenceUpdated', expect.anything())
+  })
+  it.each(['retry', 'apply'])('a stored Agent ON recovered by %s confirms the cost before saving the changed selection', async (path) => {
+    const options: any = { enabled: true, agentStatus: 503 }
+    const { w, vm, post } = await setup(options)
+    vm.formData.selectModel = 'fixture-next-lane'
+    vm.formData.context = 3
+    await flushPromises()
+    await vm.sure()
+    await flushPromises()
+    expect(w.find('.ms-agent-pref-failed').exists()).toBe(true)
+    options.agentStatus = 200
+    if (path === 'retry') {
+      await w.find('.ms-agent-pref-failed button').trigger('click')
+      await flushPromises()
+      expect(w.find('.ms-agent-pref-failed').exists()).toBe(false)
+      expect(vm.deepPrepEnabled).toBe(true)
+    }
+    const declined = vm.sure()
+    await flushPromises()
+    expect(vm.costModalVisible).toBe(true)
+    vm.settleCostModal(false)
+    await declined
+    expect(post.mock.calls.filter(([url]) => url === '/settings')).toHaveLength(0)
+    expect(w.emitted('select')).toBeUndefined()
+    expect(w.find('.ms-agent-pref-failed').exists()).toBe(false)
+    const accepting = vm.sure()
+    await flushPromises()
+    expect(vm.costModalVisible).toBe(true)
+    vm.settleCostModal(true)
+    await accepting
+    expect(post.mock.calls.filter(([url]) => url === '/settings')).toEqual([['/settings', expect.objectContaining({ data: expect.objectContaining({ selectModel: 'fixture-next-lane', context: 3, multiPassEnabled: true, agentCostSelectionKey: 'selection-a' }) })]])
+    expect(w.emitted('select')?.[0]?.[0]).toMatchObject({ multiPassEnabled: true, agentCostSelectionKey: 'selection-a', persisted: true })
+    expect(w.emitted('close')).toHaveLength(1)
+  })
+  it('preserves stored Agent ON when preference is host-disabled', async () => {
+    const { w, vm, post, stored } = await setup({ enabled: true, agentCapability: false })
     vm.formData.selectModel = 'fixture-next-lane'
     vm.formData.context = 3
     await flushPromises()
