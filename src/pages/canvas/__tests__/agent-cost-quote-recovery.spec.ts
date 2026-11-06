@@ -38,18 +38,19 @@ describe('Agent quote changed before admission', () => {
 })
 
 describe('applying model settings with an unknown Agent preference', () => {
-  it('keeps the canvas Agent state when the saved payload omitted the mode', () => {
+  it('keeps the canvas Agent state when the saved payload omitted the mode', async () => {
     const applyMultiPassPreference = vi.fn()
     const scope: any = {
       selectedVariantValue: { value: 'shown-model' }, formData: { selectModel: 'stored-model' }, modelGroups: { value: [] },
+      settingsRoleId: { value: 'fixture-role' }, conversationId: { value: 'fixture-conversation' }, unref: (v: any) => v.value,
       findVariant: () => null, composeModelDisplayName: () => '', thinkingDepthForVariant: () => '',
       roleSettingsSnapshot: {}, currentRoleSettings: () => ({}), modelCostQuoteChanged: { value: false },
       applyMultiPassPreference, multiPassRuntimeEnabled: { value: true }, multiPassModelSupported: { value: true },
       persistRoleSettings: vi.fn(), loadModelCatalog: vi.fn(), loadMultiPassPreference: vi.fn(),
     }
-    const js = ts.transpile(take('function onApplyModelSettings(', '// ── 這張卡的遊玩設定')
-      + '\nonApplyModelSettings({ persisted: true, selectModel: "shown-model", context: 3 });', { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None })
-    new Function(...Object.keys(scope), js)(...Object.values(scope))
+    const js = ts.transpile(take('async function onApplyModelSettings(', '// ── 這張卡的遊玩設定')
+      + '\nreturn onApplyModelSettings({ persisted: true, selectModel: "shown-model", context: 3 });', { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None })
+    await new Function(...Object.keys(scope), js)(...Object.values(scope))
     expect(scope.formData.context).toBe(3)
     expect(applyMultiPassPreference).not.toHaveBeenCalled()
   })

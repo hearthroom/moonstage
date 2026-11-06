@@ -3874,7 +3874,7 @@ function buildHudHost(): HudHost {
     setEditText: (text) => { menuDraft.value = text; return true; },
     submitEdit: (_id, text) => { menuDraft.value = text; onMenuConfirmEdit(); return true; },
     cancelEdit: () => { closeMessageMenu(); return true; },
-    selectModel: (modelId) => { onApplyModelSettings({ selectModel: modelId }); return true; },
+    selectModel: (modelId) => onApplyModelSettings({ selectModel: modelId }),
     loadConversations: () => loadArchives().then(() => true),
     selectConversation: (key) => onPickArchive(key).then(() => true),
     renameConversation: (key, title) => onRenameArchive(key, title).then(() => true),
@@ -10804,10 +10804,13 @@ function closeCapacityChoice(restoreMore = false) {
 
 // 只寫動到的那一個欄位；存失敗就還原，畫面上的檔位不能停在沒存進去的值。
 async function saveCapacityPatch(patch: CapacityPatch): Promise<boolean> {
+  const targetRole = String(unref(settingsRoleId) || '')
+  const targetConversation = String(unref(conversationId) || '')
   const before = { context: formData.context, trimConstantLore: formData.trimConstantLore === true }
   if ('context' in patch) formData.context = patch.context
   if ('trimConstantLore' in patch) formData.trimConstantLore = patch.trimConstantLore
   const ok = await persistRoleSettings()
+  if (String(unref(settingsRoleId) || '') !== targetRole || String(unref(conversationId) || '') !== targetConversation) return false
   if (!ok) {
     formData.context = before.context
     formData.trimConstantLore = before.trimConstantLore
@@ -10839,7 +10842,7 @@ async function onCapacityPick(key: CapacityChoiceKey) {
     save: saveCapacityPatch,
     resend: resendAfterCapacityChoice,
   })
-  if (!done) capacitySpec.value = { ...capacitySpec.value, saving: false, error: t('canvas.capacity.saveFailed') }
+  if (!done) capacitySpec.value = { ...capacitySpec.value, saving: false, error: panel.value.sheet === 'capacity' ? t('canvas.capacity.saveFailed') : '' }
 }
 
 const resetChoices = ref({ clearNotepad: false, clearDirectives: false, clearResponseSettings: false })
@@ -11020,8 +11023,15 @@ const modelPanelLabels = computed(() => ({
   三個值一起寫是必要的：不同模型能吃的檔位不一樣，只換模型不換檔位會送出
   伺服器不認得的檔位。選單裡已經算好了，這裡照收。
 */
-function onApplyModelSettings(payload: any) {
+async function onApplyModelSettings(payload: any) {
   const next = payload || {}
+  const targetRole = String(unref(settingsRoleId) || '')
+  const targetConversation = String(unref(conversationId) || '')
+  const before = {
+    selectModel: formData.selectModel, selectModelName: formData.selectModelName,
+    context: formData.context, thinkingDepth: formData.thinkingDepth,
+    thinkingDepthManual: formData.thinkingDepthManual,
+  }
   /*
     只有玩家真的挑了另一條線路才動模型。
 
@@ -11050,12 +11060,27 @@ function onApplyModelSettings(payload: any) {
     roleSettingsSnapshot = { ...roleSettingsSnapshot, ...currentRoleSettings() }
     modelCostQuoteChanged.value = false
     if (typeof next.multiPassEnabled === 'boolean') applyMultiPassPreference({ multiPassEnabled: next.multiPassEnabled, runtimeEnabled: multiPassRuntimeEnabled.value, modelSupported: multiPassModelSupported.value })
-  } else persistRoleSettings()
+  } else {
+    const attempted = { ...currentRoleSettings(), selectModelName: formData.selectModelName }
+    if (!await persistRoleSettings()) {
+      if (String(unref(settingsRoleId) || '') === targetRole && String(unref(conversationId) || '') === targetConversation) {
+        // A HUD choice is provisional until saved. Do not leave a rejected model
+        // in later persona/settings diffs, or overwrite a newer local choice.
+        const selectionKeys = ['selectModel', 'context', 'thinkingDepth', 'thinkingDepthManual'] as const
+        if (selectionKeys.every(key => formData[key] === attempted[key])) {
+          for (const key of selectionKeys) formData[key] = before[key]
+        }
+        if (formData.selectModel === before.selectModel) formData.selectModelName = before.selectModelName
+      }
+      return false
+    }
+  }
   // 目錄的標價是按上下文檔位算的，換了檔位就重抓一次，否則玩家在決定的那一刻
   // 看到的是舊價。
   loadModelCatalog()
   // 換了模型，Agent 模式支不支援也跟著變。
   loadMultiPassPreference()
+  return true
 }
 
 // ── 這張卡的遊玩設定 ───────────────────────────────────────────────────
@@ -11172,8 +11197,12 @@ watch(hasLogin, (loggedIn) => {
 })
 
 async function persistRoleSettings() {
+  const targetRole = String(unref(settingsRoleId) || '')
+  const targetConversation = String(unref(conversationId) || '')
+  const submitted = currentRoleSettings()
+  const before = roleSettingsSnapshot
   const payload = buildRoleSettingsSavePayload(
-    String(unref(settingsRoleId) || ''), roleSettingsSnapshot, currentRoleSettings(),
+    String(unref(settingsRoleId) || ''), before, submitted,
   )
   // 一個字都沒動就連請求都不發。
   if (!payload) return true
@@ -11183,14 +11212,32 @@ async function persistRoleSettings() {
       data: payload,
       showLoading: false,
     })
+    if (String(unref(settingsRoleId) || '') !== targetRole || String(unref(conversationId) || '') !== targetConversation) return false
     if (res.statusCode !== 200) {
       // 稱呼與自我介紹會過內容審核，被擋下時伺服器講的是原因——照講給玩家聽，
       // 不要換成一句「儲存失敗」。
       const reason = (res.data && (res.data.error || res.data.message)) || ''
+      if (res.statusCode === 409 && reason === 'quote_changed') {
+        // Restore only this rejected selection. Metadata remains the player's
+        // draft, and an edit made while saving must not be rolled back.
+        const selectionKeys = ['selectModel', 'context', 'thinkingDepth', 'thinkingDepthManual'] as const
+        if (selectionKeys.every(key => formData[key] === submitted[key])) {
+          for (const key of selectionKeys) if (key in payload) formData[key] = before[key]
+          if ('selectModel' in payload) {
+            const variant = findVariant(modelGroups.value, formData.selectModel)
+            formData.selectModelName = variant ? composeModelDisplayName(variant, variant.family) : formData.selectModel
+          }
+        }
+        openModelSelect()
+        modelCostQuoteChanged.value = true
+        return false
+      }
       uni.showToast({ title: t('main.save_failed'), icon: 'error' })
       return false
     }
-    roleSettingsSnapshot = { ...roleSettingsSnapshot, ...currentRoleSettings() }
+    // A later local edit is not part of the completed request.
+    const { roleId: _savedRole, ...saved } = payload
+    roleSettingsSnapshot = { ...roleSettingsSnapshot, ...saved }
     return true
   } catch (e) {
     uni.showToast({ title: t('main.save_failed'), icon: 'error' })
