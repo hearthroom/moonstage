@@ -11213,6 +11213,12 @@ async function persistRoleSettings() {
       header: { 'content-type': 'application/json' },
       data: payload,
       showLoading: false,
+      quietErrors: true,
+    }).catch(error => {
+      // setupHttp rejects business conflicts. Feed the actual response through
+      // the same recovery path as hosts that resolve non-200 responses.
+      if (error?.statusCode === 409) return error
+      throw error
     })
     if (String(unref(settingsRoleId) || '') !== targetRole || String(unref(conversationId) || '') !== targetConversation) return false
     if (res.statusCode !== 200) {

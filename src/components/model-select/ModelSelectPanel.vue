@@ -2275,9 +2275,16 @@ function composeModelDisplayName(variant, familyName) {
 			deepPrepSaving.value = true;
 			const agentPreference = saveAgentPreference ? { multiPassEnabled: deepPrepEnabled.value, agentCostSelectionKey: estimate?.selectionKey || '' } : {};
 			const data = { roleId: formData.roleId, ...(formData.selectModel !== props.selectModel ? { selectModel: formData.selectModel } : {}), context: formData.context, thinkingDepth: formData.thinkingDepth, thinkingDepthManual: formData.thinkingDepthManual, ...agentPreference };
-			const res = await _this.http.post(_this.requestUrl.playerRoleSettingsSave, { data, showLoading: false });
+			const res = await _this.http.post(_this.requestUrl.playerRoleSettingsSave, { data, showLoading: false, quietErrors: true }).catch(error => {
+				if (error?.statusCode === 409) return error;
+				throw error;
+			});
 			if (!res || res.statusCode !== 200) {
-				if (res?.statusCode === 409) { deepPrepQuoteChanged.value = true; dockOpen.value = 'agent'; await loadDeepPrepPreference(); }
+				if (res?.statusCode === 409 && (res.data?.error === 'quote_changed' || res.data?.errorCode === 'quote_changed')) {
+					deepPrepQuoteChanged.value = true; dockOpen.value = 'agent';
+					await loadDeepPrepPreference();
+					return;
+				}
 				message.error(t('main.save_failed'));
 				return;
 			}
