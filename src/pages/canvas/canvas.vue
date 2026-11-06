@@ -10785,8 +10785,10 @@ function askCapacityChoice(advice: CapacityAdvice | null, draft: string, bubbleI
 const capacityProps = computed(() => {
   const spec = capacitySpec.value
   // 錯誤沒帶大小時，用模型選單上那一檔的大小。
-  const fallbackTokens = spec.advice?.requiredTier
-    ? contextBudgetTokens(selectedVariant.value?.contextBudgetOptions, spec.advice.requiredTier)
+  const requiredTier = spec.advice?.requiredTier
+  const options = selectedVariant.value?.contextBudgetOptions
+  const fallbackTokens = requiredTier && Array.isArray(options)
+    ? options.find(option => Number(option?.value) === Number(requiredTier))?.tokens
     : null
   return {
     content: t('canvas.capacity.content'),
