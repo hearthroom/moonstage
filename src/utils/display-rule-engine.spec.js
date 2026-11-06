@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 
 import {
   applyDisplayRules,
+  expandRandom,
   neutralizeRelativeMediaSources,
   matchesEmptyString,
   hasCrossLineRule,
@@ -281,5 +282,43 @@ describe('neutralizeRelativeMediaSources', () => {
   it('applyDisplayRules 的輸出已經處理過：規則產出的點火圖片不會再打站台', () => {
     const out = applyDisplayRules('<st>hi</st>', [{ id: 'r', find: '/<st>([\\s\\S]*?)<\\/st>/g', replace: '<div><img src="x-sao-v153-turn" onerror="fire()">$1</div>', enabled: true }])
     expect(out.html).toBe('<div><img src="data:," onerror="fire()">hi</div>')
+  })
+})
+
+
+describe('random macro compatibility', () => {
+  it.each([
+    ['comma syntax', '{{random:a,b}}', ['a', 'b']],
+    ['double-colon syntax', '{{random::a::b}}', ['a', 'b']],
+    ['legacy mixed syntax', '{{random:a::b}}', ['a', 'b']],
+    ['escaped URL colons', String.raw`{{random::https\://example.test/a.webp::https\://example.test/b.webp}}`, ['https://example.test/a.webp', 'https://example.test/b.webp']],
+    ['comma URL syntax', String.raw`{{random:https\://example.test/a.webp,https\://example.test/b.webp}}`, ['https://example.test/a.webp', 'https://example.test/b.webp']],
+    ['single comma option', '{{random: only }}', ['only']],
+    ['single colon option', '{{random:: only }}', ['only']],
+    ['commas within double-colon options', '{{random::a,b::c,d}}', ['a,b', 'c,d']],
+    ['single option with comma in double-colon syntax', '{{random::a,b}}', ['a,b']],
+    ['empty comma options', '{{random: , a, ,b, }}', ['a', 'b']],
+    ['empty double-colon options', '{{random::::a::::b::}}', ['a', 'b']],
+  ])('%s supplies clean choices before drawing', (_name, token, expected) => {
+    const seen = []
+    const output = expandRandom(token, (options) => { seen.push(options); return options[0] })
+    expect(seen).toEqual([expected])
+    expect(output).toBe(expected[0])
+  })
+
+  it.each(['{{random:}}', '{{random::}}', '{{random: , , }}', '{{random:::: ::}}'])('empty pool %s does not draw', (token) => {
+    let draws = 0
+    expect(expandRandom(token, () => { draws++; return 'unexpected' })).toBe('')
+    expect(draws).toBe(0)
+  })
+
+  it('restores URL colons before relative media neutralization', () => {
+    const out = applyDisplayRules('<pic>', [{ find: '<pic>', replace: String.raw`<img src="{{random::https\://example.test/a.webp::https\://example.test/b.webp}}">` }], { pickRandom: (options) => options[0] })
+    expect(out.html).toBe('<img src="https://example.test/a.webp">')
+    expect(out.rollbacks).toEqual([])
+  })
+
+  it('keeps escape handling inside the random macro', () => {
+    expect(expandRandom(String.raw`outside\: {{random::a\:b::c}}`, (options) => options[0])).toBe(String.raw`outside\: a:b`)
   })
 })

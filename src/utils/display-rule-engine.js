@@ -30,7 +30,7 @@ const ROLLBACK_VOLUME = 'volume'
 
 const SLASH_FORM = /^\/([\s\S]+)\/([a-zA-Z]*)$/
 const FIELD_TOKEN = /\$([a-zA-Z_一-龥][\w一-龥]*)/g
-const RANDOM_TOKEN = /\{\{random:([^}]*)\}\}/g
+const RANDOM_TOKEN = /\{\{random(:{1,2})([^}]*)\}\}/g
 
 function escapeLiteral(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -157,10 +157,13 @@ function parseFieldTable(capture) {
 
 function expandRandom(text, pickRandom = defaultPickRandom, position = {}) {
   let tokenIndex = 0
-  return text.replace(RANDOM_TOKEN, (whole, body) => {
+  return text.replace(RANDOM_TOKEN, (whole, separator, body) => {
+    // MMD/ST 接受 random::a::b 與 random:a,b；保留既有 random:a::b。
+    // 雙冒號語法的逗號屬於選項內容，單選項時也不能拆開。
+    const delimiter = separator === '::' || body.indexOf('::') >= 0 ? '::' : ','
     const options = String(body)
-      .split('::')
-      .map((option) => option.trim())
+      .split(delimiter)
+      .map((option) => option.trim().replace(/\\:/g, ':'))
       .filter((option) => option !== '')
     if (!options.length) return ''
     return pickRandom(options, { ...position, tokenIndex: tokenIndex++ })

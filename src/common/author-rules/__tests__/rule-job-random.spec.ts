@@ -127,3 +127,28 @@ describe('rolled-back rules do not spend random cards', () => {
     })
   }
 })
+
+
+describe('MMD random URL compatibility across page engines', () => {
+  for (const engine of ['tavern', 'display'] as const) {
+    for (const token of [
+      String.raw`{{random::https\://example.test/a.webp::https\://example.test/b.webp}}`,
+      String.raw`{{random:https\://example.test/a.webp,https\://example.test/b.webp}}`,
+    ]) {
+      it(`${engine}: inline and worker draw valid image URLs from ${token}`, async () => {
+        const { createRuleWorkerHandler } = await import('../rule-worker-protocol')
+        const rules = [{ id: 'image', find: '<pic>', replace: `<img src="${token}">` }]
+        const options = { seed: 'message', randomScope: 'compatibility' }
+        const inline = executeRuleJob(engine, '<pic><pic>', rules, options)
+        const sources = [...inline.html.matchAll(/src="([^"]+)"/g)].map((m) => m[1])
+        expect(sources.sort()).toEqual(['https://example.test/a.webp', 'https://example.test/b.webp'])
+        const replies: any[] = []
+        const handle = createRuleWorkerHandler((reply: any) => replies.push(reply))
+        handle({ t: 'rules', key: 'image', rules })
+        handle({ t: 'job', id: 1, engine, text: '<pic><pic>', rulesKey: 'image', options })
+        expect(replies[0].html).toBe(inline.html)
+        expect(inline.rollbacks).toEqual([])
+      })
+    }
+  }
+})
