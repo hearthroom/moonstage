@@ -32,6 +32,39 @@ function unwrapResponseBody(raw: any): any {
   return body
 }
 
+export interface AgentCostEstimate {
+  status: 'observed' | 'estimated' | 'unknown'
+  typicalCredits: number | null
+  highCredits: number | null
+  normalTypicalCredits: number | null
+  reason: string
+  presentation: 'none' | 'inline' | 'confirm'
+  selectionKey: string
+  ruleVersion: string
+  generatedAt: string
+  expiresAt: string
+  sampleCount: number
+}
+export function normalizeAgentCostEstimate(raw: unknown): AgentCostEstimate | null {
+  const value: any = raw
+  if (!value || !['observed', 'estimated', 'unknown'].includes(value.status)
+    || !['none', 'inline', 'confirm'].includes(value.presentation)) return null
+  const credits = (n: unknown) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n : null
+  const typical = credits(value.typicalCredits), high = credits(value.highCredits)
+  if (value.status !== 'unknown' && (typical === null || high === null || typical > high)) return null
+  return {
+    status: value.status, typicalCredits: value.status === 'unknown' ? null : typical,
+    highCredits: value.status === 'unknown' ? null : high,
+    normalTypicalCredits: credits(value.normalTypicalCredits),
+    reason: typeof value.reason === 'string' ? value.reason : '', presentation: value.presentation,
+    selectionKey: typeof value.selectionKey === 'string' ? value.selectionKey : '',
+    ruleVersion: typeof value.ruleVersion === 'string' ? value.ruleVersion : '',
+    generatedAt: typeof value.generatedAt === 'string' ? value.generatedAt : '',
+    expiresAt: typeof value.expiresAt === 'string' ? value.expiresAt : '',
+    sampleCount: credits(value.sampleCount) || 0,
+  }
+}
+
 export function normalizeMultiPassPreference(raw: any) {
   const body = unwrapResponseBody(raw)
   return {
@@ -39,13 +72,9 @@ export function normalizeMultiPassPreference(raw: any) {
     // 伺服器沒說支援就是不支援，不猜。
     modelSupported: !!body.modelSupported,
     runtimeEnabled: body.runtimeEnabled === true,
-    // costWarning：撥開之前要不要先彈一次高消費提醒。
-    //
-    // 沒說就是不提醒。這裡不能學 modelSupported 的保守方向（拿不到就當不支援）：
-    // 那邊保守是少給一個功能，這邊保守會變成對每一個模型都攔一次，包括便宜到
-    // 不需要攔的——提醒到處都是，使用者就會學會直接點掉，真正該攔的那次也一起
-    // 被點掉了。名單在伺服器，舊版伺服器沒有這個欄位，行為就跟改動前一樣。
+    // Additive contract: old servers retain their existing boolean behavior.
     costWarning: body.costWarning === true,
+    costEstimate: normalizeAgentCostEstimate(body.costEstimate),
   }
 }
 

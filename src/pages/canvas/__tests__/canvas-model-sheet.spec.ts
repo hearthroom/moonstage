@@ -174,6 +174,6 @@ describe('模型選單吃卡片美化', () => {
     expect(template).not.toContain('class="ms-search"')
   })
   it('每次打開都把上一次的確認狀態歸零', () => {
-    expect(template).toMatch(/watch\(\(\) => props\.open, \(open\) => \{\s*\n\s*if \(!open\) return;[\s\S]{0,400}isSure\.value = false;/)
+    expect(template).toMatch(/watch\(\(\) => props\.open, async \(open\) => \{\s*\n\s*if \(!open\) \{[^}]*return; \}[\s\S]{0,500}isSure\.value = false;/)
   })
 })

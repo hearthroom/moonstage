@@ -1,8 +1,11 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import CanvasModelPanel from '../components/canvas-model-panel.vue'
 import ModelSelectPanel from '@/components/model-select/ModelSelectPanel.vue'
 import catalog from './fixtures/model-catalog.json'
+
+beforeEach(() => { vi.stubGlobal('uni', { showToast: vi.fn(), $emit: vi.fn() }) })
+afterEach(() => { vi.unstubAllGlobals() })
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 
@@ -28,7 +31,7 @@ async function panel(depth: string, manual: boolean) {
     props: { open: true, roleId: 'fixture-role', selectedValue: 'deepseek-v4-flash-mist',
       thinkingDepth: depth, thinkingDepthManual: manual },
     global: { config: { globalProperties: {
-      http: { get }, requestUrl: { playerAgentMode: '/agent-mode', getModelListV2: '/models' },
+      http: { get, post: vi.fn(async () => ({ statusCode: 200, data: {} })) }, requestUrl: { playerRoleSettingsSave: '/settings', playerAgentMode: '/agent-mode', getModelListV2: '/models' },
     } } },
   })
   await flushPromises()

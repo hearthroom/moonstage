@@ -43,6 +43,8 @@
         ref="picker"
         :open="open"
         :role-id="roleId"
+        :conversation-id="conversationId"
+        :agent-cost-changed="agentCostChanged"
         :select-model="selectedValue"
         :select-model-name="modelName"
         :context="contextValue"
@@ -113,6 +115,8 @@ const props = withDefaults(defineProps<{
   open?: boolean
   title?: string
   roleId?: string
+  conversationId?: string
+  agentCostChanged?: boolean
   selectedValue?: string
   modelName?: string
   scoreText?: string
@@ -136,6 +140,8 @@ const props = withDefaults(defineProps<{
   open: true,
   title: '',
   roleId: '',
+  conversationId: '',
+  agentCostChanged: false,
   selectedValue: '',
   modelName: '',
   scoreText: '',

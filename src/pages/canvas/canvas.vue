@@ -174,6 +174,8 @@
         :open="panel.sheet === 'model'"
         :title="t('canvas.panel.model')"
         :role-id="settingsRoleId"
+        :conversation-id="String(unref(conversationId) || '')"
+        :agent-cost-changed="modelCostQuoteChanged"
         :selected-value="selectedVariantValue"
         :model-name="formData.selectModelName"
         :score-text="modelScoreText"
@@ -5080,6 +5082,7 @@ function openModelSelect(focus: '' | 'lanes' = '') {
     return
   }
   modelPanelFocus.value = focus
+  modelCostQuoteChanged.value = false
   panel.value = openSheet(panel.value, 'model')
 }
 
@@ -8496,12 +8499,12 @@ function recoverPendingChatTurnBeforeAccepted(showNotice = true, errorMetadata: 
   rewrite.value = false;
   contine.value = false;
   const explicitErrorType = String(pending.preAdmissionErrorType || '').trim();
-  if (explicitErrorType) {
+  if (explicitErrorType && explicitErrorType !== 'quote_changed') {
     // 伺服器已經明確講了原因（免費次數用完、點數不足這類），這種時候只彈一句
     // 「訊息未送出」等於把一個明確的答案顯示成斷線——使用者分不出是我們壞了
     // 還是他不能用。把原話印進錯誤氣泡，草稿仍然留在輸入框讓他換個模型再送。
     appendChatErrorBubble(explicitErrorType, resolveChatErrorMessage(explicitErrorType, t), errorMetadata);
-  } else if (showNotice) {
+  } else if (showNotice && explicitErrorType !== 'quote_changed') {
     message.warning(t('chat.messageNotSentDraftSaved'));
   }
   return true;
@@ -8630,6 +8633,10 @@ function settleConfirmedPreAdmissionFailure(
   const errorType = String(
     capturedPending.preAdmissionErrorType || 'connection_error',
   ).trim();
+  if (errorType === 'quote_changed' && capturedPending.accepted !== true) {
+    openModelSelect();
+    modelCostQuoteChanged.value = true;
+  }
   const errorMessage = resolveChatErrorMessage(errorType, t);
   const operationProjection = createPreAdmissionOperationErrorProjection(
     talkList.value,
@@ -8647,7 +8654,7 @@ function settleConfirmedPreAdmissionFailure(
     pendingResendPayload.value = null;
     clearStreamState();
     removeOrphanPlaceholder();
-    appendChatErrorBubble(errorType, errorMessage, operationProjection);
+    if (errorType !== 'quote_changed') appendChatErrorBubble(errorType, errorMessage, operationProjection);
     closeWebSocket();
     return true;
   }
@@ -8661,7 +8668,7 @@ function settleConfirmedPreAdmissionFailure(
     pendingResendPayload.value = null;
     clearStreamState();
     removeOrphanPlaceholder();
-    appendChatErrorBubble(errorType, errorMessage, operationProjection);
+    if (errorType !== 'quote_changed') appendChatErrorBubble(errorType, errorMessage, operationProjection);
     closeWebSocket();
     return true;
   }
@@ -8672,7 +8679,7 @@ function settleConfirmedPreAdmissionFailure(
     ownershipRevision.value++; pendingChatTurn = null;
     clearStreamState();
     removeOrphanPlaceholder();
-    appendChatErrorBubble(errorType, errorMessage, operationProjection);
+    if (errorType !== 'quote_changed') appendChatErrorBubble(errorType, errorMessage, operationProjection);
   }
   closeWebSocket();
   return true;
@@ -10502,6 +10509,7 @@ useCanvasModalFocus(sandboxFrame, () => !!sandboxCard.value && !['model', 'respo
 
 // 模型選單這次要停在哪裡：'lanes' ＝目前這顆模型的線路清單。選單關掉就歸零，下次照一般方式開。
 const modelPanelFocus = ref<'' | 'lanes'>('')
+const modelCostQuoteChanged = ref(false)
 watch(() => panel.value.sheet, (sheet) => { if (sheet !== 'model') modelPanelFocus.value = '' })
 const presetDrawerOpen = ref(false)
 const moreParent = ref(false)
@@ -11038,7 +11046,11 @@ function onApplyModelSettings(payload: any) {
     formData.thinkingDepth = thinkingDepthForVariant(variant, previousDepth, formData.thinkingDepthManual === true)
     if (formData.thinkingDepth !== previousDepth) formData.thinkingDepthManual = false
   }
-  persistRoleSettings()
+  if (next.persisted === true) {
+    roleSettingsSnapshot = { ...roleSettingsSnapshot, ...currentRoleSettings() }
+    modelCostQuoteChanged.value = false
+    applyMultiPassPreference({ multiPassEnabled: next.multiPassEnabled === true, runtimeEnabled: multiPassRuntimeEnabled.value, modelSupported: multiPassModelSupported.value })
+  } else persistRoleSettings()
   // 目錄的標價是按上下文檔位算的，換了檔位就重抓一次，否則玩家在決定的那一刻
   // 看到的是舊價。
   loadModelCatalog()

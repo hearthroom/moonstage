@@ -49,8 +49,8 @@
 						@click="toggleDock('agent')"
 						@keydown.enter.prevent="toggleDock('agent')">✦ {{ t('modelSelect.deepPrepLabel') }}</span>
 					<ASwitch
-						:checked="deepPrepOn"
-						:disabled="!deepPrepModelSupported || deepPrepSaving"
+						:checked="deepPrepEnabled"
+						:disabled="(!deepPrepModelSupported && !deepPrepEnabled) || deepPrepSaving"
 						size="small"
 						@change="onDeepPrepChange" />
 				</div>
@@ -121,6 +121,11 @@
 			<div v-if="deepPrepVisible" v-show="dockOpen === 'agent'" class="ms-dock-panel">
 				<span class="ms-card-title">✦ {{ t('modelSelect.deepPrepLabel') }}</span>
 				<span class="ms-hint">{{ deepPrepModelSupported ? t('modelSelect.deepPrepHintBilling') : t('modelSelect.deepPrepUnsupported') }}</span>
+				<span v-if="deepPrepModelSupported" class="ms-hint" role="status" aria-live="polite">{{ agentCostText }}</span>
+				<button v-if="deepPrepModelSupported && (!deepPrepCostEstimate || deepPrepCostEstimate.status === 'unknown')" type="button" class="ms-pill" :disabled="deepPrepQuoteLoading" @click="loadDeepPrepPreference">{{ t('modelSelect.agentCostReload') }}</button>
+				<span v-if="deepPrepEnabled && selectItem && selectItem.noLimitEligible" class="ms-hint">{{ t('modelSelect.agentCostPlanNotCovered') }}</span>
+				<span class="ms-hint">{{ t('modelSelect.agentCostCompactNote') }}</span>
+				<span v-if="deepPrepQuoteChanged" class="ms-hint" role="status">{{ t('modelSelect.agentCostChanged') }}</span>
 			</div>
 		</Teleport>
 
@@ -426,14 +431,16 @@
 		<!-- 清單的淡出 mask 會裁掉 fixed 子孫；確認框留在同一個模型殼，移出捲動清單。 -->
 		<Teleport :to="costDialogHost" :disabled="!costDialogHost">
 		<div v-if="costModalVisible" class="ms-cost-mask" @click.self="settleCostModal(false)">
-			<div class="ms-cost confirm-scope">
+			<div ref="costDialogEl" class="ms-cost confirm-scope" role="dialog" aria-modal="true" :aria-label="costModalTitle" @keydown.esc.prevent.stop="settleCostModal(false)" @keydown="trapCostFocus">
 				<span class="ms-cost-title">{{ costModalTitle }}</span>
-				<span class="confirm-content">{{ t('modelSelect.deepPrepCostBody') }}</span>
-				<span class="ms-hint ms-cost-suggest">{{ t('modelSelect.deepPrepCostSuggest') }}</span>
+				<span v-if="deepPrepQuoteChanged" class="ms-hint" role="status">{{ t('modelSelect.agentCostChanged') }}</span>
+				<span class="confirm-content">{{ agentCostConfirmText }}</span>
+				<span v-if="selectItem && selectItem.noLimitEligible" class="ms-hint">{{ t('modelSelect.agentCostPlanNotCovered') }}</span>
+				<span class="ms-hint ms-cost-suggest">{{ t('modelSelect.agentCostCompactNote') }}</span>
 				<div class="confirm-bottom">
-					<div class="cancel-btn" @click="settleCostModal(false)">{{ t('modelSelect.deepPrepCostCancel') }}</div>
+					<button type="button" class="cancel-btn" @click="settleCostModal(false)">{{ t('modelSelect.agentCostConfirmBack') }}</button>
 					<div class="btn-gap"></div>
-					<div class="ok-btn" @click="settleCostModal(true)">{{ t('modelSelect.deepPrepCostConfirm') }}</div>
+					<button type="button" class="ok-btn" @click="settleCostModal(true)">{{ t('modelSelect.agentCostConfirmUse') }}</button>
 				</div>
 			</div>
 		</div>
@@ -532,6 +539,8 @@
 	} from '@/utils/model-select-category-memory'
 	import { setShowThinkingProcess } from '@/utils/thinking-display-pref'
 	import { normalizeMultiPassPreference } from '@/utils/multi-pass'
+	import { needsAgentCostConfirmation, rememberAgentCostConfirmation } from '@/utils/agent-cost-confirmation'
+	import { onStorageScopeChange } from '@/common/author-rules/storage-scope'
 	const gemIconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="#FED880" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:100%;height:100%;display:block;"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3L8 9l4 13 4-13-3-6M2 9h20"/></svg>'
 	/*
 		這一份原本是整頁，設定由它自己去讀寫。搬進畫布的彈層之後，設定的主換成
@@ -543,6 +552,8 @@
 	*/
 	const props = withDefaults(defineProps<{
 		roleId?: string
+		conversationId?: string
+		agentCostChanged?: boolean
 		/** 彈層開著嗎——關著時不重抓清單 */
 		open?: boolean
 		selectModel?: string
@@ -566,7 +577,7 @@
 		 */
 		focus?: '' | 'lanes'
 	}>(), {
-		roleId: '', open: true, selectModel: '', selectModelName: '', context: 1,
+		roleId: '', conversationId: '', agentCostChanged: false, open: true, selectModel: '', selectModelName: '', context: 1,
 		thinkingDepth: '', thinkingDepthManual: false, showThinkingProcess: true, autoCompactEnabled: false,
 		compactExtraInstruction: '', searchQuery: '', dockChips: null, dockPanel: null, costDialogHost: null, focus: '',
 	});
@@ -602,8 +613,9 @@
 		由呼叫端做（它才知道快照是什麼，只送真的動到的欄位），退頁換成關掉彈層——
 		這一頁不換頁，換頁等於把卡片的裝修整個丟掉。
 	*/
-	const saveUserDefine = async () => {
+	const saveUserDefine = async (saved = {}) => {
 		emit('select', {
+			...saved,
 			selectModel: formData.selectModel,
 			selectModelName: formData.selectModelName,
 			context: formData.context,
@@ -616,6 +628,7 @@
 	}
 
 	// Data
+	let modelCatalogRequest = 0;
 	const modelTabs = ref([]);        // ModelGroupV2[]
 	const tabCurrent = ref(0);
 	const currentFamilies = ref([]);   // Currently displayed families
@@ -1544,8 +1557,29 @@ const truncationText = (completionRate: number) => {
 	const deepPrepRuntimeEnabled = ref(false);
 	const deepPrepModelSupported = ref(false);
 	const deepPrepSaving = ref(false);
-	// 撥開之前要不要先攔一次高消費確認。由伺服器宣告，見 utils/multi-pass 的註解。
+	// Legacy fallback; new clients use the server cost estimate presentation.
 	const deepPrepCostWarning = ref(false);
+	const deepPrepCostEstimate = ref(null);
+	const deepPrepQuoteLoading = ref(false);
+	const deepPrepQuoteFailed = ref(false);
+	const deepPrepQuoteChanged = ref(props.agentCostChanged === true);
+	let deepPrepRequest = 0;
+	let deepPrepInitialized = false;
+	const pendingAgentSelection = () => JSON.stringify([formData.roleId, props.conversationId, formData.selectModel, formData.context, formData.thinkingDepth, deepPrepEnabled.value]);
+	const agentCostText = computed(() => {
+		const estimate = deepPrepCostEstimate.value;
+		if (deepPrepQuoteLoading.value) return t('modelSelect.agentCostLoading');
+		if (deepPrepQuoteFailed.value) return t('modelSelect.agentCostLoadFailed');
+		if (!estimate || estimate.status === 'unknown') return t('modelSelect.agentCostInlineUnknown');
+		const format = new Intl.NumberFormat(stageHost.locale.get() || 'en');
+		return t(estimate.status === 'observed' ? 'modelSelect.agentCostInlineObserved' : 'modelSelect.agentCostInlineEstimated', { typical: format.format(estimate.typicalCredits), high: format.format(estimate.highCredits) }, estimate.typicalCredits);
+	});
+	const agentCostConfirmText = computed(() => {
+		const estimate = deepPrepCostEstimate.value;
+		if (!estimate || estimate.status === 'unknown') return t('modelSelect.agentCostInlineUnknown');
+		const format = new Intl.NumberFormat(stageHost.locale.get() || 'en');
+		return t(estimate.status === 'observed' ? 'modelSelect.agentCostConfirmObserved' : 'modelSelect.agentCostConfirmEstimated', { typical: format.format(estimate.typicalCredits), high: format.format(estimate.highCredits) }, estimate.typicalCredits);
+	});
 	// 總開關關著時整個選項不出現：那是全站狀態，不是這個對話的問題，
 	// 顯示一個永遠灰著的開關只會讓人以為自己做錯了什麼。
 	const deepPrepSupported = computed(() => deepPrepModelSupported.value && deepPrepRuntimeEnabled.value);
@@ -1571,39 +1605,60 @@ const truncationText = (completionRate: number) => {
 
 
 	const loadDeepPrepPreference = async () => {
-		if (!props.open || stageHost.capabilities?.agentMode === false) return;
-		if (!formData.roleId) return;
+		if (!props.open || stageHost.capabilities?.agentMode === false || !formData.roleId) return null;
+		const request = ++deepPrepRequest;
+		const selection = pendingAgentSelection();
+		deepPrepCostEstimate.value = null;
+		deepPrepQuoteLoading.value = true;
+		deepPrepQuoteFailed.value = false;
 		try {
-			// 帶上「使用者現在挑的那個模型」，而不是只問已存檔的那個。
-			//
-			// 深入準備的開關靠 modelSupported 決定顯不顯示，而使用者在這一頁做的事
-			// 就是**還沒存檔地挑模型**。只問已存檔的等於答非所問：他點了 A，拿回來
-			// 的是上次存的 B 支不支援，開關的顯隱因此跟他的操作完全脫節。
 			const res = await _this.http.get(_this.requestUrl.playerAgentMode, {
-				data: { roleId: formData.roleId, model: formData.selectModel || '' },
+				data: { roleId: formData.roleId, ...(props.conversationId ? { conversationId: props.conversationId } : {}), model: formData.selectModel || '', contextLevel: formData.context, thinkingDepth: formData.thinkingDepth },
 				showLoading: false,
 			});
+			if (request !== deepPrepRequest || selection !== pendingAgentSelection() || !props.open) return null;
+			if (!res || res.statusCode !== 200) throw new Error('unexpected status');
 			const pref = normalizeMultiPassPreference(res);
-			deepPrepEnabled.value = pref.multiPassEnabled;
+			// Only the initial read seeds the pending switch. Model/shape refreshes may
+			// never replace an unsaved choice with the stored preference.
+			if (!deepPrepInitialized) { deepPrepEnabled.value = pref.multiPassEnabled; deepPrepInitialized = true; }
 			deepPrepRuntimeEnabled.value = pref.runtimeEnabled;
 			deepPrepModelSupported.value = pref.modelSupported;
 			deepPrepCostWarning.value = pref.costWarning;
+			deepPrepCostEstimate.value = pref.costEstimate;
+			return pref;
 		} catch (error) {
-			console.warn('[ModelSelect] 讀取深入準備偏好失敗:', error);
-		}
+			if (request === deepPrepRequest) { deepPrepCostEstimate.value = null; deepPrepCostWarning.value = false; deepPrepQuoteFailed.value = true; }
+			console.warn('[ModelSelect] 讀取 Agent 模式偏好失敗');
+			return null;
+		} finally { if (request === deepPrepRequest) deepPrepQuoteLoading.value = false; }
 	};
 
 	// 開啟前的高消費確認。
 	//
 	// 只在**開啟**方向攔：關掉沒有代價，攔一次只是擋路。攔的門檻由伺服器宣告
 	// （costWarning），前端不自己判斷哪些模型貴——前端沒有定價，也沒有模型目錄。
+	const panelCostAccepted = ref(null);
+	const panelAcceptedCost = (estimate) => {
+		const accepted = panelCostAccepted.value;
+		return !!accepted && estimate.selectionKey === accepted.selectionKey && estimate.ruleVersion === accepted.ruleVersion
+			&& estimate.highCredits != null && estimate.highCredits < accepted.highCredits * 1.25;
+	};
 	const costModalVisible = ref(false);
+	const costDialogEl = ref(null);
+	let costPreviousFocus = null;
+	const trapCostFocus = (event) => {
+		if (event.key !== 'Tab') return;
+		const buttons = costDialogEl.value?.querySelectorAll('button');
+		if (!buttons?.length) return;
+		const first = buttons[0], last = buttons[buttons.length - 1];
+		if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+		else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+	};
 	const costModalResolve = ref(null);
-	// 標題點名使用者剛挑的那個模型。攔他的原因是**這個模型本來就貴**，不是這個
-	// 模式本身——便宜的模型再多跑幾輪也還是便宜，所以那些根本不攔。講成「這個
-	// 模式很貴」會跟豁免名單自相矛盾。
+	// Name the currently selected model; the server decides whether its cost needs confirmation.
 	const costModalTitle = computed(() =>
-		t('modelSelect.deepPrepCostTitle', { model: selectedFamilyName.value })
+		t('modelSelect.agentCostConfirmTitle', { model: selectedFamilyName.value })
 	);
 
 	// 任何不是明確按下確認的收尾都往「不開」倒——這道確認守的是錢。
@@ -1611,66 +1666,47 @@ const truncationText = (completionRate: number) => {
 		const resolve = costModalResolve.value;
 		costModalResolve.value = null;
 		costModalVisible.value = false;
+		costPreviousFocus?.focus?.();
 		if (resolve) resolve(!!confirmed);
 	};
 
 	const confirmDeepPrepCost = () => new Promise((resolve) => {
 		costModalResolve.value = resolve;
+		costPreviousFocus = typeof document !== 'undefined' ? document.activeElement : null;
 		costModalVisible.value = true;
+		nextTick(() => costDialogEl.value?.querySelector('button')?.focus());
 	});
 
 	const onDeepPrepChange = async (nextEnabled) => {
-		if (!props.open || stageHost.capabilities?.agentMode === false) return;
-		// 停用態仍然在畫面上，所以也可能被觸發——在這裡擋掉，不要送出一個
-		// 伺服器本來就不會生效的偏好。
-		if (!deepPrepModelSupported.value) return;
-		if (deepPrepSaving.value) return;
-		const previous = deepPrepEnabled.value;
-		deepPrepEnabled.value = nextEnabled;
-		deepPrepSaving.value = true;
-		try {
-			const res = await _this.http.post(_this.requestUrl.playerAgentMode, {
-				data: { roleId: formData.roleId, multiPassEnabled: nextEnabled },
-			});
-			if (!res || res.statusCode !== 200) throw new Error('unexpected status');
-			const pref = normalizeMultiPassPreference(res);
-			deepPrepEnabled.value = pref.multiPassEnabled;
-			deepPrepRuntimeEnabled.value = pref.runtimeEnabled;
-			deepPrepModelSupported.value = pref.modelSupported;
-			deepPrepCostWarning.value = pref.costWarning;
-			uni.$emit('multiPassPreferenceUpdated', { roleId: formData.roleId, ...pref });
-			// 價格與無限卡覆蓋是伺服器按「這張卡有沒有開 Agent 模式」算的，所以
-			// 開關一撥，整份清單的標價就變了——固定價轉成浮動、無限卡從涵蓋變成
-			// 不涵蓋。不重抓的話使用者會在**決定要不要開的那一頁**看到舊價，
-			// 要離開再回來才會更新。
-			getModelList();
-		} catch (error) {
-			// 存不進去就把開關撥回去——顯示成已開啟卻沒生效，比不給開更糟。
-			deepPrepEnabled.value = previous;
-			console.warn('[ModelSelect] 儲存深入準備偏好失敗:', error);
-		} finally {
-			deepPrepSaving.value = false;
-		}
+		if (!props.open || stageHost.capabilities?.agentMode === false || deepPrepSaving.value) return;
+		// An unsupported model can still switch a stored preference off.
+		if (nextEnabled && !deepPrepModelSupported.value) return;
+		deepPrepInitialized = true;
+		deepPrepEnabled.value = nextEnabled === true;
+		refreshDynamicPrices();
 	};
 
-	onMounted(() => {
+	onMounted(async () => {
 		if (props.open) {
-			getModelList();
-			loadDeepPrepPreference();
+			if (deepPrepQuoteChanged.value) dockOpen.value = 'agent';
+			await loadDeepPrepPreference();
+			if (props.open) getModelList();
 		}
 	});
 
 	// 彈層不是頁面：它掛上去之後就一直在，沒有「再次顯示」這個事件。每一次被打開
 	// 都要重問一次——價格與支援度都會在別處被改掉（換了 Agent 模式、換了卡）。
-	watch(() => props.open, (open) => {
-		if (!open) return;
+	watch(() => props.open, async (open) => {
+		if (!open) { panelCostAccepted.value = null; ++modelCatalogRequest; ++deepPrepRequest; deepPrepCostEstimate.value = null; settleCostModal(false); return; }
+		deepPrepInitialized = false;
+		deepPrepQuoteChanged.value = props.agentCostChanged === true;
 		// 這一份掛上去就一直在（彈層不是頁面）：上一次按過確認留下的 isSure 會讓第二次
 		// 確認直接被擋掉——重新整理後只有第一次有效（owner 2026-09-05）。每次打開歸零。
 		isSure.value = false;
-		dockOpen.value = '';
+		dockOpen.value = deepPrepQuoteChanged.value ? 'agent' : '';
 		syncFromProps();
-		getModelList();
-		loadDeepPrepPreference();
+		await loadDeepPrepPreference();
+		if (props.open) getModelList();
 	});
 
 	// 呼叫端那邊的設定變了（例如另一個彈層存了上下文檔位）就跟著走。
@@ -1690,26 +1726,14 @@ const truncationText = (completionRate: number) => {
 		if (!props.open) syncFromProps();
 	});
 
-	// 換了模型就重新問一次支援度。
-	//
-	// 先前只在 onLoad / onShow 查——而 onShow 是「頁面顯示」不是「選了模型」，
-	// 所以在頁面裡點來點去時支援度從不更新，開關的顯隱取決於進頁面那一刻的模型。
-	// 那段程式碼的註解寫著「換過模型之後支援度可能變了，重新確認一次」，
-	// 但它掛錯了事件，所以那件事實際上沒有發生。
-	watch(() => formData.selectModel, () => {
-		if (isLoading.value) return;
-		loadDeepPrepPreference();
+	// Every cost-affecting selection gets a new quote; late requests are ignored.
+	watch(() => [formData.selectModel, formData.context, formData.thinkingDepth, props.conversationId], () => {
+		if (!isLoading.value) loadDeepPrepPreference();
 	});
-
-	// 記憶輪數變更時重新拉取動態模型的價格範圍
-	watch(() => formData.context, () => {
-		if (!isLoading.value) {
-			refreshDynamicPrices();
-		}
-	});
+	watch(() => formData.context, () => { if (!isLoading.value) refreshDynamicPrices(); });
 
 	const modelListQueryParams = () => {
-		const data = { contextLevel: formData.context };
+		const data = { contextLevel: formData.context, pendingAgent: deepPrepEnabled.value };
 		if (formData.roleId) {
 			data.roleId = formData.roleId;
 		}
@@ -1717,46 +1741,31 @@ const truncationText = (completionRate: number) => {
 	};
 
 	const refreshDynamicPrices = async () => {
+		const request = ++modelCatalogRequest;
+		const data = modelListQueryParams();
+		const selection = JSON.stringify(data);
 		try {
-			// 這一片自己有骨架（isLoading）。不關掉全螢幕的等待遮罩，玩家會看到一層
-			// 蓋住整個畫面的轉圈，而他要的東西就在底下正在畫出來。
-			const res = await _this.http.get(_this.requestUrl.getModelListV2, {
-				data: modelListQueryParams(),
-				showLoading: false,
-			});
-			if (res.statusCode == 200 && res.data) {
-				const newTabs = res.data;
-				for (let g = 0; g < newTabs.length && g < modelTabs.value.length; g++) {
-					const newFamilies = newTabs[g].families || [];
-					const oldFamilies = modelTabs.value[g].families || [];
-					for (const nf of newFamilies) {
-						const of = oldFamilies.find(f => f.family === nf.family);
-						if (!of) continue;
-						for (const nv of (nf.variants || [])) {
-							const ov = (of.variants || []).find(v => v.value === nv.value);
-							if (ov) {
-								ov.noLimitEligible = nv.noLimitEligible;
-								ov.noLimitCovered = nv.noLimitCovered;
-								if (nv.billingType === 'dynamic') {
-									ov.estMinScore = nv.estMinScore;
-									ov.estMaxScore = nv.estMaxScore;
-									ov.estSource = nv.estSource;
-									ov.estSampleCount = nv.estSampleCount;
-								}
-							}
+			const res = await _this.http.get(_this.requestUrl.getModelListV2, { data, showLoading: false });
+			if (!props.open || request !== modelCatalogRequest || selection !== JSON.stringify(modelListQueryParams())) return;
+			if (res.statusCode === 200 && Array.isArray(res.data)) {
+				for (const newTab of res.data) {
+					const oldTab = modelTabs.value.find(tab => tab.group === newTab.group);
+					if (!oldTab) continue;
+					for (const nextFamily of newTab.families || []) {
+						const family = (oldTab.families || []).find(f => f.family === nextFamily.family);
+						if (!family) continue;
+						for (const nextVariant of nextFamily.variants || []) {
+							const variant = (family.variants || []).find(v => v.value === nextVariant.value);
+							if (!variant) continue;
+							// Fixed/variable billing, tier quotes and pass coverage change together.
+							Object.assign(variant, nextVariant);
+							if (selectItem.value?.value === variant.value) selectItem.value = { ...selectItem.value, ...nextVariant };
 						}
-						if (nf.billingType === 'dynamic') {
-							of.estMinScore = nf.estMinScore;
-							of.estMaxScore = nf.estMaxScore;
-							of.estSource = nf.estSource;
-							of.estSampleCount = nf.estSampleCount;
-						}
+						Object.assign(family, nextFamily, { variants: family.variants });
 					}
 				}
 			}
-		} catch (e) {
-			console.warn('Failed to refresh dynamic prices:', e);
-		}
+		} catch { console.warn('[ModelSelect] 更新模型估價失敗'); }
 	};
 
 	const goBack = () => emit('close');
@@ -2064,14 +2073,18 @@ const truncationText = (completionRate: number) => {
 	};
 
 	const getModelList = async () => {
+		const request = ++modelCatalogRequest;
+		const data = modelListQueryParams();
+		const selection = JSON.stringify(data);
 		try {
 			// 這一片自己有骨架（isLoading）。不關掉全螢幕的等待遮罩，玩家會看到一層
 			// 蓋住整個畫面的轉圈，而他要的東西就在底下正在畫出來。
 			const res = await _this.http.get(_this.requestUrl.getModelListV2, {
-				data: modelListQueryParams(),
+				data,
 				showLoading: false,
 			});
 
+			if (!props.open || request !== modelCatalogRequest || selection !== JSON.stringify(modelListQueryParams())) return;
 			if (res.statusCode == 200) {
 				modelTabs.value = res.data;
 				// 接回使用者上一輪瀏覽到的分類（見 utils/model-select-category-memory）。
@@ -2183,23 +2196,60 @@ function composeModelDisplayName(variant, familyName) {
 	// （換到貴模型）反而完全不攔。而不管使用者怎麼換模型、怎麼撥開關，最後都會
 	// 經過「確認」這一步，攔在這裡才蓋得住所有路徑。
 	const costConfirming = ref(false);
-	const sure = async () => {
-		if (isSure.value || costConfirming.value) return;
-		if (deepPrepOn.value && deepPrepCostWarning.value) {
-			costConfirming.value = true;
-			let confirmed = false;
-			try {
-				confirmed = await confirmDeepPrepCost();
-			} finally {
-				costConfirming.value = false;
-			}
-			// 取消就留在這一頁，什麼都不套用。Agent 模式的偏好在撥開關時就已經存過
-			// 了，這裡取消的是「換到這個模型」，兩者是分開的。
-			if (!confirmed) return;
-		}
-		isSure.value = true;
-		saveUserDefine();
+	const reportAgentCostAction = (action, estimate) => {
+		if (!_this.requestUrl.playerAgentCostAction || !estimate?.selectionKey) return;
+		void _this.http.post(_this.requestUrl.playerAgentCostAction, {
+			data: { roleId: formData.roleId, ...(props.conversationId ? { conversationId: props.conversationId } : {}), model: formData.selectModel, contextLevel: formData.context, thinkingDepth: formData.thinkingDepth, selectionKey: estimate.selectionKey, action },
+			showLoading: false, quietTransport: true,
+		}).catch(() => {});
 	};
+	const sure = async () => {
+		if (isSure.value || costConfirming.value || deepPrepSaving.value) return;
+		costConfirming.value = true;
+		const selection = pendingAgentSelection();
+		let estimate = null;
+		let accepted = false;
+		try {
+			if (deepPrepEnabled.value) {
+				const pref = await loadDeepPrepPreference();
+				if (!pref || !props.open || selection !== pendingAgentSelection()) return;
+				const canUseAgent = pref.modelSupported && pref.runtimeEnabled;
+				estimate = canUseAgent ? pref.costEstimate : null;
+				if ((estimate && !panelAcceptedCost(estimate) && needsAgentCostConfirmation(estimate)) || (canUseAgent && !estimate && pref.costWarning)) {
+					reportAgentCostAction('shown', estimate);
+					accepted = await confirmDeepPrepCost();
+					reportAgentCostAction(accepted ? 'accepted' : 'declined', estimate);
+					if (!accepted) return;
+					if (estimate) panelCostAccepted.value = { selectionKey: estimate.selectionKey, ruleVersion: estimate.ruleVersion, highCredits: estimate.highCredits };
+				}
+				if (!props.open || selection !== pendingAgentSelection()) return;
+				// A quote can expire while the player reads. Re-quote instead of applying
+				// a different price silently. The next apply uses the updated estimate.
+				if (estimate && estimate.status !== 'unknown' && (!estimate.selectionKey || Date.parse(estimate.expiresAt) <= Date.now() || !Number.isFinite(Date.parse(estimate.expiresAt)))) {
+					deepPrepQuoteChanged.value = true; dockOpen.value = 'agent';
+					await loadDeepPrepPreference();
+					return;
+				}
+			}
+			deepPrepSaving.value = true;
+			const data = { roleId: formData.roleId, ...(formData.selectModel !== props.selectModel ? { selectModel: formData.selectModel } : {}), context: formData.context, thinkingDepth: formData.thinkingDepth, thinkingDepthManual: formData.thinkingDepthManual, multiPassEnabled: deepPrepEnabled.value, agentCostSelectionKey: estimate?.selectionKey || '' };
+			const res = await _this.http.post(_this.requestUrl.playerRoleSettingsSave, { data, showLoading: false });
+			if (!res || res.statusCode !== 200) {
+				if (res?.statusCode === 409) { deepPrepQuoteChanged.value = true; dockOpen.value = 'agent'; await loadDeepPrepPreference(); }
+				message.error(t('main.save_failed'));
+				return;
+			}
+			if (estimate && (accepted || panelAcceptedCost(estimate))) rememberAgentCostConfirmation(estimate);
+			isSure.value = true;
+			uni.$emit('multiPassPreferenceUpdated', { roleId: formData.roleId, multiPassEnabled: deepPrepEnabled.value, runtimeEnabled: deepPrepRuntimeEnabled.value, modelSupported: deepPrepModelSupported.value });
+			await saveUserDefine({ multiPassEnabled: deepPrepEnabled.value, agentCostSelectionKey: estimate?.selectionKey || '', persisted: true });
+		} catch (error) {
+			message.error(t('main.save_failed'));
+			console.warn('[ModelSelect] 儲存模型設定失敗');
+		} finally { costConfirming.value = false; deepPrepSaving.value = false; }
+	};
+	const clearPanelCostOnAccountChange = onStorageScopeChange(() => { panelCostAccepted.value = null; settleCostModal(false); ++deepPrepRequest; deepPrepCostEstimate.value = null; });
+	onBeforeUnmount(() => { clearPanelCostOnAccountChange(); ++deepPrepRequest; settleCostModal(false); });
 
 	/*
 		確認鍵在殼上，不在這一份裡：作者的卡寫的是
