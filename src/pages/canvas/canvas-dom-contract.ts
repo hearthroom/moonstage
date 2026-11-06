@@ -82,7 +82,7 @@ export const ALWAYS_PRESENT_SELECTORS = [
 export const CANVAS_SELECTOR_CONTRACT: CanvasSelectorEntry[] = [
   { selector: '[data-lt="fullscreen"]', region: 'header', origin: 'lt', why: '全螢幕按鈕沿用 header-meun，美化可用穩定鉤子覆寫' },
   { selector: '[data-lt="favorite"]', region: 'header', origin: 'lt', why: '收藏鍵沿用 header-meun，美化可用穩定鉤子覆寫（宿主站有這張卡才畫）' },
-  { selector: '[data-lt="comments"]', region: 'header', origin: 'lt', why: '留言鍵沿用 header-meun，美化可用穩定鉤子覆寫（宿主站有這張卡才畫）' },
+  { selector: '[data-lt="comments"]', region: 'header', origin: 'lt', why: '卡片資訊入口（原留言鍵，名字照舊）沿用 header-meun，美化可用穩定鉤子覆寫（宿主站有這張卡才畫）' },
   // ── 頂欄 ────────────────────────────────────────────────────────────
   { selector: '.topTabbar', region: 'header', origin: 'mmd', why: '卡片寫 .kg .topTabbar 換頂欄底色' },
   { selector: '#top-bar', region: 'header', origin: 'st', why: '酒館主題移植' },

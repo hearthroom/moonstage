@@ -81,4 +81,18 @@ describe('player fullscreen', () => {
     expect(favorite.get('svg').attributes('fill')).toBe('currentColor')
     wrapper.unmount()
   })
+  it('the comments hook now opens the card info panel: circle-i icon, dialog popup, expanded state', async () => {
+    const wrapper = mount(CanvasHeader, { props: { roleName: 'Example', avatar: '', commentsSupported: true, commentsLabel: 'Card details' } })
+    // Author CSS targets these names; they stay even though the key opens the info panel now.
+    const entry = wrapper.get('.header-meun.header-action.comments-toggle[data-lt="comments"]')
+    expect(entry.attributes('aria-label')).toBe('Card details')
+    expect(entry.attributes('aria-haspopup')).toBe('dialog')
+    expect(entry.attributes('aria-expanded')).toBe('false')
+    expect(entry.find('circle').exists()).toBe(true)
+    await wrapper.setProps({ commentsExpanded: true })
+    expect(entry.attributes('aria-expanded')).toBe('true')
+    await entry.trigger('click')
+    expect(wrapper.emitted('comments')).toHaveLength(1)
+    wrapper.unmount()
+  })
 })

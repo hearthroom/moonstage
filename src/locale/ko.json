@@ -10,7 +10,7 @@
 	"canvas.favorite.remove": "즐겨찾기에서 삭제",
 	"canvas.favorite.failed": "즐겨찾기를 변경하지 못했어요. 다시 시도해 주세요.",
 	"canvas.roleLoadFailed": "캐릭터 카드를 불러오지 못했어요. 페이지를 새로고침해 주세요.",
-	"canvas.comments.open": "댓글 보기",
+	"canvas.info.open": "카드 정보",
 	"error.contextCapacityTitle": "대화 용량 초과",
 	"error.contextCapacityExceeded": "이 대화는 현재 용량을 초과해요. 용량을 늘린 뒤 다시 시도해 보세요.",
 	"error.contextCapacitySettingsTitle": "캐릭터 설정 용량 초과",

@@ -221,12 +221,17 @@ export interface ChromeState {
     fullscreenSupported?: boolean
     fullscreenActive?: boolean
     fullscreenLabel?: string
-    /** 宿主站上有這張卡才畫收藏與留言（見 host/stage-host.ts 的 card）。 */
+    /** 宿主站上有這張卡才畫收藏與卡片資訊入口（見 host/stage-host.ts 的 card）。 */
     favoriteSupported?: boolean
     favoriteActive?: boolean
     favoriteLabel?: string
+    /**
+     * 卡片資訊入口。欄位與 ui 事件 'comments' 沿用留言鍵的名字：舊殼收到照樣畫鍵、按了照樣開面板。
+     * commentsExpanded 是面板開著（aria-expanded）；舊殼不認得就略過。
+     */
     commentsSupported?: boolean
     commentsLabel?: string
+    commentsExpanded?: boolean
   }
   composer: {
     placeholder: string

@@ -79,8 +79,9 @@ export interface StageHost {
   }
   scrollTo(el: Element | null, options?: { offset?: number }): void
   /**
-   * 這張卡在宿主站上的收藏與留言（頁首那兩顆）。卡片的社群資料在宿主站，舞台只認得 roleId，
-   * 所以查、改、開留言區全交給宿主。不實作，或 social() 回 null（沒上架、預覽、審核中），兩顆都不畫。
+   * 這張卡在宿主站上的收藏與卡片資訊（頁首那兩顆）。卡片的社群資料在宿主站，舞台只認得 roleId，
+   * 所以查、改、開卡片資訊面板全交給宿主。不實作，或 social() 回 null（沒上架、預覽、審核中），兩顆都不畫；
+   * 回了值就畫卡片資訊入口，favorite 為 false（沒登入）時不畫收藏。
    */
   /**
    * 分享情境（卡片腳本的 sdk.share／stage.share）：這次開卡帶進來的情境碼、這張卡在宿主站上的分享連結
@@ -102,10 +103,13 @@ export interface StageHost {
    */
   shared?: import('../common/shared-state').SharedHost
   card?: {
-    social(roleId: string): Promise<{ favorite: boolean; favorited: boolean; comments: boolean } | null>
+    social(roleId: string): Promise<{ favorite: boolean; favorited: boolean } | null>
     /** 回收藏後的實際狀態；失敗就丟，舞台還原並提示。 */
     setFavorite(roleId: string, on: boolean): Promise<boolean>
-    openComments(roleId: string): void
+    /** 開或收卡片資訊面板（面板由宿主畫，疊在畫布上，不動畫布）。 */
+    toggleInfo(roleId: string): void
+    /** 面板開關變了叫 fn（頁首入口的 aria-expanded）；回傳取消訂閱。 */
+    onInfoChange?(fn: (open: boolean) => void): () => void
   }
 }
 

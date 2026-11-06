@@ -10,7 +10,7 @@
 	"canvas.favorite.remove": "取消收藏",
 	"canvas.favorite.failed": "收藏没有成功，请再试一次。",
 	"canvas.roleLoadFailed": "角色卡加载失败，请刷新页面。",
-	"canvas.comments.open": "查看评论",
+	"canvas.info.open": "卡片信息",
 	"error.contextCapacityTitle": "对话内容超出容量",
 	"error.contextCapacityExceeded": "当前容量无法容纳这段对话，请提高容量后再试。",
 	"error.contextCapacitySettingsTitle": "角色设置超出容量",

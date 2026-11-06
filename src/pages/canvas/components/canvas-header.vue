@@ -36,7 +36,7 @@
         <div class="header-icon-meun" data-lt="header-actions">
           <!-- 本機草稿在套用中：純預覽或蓋掉線上規則時都亮著，讓作者知道現在看的不是線上版。 -->
           <div v-if="badge" class="header-meun preview-badge" data-lt="preview-badge">{{ badge }}</div>
-          <!-- 收藏與留言：卡片在宿主站上的社群資料，宿主說這張卡有才畫。
+          <!-- 收藏與卡片資訊：卡片在宿主站上的社群資料，宿主說這張卡有才畫。
                跟全螢幕一樣掛 header-meun，作者替頂欄功能鍵寫的美化直接套得上。 -->
           <div
             v-if="favoriteSupported"
@@ -56,6 +56,8 @@
               <path d="M12 20.5s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3z" />
             </svg>
           </div>
+          <!-- 卡片資訊入口（資訊／評論／榜單面板）。原本是留言鍵：comments-toggle、data-lt="comments"
+               與 ui 事件 comments 是作者美化與沙盒殼的公開名字，鍵的意思改了，名字照舊不動。 -->
           <div
             v-if="commentsSupported"
             role="button"
@@ -64,13 +66,16 @@
             data-lt="comments"
             :aria-label="commentsLabel"
             :title="commentsLabel"
+            aria-haspopup="dialog"
+            :aria-expanded="commentsExpanded ? 'true' : 'false'"
             @click="$emit('comments')"
             @keydown.enter.prevent="$emit('comments')"
             @keydown.space.prevent="$emit('comments')"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-              <path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.1A8 8 0 1 1 20 12z" />
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 11v5.5M12 7.5v.01" />
             </svg>
           </div>
           <div
@@ -101,7 +106,7 @@
 <script setup lang="ts">
 /*
  頂欄。作者的卡片把整條當成自己的畫布：換底色、換字體、替功能鍵上色。
-       所以這裡只放「走得掉／知道跟誰講話／收藏與留言／全螢幕」，其餘取值全部走變數。
+       所以這裡只放「走得掉／知道跟誰講話／收藏與卡片資訊／全螢幕」，其餘取值全部走變數。
        換模型不在這裡：輸入區的點數鍵、快捷列、「＋」都開得到，快捷列那顆寫著目前的模型名。
 */
 withDefaults(defineProps<{
@@ -115,12 +120,15 @@ withDefaults(defineProps<{
   fullscreenSupported?: boolean
   fullscreenActive?: boolean
   fullscreenLabel?: string
-  /** 宿主站上有這張卡（上架中）才有收藏與留言 */
+  /** 宿主站上有這張卡（上架中）才有收藏與卡片資訊入口 */
   favoriteSupported?: boolean
   favoriteActive?: boolean
   favoriteLabel?: string
+  /** 卡片資訊入口（沿用留言鍵的名字，見模板註解） */
   commentsSupported?: boolean
   commentsLabel?: string
+  /** 宿主的卡片資訊面板開著 */
+  commentsExpanded?: boolean
 }>(), { badge: '', showBack: true })
 
 defineEmits<{

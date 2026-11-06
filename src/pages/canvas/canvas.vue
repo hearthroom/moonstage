@@ -27,11 +27,12 @@
       :favorite-supported="!!social?.favorite"
       :favorite-active="!!social?.favorited"
       :favorite-label="favoriteLabel"
-      :comments-supported="!!social?.comments"
-      :comments-label="t('canvas.comments.open')"
+      :comments-supported="!!social"
+      :comments-label="t('canvas.info.open')"
+      :comments-expanded="infoOpen"
       @fullscreen="toggleFullscreen"
       @favorite="toggleFavorite"
-      @comments="openComments"
+      @comments="toggleInfo"
       @back="onHeaderBack"
     />
 
@@ -2872,10 +2873,14 @@ onMounted(() => {
 onUnmounted(() => { fullscreenControl?.dispose(); disposeViewport?.(); disposeGeometryDebug?.(); disposeBubbleFit?.(); });
 function toggleFullscreen() { void fullscreenControl?.toggle(); }
 
-// ── 收藏與留言（頁首）────────────────────────────────────────────────
+// ── 收藏與卡片資訊（頁首）──────────────────────────────────────────────
 // 卡片的社群資料在宿主站：這張卡有沒有上架、玩家收藏了沒，都問宿主。預覽、草稿、試玩不問——
 // 那不是公開那一張，按了也是記到別張上。換卡時先收起兩顆，舊卡的答案晚到不能蓋到新卡上。
-const social = ref<{ favorite: boolean; favorited: boolean; comments: boolean } | null>(null);
+const social = ref<{ favorite: boolean; favorited: boolean } | null>(null);
+/** 宿主的卡片資訊面板開著（頁首入口的 aria-expanded） */
+const infoOpen = ref(false);
+const stopInfoWatch = stageHost.card?.onInfoChange?.((open) => { infoOpen.value = open; });
+onUnmounted(() => stopInfoWatch?.());
 const favoriteBusy = ref(false);
 let socialSeq = 0;
 watch([roleId, previewOnly, previewDraft, trialCard], async ([id]) => {
@@ -2905,8 +2910,8 @@ async function toggleFavorite() {
     stageHost.ui.toast(t('canvas.favorite.failed'), 'error');
   } finally { favoriteBusy.value = false; }
 }
-function openComments() {
-  if (social.value?.comments) stageHost.card?.openComments(String(roleId.value));
+function toggleInfo() {
+  if (social.value) stageHost.card?.toggleInfo(String(roleId.value));
 }
 
 // 頁首與輸入區的呈現資料：跟模板上綁給 CanvasHeader／CanvasComposer 的是同一批值，殼那邊用同一套元件畫。
@@ -2929,8 +2934,9 @@ function buildChromeState() {
       favoriteSupported: !!social.value?.favorite,
       favoriteActive: !!social.value?.favorited,
       favoriteLabel: favoriteLabel.value,
-      commentsSupported: !!social.value?.comments,
-      commentsLabel: t('canvas.comments.open'),
+      commentsSupported: !!social.value,
+      commentsLabel: t('canvas.info.open'),
+      commentsExpanded: infoOpen.value,
     },
     composer: {
       placeholder: t('canvas.placeholder'),
@@ -3322,7 +3328,7 @@ function mountSandbox(asset: any) {
           case 'meter-hint-done': onMeterHintDone(); return;
           case 'fullscreen': toggleFullscreen(); return;
           case 'favorite': void toggleFavorite(); return;
-          case 'comments': openComments(); return;
+          case 'comments': toggleInfo(); return;
           case 'shortcut': onShortcut(String(key || '')); return;
           case 'paste-feedback': onPasteFeedback(String(key || '')); return;
           case 'back': goBackToEntry(); return;

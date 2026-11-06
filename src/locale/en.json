@@ -10,7 +10,7 @@
 	"canvas.favorite.remove": "Remove from favorites",
 	"canvas.favorite.failed": "Couldn’t update your favorites. Try again.",
 	"canvas.roleLoadFailed": "The character card couldn’t be loaded. Reload the page.",
-	"canvas.comments.open": "View comments",
+	"canvas.info.open": "Card details",
 	"error.contextCapacityTitle": "Conversation exceeds capacity",
 	"error.contextCapacityExceeded": "This conversation exceeds the current capacity. Increase the capacity and try again.",
 	"error.contextCapacitySettingsTitle": "Character setup exceeds capacity",
