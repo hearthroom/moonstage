@@ -27,7 +27,7 @@ function geometry(width: number, height: number, flowHud: boolean | 'fixed-only'
   refs.statusbar!.innerHTML = '<div id="mount-form" style="height:4000px">Mount form copy</div><button id="dock" style="position:fixed;z-index:1;right:0;top:100px;width:60px;height:44px">Dock</button>'
   if (flowHud) refs.statusbar!.innerHTML = '<div style="height:44px">Status values</div><button id="dock" style="position:fixed;z-index:1;right:0;top:100px;width:60px;height:44px">Dock</button>'
   if (flowHud === 'fixed-only') refs.statusbar!.firstElementChild!.remove()
-  refs.list.innerHTML = '<article style="height:4000px">Opening form in the message</article>'
+  refs.list.innerHTML = '<article><div id="mount-form" style="height:4000px">Mount form copy</div></article>'
   hideDuplicateStatusbarFlow(refs.statusbar, refs.list)
   const markup = `<!doctype html><style>${css}\n[data-chat="messages"]{overflow:auto}</style>${document.body.innerHTML}`
   const dir = mkdtempSync(join(tmpdir(), 'moonstage-statusbar-layout-')); dirs.push(dir)

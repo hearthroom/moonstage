@@ -162,10 +162,6 @@ function matchesListBlock(node: Element, list: HTMLElement): boolean {
     const all = Array.from(list.querySelectorAll(node.tagName))
     if (all.some((n) => n !== node && (n.textContent || '').replace(/[\s\uFEFF]+/g, '') === norm)) return true
   }
-  if (inlinePxHeight(node) >= 120) {
-    const all = Array.from(list.querySelectorAll('*'))
-    if (all.some((n) => n !== node && inlinePxHeight(n) >= 120)) return true
-  }
   return false
 }
 

@@ -77,7 +77,7 @@ export interface MessageListDeps {
   /** 正文裡的 <script>（宿主渲染管線保留它們）在氣泡掛上後跑一次。 */
   runScripts?: (bubble: HTMLElement, codes: string[]) => void
   /** 氣泡拆掉或正文換版時，釋放這顆氣泡跑過的訊息腳本記錄，讓重建的新氣泡能重新綁定。 */
-  releaseScripts?: (codes: string[]) => void
+  releaseScripts?: (codes: string[], bubble: HTMLElement) => void
   /** 定稿後替正文裡的前端區塊（圍欄裝的整份 HTML 文件）掛 iframe。 */
   mountFrontend?: (bubble: HTMLElement) => void
   /** 視窗化；沒給就全部掛著。 */
@@ -215,7 +215,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     const html = entry.state ? sourceHtml(entry.message) : ''
     if (!html || entry.activatedHtml === html || entry.message.state !== 'done') return
     if (entry.ranScripts.length) {
-      deps.releaseScripts?.(entry.ranScripts)
+      deps.releaseScripts?.(entry.ranScripts, entry.article)
       entry.ranScripts = []
     }
     entry.activatedHtml = html
@@ -277,7 +277,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
 
   const unmountApp = (entry: Entry) => {
     if (entry.ranScripts.length) {
-      deps.releaseScripts?.(entry.ranScripts)
+      deps.releaseScripts?.(entry.ranScripts, entry.article)
       entry.ranScripts = []
     }
     entry.activatedHtml = ''

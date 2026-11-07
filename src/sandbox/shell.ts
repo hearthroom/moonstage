@@ -369,25 +369,24 @@ export function createShell(options: CreateShellOptions): Shell {
     onError: (ruleName, error) => debug.error(strings.scriptError, ruleName, error),
     onExternalError: (ruleName, src) => debug.warn(strings.externalScriptFailed, ruleName, src),
   })
-  const messageScriptCounts = new Map<string, number>()
+  const messageScriptOwners = new Map<string, HTMLElement>()
   const runMessageScripts = (bubble: HTMLElement, codes: string[]) => {
     for (const code of new Set(codes)) {
       if (bubble === refs.statusbar) {
         if (bootRanScripts.has(code)) continue
         bootRanScripts.add(code)
       } else {
-        const count = messageScriptCounts.get(code) || 0
-        messageScriptCounts.set(code, count + 1)
-        if (bootRanScripts.has(code) || count > 0) continue
+        if (bootRanScripts.has(code) || messageScriptOwners.has(code)) continue
+        messageScriptOwners.set(code, bubble)
       }
       scope.run(bubble, () => runInlineScript(code, 'message', { doc, win, onError: (name, e) => debug.error(strings.scriptError, name, e), onExternalError: () => {} }))
     }
   }
-  const releaseMessageScripts = (codes: string[]) => {
+  const releaseMessageScripts = (codes: string[], bubble: HTMLElement) => {
+    // Only the DOM that actually ran the script owns its lifetime. A skipped duplicate
+    // must neither retain the old owner's lock nor release a rebuilt owner's lock.
     for (const code of new Set(codes)) {
-      const count = messageScriptCounts.get(code) || 0
-      if (count <= 1) messageScriptCounts.delete(code)
-      else messageScriptCounts.set(code, count - 1)
+      if (messageScriptOwners.get(code) === bubble) messageScriptOwners.delete(code)
     }
   }
   if (refs.statusbar && config.card.statusbarHtml) runMessageScripts(refs.statusbar, Array.from(String(config.card.statusbarHtml).matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)).map((m) => m[1]))
@@ -845,7 +844,7 @@ export function createShell(options: CreateShellOptions): Shell {
         if (stageState !== 'closed') { sdkHost.stage.close(); bus.emit('stage:close') }
         history.more = false
         history.loading = false
-        messageScriptCounts.clear()
+        messageScriptOwners.clear()
         list.clear()
         bus.resetReplay()
         // 載荷 { conversationId }（宿主有給才帶）：卡片用它對上 sdk.archive.list() 裡的那一段
