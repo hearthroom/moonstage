@@ -798,6 +798,8 @@ async function loadMultiPassPreference(retryLeft = 1) {
       data: { roleId: id, model: formData.selectModel || '' },
       showLoading: false,
       quietTransport: true,
+      // A background refresh can fail after settings were saved successfully.
+      quietErrors: true,
     })
     if (String(unref(settingsRoleId) || '') !== id || res?.statusCode !== 200) return
     applyMultiPassPreference(normalizeMultiPassPreference(res))
@@ -806,7 +808,7 @@ async function loadMultiPassPreference(retryLeft = 1) {
       await new Promise((r) => setTimeout(r, 800))
       return loadMultiPassPreference(retryLeft - 1)
     }
-    // 拿不到就當作沒開：AI 記事本會提示要開 Agent 模式，但不給前往開啟的鍵（runtime 未知）。
+    // 保留最近確認的狀態；首次尚未知時沿用初始值，模型面板另有載入錯誤與重試。
     console.warn('[Canvas] 讀取 Agent 模式狀態失敗:', e)
   }
 }

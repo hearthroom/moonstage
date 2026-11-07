@@ -19,7 +19,7 @@ async function client() {
   vi.resetModules()
   const calls: any[] = []
   const catalog = (await import('./fixtures/model-catalog-live.json')).default
-  const control = { status: 409, reason: 'quote_changed', key: 'before-price', high: 999 }
+  const control = { status: 409, reason: 'quote_changed', key: 'before-price', high: 999, agentStatus: 200 }
   vi.stubGlobal('uni', {
     request: (o: any) => {
       calls.push(o)
@@ -27,6 +27,7 @@ async function client() {
         const path = new URL(o.url).pathname
         let statusCode = 200, data: any = {}
         if (path.endsWith('/models')) data = catalog
+        if (path.endsWith('/agent')) statusCode = control.agentStatus
         if (path.endsWith('/agent')) data = {
           runtimeEnabled: true, modelSupported: true, multiPassEnabled: true,
           costWarning: control.high >= 1000,
@@ -165,4 +166,39 @@ describe('Agent settings through the real request interceptor', () => {
     expect(w.emitted('select')).toBeUndefined()
     expect(uni.showToast).toHaveBeenCalledOnce()
   })
+})
+
+
+it('does not report save failure or clear confirmed mode when the post-save background refresh rejects503', async () => {
+  const { http, control, calls, toast } = await client()
+  control.status = 200
+  control.reason = ''
+  control.agentStatus = 503
+  const ctx = canvas(http)
+  ctx.stageHost = { capabilities: { agentMode: true } }
+  ctx.multiPassEnabled = ref(true)
+  ctx._this.requestUrl.playerAgentMode = '/agent'
+  ctx.console = { warn: vi.fn() }
+  const refreshNames = ['loadMultiPassPreference', 'isTransportFailure', 'applyMultiPassPreference']
+  const refreshHandlers = refreshNames.map(name => {
+    const n = tree.statements.find(n => ts.isFunctionDeclaration(n) && n.name?.text === name)
+    if (!n) throw Error(`Missing actual refresh handler ${name}`)
+    return n.getText(tree)
+  }).join('\n')
+  runInNewContext(ts.transpileModule(refreshHandlers, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
+    + '\n' + refreshNames.map(n => `this.${n} = ${n}`).join(';'), ctx)
+  expect(await ctx.onApplyModelSettings({ selectModel: 'next-lane' })).toBe(true)
+  await flushPromises()
+  expect(calls.filter(c => c.url.endsWith('/save')).map(c => c.method)).toEqual(['POST'])
+  expect(calls.findIndex(c => c.url.endsWith('/save'))).toBeLessThan(calls.findIndex(c => c.url.endsWith('/agent')))
+  expect(ctx.roleSettingsSnapshot.selectModel).toBe('next-lane')
+  expect(ctx.formData.selectModel).toBe('next-lane')
+  expect(ctx.multiPassEnabled.value).toBe(true)
+  expect(ctx.multiPassRuntimeEnabled.value).toBe(true)
+  expect(ctx.multiPassModelSupported.value).toBe(true)
+  expect(toast.serverError).not.toHaveBeenCalled()
+  expect(uni.showToast).not.toHaveBeenCalled()
+  // Only this background read is quiet. An ordinary caller still gets its error.
+  await http.get('/agent', { data: { roleId: 'fixture-role' }, showLoading: false }).catch(() => {})
+  expect(toast.serverError).toHaveBeenCalledOnce()
 })
