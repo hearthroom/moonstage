@@ -529,6 +529,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
       entry.message.view = view
       if (!entry.app) return
       applyState(entry, stateOf(entry.message))
+      if (entry.message.state === 'done') nextTick(() => { if (entry.app) activate(entry) })
     },
     remove,
     bubbleOf: (id) => { const e = entries.get(String(id)); return e && e.app ? e.article : null },

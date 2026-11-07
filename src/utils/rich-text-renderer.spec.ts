@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 // @ts-ignore - plain JS module without bundled declarations
-import { renderRichText, isHeavyHtml, unwrapSingleHtmlFence } from './rich-text-renderer.js'
+import { renderRichText, isHeavyHtml, unwrapSingleHtmlFence, sanitizeHtml } from './rich-text-renderer.js'
 
 // 部分模型習慣把整張 HTML 卡包在 ```html 圍欄裡輸出，
 // isHeavyHtml 原本只認「開頭是 <」，整段包圍欄時走 MD 路徑、tag 被 escape 直出成原始碼。
@@ -136,5 +136,26 @@ describe('indented author images', () => {
     holder.innerHTML = renderRichText('Example:\n\n```html\n    ' + image + '\n```')
     expect(holder.querySelector('img')).toBeNull()
     expect(holder.querySelector('pre code')?.textContent).toContain('<img')
+  })
+})
+
+describe('head tag sanitization preserves embedded style/script and canvas placeholders (card 100737)', () => {
+  test('strips <head>, <meta>, <title> while keeping <style> and <script> inside <head>', () => {
+    const html = '<head><meta charset="utf-8"><title>角色卡</title><style>.card-100737{color:#e9eefc}</style><script>window.__headScript=1</script></head><div class="card-100737">內容</div>'
+    const out = sanitizeHtml(html)
+    expect(out).toContain('<style>.card-100737{color:#e9eefc}</style>')
+    expect(out).toContain('<script>window.__headScript=1</script>')
+    expect(out).toContain('<div class="card-100737">內容</div>')
+    expect(out).not.toMatch(/<\/?(?:head|meta|title)\b/i)
+    expect(out).not.toContain('角色卡')
+  })
+
+  test('preserves canvas.vue highlightText stashed style/script placeholders (\x05N\x06\x07) inside <head>', () => {
+    const html = '<head>\n  <meta name="viewport" content="width=device-width">\n  <title>無視</title>\n  \x050\x06\x07\n</head>\n<div class="wrap">表單</div>\n\x051\x06\x07'
+    const out = sanitizeHtml(html)
+    expect(out).toContain('\x050\x06\x07')
+    expect(out).toContain('\x051\x06\x07')
+    expect(out).toContain('<div class="wrap">表單</div>')
+    expect(out).not.toMatch(/<\/?(?:head|meta|title)\b/i)
   })
 })

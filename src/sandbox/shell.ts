@@ -41,7 +41,7 @@ import '@/pages/canvas/canvas-player-background.css'
 // 殼的內距在 layer 外的副本，跟一般卡同一份、同一個先後：卡片的 `* { margin: 0; padding: 0 }` 不分層，
 // 少了這份，殼裡的頁首、快捷列、輸入區內距在沙箱卡上會被整批清掉，一般卡卻不會。
 import '@/pages/canvas/canvas-chrome-box.css'
-import { buildShell, confirmDialog, setComposerVisible, setStage, setTheme, setViewportHeight, type ShellRefs } from './render/shell-dom'
+import { buildShell, confirmDialog, hideDuplicateStatusbarFlow, setComposerVisible, setStage, setTheme, setViewportHeight, type ShellRefs } from './render/shell-dom'
 import { createDebugPanel } from './debug'
 import { shellStrings } from './strings'
 import { createScriptTagLoader, scriptDirectionFor, type DisplayScriptLoader, type TextConverter } from './display-script'
@@ -310,7 +310,9 @@ export function createShell(options: CreateShellOptions): Shell {
       { engine: 'display', text: content, rules: card.rules, options: { variants: config.variants || null, seed: opts.seed } },
       { streaming: !!opts.streaming },
     )
-    const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, macros, fencedDocument: stylePolicy.fencedDocument, convert, nativeBlocks: opts.role === 'ai', preserveAuthorHtml: card.scripts.length > 0 }), stylePolicy)
+    const matched = opts.role && !opts.streaming && !out.provisional ? Array.from(card.matchedScripts(content, config.variants || null)) : []
+    const scriptSuffix = matched.map((c) => `<script>${c}</script>`).join('')
+    const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, macros, fencedDocument: stylePolicy.fencedDocument, convert, nativeBlocks: opts.role === 'ai', preserveAuthorHtml: card.scripts.length > 0 }), stylePolicy) + scriptSuffix
     return out.provisional ? { html, provisional: true } : html
   }
   const htmlOf = (out: string | { html: string }) => (typeof out === 'string' ? out : out.html)
@@ -330,10 +332,12 @@ export function createShell(options: CreateShellOptions): Shell {
     }
   }
   const statusbarHtml = refs.statusbar ? createLiveHtml(refs.statusbar, { dropBareText: true }) : null
-  const setStatusbarHtml = (html: string) => { statusbarFrames.clear(); statusbarHtml?.replace(html) }
+  const syncStatusbarDedupe = () => hideDuplicateStatusbarFlow(refs.statusbar, refs.list)
+  const setStatusbarHtml = (html: string) => { statusbarFrames.clear(); statusbarHtml?.replace(html); syncStatusbarDedupe() }
   const updateStatusbarHtml = (html: string) => {
     const before = Array.from(statusbarFrames, ([pre, frame]) => ({ pre, frame, text: pre.querySelector('code')?.textContent ?? pre.textContent ?? '' }))
     statusbarHtml?.update(html)
+    syncStatusbarDedupe()
     for (const { pre, frame, text } of before) {
       const next = pre.querySelector('code')?.textContent ?? pre.textContent ?? ''
       // srcdoc 是可執行的完整文件；只有來源變了才重載該區塊，其餘 frame 與外層作者狀態保留。
@@ -354,19 +358,23 @@ export function createShell(options: CreateShellOptions): Shell {
     }
     mountFrontend(refs.statusbar)
   }
-  runAuthorScripts(card.scripts, {
+  // 功能欄、SDK、純腳本規則在 hello 跑一次；與訊息區 HTML 元素同規則產出且未命中功能欄的腳本，等氣泡掛上後再由 runMessageScripts 跑一次。
+  const statusbarMatched = card.matchedScripts(config.card.statusbar, config.variants || null)
+  const bootScripts = card.scripts.filter((sc) => sc.kind !== 'inline' || !sc.messageDom || statusbarMatched.has(sc.code))
+  // 作者腳本「同一段只跑一次」：hello 跑成功的腳本記進 ranScripts，氣泡掛載後不再重跑；
+  // 訊息規則的腳本在氣泡掛上後跑一次並記進 ranScripts（切會話時隨氣泡拆掉重置訊息級記錄）。
+  const ranScripts = runAuthorScripts(bootScripts, {
     doc,
     win,
     onError: (ruleName, error) => debug.error(strings.scriptError, ruleName, error),
     onExternalError: (ruleName, src) => debug.warn(strings.externalScriptFailed, ruleName, src),
   })
-  // 作者腳本「同一段只跑一次」：裝卡時規則裡的 <script> 已經跑過；正文裡出現同一段（規則套上去的）不再跑，
-  // 不同段（例如模型輸出裡帶的）跑一次後也記住。跟 MMD 舊頁「同段去重」的行為一致。
-  const ranScripts = new Set<string>(card.scripts.filter((sc) => sc.kind === 'inline').map((sc) => (sc as { code: string }).code))
+  const ranMessageScripts = new Set<string>()
   const runMessageScripts = (bubble: HTMLElement, codes: string[]) => {
     for (const code of codes) {
       if (ranScripts.has(code)) continue
       ranScripts.add(code)
+      if (bubble !== refs.statusbar) ranMessageScripts.add(code)
       scope.run(bubble, () => runInlineScript(code, 'message', { doc, win, onError: (name, e) => debug.error(strings.scriptError, name, e), onExternalError: () => {} }))
     }
   }
@@ -424,6 +432,7 @@ export function createShell(options: CreateShellOptions): Shell {
       if (!statusbarPending) { setStatusbarHtml(htmlOf(out)); mountFrontend(refs.statusbar) }
     }
     list.refresh()
+    syncStatusbarDedupe()
   })
 
   // 字典載好（或確定不需要）：狀態欄與列表用轉過的字重畫一次，再讓 sdk.text.ready() 完成。
@@ -442,6 +451,7 @@ export function createShell(options: CreateShellOptions): Shell {
           mountFrontend(refs.statusbar)
         }
         list.rerenderAll()
+        syncStatusbarDedupe()
       }
       markTextReady()
     }, () => { markTextReady() })
@@ -667,6 +677,7 @@ export function createShell(options: CreateShellOptions): Shell {
   let readySent = false
   const coldStart = (messages: SandboxMessage[]) => {
     list.reset(messages)
+    syncStatusbarDedupe()
     if (!readySent) {
       readySent = true
       bus.emit('ready')
@@ -720,6 +731,7 @@ export function createShell(options: CreateShellOptions): Shell {
       case 'message.new':
         if (message.before) list.insertBefore(message.message, message.before)
         else list.add(message.message)
+        syncStatusbarDedupe()
         return
       case 'history':
         history.more = !!message.more
@@ -732,9 +744,11 @@ export function createShell(options: CreateShellOptions): Shell {
         return
       case 'message.done':
         list.done(message.id, message.content, message.serverId, message.view)
+        syncStatusbarDedupe()
         return
       case 'message.view':
         list.setView(message.id, message.view)
+        syncStatusbarDedupe()
         return
       case 'message.remove':
         list.remove(message.id)
@@ -818,6 +832,8 @@ export function createShell(options: CreateShellOptions): Shell {
         if (stageState !== 'closed') { sdkHost.stage.close(); bus.emit('stage:close') }
         history.more = false
         history.loading = false
+        for (const code of ranMessageScripts) ranScripts.delete(code)
+        ranMessageScripts.clear()
         list.clear()
         bus.resetReplay()
         // 載荷 { conversationId }（宿主有給才帶）：卡片用它對上 sdk.archive.list() 裡的那一段

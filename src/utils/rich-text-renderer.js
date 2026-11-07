@@ -187,8 +187,11 @@ function sanitizeHtml(html) {
     .replace(/<!DOCTYPE[^>]*>/gi, '')
     .replace(/<html[^>]*>/gi, '')
     .replace(/<\/html>/gi, '')
-    // 完整 head 區塊（連內容一起）
-    .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
+    // 完整 head 區塊：剝除 head/meta/title 外殼，但保留作者放在 <head> 裡的 <style>、<script> 與 highlightText 暫存標記（\x05N\x06\x07）
+    .replace(/<head[^>]*>([\s\S]*?)<\/head>/gi, (_m, inner) => {
+      const kept = String(inner).match(/<style\b[^>]*>[\s\S]*?<\/style\s*>|<script\b[^>]*>[\s\S]*?<\/script\s*>|\x05\d+\x06\x07/gi);
+      return kept ? kept.join('\n') : '';
+    })
     // 殘缺 head tag（流式生成可能只有開始或結束）
     .replace(/<head[^>]*>/gi, '')
     .replace(/<\/head>/gi, '')

@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { buildShell } from '../render/shell-dom'
+import { buildShell, hideDuplicateStatusbarFlow } from '../render/shell-dom'
 import { shellStrings } from '../strings'
 
 // jsdom has no layout. Measure the actual shell DOM/CSS in the installed browser;
@@ -24,21 +24,22 @@ function geometry(width: number, height: number, flowHud: boolean | 'fixed-only'
     hasStatusbar: true, composerVisible: true,
   })
   refs.root.setAttribute('data-chrome', 'shell')
-  refs.statusbar!.innerHTML = '<div style="height:4000px">Mount form copy</div><button id="dock" style="position:fixed;z-index:1;right:0;top:100px;width:60px;height:44px">Dock</button>'
+  refs.statusbar!.innerHTML = '<div id="mount-form" style="height:4000px">Mount form copy</div><button id="dock" style="position:fixed;z-index:1;right:0;top:100px;width:60px;height:44px">Dock</button>'
   if (flowHud) refs.statusbar!.innerHTML = '<div style="height:44px">Status values</div><button id="dock" style="position:fixed;z-index:1;right:0;top:100px;width:60px;height:44px">Dock</button>'
   if (flowHud === 'fixed-only') refs.statusbar!.firstElementChild!.remove()
   refs.list.innerHTML = '<article style="height:4000px">Opening form in the message</article>'
+  hideDuplicateStatusbarFlow(refs.statusbar, refs.list)
   const markup = `<!doctype html><style>${css}\n[data-chat="messages"]{overflow:auto}</style>${document.body.innerHTML}`
   const dir = mkdtempSync(join(tmpdir(), 'moonstage-statusbar-layout-')); dirs.push(dir)
   const file = join(dir, 'layout.html')
   writeFileSync(file, `<!doctype html><iframe style="border:0;width:${width}px;height:${height}px" srcdoc="${markup.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" onload="
     const d=this.contentDocument, q=s=>d.querySelector(s), box=s=>q(s).getBoundingClientRect().toJSON();
-    const m=q('[data-chat=messages]'), dock=q('#dock'), r=dock.getBoundingClientRect();
+    const m=q('[data-chat=messages]'), dock=q('#dock'), r=dock.getBoundingClientRect(), mf=q('#mount-form');
     const overlay=d.createElement('author-overlay');overlay.style.cssText='position:fixed;inset:0;z-index:2';
     overlay.attachShadow({mode:'open'}).innerHTML='<style>:host{pointer-events:none}</style>';
     q('[data-slot=statusbar]').append(overlay);
     m.scrollTop=1000;
-    const result={width:this.contentWindow.innerWidth,messages:box('[data-chat=messages]'),composer:box('[data-chat=composer]'),statusbar:box('[data-slot=statusbar]'),scrollTop:m.scrollTop,dockHit:d.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===dock,shadowPointer:this.contentWindow.getComputedStyle(overlay).pointerEvents};
+    const result={width:this.contentWindow.innerWidth,messages:box('[data-chat=messages]'),composer:box('[data-chat=composer]'),statusbar:box('[data-slot=statusbar]'),mountForm:mf?mf.getBoundingClientRect().toJSON():null,scrollTop:m.scrollTop,dockHit:d.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===dock,shadowPointer:this.contentWindow.getComputedStyle(overlay).pointerEvents};
     document.querySelector('pre').textContent=JSON.stringify(result);
   "></iframe><pre id="result"></pre>`)
   const run = spawnSync(chrome!, ['--headless=new', '--no-first-run', '--no-default-browser-check', `--user-data-dir=${join(dir, 'profile')}`, '--dump-dom', '--virtual-time-budget=1000', `file://${file}`], { encoding: 'utf8', timeout: 20000, maxBuffer: 2 * 1024 * 1024 })
@@ -71,6 +72,8 @@ describe('mount content leaves the message viewport available', () => {
   it.each([[390, 844], [1440, 900]])('keeps messages scrollable and fixed author controls clickable at %i × %i', (width, height) => {
     const result = geometry(width, height)
     expect(result.width).toBe(width)
+    expect(result.mountForm.height).toBe(0)
+    expect(result.statusbar.height).toBe(0)
     expect(result.messages.height).toBeGreaterThan(height / 2)
     expect(result.composer.bottom).toBeLessThanOrEqual(height)
     expect(result.scrollTop).toBeGreaterThan(0)

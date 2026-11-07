@@ -20,6 +20,7 @@ function config(over: Partial<SandboxHelloConfig> = {}): SandboxHelloConfig {
 let shell: Shell | null = null
 let sent: ShellToHost[] = []
 const boot = (cfg: SandboxHelloConfig) => {
+  shell?.dispose()
   sent = []
   document.body.innerHTML = '<div id="app"></div>'
   shell = createShell({ doc: document, win: window as Window & typeof globalThis, mount: document.getElementById('app')!, config: cfg, transport: { send: (m) => sent.push(m) } })
@@ -896,5 +897,236 @@ describe('殼：分享情境', () => {
     expect(s.sdk.share.context).toBeNull()
     expect(s.sdk.share.enabled).toBe(false)
     expect(() => s.sdk.share.link('a')).toThrow(expect.objectContaining({ code: 'HOST_DENIED' }))
+  })
+})
+
+describe('殼：訊息規則腳本與功能欄／SDK 去重（卡 100737／100743）', () => {
+  it.each([true, false])('卡 100737 同構：訊息規則的建角表單 script 等氣泡掛上才跑一次，分頁、輸入預覽與 execCommand 複製均有效（宿主 view=%s）', async (useHostView) => {
+    delete (window as unknown as Record<string, unknown>).__formRuns
+    const copied: string[] = []
+    const origExecCommand = document.execCommand
+    document.execCommand = ((cmd: string) => { copied.push(cmd); return true }) as typeof document.execCommand
+    try {
+      const formHtml = `
+        <head><style>.form-wrap{color:#e9eefc}</style></head>
+        <div class="form-wrap">
+          <div role="tablist">
+            <button type="button" class="tab is-active" id="tab-1" data-tab="panel-1" value="panel-1">基本</button>
+            <button type="button" class="tab" id="tab-2" data-tab="panel-2" value="panel-2">外貌</button>
+          </div>
+          <div class="panel" id="panel-1"><input id="f-name" type="text" /></div>
+          <div class="panel" id="panel-2" hidden><select id="f-hair"><option value="黑">黑</option><option value="銀">銀</option></select></div>
+          <pre id="preview"></pre>
+          <button type="button" id="btn-copy">一键复制</button>
+        </div>
+        <script>(function(){
+          window.__formRuns = (window.__formRuns || 0) + 1;
+          var tabs = Array.from(document.querySelectorAll('.tab'));
+          var panels = Array.from(document.querySelectorAll('.panel'));
+          tabs.forEach(function(t){
+            t.addEventListener('click', function(){
+              var id = t.getAttribute('data-tab') || t.getAttribute('value');
+              tabs.forEach(function(b){ b.classList.toggle('is-active', b === t); });
+              panels.forEach(function(p){ if (p.id === id) p.removeAttribute('hidden'); else p.setAttribute('hidden', ''); });
+            });
+          });
+          var fName = document.getElementById('f-name');
+          var fHair = document.getElementById('f-hair');
+          var preview = document.getElementById('preview');
+          function build(){
+            preview.textContent = '【姓名】' + (fName.value.trim() || '（未填）') + '\\n【发色】' + fHair.value;
+          }
+          [fName, fHair].forEach(function(el){
+            el.addEventListener('input', build);
+            el.addEventListener('change', build);
+          });
+          var btnCopy = document.getElementById('btn-copy');
+          btnCopy.addEventListener('click', function(){
+            document.execCommand('copy');
+            btnCopy.textContent = '已复制 ✓';
+          });
+          build();
+        })();</script>
+      `
+      const s = boot(config({
+        card: {
+          rules: [{ id: 1, name: '开场白', find: '开场白', replace: formHtml, enabled: true }],
+          statusbar: '',
+        },
+      }))
+      // hello 階段（訊息尚未送達）不提早跑訊息規則腳本，不產生空 DOM 拋錯
+      expect((window as unknown as { __formRuns?: number }).__formRuns).toBeUndefined()
+      expect(document.querySelector('[data-chat="sdk-debug"]')).toBeNull()
+
+      s.handle({
+        type: 'messages',
+        messages: [{
+          id: 'g1',
+          role: 'ai',
+          content: '开场白',
+          serverId: '1',
+          state: 'done',
+          ...(useHostView ? { view: { name: '露娜', html: formHtml, finished: true } } : {}),
+        }],
+      })
+      await nextTick()
+
+      expect((window as unknown as { __formRuns?: number }).__formRuns).toBe(1)
+      expect(document.querySelector('[data-chat="sdk-debug"]')).toBeNull()
+      expect(document.getElementById('preview')!.textContent).toBe('【姓名】（未填）\n【发色】黑')
+
+      // 分頁點擊切換
+      ;(document.getElementById('tab-2') as HTMLElement).click()
+      expect(document.getElementById('tab-2')!.classList.contains('is-active')).toBe(true)
+      expect(document.getElementById('panel-2')!.hasAttribute('hidden')).toBe(false)
+      expect(document.getElementById('panel-1')!.hasAttribute('hidden')).toBe(true)
+
+      // 表單輸入與下拉更新預覽
+      const fName = document.getElementById('f-name') as HTMLInputElement
+      fName.value = '測試主角'
+      fName.dispatchEvent(new Event('input', { bubbles: true }))
+      expect(document.getElementById('preview')!.textContent).toBe('【姓名】測試主角\n【发色】黑')
+
+      // 複製按鈕點擊只觸發一次 execCommand('copy')
+      ;(document.getElementById('btn-copy') as HTMLElement).click()
+      expect(copied).toEqual(['copy'])
+      expect(document.getElementById('btn-copy')!.textContent).toBe('已复制 ✓')
+
+      // 後續新訊息帶相同腳本不再重複執行，事件不重複綁定
+      s.handle({
+        type: 'message.new',
+        message: {
+          id: 'g2',
+          role: 'ai',
+          content: '开场白',
+          serverId: '2',
+          state: 'done',
+          ...(useHostView ? { view: { name: '露娜', html: formHtml, finished: true } } : {}),
+        },
+      })
+      await nextTick()
+      expect((window as unknown as { __formRuns?: number }).__formRuns).toBe(1)
+      ;(document.getElementById('btn-copy') as HTMLElement).click()
+      expect(copied).toEqual(['copy', 'copy'])
+    } finally {
+      document.execCommand = origExecCommand
+    }
+  })
+
+  it.each([true, false])('卡 100743 同構：功能欄（statusbar）命中的規則腳本在 hello 執行一次，與開場白重複的大型流內表單不可見，保留緊湊頂部狀態列（卡 100377）（宿主 view=%s）', async (useHostView) => {
+    delete (window as unknown as Record<string, unknown>).__hudRuns
+    delete (window as unknown as Record<string, unknown>).__hudClicks
+    const sidebarHtml = `<div class="hunter-sidebar" style="position:fixed;left:0;top:50%"><button type="button" id="hud-toggle">面板</button></div><script>(function(){
+      window.__hudRuns = (window.__hudRuns || 0) + 1;
+      window.__hudClicks = window.__hudClicks || 0;
+      var btn = document.getElementById('hud-toggle');
+      if (btn) btn.addEventListener('click', function(){ window.__hudClicks++; });
+    })();</script>`
+    const formHtml = `<div class="hunter-creation-ui" style="position:relative"><h2>獵人檔案</h2><input id="h-name" value="小傑"><select id="h-type"><option>強化系</option></select><button type="button">隨機</button><button type="button">確認</button></div>`
+    const residueHtml = `<div class="hxh-box"><span class="hxh-lbl">([\\s\\S]+?)</span><div class="hxh-bubble">([\\s\\S]*?)</div></div>`
+    const compactHudHtml = `<div class="top-hud" style="height:44px">HP 100 / MP 50</div>`
+    const s = boot(config({
+      card: {
+        rules: [
+          { id: 1, name: '侧边栏', find: '《侧边栏》', replace: sidebarHtml, enabled: true },
+          { id: 2, name: '建角面板', find: '《建角面板》', replace: formHtml, enabled: true },
+          { id: 3, name: '范例残字', find: '《范例残字》', replace: residueHtml, enabled: true },
+          { id: 4, name: '紧凑状态列', find: '《紧凑状态列》', replace: compactHudHtml, enabled: true },
+        ],
+        statusbar: '《侧边栏》《建角面板》《范例残字》《紧凑状态列》',
+        ...(useHostView ? { statusbarHtml: sidebarHtml + formHtml + residueHtml + compactHudHtml } : {}),
+      },
+    }))
+    // hello 階段功能欄已掛載，腳本跑成功 1 次
+    expect((window as unknown as { __hudRuns?: number }).__hudRuns).toBe(1)
+
+    // 開場白訊息同樣含《建角面板》（如卡 100743），氣泡掛載後同一段 script 不重跑
+    s.handle({
+      type: 'messages',
+      messages: [{
+        id: 'g1',
+        role: 'ai',
+        content: '《侧边栏》《建角面板》',
+        serverId: '1',
+        state: 'done',
+        ...(useHostView ? { view: { name: '露娜', html: sidebarHtml + formHtml, finished: true } } : {}),
+      }],
+    })
+    await nextTick()
+    expect((window as unknown as { __hudRuns?: number }).__hudRuns).toBe(1)
+    ;(document.getElementById('hud-toggle') as HTMLElement).click()
+    expect((window as unknown as { __hudClicks?: number }).__hudClicks).toBe(1)
+
+    // 功能欄內與開場白重複的大型流內表單（.hunter-creation-ui）及正則殘字（.hxh-box）不可見
+    const sbForm = s.refs.statusbar!.querySelector('.hunter-creation-ui') as HTMLElement
+    const sbResidue = s.refs.statusbar!.querySelector('.hxh-box') as HTMLElement
+    const sbSidebar = s.refs.statusbar!.querySelector('.hunter-sidebar') as HTMLElement
+    const sbCompactHud = s.refs.statusbar!.querySelector('.top-hud') as HTMLElement
+    const msgForm = s.refs.list.querySelector('.hunter-creation-ui') as HTMLElement
+    expect(sbForm.hidden).toBe(true)
+    expect(window.getComputedStyle(sbForm).display).toBe('none')
+    expect(sbResidue.hidden).toBe(true)
+    expect(window.getComputedStyle(sbResidue).display).toBe('none')
+    // 功能欄內的 fixed 側欄與卡 100377 型緊湊頂部狀態列保留可見，開場白訊息內的表單也正常可見
+    expect(sbSidebar.hidden).toBe(false)
+    expect(window.getComputedStyle(sbSidebar).display).not.toBe('none')
+    expect(sbCompactHud.hidden).toBe(false)
+    expect(window.getComputedStyle(sbCompactHud).display).not.toBe('none')
+    expect(msgForm.hidden).toBe(false)
+    expect(window.getComputedStyle(msgForm).display).not.toBe('none')
+  })
+
+  it.each([true, false])('sdk.on(messages) 卡：含 sdk 訂閱的規則腳本在 hello 跑一次，氣泡掛載後不重跑、不重複綁事件（宿主 view=%s）', async (useHostView) => {
+    delete (window as unknown as Record<string, unknown>).__sdkScriptRuns
+    delete (window as unknown as Record<string, unknown>).__sdkDoneEvents
+    const sdkRuleHtml = `<div class="sdk-card">狀態</div><script>
+      window.__sdkScriptRuns = (window.__sdkScriptRuns || 0) + 1;
+      window.__sdkDoneEvents = window.__sdkDoneEvents || [];
+      sdk.on('message:done', function(p){ window.__sdkDoneEvents.push(p.id); });
+    </script>`
+    const s = boot(config({
+      card: {
+        rules: [{ id: 1, name: 'sdk-rule', find: '开场白', replace: sdkRuleHtml, enabled: true }],
+        statusbar: '',
+      },
+    }))
+    expect((window as unknown as { __sdkScriptRuns?: number }).__sdkScriptRuns).toBe(1)
+
+    s.handle({
+      type: 'messages',
+      messages: [{
+        id: 'm1',
+        role: 'ai',
+        content: '开场白',
+        serverId: '1',
+        state: 'done',
+        ...(useHostView ? { view: { name: '露娜', html: sdkRuleHtml, finished: true } } : {}),
+      }],
+    })
+    await nextTick()
+    expect((window as unknown as { __sdkScriptRuns?: number }).__sdkScriptRuns).toBe(1)
+    expect((window as unknown as { __sdkDoneEvents?: string[] }).__sdkDoneEvents).toEqual(['m1'])
+
+    s.handle({
+      type: 'message.new',
+      message: {
+        id: 'm2',
+        role: 'ai',
+        content: '开场白',
+        serverId: '2',
+        state: 'done',
+        ...(useHostView ? { view: { name: '露娜', html: sdkRuleHtml, finished: true } } : {}),
+      },
+    })
+    s.handle({
+      type: 'message.done',
+      id: 'm2',
+      content: '开场白',
+      serverId: '2',
+      ...(useHostView ? { view: { name: '露娜', html: sdkRuleHtml, finished: true } } : {}),
+    })
+    await nextTick()
+    expect((window as unknown as { __sdkScriptRuns?: number }).__sdkScriptRuns).toBe(1)
+    expect((window as unknown as { __sdkDoneEvents?: string[] }).__sdkDoneEvents).toEqual(['m1', 'm2'])
   })
 })
