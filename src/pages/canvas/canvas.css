@@ -312,7 +312,7 @@
 }
 
 /*
-  氣泡裡的圖片跟著氣泡寬走，高度自動。
+  氣泡裡的圖片跟著氣泡寬走。
 
   這條原本只在 @layer lt-base 裡：宿主任何一條沒分層的 img 重置（例如社群站為了
   作者資產的地圖模組寫的 `body:has(.play) img { max-width: none }`）都會贏過層內規則，
@@ -322,6 +322,14 @@
 */
 .canvas-root .mes_text img {
   max-width: 100%;
+}
+
+/*
+  高度只是預設，不是防爆寬的邊界。作者的 absolute/cover 圖片需要 height:100%
+  才能填滿面板並切換裁切位置；不能被這裡的 auto 蓋掉。:where 讓建置加上
+  .ms-stage 範圍後仍為零特異性，作者的圖片尺寸不受插入順序影響。
+*/
+:where(.canvas-root .mes_text img) {
   height: auto;
 }
 

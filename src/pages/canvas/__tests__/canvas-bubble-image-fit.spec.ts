@@ -35,11 +35,11 @@ describe('氣泡圖片貼合氣泡寬', () => {
     expect(inLayer).toBe(false)
   })
 
-  it('寬度跟著容器、高度自動，不會被寫死的 height 屬性拉變形', () => {
+  it('高權重的防爆寬規則只約束寬度，讓作者的圖片高度能生效', () => {
     const rule = findRule('.canvas-root .mes_text img')!
     const decls: Record<string, string> = {}
     rule.walkDecls((d) => { decls[d.prop] = d.value })
     expect(decls['max-width']).toBe('100%')
-    expect(decls['height']).toBe('auto')
+    expect(decls['height']).toBeUndefined()
   })
 })
