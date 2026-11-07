@@ -126,3 +126,11 @@ describe('content restriction copy follows the actions on the card', () => {
     }
   })
 })
+
+it('does not describe a charged or unknown recap as free after a later internal failure', () => {
+  for (const summaryUncharged of [false, undefined]) {
+    expect(operationFailureSub('internal_error', key, { failurePhase: 'compacting', summaryUncharged, settled: true, chargeCredits: 0 })).toBe('')
+  }
+  expect(operationFailureSub('internal_error', key, { summaryUncharged: false, settled: true, chargeCredits: 0 })).toBe('')
+  expect(operationFailureSub('internal_error', key, { failurePhase: 'compacting', summaryUncharged: true, settled: true, chargeCredits: 0 })).toBe('systemMsg.ourErrorSub')
+})

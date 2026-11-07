@@ -68,7 +68,10 @@ export function operationFailureSub(cause: unknown, t: (key: string) => string, 
     case 'content_filter':
       return opts.agent ? t('error.contentFilter') : ''
     case 'internal_error':
-      return opts.settled === true && opts.chargeCredits === 0 ? t('systemMsg.ourErrorSub') : ''
+      return opts.settled === true && opts.chargeCredits === 0
+        && opts.summaryUncharged !== false
+        && (opts.failurePhase !== 'compacting' || opts.summaryUncharged === true)
+        ? t('systemMsg.ourErrorSub') : ''
     case 'service_unavailable':
     case 'upstream_timeout':
     case 'stream_incomplete':
