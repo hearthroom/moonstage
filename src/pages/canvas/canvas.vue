@@ -84,8 +84,8 @@
         <chat-system-message
           v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason) && !filterCardReplaced(item)"
           :kind="getSystemMsgKind(item.finishReason)"
-          :label="creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || getSystemMsgLabel(item.finishReason)"
-          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched, offersTraditional: filterCardFor(item, index).offersTraditional, traditionalFailed: filterCardFor(item, index).traditionalFailed }) || getSystemMsgSub(item.finishReason, item, index)"
+          :label="creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent, item.failurePhase) || getSystemMsgLabel(item.finishReason)"
+          :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, failurePhase: item.failurePhase, summaryUncharged: item.summaryUncharged, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched, offersTraditional: filterCardFor(item, index).offersTraditional, traditionalFailed: filterCardFor(item, index).traditionalFailed }) || getSystemMsgSub(item.finishReason, item, index)"
           :links="creditsOverrideFor(item)?.links ?? []"
           :cta="getSystemMsgCta(item.finishReason, item, index)"
           :cta-action="getSystemMsgCtaAction(item.finishReason, item, index)"
@@ -1111,6 +1111,10 @@ type OperationResumeFields = {
   allowedActions?: string[];
   reasonCode?: string;
   failureCause?: string;
+  failurePhase?: 'compacting';
+  summaryUncharged?: boolean;
+  settled?: boolean;
+  chargeCredits?: number;
   filterReason?: string;
   messageKey?: string;
 };
@@ -1320,6 +1324,10 @@ function persistAcceptedStreamState() {
       reasonCode: pendingChatTurn.reasonCode || '',
       filterReason: pendingChatTurn.filterReason,
       failureCause: pendingChatTurn.failureCause || '',
+      failurePhase: pendingChatTurn.failurePhase,
+      summaryUncharged: pendingChatTurn.summaryUncharged,
+      settled: pendingChatTurn.settled,
+      chargeCredits: pendingChatTurn.chargeCredits,
       messageKey: pendingChatTurn.messageKey || '',
     })
     : readLsEntry();
@@ -2003,6 +2011,10 @@ function tryResumeOnMount() {
         reasonCode: pending.reasonCode,
       filterReason: pending.filterReason,
       failureCause: pending.failureCause,
+      failurePhase: pending.failurePhase,
+      summaryUncharged: pending.summaryUncharged,
+      settled: pending.settled,
+      chargeCredits: pending.chargeCredits,
         messageKey: pending.messageKey,
       });
     } else if (pending.operationId) {
@@ -2026,6 +2038,10 @@ function tryResumeOnMount() {
         reasonCode: pending.reasonCode,
       filterReason: pending.filterReason,
       failureCause: pending.failureCause,
+      failurePhase: pending.failurePhase,
+      summaryUncharged: pending.summaryUncharged,
+      settled: pending.settled,
+      chargeCredits: pending.chargeCredits,
         messageKey: pending.messageKey,
         operationKind: operationKindFromServer(pending.serverOperationKind),
       });
@@ -2135,6 +2151,10 @@ function tryResumeOnMount() {
       reasonCode: pending.reasonCode,
       filterReason: pending.filterReason,
       failureCause: pending.failureCause,
+      failurePhase: pending.failurePhase,
+      summaryUncharged: pending.summaryUncharged,
+      settled: pending.settled,
+      chargeCredits: pending.chargeCredits,
       messageKey: pending.messageKey,
       operationKind: operationKindFromServer(pending.serverOperationKind),
       startedAt: pending.pendingSince,
@@ -3691,8 +3711,8 @@ function systemNoticeFor(item: any, index: number) {
   const actions: Array<{ action: string; label: string }> = ctas.length ? ctas : (cta && ctaAction ? [{ action: ctaAction, label: cta }] : []);
   return {
     kind: getSystemMsgKind(item.finishReason),
-    label: creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || getSystemMsgLabel(item.finishReason),
-    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched, offersTraditional: filterCardFor(item, index).offersTraditional, traditionalFailed: filterCardFor(item, index).traditionalFailed }) || getSystemMsgSub(item.finishReason, item, index),
+    label: creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent, item.failurePhase) || getSystemMsgLabel(item.finishReason),
+    sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, failurePhase: item.failurePhase, summaryUncharged: item.summaryUncharged, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched, offersTraditional: filterCardFor(item, index).offersTraditional, traditionalFailed: filterCardFor(item, index).traditionalFailed }) || getSystemMsgSub(item.finishReason, item, index),
     actions: actions.map((entry) => ({ action: String(entry.action), label: String(entry.label) })),
     // 內容限制卡：存偏好期間整列不能按、手機上主行動整行排第一。只在成立時才帶，其他卡跟以前一模一樣。
     ...(filterCardBusy.value === String(item.id) ? { busy: true } : {}),
@@ -3716,8 +3736,8 @@ function generationOutcomeFor(list: any[]) {
     const failedAgain = agentResumeFailedAgain(unref(knownOperations), item.operationId);
     const failedAgainSub = t('multiPass.failedAgainSub');
     return outcomeFromInterruption(id, {
-      label: operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent) || t('multiPass.interruptedNotice'),
-      sub: !item.filterReason && canSwitchModelFor(item, index) && failedAgain && failedAgainSub ? failedAgainSub : (operationFailureSub(item.failureCause || item.finishReason, t, { agent: true, filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent }) || t('multiPass.interruptedNoticeSub')),
+      label: operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent, item.failurePhase) || t('multiPass.interruptedNotice'),
+      sub: !item.filterReason && canSwitchModelFor(item, index) && failedAgain && failedAgainSub ? failedAgainSub : (operationFailureSub(item.failureCause || item.finishReason, t, { agent: true, filterReason: item.filterReason, failurePhase: item.failurePhase, summaryUncharged: item.summaryUncharged, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent }) || t('multiPass.interruptedNoticeSub')),
       continueLabel: t('multiPass.continueAction'),
       switchModelLabel: t('chat.switchModel'),
       failedAgain,
@@ -7812,6 +7832,10 @@ function recordAuthoritativeOperationStatus(input: any) {
     if (status.reasonCode) pendingChatTurn.reasonCode = status.reasonCode;
     if (status.filterReason) pendingChatTurn.filterReason = status.filterReason;
     if (status.failureCause) pendingChatTurn.failureCause = status.failureCause;
+    pendingChatTurn.failurePhase = status.failurePhase;
+    pendingChatTurn.summaryUncharged = status.summaryUncharged;
+    pendingChatTurn.settled = status.settled;
+    pendingChatTurn.chargeCredits = status.chargeCredits;
     if (status.messageKey) pendingChatTurn.messageKey = status.messageKey;
     if (typeof status.nonStreaming==='boolean') pendingChatTurn.nonStreaming=status.nonStreaming;
   }
@@ -7849,6 +7873,8 @@ function recordAuthoritativeOperationStatus(input: any) {
     operationBubble.chargeCredits = status.chargeCredits;
     if (status.filterReason) operationBubble.filterReason = status.filterReason;
     if (status.failureCause) operationBubble.failureCause = status.failureCause;
+    operationBubble.failurePhase = status.failurePhase;
+    operationBubble.summaryUncharged = status.summaryUncharged;
     if (status.messageKey) operationBubble.messageKey = status.messageKey;
   }
 
@@ -7874,7 +7900,7 @@ function refreshHistoryAfterAuthoritativeOperation(status: any) {
 
   notifyBufferedTerminal(status, operationBubble?.content || replyContent.value, bufferedTerminalNotices, () => {
     const reason = projectionFinishReason(status);
-    uni.showToast({ title: operationFailureTitle(status.failureCause || status.finishReason, t, status.filterReason) || getSystemMsgLabel(reason), icon: 'error' });
+    uni.showToast({ title: operationFailureTitle(status.failureCause || status.finishReason, t, status.filterReason, false, status.failurePhase) || getSystemMsgLabel(reason), icon: 'error' });
   });
 
   if (operationBubble) {
@@ -7903,6 +7929,8 @@ function refreshHistoryAfterAuthoritativeOperation(status: any) {
     operationBubble.chargeCredits = status.chargeCredits;
     if (status.filterReason) operationBubble.filterReason = status.filterReason;
     if (status.failureCause) operationBubble.failureCause = status.failureCause;
+    operationBubble.failurePhase = status.failurePhase;
+    operationBubble.summaryUncharged = status.summaryUncharged;
     if (status.messageKey) operationBubble.messageKey = status.messageKey;
     operationBubble.finishReason = projectionFinishReason(
       status,
@@ -10082,8 +10110,8 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     // 「有沒有在幹活」的依據，不該隨氣泡出現而消失。
     prepTrail: Array.isArray(item.prepTrail) ? item.prepTrail : null,
     agentInterrupted: canGenerate.value && item.agentInterrupted === true,
-    interruptedNotice: operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent),
-    interruptedNoticeSub: operationFailureSub(item.failureCause || item.finishReason, t, { agent: true, filterReason: item.filterReason, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent }),
+    interruptedNotice: operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent, item.failurePhase),
+    interruptedNoticeSub: operationFailureSub(item.failureCause || item.finishReason, t, { agent: true, filterReason: item.filterReason, failurePhase: item.failurePhase, summaryUncharged: item.summaryUncharged, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent }),
     // 續跑的那次又停在跟上一次同一個原因上：卡片改建議換模型（看伺服器給的操作清單，重新載入也一樣）。
     agentFailedAgain: item.agentInterrupted === true && !item.filterReason && canSwitchModelFor(item, index) && agentResumeFailedAgain(unref(knownOperations), item.operationId),
     reasoning: (!isUser && item.thinkingContent && formData.showThinkingProcess !== false)

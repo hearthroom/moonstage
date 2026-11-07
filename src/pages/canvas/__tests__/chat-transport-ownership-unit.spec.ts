@@ -1360,3 +1360,26 @@ describe('agent 中斷的那一輪', () => {
    const rows = mergeChatHistoryOperationProjections([{id:'u-cause',chatId:'u-cause',type:1,content:'Hi'}], {schemaVersion:'outcome_v1',operationStatusAvailable:true,operations:[status]}, {agentPrepTrail:['Drafting']} as any)
    expect(rows.find((row:any) => row.agentInterrupted)?.failureCause).toBe('tool_rejections')
  })
+
+it('preserves terminal summary stage and three-state billing through every projection', () => {
+  for (const summaryUncharged of [true,false,undefined]) {
+    const input={operationId:'op-summary',conversationId:'conv-summary',kind:'send',state:'failed_retryable',failureCause:'output_limit',failurePhase:'compacting',sourceChatId:'u-summary',summaryUncharged,settled:true,chargeCredits:0,allowedActions:['retry','switch_model']}
+    const status=normalizeChatOperationStatus(input)
+    expect(status.failurePhase).toBe('compacting')
+    expect(status.summaryUncharged).toBe(summaryUncharged)
+    const entry=mergeOperationStatusIntoStreamEntry({},status)
+    expect(entry.failurePhase).toBe('compacting')
+    expect(entry.summaryUncharged).toBe(summaryUncharged)
+    const reloaded=transport.operationResumeIdentity(entry as any)
+    expect(reloaded.failurePhase).toBe('compacting')
+    expect(reloaded.summaryUncharged).toBe(summaryUncharged)
+    const row=transport.operationProjectionMetadata(status)
+    const restored=transport.operationStatusFromProjectionRow(row)
+    expect(restored.failurePhase).toBe('compacting')
+    expect(restored.summaryUncharged).toBe(summaryUncharged)
+    const rows=mergeChatHistoryOperationProjections([{id:'u-summary',chatId:'u-summary',type:1,content:'Synthetic user'}],{schemaVersion:'outcome_v1',operationStatusAvailable:true,operations:[status]},{} as any)
+    expect(rows.find((r:any)=>r?.operationId==='op-summary')?.failurePhase).toBe('compacting')
+    expect(rows.find((r:any)=>r?.operationId==='op-summary')?.summaryUncharged).toBe(summaryUncharged)
+  }
+  expect(normalizeChatOperationStatus({operationId:'old',state:'failed_retryable',failurePhase:'private text',summaryUncharged:'true'}).failurePhase).toBeUndefined()
+})

@@ -4425,5 +4425,8 @@
   "responseSettings.preset.purpose.tested": "テスト済み",
   "responseSettings.preset.purpose.recommendation": "作者のおすすめ：{models}",
 	"systemMsg.filterSummaryPolicy": "この回線がストーリー要約を拒否",
-	"systemMsg.filterSummaryPolicySub": "この回線の提供元が、内容の制限により前のストーリーの要約を断りました。モデルの障害や直前のメッセージが原因ではありません。回線かモデルを切り替えると、要約できる場合があります。"
+	"systemMsg.filterSummaryPolicySub": "この回線の提供元が、内容の制限により前のストーリーの要約を断りました。モデルの障害や直前のメッセージが原因ではありません。回線かモデルを切り替えると、要約できる場合があります。",
+	"systemMsg.summaryLengthCap": "ストーリーの整理が長さの上限に到達",
+	"systemMsg.summaryLengthCapSub": "ストーリーの整理中に長さの上限に達しました。再試行してください。",
+	"systemMsg.summaryLengthCapSubUncharged": "ストーリーの整理中に長さの上限に達しました。ポイントは消費されていません。再試行してください。"
 }

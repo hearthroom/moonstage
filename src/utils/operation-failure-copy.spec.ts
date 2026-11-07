@@ -8,6 +8,28 @@ import ko from '../locale/ko.json'
 
 const key = (k: string) => k
 
+describe('summary length limits use the confirmed failure stage and settlement', () => {
+  it('keeps ordinary reply limits and legacy unknown stages unchanged', () => {
+    expect(operationFailureTitle('output_limit', key)).toBe('')
+    expect(operationFailureSub('output_limit', key, { settled:true,chargeCredits:0 })).toBe('')
+    expect(operationFailureSub('output_limit', key, { failurePhase:'generating',summaryUncharged:true,settled:true,chargeCredits:0 } as any)).toBe('')
+  })
+  it('only claims no charge when every summary is confirmed free and the turn is settled', () => {
+    expect(operationFailureTitle('output_limit',key,undefined,false,'compacting')).toBe('systemMsg.summaryLengthCap')
+    for (const summaryUncharged of [false,undefined]) {
+      expect(operationFailureSub('output_limit',key,{failurePhase:'compacting',summaryUncharged,settled:true,chargeCredits:0} as any)).toBe('systemMsg.summaryLengthCapSub')
+    }
+    expect(operationFailureSub('output_limit',key,{failurePhase:'compacting',summaryUncharged:true,settled:true,chargeCredits:0} as any)).toBe('systemMsg.summaryLengthCapSubUncharged')
+    expect(operationFailureSub('output_limit',key,{failurePhase:'compacting',summaryUncharged:true,settled:false,chargeCredits:0} as any)).toBe('systemMsg.summaryLengthCapSub')
+    expect(operationFailureSub('output_limit',key,{failurePhase:'compacting',summaryUncharged:true,settled:true,chargeCredits:20} as any)).toBe('systemMsg.summaryLengthCapSub')
+  })
+  it('has the same three copy keys in every supported language', () => {
+    for (const locale of [zhHant,zhHans,en,ja,ko]) {
+      for (const name of ['systemMsg.summaryLengthCap','systemMsg.summaryLengthCapSub','systemMsg.summaryLengthCapSubUncharged']) expect((locale as any)[name],name).toBeTruthy()
+    }
+  })
+})
+
 // 玩家要看得出這次是誰的問題、自己能做什麼：模型那邊、我們這邊，還是他自己能處理的事。
 describe('operation failure copy says whose problem it was', () => {
   it('names our own failure and apologises', () => {

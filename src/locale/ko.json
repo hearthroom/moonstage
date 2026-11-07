@@ -4425,5 +4425,8 @@
   "responseSettings.preset.purpose.tested": "테스트됨",
   "responseSettings.preset.purpose.recommendation": "작성자 추천: {models}",
 	"systemMsg.filterSummaryPolicy": "이 회선에서 스토리 요약 거부",
-	"systemMsg.filterSummaryPolicySub": "이 회선의 제공업체가 콘텐츠 제한 때문에 앞부분 스토리 요약을 거부했어요. 모델 장애나 방금 보낸 메시지 때문이 아니에요. 회선이나 모델을 바꾸면 요약될 수도 있어요."
+	"systemMsg.filterSummaryPolicySub": "이 회선의 제공업체가 콘텐츠 제한 때문에 앞부분 스토리 요약을 거부했어요. 모델 장애나 방금 보낸 메시지 때문이 아니에요. 회선이나 모델을 바꾸면 요약될 수도 있어요.",
+	"systemMsg.summaryLengthCap": "스토리 정리 길이 제한 도달",
+	"systemMsg.summaryLengthCapSub": "스토리를 정리하는 중 길이 제한에 도달했습니다. 다시 시도해 주세요.",
+	"systemMsg.summaryLengthCapSubUncharged": "스토리를 정리하는 중 길이 제한에 도달했습니다. 포인트는 차감되지 않았습니다. 다시 시도해 주세요."
 }

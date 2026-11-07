@@ -4425,5 +4425,8 @@
   "responseSettings.preset.purpose.tested": "Tested",
   "responseSettings.preset.purpose.recommendation": "Author recommends: {models}",
 	"systemMsg.filterSummaryPolicy": "This lane blocked the recap",
-	"systemMsg.filterSummaryPolicySub": "This lane’s provider declined to recap the earlier story under its content restrictions, not because of a model outage or the latest message. Switching lane or model may let the recap go through."
+	"systemMsg.filterSummaryPolicySub": "This lane’s provider declined to recap the earlier story under its content restrictions, not because of a model outage or the latest message. Switching lane or model may let the recap go through.",
+	"systemMsg.summaryLengthCap": "Story recap length limit reached",
+	"systemMsg.summaryLengthCapSub": "The story recap reached the length limit. Retry.",
+	"systemMsg.summaryLengthCapSubUncharged": "The story recap reached the length limit. No credits were charged. Retry."
 }
