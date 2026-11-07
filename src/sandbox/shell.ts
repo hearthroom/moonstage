@@ -361,21 +361,33 @@ export function createShell(options: CreateShellOptions): Shell {
   // 功能欄、SDK、純腳本規則在 hello 跑一次；與訊息區 HTML 元素同規則產出且未命中功能欄的腳本，等氣泡掛上後再由 runMessageScripts 跑一次。
   const statusbarMatched = card.matchedScripts(config.card.statusbar, config.variants || null)
   const bootScripts = card.scripts.filter((sc) => sc.kind !== 'inline' || !sc.messageDom || statusbarMatched.has(sc.code))
-  // 作者腳本「同一段只跑一次」：hello 跑成功的腳本記進 ranScripts，氣泡掛載後不再重跑；
-  // 訊息規則的腳本在氣泡掛上後跑一次並記進 ranScripts（切會話時隨氣泡拆掉重置訊息級記錄）。
-  const ranScripts = runAuthorScripts(bootScripts, {
+  // 作者腳本「同一段只跑一次」：hello 跑成功的腳本記進 bootRanScripts，氣泡掛載或重建後不再重跑；
+  // 訊息規則的腳本在氣泡掛上後跑一次，若該氣泡被卸載重建（如字典載完重繪或視窗化重建），隨舊氣泡釋放後再對新氣泡跑一次。
+  const bootRanScripts = runAuthorScripts(bootScripts, {
     doc,
     win,
     onError: (ruleName, error) => debug.error(strings.scriptError, ruleName, error),
     onExternalError: (ruleName, src) => debug.warn(strings.externalScriptFailed, ruleName, src),
   })
-  const ranMessageScripts = new Set<string>()
+  const messageScriptCounts = new Map<string, number>()
   const runMessageScripts = (bubble: HTMLElement, codes: string[]) => {
-    for (const code of codes) {
-      if (ranScripts.has(code)) continue
-      ranScripts.add(code)
-      if (bubble !== refs.statusbar) ranMessageScripts.add(code)
+    for (const code of new Set(codes)) {
+      if (bubble === refs.statusbar) {
+        if (bootRanScripts.has(code)) continue
+        bootRanScripts.add(code)
+      } else {
+        const count = messageScriptCounts.get(code) || 0
+        messageScriptCounts.set(code, count + 1)
+        if (bootRanScripts.has(code) || count > 0) continue
+      }
       scope.run(bubble, () => runInlineScript(code, 'message', { doc, win, onError: (name, e) => debug.error(strings.scriptError, name, e), onExternalError: () => {} }))
+    }
+  }
+  const releaseMessageScripts = (codes: string[]) => {
+    for (const code of new Set(codes)) {
+      const count = messageScriptCounts.get(code) || 0
+      if (count <= 1) messageScriptCounts.delete(code)
+      else messageScriptCounts.set(code, count - 1)
     }
   }
   if (refs.statusbar && config.card.statusbarHtml) runMessageScripts(refs.statusbar, Array.from(String(config.card.statusbarHtml).matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)).map((m) => m[1]))
@@ -421,6 +433,7 @@ export function createShell(options: CreateShellOptions): Shell {
     },
     // 宿主的渲染管線保留正文裡的 <script>（跟一般卡同一套信任模型）：掛上後在那則的作用域裡跑一次。
     runScripts: runMessageScripts,
+    releaseScripts: releaseMessageScripts,
     mountFrontend,
     virtualize,
   })
@@ -832,8 +845,7 @@ export function createShell(options: CreateShellOptions): Shell {
         if (stageState !== 'closed') { sdkHost.stage.close(); bus.emit('stage:close') }
         history.more = false
         history.loading = false
-        for (const code of ranMessageScripts) ranScripts.delete(code)
-        ranMessageScripts.clear()
+        messageScriptCounts.clear()
         list.clear()
         bus.resetReplay()
         // 載荷 { conversationId }（宿主有給才帶）：卡片用它對上 sdk.archive.list() 裡的那一段

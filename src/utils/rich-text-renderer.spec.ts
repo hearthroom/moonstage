@@ -150,12 +150,20 @@ describe('head tag sanitization preserves embedded style/script and canvas place
     expect(out).not.toContain('角色卡')
   })
 
-  test('preserves canvas.vue highlightText stashed style/script placeholders (\x05N\x06\x07) inside <head>', () => {
-    const html = '<head>\n  <meta name="viewport" content="width=device-width">\n  <title>無視</title>\n  \x050\x06\x07\n</head>\n<div class="wrap">表單</div>\n\x051\x06\x07'
-    const out = sanitizeHtml(html)
-    expect(out).toContain('\x050\x06\x07')
-    expect(out).toContain('\x051\x06\x07')
-    expect(out).toContain('<div class="wrap">表單</div>')
-    expect(out).not.toMatch(/<\/?(?:head|meta|title)\b/i)
+  test('preserves canvas.vue highlightText stashed style/script placeholders (\x05N\x06 and \x05N\x06\x07) inside <head>', () => {
+    const htmlWithMarker = '<head>\n  <meta name="viewport" content="width=device-width">\n  <title>無視</title>\n  \x050\x06\x07\n</head>\n<div class="wrap">表單</div>\n\x051\x06\x07'
+    const outWithMarker = sanitizeHtml(htmlWithMarker)
+    expect(outWithMarker).toContain('\x050\x06\x07')
+    expect(outWithMarker).toContain('\x051\x06\x07')
+    expect(outWithMarker).toContain('<div class="wrap">表單</div>')
+    expect(outWithMarker).not.toMatch(/<\/?(?:head|meta|title)\b/i)
+
+    // canvas.vue highlightText 在呼叫 sanitizeHtml 前先跑了 .replace(/\x07/g, '')，佔位符為 \x05N\x06
+    const htmlAfterStrip07 = htmlWithMarker.replace(/\x07/g, '')
+    const outAfterStrip07 = sanitizeHtml(htmlAfterStrip07)
+    expect(outAfterStrip07).toContain('\x050\x06')
+    expect(outAfterStrip07).toContain('\x051\x06')
+    expect(outAfterStrip07).toContain('<div class="wrap">表單</div>')
+    expect(outAfterStrip07).not.toMatch(/<\/?(?:head|meta|title)\b/i)
   })
 })

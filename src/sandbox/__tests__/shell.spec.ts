@@ -1129,4 +1129,97 @@ describe('殼：訊息規則腳本與功能欄／SDK 去重（卡 100737／10074
     expect((window as unknown as { __sdkScriptRuns?: number }).__sdkScriptRuns).toBe(1)
     expect((window as unknown as { __sdkDoneEvents?: string[] }).__sdkDoneEvents).toEqual(['m1', 'm2'])
   })
+
+  it.each([true, false])('卡 100737 自然掛載：sandbox-zh.js 非同步載完觸發 rerenderAll 後，表單預覽與 Tab 切換仍有效（宿主 view=%s）', async (useHostView) => {
+    const formHtml = `
+      <head><style>.form-wrap{color:#e9eefc}</style></head>
+      <div class="form-wrap">
+        <div role="tablist">
+          <button type="button" class="tab is-active" id="tab-1" data-tab="panel-1" value="panel-1">基本</button>
+          <button type="button" class="tab" id="tab-2" data-tab="panel-2" value="panel-2">外貌</button>
+        </div>
+        <div class="panel" id="panel-1"><input id="f-name" type="text" /><input id="f-age" type="number" value="22" /></div>
+        <div class="panel" id="panel-2" hidden><select id="f-hair"><option value="黑">黑</option><option value="銀">銀</option></select></div>
+        <pre id="preview"></pre>
+        <button type="button" id="btn-copy">一键复制</button>
+      </div>
+      <script>(function(){
+        var tabs = Array.from(document.querySelectorAll('.tab'));
+        var panels = Array.from(document.querySelectorAll('.panel'));
+        tabs.forEach(function(t){
+          t.addEventListener('click', function(){
+            var id = t.getAttribute('data-tab') || t.getAttribute('value');
+            tabs.forEach(function(b){ b.classList.toggle('is-active', b === t); });
+            panels.forEach(function(p){ if (p.id === id) p.removeAttribute('hidden'); else p.setAttribute('hidden', ''); });
+          });
+        });
+        var fName = document.getElementById('f-name');
+        var fAge = document.getElementById('f-age');
+        var preview = document.getElementById('preview');
+        function build(){
+          preview.textContent = (fName.value.trim() ? '【姓名】' + fName.value.trim() + '\\n' : '') + '【年龄】' + fAge.value;
+        }
+        [fName, fAge].forEach(function(el){
+          el.addEventListener('input', build);
+          el.addEventListener('change', build);
+        });
+        build();
+      })();</script>
+    `
+    let resolveDisplayScript!: (fn: ((t: string) => string) | null) => void
+    const displayScriptPromise = new Promise<((t: string) => string) | null>((r) => { resolveDisplayScript = r })
+    document.body.innerHTML = '<div id="app"></div>'
+    shell?.dispose()
+    sent = []
+    shell = createShell({
+      doc: document,
+      win: window as Window & typeof globalThis,
+      mount: document.getElementById('app')!,
+      config: config({
+        locale: 'zh-Hant',
+        cardLanguage: '',
+        card: {
+          rules: [{ id: '100737-rule', name: '开场白', find: '开场白', replace: formHtml, enabled: true }],
+          statusbar: '',
+        },
+      }),
+      transport: { send: (m) => sent.push(m) },
+      displayScript: () => displayScriptPromise,
+    })
+
+    // 1. messages 先到（模擬 /play/497372 冷啟動）
+    shell.handle({
+      type: 'messages',
+      messages: [{
+        id: 'greeting',
+        role: 'ai',
+        content: '开场白',
+        serverId: null,
+        state: 'done',
+        ...(useHostView ? { view: { name: '露娜', html: formHtml, finished: true } } : {}),
+      }],
+    })
+    await nextTick()
+
+    // 2. 4ms 後 sandbox-zh.js 載入完成，觸發 displayScript 回呼與 rerenderAll
+    resolveDisplayScript((t) => t)
+    await displayScriptPromise
+    await nextTick()
+
+    const preview = shell.refs.list.querySelector('#preview') as HTMLElement
+    expect(preview).not.toBeNull()
+    expect(preview.textContent!.length).toBeGreaterThan(0)
+    expect(preview.textContent).toContain('【年龄】22')
+
+    const tab2 = shell.refs.list.querySelector('#tab-2') as HTMLButtonElement
+    tab2.click()
+    expect(tab2.classList.contains('is-active')).toBe(true)
+
+    const tab1 = shell.refs.list.querySelector('#tab-1') as HTMLButtonElement
+    tab1.click()
+    const fName = shell.refs.list.querySelector('#f-name') as HTMLInputElement
+    fName.value = 'QA自然輸入'
+    fName.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(preview.textContent).toContain('【姓名】QA自然輸入')
+  })
 })
