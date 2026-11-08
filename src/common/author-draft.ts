@@ -5,7 +5,7 @@
  * 一份草稿就是「畫布套得上的作者資產」加上預覽要用的幾個欄位。
  * 這裡只定義形狀與匯入；儲存見 author-draft-store.ts。
  */
-import type { TavernRule } from '@/pages/canvas/canvas-rule-engine'
+import type { TavernRule, RuleMessageTarget } from '@/pages/canvas/canvas-rule-engine'
 import type { CardFormat } from './card-format'
 export type DraftMountLayer = 'under' | 'over' | 'cover'
 export type DraftChatPage = 'classic' | 'sandbox'
@@ -164,6 +164,12 @@ function str(v: any): string {
   return typeof v === 'string' ? v : ''
 }
 
+/** 保留明確的空選擇；缺欄位回 undefined，維持 legacy 全訊息套用。 */
+function targetsFromMetadata(value: unknown): RuleMessageTarget[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.filter((target): target is RuleMessageTarget => target === 'ai' || target === 'user' || target === 'system')
+}
+
 /** MMD 的 `/pattern/flags` 字串直接餵給引擎即可（引擎自己分辨字面量與正則）。 */
 function mmdRule(item: any, index: number): TavernRule | null {
   const find = str(item.regex ?? item.find)
@@ -175,24 +181,30 @@ function mmdRule(item: any, index: number): TavernRule | null {
     find,
     replace,
     enabled: true,
+    ...(Array.isArray(item.targets) ? { targets: targetsFromMetadata(item.targets) } : {}),
   }
 }
 
 /**
  * 酒館的規則：placement 1 = 使用者輸入、2 = AI 輸出、3 = 斜線指令、5 = 世界書。
- * 只有作用在 AI 輸出的規則會在畫面上看得到；沒寫 placement 的當成全部。
+ * 自有 targets metadata 優先；否則保留玩家／AI 對象，沒寫 placement 的當成全部。
  */
 function stRule(item: any, index: number): TavernRule | null {
   const find = str(item.findRegex)
   if (!find) return null
   const placement = Array.isArray(item.placement) ? item.placement.map(Number) : null
-  if (placement && placement.length && !placement.includes(2)) return null
+  const targets = targetsFromMetadata(item.targets)
+    ?? (placement && placement.length
+      ? ([1, 2] as const).filter(p => placement.includes(p)).map((p): RuleMessageTarget => p === 1 ? 'user' : 'ai')
+      : undefined)
+  if (!Array.isArray(item.targets) && targets?.length === 0) return null
   return {
     id: item.id ?? index + 1,
     name: str(item.scriptName) || `#${index + 1}`,
     find,
     replace: str(item.replaceString),
     enabled: item.disabled !== true,
+    ...(targets !== undefined ? { targets } : {}),
     promptOnly: item.promptOnly === true,
     trimStrings: Array.isArray(item.trimStrings) ? item.trimStrings.filter((s: any) => typeof s === 'string') : undefined,
   }
@@ -587,6 +599,7 @@ export function draftToTrialPayload(draft: AuthorDraft): Record<string, any> | n
         find: String(r.find || ''),
         replace: String(r.replace || ''),
         enabled: r.enabled !== false,
+        ...(Array.isArray(r.targets) ? { targets: r.targets } : {}),
       })),
       mountTrigger: draft.mountTrigger,
       mountLayer: draft.mountLayer,

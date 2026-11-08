@@ -59,19 +59,21 @@ describe('importAuthorDraft', () => {
     expect(d.rules[0]).toMatchObject({ id: 1, name: '網頁美化', find: '/【網頁美化】/g', replace: '<style>.kg{}</style>', enabled: true })
   })
 
-  it('酒館規則：留 trimStrings、對應 disabled 與 promptOnly，只作用在使用者輸入的規則不進顯示層', () => {
+  it('酒館規則：留 trimStrings、對應 disabled 與 promptOnly，玩家規則保留其套用對象', () => {
     const d = importAuthorDraft(JSON.stringify([
       { scriptName: '狀態', findRegex: '/<s>(.*?)<\\/s>/g', replaceString: '<i>$1</i>', trimStrings: ['x'], placement: [2], disabled: false },
       { scriptName: '關掉的', findRegex: 'a', replaceString: 'b', disabled: true },
-      { scriptName: '只給模型', findRegex: 'c', replaceString: 'd', placement: [1] },
+      { scriptName: '玩家規則', findRegex: 'c', replaceString: 'd', placement: [1] },
       { scriptName: '沒寫位置', findRegex: 'e', replaceString: 'f' },
     ]))
     expect(d.format).toBe('st-regex')
     expect(d.cardFormat).toBe('tavern')
-    expect(d.rules.map((r) => r.name)).toEqual(['狀態', '關掉的', '沒寫位置'])
+    expect(d.rules.map((r) => r.name)).toEqual(['狀態', '關掉的', '玩家規則', '沒寫位置'])
     expect(d.rules[0].trimStrings).toEqual(['x'])
     expect(d.rules[0].enabled).toBe(true)
     expect(d.rules[1].enabled).toBe(false)
+    expect(d.rules[0].targets).toEqual(['ai'])
+    expect(d.rules[2].targets).toEqual(['user'])
   })
 
   it('酒館單一規則物件也吃', () => {
@@ -211,7 +213,7 @@ describe('酒館卡 → 試玩卡', () => {
     expect(p.worldbook.entries).toHaveLength(3)
     expect(p.worldbook.format).toBe('tavern')
     expect(p.worldbook.entries[1]).toEqual({ name: '帽子', content: '戴帽的男人', keywords: ['帽子'], secondaryKeywords: [], isConstant: true, isEnabled: true, matchOptions: { caseSensitive: false, matchWholeWords: false, selectiveLogic: 0 } })
-    expect(p.authorAsset.rules[0]).toEqual({ id: '1', name: '狀態欄', find: '/<s>(.*)<\\/s>/g', replace: '$1', enabled: true })
+    expect(p.authorAsset.rules[0]).toEqual({ id: '1', name: '狀態欄', find: '/<s>(.*)<\\/s>/g', replace: '$1', enabled: true, targets: ['ai'] })
     expect(p.authorAsset.mountLayer).toBe('over')
   })
 
@@ -445,5 +447,60 @@ describe('世界書的次要關鍵詞（酒館 selective + secondary_keys，AND 
     ] } } })
     const d = importAuthorDraft(card, 'c')
     expect(d.card!.book!.entries[0]).toMatchObject({ keywords: ['k1', 'k2'], secondaryKeywords: ['s1'] })
+  })
+})
+
+
+describe('顯示規則對象從匯入保留到預覽及試玩酬載', () => {
+  const script = { findRegex: '戰報', replaceString: '折疊' }
+  const cardWith = (scripts: unknown[]) => ({ spec: 'chara_card_v2', data: { name: '對象測試', description: '設定', extensions: { regex_scripts: scripts } } })
+
+  it('酒館 placement 的玩家、AI、兩者保留，非訊息位置丟棄；缺或空位置仍是 legacy 全套', () => {
+    const draft = importAuthorDraft(JSON.stringify(cardWith([
+      { ...script, id: 'user', placement: [1] },
+      { ...script, id: 'ai', placement: [2] },
+      { ...script, id: 'both', placement: [2, 1] },
+      { ...script, id: 'slash', placement: [3] },
+      { ...script, id: 'book', placement: [5] },
+      { ...script, id: 'legacy' },
+      { ...script, id: 'empty-placement', placement: [] },
+    ])))
+    expect(draft.rules.map(r => [r.id, r.targets])).toEqual([
+      ['user', ['user']], ['ai', ['ai']], ['both', ['user', 'ai']], ['legacy', undefined], ['empty-placement', undefined],
+    ])
+    const payload = draftToTrialPayload(draft)!
+    expect(payload.authorAsset.rules.map((r: any) => [r.id, r.targets])).toEqual(draft.rules.map(r => [r.id, r.targets]))
+    expect(payload.authorAsset.rules[3]).not.toHaveProperty('targets')
+  })
+
+  it('本機自有 targets metadata 優先於酒館 placement，空陣列與只套系統都不會被丟掉', () => {
+    const draft = importAuthorDraft(JSON.stringify(cardWith([
+      { ...script, targets: [], placement: [1] },
+      { ...script, targets: ['system'], placement: [3] },
+      { ...script, targets: ['ai', 'system'], placement: [1] },
+      { ...script, targets: ['invalid', 'user'], placement: [2] },
+    ])))
+    expect(draft.rules.map(r => r.targets)).toEqual([[], ['system'], ['ai', 'system'], ['user']])
+    expect(draftToAuthorAsset(draft).rules.map(r => r.targets)).toEqual([[], ['system'], ['ai', 'system'], ['user']])
+    expect(draftToTrialPayload(draft)!.authorAsset.rules.map((r: any) => r.targets)).toEqual([[], ['system'], ['ai', 'system'], ['user']])
+  })
+
+  it('原生資產缺 targets 與 targets:[] 往返後仍可區別；mmdRule 的既有 enabled=true 不改', () => {
+    const draft = importAuthorDraft(JSON.stringify({ authorAsset: { mountTrigger: '', mountLayer: 'over', rules: [
+      { find: '戰報', replace: 'legacy', enabled: false },
+      { find: '戰報', replace: 'none', targets: [], enabled: false },
+      { find: '戰報', replace: 'system', targets: ['system'] },
+    ] } }))
+    expect(draft.format).toBe('moonstage-asset')
+    expect(draft.rules.map(r => r.targets)).toEqual([undefined, [], ['system']])
+    expect(draft.rules[0]).not.toHaveProperty('targets')
+    expect(draft.rules.every(r => r.enabled === true)).toBe(true)
+    const roundtrip = importAuthorDraft(JSON.stringify(draftToAuthorAsset(draft)))
+    expect(roundtrip.rules.map(r => r.targets)).toEqual([undefined, [], ['system']])
+    const merged = mergeAuthorDraft(draft, importAuthorDraft('可建立試玩的角色設定', '設定'))!
+    const sent = draftToTrialPayload(merged)!.authorAsset.rules
+    expect(sent[0]).not.toHaveProperty('targets')
+    expect(sent[1]).toHaveProperty('targets', [])
+    expect(sent[2]).toHaveProperty('targets', ['system'])
   })
 })
