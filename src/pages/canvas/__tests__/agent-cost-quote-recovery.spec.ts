@@ -3,6 +3,8 @@ import path from 'node:path'
 import ts from 'typescript'
 import { describe, it, expect, vi } from 'vitest'
 import { isDefinitivePreAdmissionRejection } from '../chat-transport-ownership'
+import { adoptInterruptedAgentBubbleForResume, createRewriteSnapshotForTarget, restoreRewriteCandidate, removeOperationCandidate, keepInterruptedAgentBubble } from '../chat-operation-ui-state'
+import { findResumableAgentOperation, resolveAgentResumeTarget } from '@/utils/agent-composer-action'
 const source = readFileSync(path.resolve(__dirname, '../canvas.vue'), 'utf8')
 const take = (a: string, b: string) => source.slice(source.indexOf(a), source.indexOf(b, source.indexOf(a)))
 describe('Agent quote changed before admission', () => {
@@ -99,5 +101,76 @@ describe('Agent Continue quote rejection preserves the composer', () => {
     expect(openModelSelect).toHaveBeenCalledOnce()
     expect(appendChatErrorBubble).not.toHaveBeenCalled()
     expect(pending.payload.message).toBe('Submitted story choice')
+  })
+})
+
+
+describe('Agent Continue quote cancellation keeps its same-page resume target', () => {
+  it.each(['', 'Unsent player note'])('restores the interrupted bubble and trail with draft "%s"', (draft) => {
+    const originalTrail = ['Looked up the scene', 'Saved the draft']
+    const content = { value: draft }
+    const talkList = { value: [
+      { id: 'saved-user', chatId: 'saved-user', type: 1, content: 'Submitted story choice' },
+      { id: 'saved-ai', chatId: 'saved-ai', type: 0, content: '', agentInterrupted: true,
+        chatLoading: false, prepTrail: originalTrail, allowedActions: ['continue'] },
+    ] }
+    const calls: any[] = []
+    const scope: any = {
+      content, talkList, canGenerate: { value: true }, isTimelineMutationBlocked: () => false,
+      knownOperations: { value: [{ operationId: 'saved-operation', reasonCode: 'agent_progress_preserved', sourceChatId: 'saved-user' }] },
+      unref: (ref: any) => ref.value, findResumableAgentOperation, resolveAgentResumeTarget,
+      createRewriteSnapshotForTarget, adoptInterruptedAgentBubbleForResume, restoreRewriteCandidate, removeOperationCandidate, keepInterruptedAgentBubble,
+      prepSteps: { value: originalTrail.slice() }, hasRenderableAssistantOutput: (body: string, thinking: string) => !!(body || thinking),
+      ownershipRevision: { value: 0 }, pendingChatTurn: null, pendingRewriteSnapshot: null,
+      rewrite: { value: false }, contine: { value: false }, rewriteTargetChatId: { value: '' }, continueTargetChatId: { value: '' },
+      resumeFromOperationIdOverride: '', requestedOperationKindOverride: '',
+      modelCostQuoteChanged: { value: false }, openModelSelect: vi.fn(),
+      chatTransport: { shouldRecoverTransientTurn: () => true }, messageQueue: { value: [] },
+      tempContent: { value: '' }, replyContent: { value: '' }, thinkingContent: { value: '' }, lastFinishReason: { value: '' }, pendingMessageMeta: { value: null },
+      clearStreamState: vi.fn(), appendChatErrorBubble: vi.fn(), resolveChatErrorMessage: () => '', t: (s: string) => s, message: { warning: vi.fn() },
+      createPreAdmissionOperationErrorProjection: () => ({}), operationStatusPollScheduler: { cancel: vi.fn() }, operationStatusRequestKey: '', durableAckProbeKey: '',
+      pendingResendPayload: { value: null }, closeWebSocket: vi.fn(),
+      operationKindFromPayload: () => 'retry_generation', calls,
+    }
+    const js = ts.transpile(
+      take('function removeOrphanPlaceholder()', 'function removeResumeHistoryDuplicateByMessageAnchor(')
+      + take('function isReplacementOperationKind(', 'function recordAuthoritativeOperationStatus(')
+      + take('function resumeAgentOperation(): boolean {', 'function onActionBtnClick() {')
+      + take('function beginPendingChatTurn(', 'function discardStoppedOperationWithoutDurableTerminal(')
+      + take('function recoverPendingChatTurnBeforeAccepted(', 'function markPendingChatTurnAccepted(')
+      + take('function restoreRefusedReplacement(', 'function settleFrozenLegacyStreamError(')
+      + `
+      function send() {
+        const message = content.value;
+        const adopted = adoptInterruptedAgentBubbleForResume(talkList.value);
+        prepSteps.value = adopted ? adopted.trail.slice() : [];
+        content.value = '';
+        const payload = { message, chatId: rewriteTargetChatId.value,
+          resumeFromOperationId: resumeFromOperationIdOverride, supportsOperationOutcome: true };
+        calls.push(payload);
+        beginPendingChatTurn({ aiBubbleId: adopted?.bubbleId, draft: message, payload,
+          operationKind: 'retry_generation', preAdmissionErrorType: 'quote_changed' });
+      }
+      resumeAgentOperation();
+      settleConfirmedPreAdmissionFailure(pendingChatTurn, pendingChatTurn.draft);
+      const restored = JSON.parse(JSON.stringify(talkList.value));
+      const draftAfterRejection = content.value;
+      const callsBeforeManualRetry = calls.length;
+      // Cancelling the model sheet does not generate; the same visible target remains.
+      const canRetry = resumeAgentOperation();
+      return { restored, draftAfterRejection, callsBeforeManualRetry, canRetry };
+      `, { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None })
+    const result = new Function(...Object.keys(scope), js)(...Object.values(scope))
+    const restored = result.restored.find((row: any) => row.id === 'saved-ai')
+    expect(restored).toBeDefined()
+    expect(restored.agentInterrupted).toBe(true)
+    expect(restored.prepTrail).toEqual(originalTrail)
+    expect(restored.allowedActions).toContain('continue')
+    expect(result.restored.filter((row: any) => row.type === 1)).toHaveLength(1)
+    expect(result.draftAfterRejection).toBe(draft)
+    expect(content.value).toBe(draft)
+    expect(result.callsBeforeManualRetry).toBe(1)
+    expect(result.canRetry).toBe(true)
+    expect(calls.map(p => p.resumeFromOperationId)).toEqual(['saved-operation', 'saved-operation'])
   })
 })

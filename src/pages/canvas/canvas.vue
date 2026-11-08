@@ -2314,7 +2314,8 @@ function resumeAgentOperation(): boolean {
   // 那顆空的使用者泡泡自己就不會出現了。
   rewrite.value = true;
   contine.value = false;
-  pendingRewriteSnapshot = null;
+  // Keep the interrupted row before send() adopts it and clears its trail.
+  pendingRewriteSnapshot = createRewriteSnapshotForTarget(unref(talkList), target.chatId);
   rewriteTargetChatId.value = target.chatId;
   resumeFromOperationIdOverride = target.operationId;
   requestedOperationKindOverride = 'retry_generation';
@@ -8621,10 +8622,17 @@ function recoverPendingTurnAfterMissingDurableAck(
 // gone already, so the line goes back to the composer as before. An agent Continue
 // (resumeFromOperationId) adopted a bubble that is still the server's turn.
 function restoreRefusedReplacement(pending: PendingChatTurn | null): boolean {
-  if (!pending || pending.preAdmissionTurnKept !== true) return false;
+  if (!pending) return false;
   if (!isReplacementOperationKind(pending.operationKind)) return false;
   if (!pending.rewriteSnapshot) return false;
-  if (String((pending.payload as any)?.resumeFromOperationId || '').trim()) return false;
+  const agentResume = String((pending.payload as any)?.resumeFromOperationId || '').trim();
+  // This runs only after the new intent was confirmed absent, before admission.
+  if (agentResume ? pending.preAdmissionErrorType !== 'quote_changed' : pending.preAdmissionTurnKept !== true) return false;
+  if (agentResume && pending.aiBubbleId != null) {
+    // An adopted row has no provisional marker. Reinsert its original snapshot
+    // instead of letting restoreRewriteCandidate mistake it for an untouched row.
+    talkList.value = talkList.value.filter(item => String(item?.id) !== String(pending.aiBubbleId));
+  }
   return discardPendingChatOperationCandidate(pending);
 }
 
@@ -8667,7 +8675,7 @@ function settleConfirmedPreAdmissionFailure(
   const originalLine = String(capturedPending.rewriteSnapshot?.userBubble?.content ?? '');
   if (restoreRefusedReplacement(capturedPending)) {
     // 「編輯並重送」：氣泡換回原句，改過的字留在輸入框，不能丟。
-    if (storedDraft && storedDraft.trim() !== originalLine.trim() && !content.value) content.value = storedDraft;
+    if (!String(capturedPending.payload?.resumeFromOperationId || '').trim() && storedDraft && storedDraft.trim() !== originalLine.trim() && !content.value) content.value = storedDraft;
     pendingResendPayload.value = null;
     clearStreamState();
     removeOrphanPlaceholder();
