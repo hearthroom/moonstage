@@ -21,7 +21,7 @@
 	"canvas.capacity.raiseNoSize": "調高上下文容量",
 	"canvas.capacity.raiseSub": "AI 能記住更多內容，每輪費用可能增加。",
 	"canvas.capacity.trim": "維持目前的上下文容量",
-	"canvas.capacity.trimSub": "每輪費用不變。",
+	"canvas.capacity.trimSub": "每輪費用不變，AI 以卡片的重點設定回覆。",
 	"canvas.capacity.choose": "選擇繼續方式",
 	"canvas.capacity.saveFailed": "設定未儲存，請再試一次。",
 	"mine.checkRole.author": "作者",

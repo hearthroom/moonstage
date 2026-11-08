@@ -461,6 +461,7 @@
 	const stageHost = useStageHost()
 	import { variantPrice, priceMeaning } from '@/pages/canvas/canvas-model-catalog'
 	import { visibleLanes, hiddenLaneCount, laneCount, laneTagOf, isDeadLane, composeModelDisplayName } from '@/pages/canvas/canvas-model-lanes'
+	import { raisesContext } from '@/pages/canvas/canvas-capacity-choice'
 	import icon_deepseek from '@/static/icon/models/deepseek.png';
 	import icon_gpt from '@/static/icon/models/gpt.png';
 	import icon_claude from '@/static/icon/models/claude.png';
@@ -2274,7 +2275,9 @@ function composeModelDisplayName(variant, familyName) {
 			}
 			deepPrepSaving.value = true;
 			const agentPreference = saveAgentPreference ? { multiPassEnabled: deepPrepEnabled.value, agentCostSelectionKey: estimate?.selectionKey || '' } : {};
-			const data = { roleId: formData.roleId, ...(formData.selectModel !== props.selectModel ? { selectModel: formData.selectModel } : {}), context: formData.context, thinkingDepth: formData.thinkingDepth, thinkingDepthManual: formData.thinkingDepthManual, ...agentPreference };
+			// 調高上下文容量就回到完整帶入（見 raisesContext）：之前選過「維持目前容量」的玩家靠這條路回去。
+			const restoreFullLore = raisesContext(props.context, formData.context) ? { trimConstantLore: false } : {};
+			const data = { roleId: formData.roleId, ...(formData.selectModel !== props.selectModel ? { selectModel: formData.selectModel } : {}), context: formData.context, thinkingDepth: formData.thinkingDepth, thinkingDepthManual: formData.thinkingDepthManual, ...restoreFullLore, ...agentPreference };
 			const res = await _this.http.post(_this.requestUrl.playerRoleSettingsSave, { data, showLoading: false, quietErrors: true }).catch(error => {
 				if (error?.statusCode === 409) return error;
 				throw error;

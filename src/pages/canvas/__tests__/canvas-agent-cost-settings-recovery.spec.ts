@@ -4,7 +4,7 @@ import ts from 'typescript'
 import { ref, unref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as settings from '../canvas-role-settings'
-import { applyCapacityChoice } from '../canvas-capacity-choice'
+import { applyCapacityChoice, raisesContext } from '../canvas-capacity-choice'
 
 // Run the actual canvas handlers, with only HTTP and surrounding UI replaced.
 const source = readFileSync('src/pages/canvas/canvas.vue', 'utf8')
@@ -20,7 +20,7 @@ const handlers = names.map(name => {
 function harness() {
   const original = { ...settings.ROLE_SETTINGS_DEFAULTS, selectModel: 'saved-lane', context: 1, thinkingDepth: 'high', thinkingDepthManual: true }
   const ctx: any = {
-    ...settings, unref, applyCapacityChoice,
+    ...settings, unref, applyCapacityChoice, raisesContext,
     formData: { ...original, selectModelName: 'Saved model' }, roleSettingsSnapshot: { ...original },
     settingsRoleId: ref('fixture-role'), conversationId: ref('fixture-conversation'),
     selectedVariantValue: ref('saved-lane'), modelGroups: ref([]),
@@ -93,6 +93,40 @@ describe('canvas settings recover from Agent cost confirmation requirements', ()
     await ctx.onApplyModelSettings({ selectModel: 'next-lane' })
     expect(ctx.roleSettingsSnapshot).toMatchObject({ selectModel: 'next-lane', thinkingDepth: 'off' })
     expect(ctx.loadModelCatalog).toHaveBeenCalled()
+  })
+
+  it('raising the context from the HUD restores full lore, and a failed save puts the choice back', async () => {
+    const { ctx, post } = harness()
+    ctx.formData.trimConstantLore = true
+    ctx.roleSettingsSnapshot.trimConstantLore = true
+    post.mockResolvedValueOnce({ statusCode: 503 })
+    await ctx.onApplyModelSettings({ context: 3 })
+    expect(post).toHaveBeenLastCalledWith('/settings/save', expect.objectContaining({ data: expect.objectContaining({ context: 3, trimConstantLore: false }) }))
+    expect(ctx.formData).toMatchObject({ context: 1, trimConstantLore: true })
+    post.mockResolvedValueOnce({ statusCode: 200 })
+    await ctx.onApplyModelSettings({ context: 3 })
+    expect(ctx.roleSettingsSnapshot).toMatchObject({ context: 3, trimConstantLore: false })
+  })
+
+  it('a lower or unchanged context leaves the trimmed choice alone', async () => {
+    const { ctx, post } = harness()
+    ctx.formData.trimConstantLore = true
+    ctx.roleSettingsSnapshot.trimConstantLore = true
+    ctx.formData.context = 3
+    ctx.roleSettingsSnapshot.context = 3
+    post.mockResolvedValueOnce({ statusCode: 200 })
+    await ctx.onApplyModelSettings({ context: 2 })
+    expect(post.mock.calls.at(-1)[1].data).not.toHaveProperty('trimConstantLore')
+    expect(ctx.formData.trimConstantLore).toBe(true)
+  })
+
+  it('a panel that saved the raise itself also updates the canvas copy', async () => {
+    const { ctx, post } = harness()
+    ctx.formData.trimConstantLore = true
+    ctx.roleSettingsSnapshot.trimConstantLore = true
+    await ctx.onApplyModelSettings({ persisted: true, context: 3 })
+    expect(post).not.toHaveBeenCalled()
+    expect(ctx.roleSettingsSnapshot).toMatchObject({ context: 3, trimConstantLore: false })
   })
 
   it('an accepted model panel selection updates canvas without a second unquoted save', async () => {

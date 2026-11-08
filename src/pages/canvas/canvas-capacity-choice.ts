@@ -68,6 +68,16 @@ export function capacitySituation(messages: any[] | null | undefined, hasOlderPa
   return 'start'
 }
 
+/**
+ * 上下文容量往上調了沒有（檔位 1–5，100 是最高）。往上調就回到完整帶入常駐世界書：
+ * 「維持目前容量」留下的設定會一直生效，調高是玩家回得去的路，彈窗與模型選單都一樣。
+ */
+export function raisesContext(previous: unknown, next: unknown): boolean {
+  const from = Number(previous)
+  const to = Number(next)
+  return Number.isFinite(from) && Number.isFinite(to) && from > 0 && to > from
+}
+
 export function capacityTitleKey(situation?: CapacitySituation | null): string {
   return situation === 'later' ? 'canvas.capacity.titleLater' : 'canvas.capacity.titleStart'
 }

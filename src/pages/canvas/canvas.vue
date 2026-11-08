@@ -558,7 +558,7 @@ import { chromeTopColor, syncChromeTone } from './canvas-chrome-tone'
 import CanvasConfirm from './components/canvas-confirm.vue'
 import CanvasCapacityChoice from './components/canvas-capacity-choice.vue'
 import {
-  applyCapacityChoice, capacityChoiceOptions, capacitySituation, capacityTitleKey,
+  applyCapacityChoice, capacityChoiceOptions, capacitySituation, capacityTitleKey, raisesContext,
   type CapacityAdvice, type CapacityChoiceKey, type CapacityPatch, type CapacitySituation,
 } from './canvas-capacity-choice'
 import CanvasModify from './components/canvas-modify.vue'
@@ -11081,7 +11081,7 @@ async function onApplyModelSettings(payload: any) {
   const before = {
     selectModel: formData.selectModel, selectModelName: formData.selectModelName,
     context: formData.context, thinkingDepth: formData.thinkingDepth,
-    thinkingDepthManual: formData.thinkingDepthManual,
+    thinkingDepthManual: formData.thinkingDepthManual, trimConstantLore: formData.trimConstantLore,
   }
   /*
     只有玩家真的挑了另一條線路才動模型。
@@ -11097,6 +11097,9 @@ async function onApplyModelSettings(payload: any) {
   }
   const variant = findVariant(modelGroups.value, next.selectModel)
   if (variant) formData.selectModelName = composeModelDisplayName(variant, variant.family)
+  // 調高上下文容量就回到完整帶入（見 raisesContext）。選單自己存的那條路已經一起存了，
+  // 這裡讓本機快照跟上；由畫布存的那條路靠這一行把它放進要送的欄位。
+  if (raisesContext(before.context, next.context)) formData.trimConstantLore = false
   if (Number.isFinite(Number(next.context))) formData.context = Number(next.context)
   if (typeof next.thinkingDepth === 'string') {
     formData.thinkingDepth = next.thinkingDepth
@@ -11120,6 +11123,8 @@ async function onApplyModelSettings(payload: any) {
         const selectionKeys = ['selectModel', 'context', 'thinkingDepth', 'thinkingDepthManual'] as const
         if (selectionKeys.every(key => formData[key] === attempted[key])) {
           for (const key of selectionKeys) formData[key] = before[key]
+          // 調高時一起改回完整帶入的那個設定，存失敗就跟著還原。
+          formData.trimConstantLore = before.trimConstantLore
         }
         if (formData.selectModel === before.selectModel) formData.selectModelName = before.selectModelName
       }
@@ -11280,6 +11285,7 @@ async function persistRoleSettings() {
         const selectionKeys = ['selectModel', 'context', 'thinkingDepth', 'thinkingDepthManual'] as const
         if (selectionKeys.every(key => formData[key] === submitted[key])) {
           for (const key of selectionKeys) if (key in payload) formData[key] = before[key]
+          if ('trimConstantLore' in payload) formData.trimConstantLore = before.trimConstantLore
           if ('selectModel' in payload) {
             const variant = findVariant(modelGroups.value, formData.selectModel)
             formData.selectModelName = variant ? composeModelDisplayName(variant, variant.family) : formData.selectModel

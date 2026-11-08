@@ -21,7 +21,7 @@
 	"canvas.capacity.raiseNoSize": "Increase context capacity",
 	"canvas.capacity.raiseSub": "The AI can keep more in mind; each turn may cost more.",
 	"canvas.capacity.trim": "Keep the current context capacity",
-	"canvas.capacity.trimSub": "Each turn costs the same.",
+	"canvas.capacity.trimSub": "Each turn costs the same; the AI works from the card’s key settings.",
 	"canvas.capacity.choose": "Choose how to continue",
 	"canvas.capacity.saveFailed": "Settings weren’t saved. Try again.",
 	"mine.checkRole.author": "Author",
