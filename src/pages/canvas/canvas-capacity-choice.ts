@@ -47,7 +47,7 @@ export type CapacitySituation = 'start' | 'later'
 
 /**
  * 從畫面上的訊息判斷是哪一種：已經有 AI 回過玩家、有摘要，或還有沒載進來的更舊紀錄，
- * 就是聊到後面。開場白（玩家開口前的 AI 訊息）、錯誤泡泡、還在載入的空白回覆都不算。
+ * 就是聊到後面。開場白（玩家開口前的 AI 訊息）、錯誤泡泡、沒有內容的失敗列與載入中的空白列都不算。
  */
 export function capacitySituation(messages: any[] | null | undefined, hasOlderPages: boolean): CapacitySituation {
   if (hasOlderPages) return 'later'
@@ -59,7 +59,10 @@ export function capacitySituation(messages: any[] | null | undefined, hasOlderPa
       playerSpoke = true
       continue
     }
-    if (item.chatLoading === true && !item.content) continue
+    // 還在載入的空白列、斷線或逾時留下的失敗列（重新整理後從歷史載回來也一樣）都不是回覆：
+    // 第一輪失敗後重送被擋，放不下的仍然是這張卡。
+    if (item.isApplicationError === true) continue
+    if (!item.content && !item.thinkingContent) continue
     if (playerSpoke) return 'later'
   }
   return 'start'

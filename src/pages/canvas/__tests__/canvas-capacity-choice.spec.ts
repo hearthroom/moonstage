@@ -114,8 +114,14 @@ describe('放不下的是什麼', () => {
     expect(capacitySituation([player], true)).toBe('later')
   })
 
-  it('還在載入的空白回覆不算回過', () => {
+  it('還在載入的空白回覆、沒有內容的失敗列不算回過', () => {
     expect(capacitySituation([opening, player, { type: 0, content: '', chatLoading: true }], false)).toBe('start')
+    // 第一輪斷線或逾時留下的列（重新整理後從歷史載回來也是這個形狀），之後重送才被擋
+    expect(capacitySituation([opening, player, { type: 0, content: '', chatFinish: true, finishReason: 'upstream_timeout' }], false)).toBe('start')
+    expect(capacitySituation([opening, player, { type: 0, content: '連線中斷', chatFinish: true, isApplicationError: true }], false)).toBe('start')
+    // 有思考但沒有正文，或正常結束的回覆，都算回過
+    expect(capacitySituation([opening, player, { type: 0, content: '', thinkingContent: '想', finishReason: 'reasoning_only' }], false)).toBe('later')
+    expect(capacitySituation([opening, player, { type: 0, content: '回覆', finishReason: 'stop' }], false)).toBe('later')
   })
 
   it('兩種情況各用一句標題', () => {
