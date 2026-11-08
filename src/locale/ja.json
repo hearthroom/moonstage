@@ -21,7 +21,7 @@
 	"canvas.capacity.raiseNoSize": "コンテキスト容量を増やす",
 	"canvas.capacity.raiseSub": "AIがより多くの内容を覚えていられますが、1ターンあたりの料金が上がる場合があります。",
 	"canvas.capacity.trim": "今のコンテキスト容量のまま続ける",
-	"canvas.capacity.trimSub": "今の設定のまま続けます。あとからモデル設定で増やせます。",
+	"canvas.capacity.trimSub": "今の設定で続け、あとからモデル設定で増やせます。",
 	"canvas.capacity.choose": "続け方を選ぶ",
 	"canvas.capacity.saveFailed": "設定を保存できませんでした。もう一度お試しください。",
 	"mine.checkRole.author": "作成者",
