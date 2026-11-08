@@ -36,6 +36,61 @@ describe('Agent cost estimate contract', () => {
   })
 })
 describe('pending Agent settings and confirmation', () => {
+  it('a rolled-back server rejection is visible and keeps every pending choice without legacy writes', async () => {
+    // PM rollback policy B: coordinate frontend rollback and reload old tabs;
+    // this is a negative control, not a legacy dual-write compatibility claim.
+    const calls: any[] = []
+    const catalog = JSON.parse(JSON.stringify((await import('../../pages/canvas/__tests__/fixtures/model-catalog-live.json')).default))
+    const selected = catalog[0].families[0].variants[0].value
+    const showToast = vi.fn()
+    vi.stubGlobal('uni', {
+      request: (o: any) => {
+        calls.push(o)
+        queueMicrotask(() => {
+          const path = new URL(o.url).pathname
+          let statusCode = 200, data: any = {}
+          if (path.endsWith('/models')) data = catalog
+          // Exact old GET shape: no costEstimate. Even OFF preferences were
+          // initialized, so Apply sent the new fields to the old validator.
+          if (path.endsWith('/agent')) data = { roleId: 'fixture-role', multiPassEnabled: false, runtimeEnabled: true, modelSupported: true, costWarning: true }
+          if (path.endsWith('/save')) { statusCode = 400; data = { error: 'invalid_request' } }
+          const response = { statusCode, data, header: {} }
+          o.success(response); o.complete(response)
+        })
+        return { abort: () => {} }
+      },
+      getStorageSync: () => 'en', getLocale: () => 'en', showLoading: vi.fn(), hideLoading: vi.fn(), showToast, $emit: vi.fn(),
+    })
+    const http = (await import('@/components/firstui/fui-request/index.js')).default as any
+    const { setupHttp } = await import('@/api/http-setup.js')
+    const transportToast = { error: vi.fn(), timeout: vi.fn(), networkError: vi.fn(), serverError: vi.fn(), unauthorized: vi.fn() }
+    setupHttp(http, { host: 'https://api.example', loading: { show: vi.fn(), hide: vi.fn() }, toast: transportToast,
+      getLocale: () => 'en', getFreshAccessToken: async () => null, refreshAccessToken: async () => null, clearTokens: vi.fn(), redirectToLogin: vi.fn() })
+    const w = shallowMount(ModelSelectPanel, { props: { open: true, roleId: 'fixture-role', selectModel: selected }, global: {
+      stubs: { Teleport: false }, config: { globalProperties: { http, requestUrl: { getModelListV2: '/models', playerAgentMode: '/agent', playerRoleSettingsSave: '/settings/save', playerAgentCostAction: '/action' } } },
+    } })
+    mounted.push(w)
+    await flushPromises()
+    const vm = w.vm as any
+    vm.formData.selectModel = 'pending-lane'
+    vm.formData.context = 3
+    vm.formData.thinkingDepth = 'high'
+    vm.formData.thinkingDepthManual = true
+    await flushPromises()
+    await vm.sure()
+    await flushPromises()
+    expect(calls.filter(c => c.method === 'POST').map(c => new URL(c.url).pathname)).toEqual(['/settings/save'])
+    expect(calls.find(c => c.method === 'POST').data).toMatchObject({ selectModel: 'pending-lane', context: 3, thinkingDepth: 'high', thinkingDepthManual: true, multiPassEnabled: false, agentCostSelectionKey: '' })
+    expect(showToast).toHaveBeenCalledTimes(1)
+    expect(showToast).toHaveBeenCalledWith({ title: 'main.save_failed', icon: 'none' })
+    expect(transportToast.error).not.toHaveBeenCalled()
+    expect(vm.formData).toMatchObject({ selectModel: 'pending-lane', context: 3, thinkingDepth: 'high', thinkingDepthManual: true })
+    expect(vm.isSure).toBe(false)
+    expect(w.emitted('select')).toBeUndefined()
+    expect(w.emitted('close')).toBeUndefined()
+    expect(uni.$emit).not.toHaveBeenCalledWith('multiPassPreferenceUpdated', expect.anything())
+  })
+
   it('toggle is read-only until apply; cancel saves neither model nor mode', async () => {
     const { w, vm, post } = await setup()
     await vm.onDeepPrepChange(true)
