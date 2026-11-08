@@ -108,6 +108,19 @@ describe('canvas settings recover from Agent cost confirmation requirements', ()
     expect(ctx.roleSettingsSnapshot).toMatchObject({ context: 3, trimConstantLore: false })
   })
 
+  it('a failed HUD save does not undo a capacity choice the player made while it was in flight', async () => {
+    const { ctx, post } = harness()
+    let resolve!: (v: any) => void
+    post.mockImplementationOnce(() => new Promise(r => { resolve = r }))
+    const pending = ctx.onApplyModelSettings({ selectModel: 'next-lane' })
+    ctx.formData.trimConstantLore = true
+    ctx.roleSettingsSnapshot = { ...ctx.roleSettingsSnapshot, trimConstantLore: true }
+    resolve({ statusCode: 503 })
+    await pending
+    expect(ctx.formData.selectModel).toBe('saved-lane')
+    expect(ctx.formData.trimConstantLore).toBe(true)
+  })
+
   it('a lower or unchanged context leaves the trimmed choice alone', async () => {
     const { ctx, post } = harness()
     ctx.formData.trimConstantLore = true

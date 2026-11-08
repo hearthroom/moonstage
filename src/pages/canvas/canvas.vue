@@ -11124,8 +11124,8 @@ async function onApplyModelSettings(payload: any) {
         const selectionKeys = ['selectModel', 'context', 'thinkingDepth', 'thinkingDepthManual'] as const
         if (selectionKeys.every(key => formData[key] === attempted[key])) {
           for (const key of selectionKeys) formData[key] = before[key]
-          // 調高時一起改回完整帶入的那個設定，存失敗就跟著還原。
-          formData.trimConstantLore = before.trimConstantLore
+          // 調高時一起改回完整帶入的那個設定，存失敗就跟著還原；存檔途中玩家在容量彈窗另選過，就留著他的。
+          if ((formData.trimConstantLore === true) === attempted.trimConstantLore) formData.trimConstantLore = before.trimConstantLore
         }
         if (formData.selectModel === before.selectModel) formData.selectModelName = before.selectModelName
       }
@@ -11286,7 +11286,7 @@ async function persistRoleSettings() {
         const selectionKeys = ['selectModel', 'context', 'thinkingDepth', 'thinkingDepthManual'] as const
         if (selectionKeys.every(key => formData[key] === submitted[key])) {
           for (const key of selectionKeys) if (key in payload) formData[key] = before[key]
-          if ('trimConstantLore' in payload) formData.trimConstantLore = before.trimConstantLore
+          if ('trimConstantLore' in payload && (formData.trimConstantLore === true) === submitted.trimConstantLore) formData.trimConstantLore = before.trimConstantLore
           if ('selectModel' in payload) {
             const variant = findVariant(modelGroups.value, formData.selectModel)
             formData.selectModelName = variant ? composeModelDisplayName(variant, variant.family) : formData.selectModel

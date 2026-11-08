@@ -65,8 +65,8 @@ describe('模型選單調高上下文容量', () => {
     const body = source.slice(start, source.indexOf('\nasync function ', start + 1))
     expect(body).toMatch(/Number\(next\.context\) > Number\(before\.context\)\) formData\.trimConstantLore = false/)
     // 存失敗時跟著其他選擇一起還原
-    expect(body).toMatch(/for \(const key of selectionKeys\) formData\[key\] = before\[key\][\s\S]{0,120}formData\.trimConstantLore = before\.trimConstantLore/)
+    expect(body).toMatch(/for \(const key of selectionKeys\) formData\[key\] = before\[key\][\s\S]{0,200}formData\.trimConstantLore = before\.trimConstantLore/)
     const persist = source.slice(source.indexOf('async function persistRoleSettings('), source.indexOf('async function persistRoleSettings(') + 3000)
-    expect(persist).toContain("if ('trimConstantLore' in payload) formData.trimConstantLore = before.trimConstantLore")
+    expect(persist).toContain("if ('trimConstantLore' in payload && (formData.trimConstantLore === true) === submitted.trimConstantLore) formData.trimConstantLore = before.trimConstantLore")
   })
 })
