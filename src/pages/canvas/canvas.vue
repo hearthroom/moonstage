@@ -8486,7 +8486,8 @@ function recoverPendingChatTurnBeforeAccepted(showNotice = true, errorMetadata: 
     [pending.userBubbleId, pending.aiBubbleId].filter(id => id !== undefined && id !== null && id !== '')
   );
   talkList.value = talkList.value.filter(item => !transientBubbleIds.has(item && item.id));
-  if (!content.value && pending.draft) content.value = pending.draft;
+  // Agent Continue reuses a submitted message; it does not own the composer's draft.
+  if (!content.value && pending.draft && !String(pending.payload?.resumeFromOperationId || '').trim()) content.value = pending.draft;
   if (pending.socketToken) {
     messageQueue.value = messageQueue.value.filter(entry => entry && entry.socketToken !== pending.socketToken);
   }
@@ -8677,7 +8678,7 @@ function settleConfirmedPreAdmissionFailure(
 
   const recovered = recoverPendingChatTurnBeforeAccepted(false, operationProjection);
   if (!recovered) {
-    if (storedDraft && !content.value) content.value = storedDraft;
+    if (storedDraft && !content.value && !String(capturedPending.payload?.resumeFromOperationId || '').trim()) content.value = storedDraft;
     ownershipRevision.value++; pendingChatTurn = null;
     clearStreamState();
     removeOrphanPlaceholder();

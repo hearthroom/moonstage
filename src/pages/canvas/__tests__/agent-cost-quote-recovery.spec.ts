@@ -69,3 +69,35 @@ it('keeps the canvas mode if its post-save preference refresh returns503', async
   await new Function(...Object.keys(scope), js)(...Object.values(scope))
   expect(applyMultiPassPreference).not.toHaveBeenCalled()
 })
+
+describe('Agent Continue quote rejection preserves the composer', () => {
+  it.each([
+    { resume: false, draft: '', recoverable: true, expected: 'Submitted story choice' },
+    { resume: true, draft: '', recoverable: true, expected: '' },
+    { resume: true, draft: 'Unsent player note', recoverable: true, expected: 'Unsent player note' },
+    { resume: true, draft: '', recoverable: false, expected: '' },
+    { resume: true, draft: 'Unsent player note', recoverable: false, expected: 'Unsent player note' },
+  ])('resume=$resume draft="$draft" recoverable=$recoverable', ({ resume, draft, recoverable, expected }) => {
+    const pending = { operationKind: resume ? 'retry_generation' : 'send', aiBubbleId: 'candidate',
+      draft: 'Submitted story choice', preAdmissionErrorType: 'quote_changed',
+      payload: { message: 'Submitted story choice', ...(resume ? { resumeFromOperationId: 'saved-agent-operation' } : {}) } }
+    const content = { value: draft }, openModelSelect = vi.fn(), appendChatErrorBubble = vi.fn()
+    const scope: any = { pendingChatTurn: pending, content, modelCostQuoteChanged: { value: false }, openModelSelect,
+      ownershipRevision: { value: 0 }, talkList: { value: [{ id: 'original-user' }, { id: 'candidate' }] },
+      chatTransport: { shouldRecoverTransientTurn: () => recoverable }, messageQueue: { value: [] },
+      tempContent: { value: '' }, replyContent: { value: '' }, thinkingContent: { value: '' }, rewrite: { value: true }, contine: { value: false },
+      clearStreamState: vi.fn(), appendChatErrorBubble, resolveChatErrorMessage: () => '', t: (s: string) => s, message: { warning: vi.fn() },
+      createPreAdmissionOperationErrorProjection: () => ({}), operationStatusPollScheduler: { cancel: vi.fn() }, operationStatusRequestKey: '', durableAckProbeKey: '',
+      discardPendingChatOperationCandidate: vi.fn(), pendingResendPayload: { value: null }, removeOrphanPlaceholder: vi.fn(), closeWebSocket: vi.fn(),
+      isReplacementOperationKind: () => resume,
+    }
+    const js = ts.transpile(take('function recoverPendingChatTurnBeforeAccepted(', 'function markPendingChatTurnAccepted(')
+      + take('function restoreRefusedReplacement(', 'function settleFrozenLegacyStreamError(')
+      + '\nreturn settleConfirmedPreAdmissionFailure(pendingChatTurn, pendingChatTurn.draft);', { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None })
+    expect(new Function(...Object.keys(scope), js)(...Object.values(scope))).toBe(true)
+    expect(content.value).toBe(expected)
+    expect(openModelSelect).toHaveBeenCalledOnce()
+    expect(appendChatErrorBubble).not.toHaveBeenCalled()
+    expect(pending.payload.message).toBe('Submitted story choice')
+  })
+})
