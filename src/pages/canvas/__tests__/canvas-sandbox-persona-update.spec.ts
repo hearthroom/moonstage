@@ -27,7 +27,7 @@ it('全局人設保存後由真實 watcher 送新稱呼；連續改名可用、�
     roleSettingsSnapshot: { ...ROLE_SETTINGS_DEFAULTS, personaMode: 'global', userName: 'Saved card name' },
     globalPersona: ref({ userName: 'GlobalOld', userSex: '', userDefine: '' }),
     conversationPersona: ref({ exists: false }), userInfo: ref({ nickName: 'Nickname' }),
-    roleView: ref({ userName: '' }), settingsRoleId: ref('synthetic-card'),
+    roleView: ref({ userName: '' }), settingsRoleId: ref('synthetic-card'), conversationId: ref('synthetic-conversation'),
     personaSaving: ref(false), personaError: ref(''), sandboxHostRef: ref({ postUserName }),
     ensureRoleSettings: vi.fn(async () => {}), closeCanvasSheet: vi.fn(),
     sandboxStatusbarHtml: () => `<b>${ctx.userDisplayName()}</b>`, t: (key: string) => key,

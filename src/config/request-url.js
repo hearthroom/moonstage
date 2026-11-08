@@ -59,6 +59,7 @@ export const requestUrl = {
 	playerConversationPersonaSave: `${V1}/player/conversation-persona/save`,
 	// 深入準備（Agent 模式）與劇情摘要偏好
 	playerAgentMode: `${V1}/player/agent-mode`,
+	playerAgentCostAction: `${V1}/player/agent-cost-action`,
 	playerCompactPreference: `${V1}/player/compact-preference`,
 	// 玩家自己的預設（在宿主站「我的預設」建立／匯入）：列出可選的、這段對話或這張卡的新存檔綁哪一版、套用
 	presetList: `${V1}/presets`,

@@ -40,6 +40,10 @@ export function installMessageScope(doc: Document): MessageScope {
     getElementsByTagName: D.getElementsByTagName,
   }
   let cursor: Element | null = null
+  const activeCursor = (): Element | null => {
+    if (cursor && !cursor.isConnected) cursor = null
+    return cursor
+  }
 
   /** 節點在哪一則氣泡的正文裡（嚴格祖先）；不在任何氣泡裡就 null。 */
   const bodyOf = (node: Element | null): Element | null => {
@@ -48,15 +52,17 @@ export function installMessageScope(doc: Document): MessageScope {
     return parent ? parent.closest(BODY_SELECTOR) : null
   }
   const allows = (node: Element | null): boolean => {
-    if (!node || !cursor) return true
+    const c = activeCursor()
+    if (!node || !c) return true
     const body = bodyOf(node)
     if (!body) return true
-    return cursor.contains(body)
+    return c.contains(body)
   }
   const inCursor = (sel: string): Element | null => {
-    if (!cursor) return null
-    if (cursor.matches(sel)) return cursor
-    return cursor.querySelector(sel)
+    const c = activeCursor()
+    if (!c) return null
+    if (c.matches(sel)) return c
+    return c.querySelector(sel)
   }
 
   D.querySelector = function (this: Document, sel: string) {
@@ -68,9 +74,10 @@ export function installMessageScope(doc: Document): MessageScope {
 
   D.querySelectorAll = function (this: Document, sel: string) {
     const out: Element[] = []
-    if (cursor) {
-      if (cursor.matches(sel)) out.push(cursor)
-      cursor.querySelectorAll(sel).forEach((el) => out.push(el))
+    const c = activeCursor()
+    if (c) {
+      if (c.matches(sel)) out.push(c)
+      c.querySelectorAll(sel).forEach((el) => out.push(el))
     }
     native.querySelectorAll.call(this, sel).forEach((el) => {
       if (!out.includes(el) && allows(el)) out.push(el)
@@ -117,8 +124,9 @@ export function installMessageScope(doc: Document): MessageScope {
         cursor = previous
       }
     },
-    current: () => cursor,
+    current: () => activeCursor(),
     uninstall() {
+      cursor = null
       D.querySelector = native.querySelector
       D.querySelectorAll = native.querySelectorAll
       D.getElementById = native.getElementById

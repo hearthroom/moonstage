@@ -76,6 +76,8 @@ export interface MessageListDeps {
   onUi?: (id: string, ui: MessageUi) => void
   /** 正文裡的 <script>（宿主渲染管線保留它們）在氣泡掛上後跑一次。 */
   runScripts?: (bubble: HTMLElement, codes: string[]) => void
+  /** 氣泡拆掉或正文換版時，釋放這顆氣泡跑過的訊息腳本記錄，讓重建的新氣泡能重新綁定。 */
+  releaseScripts?: (codes: string[], bubble: HTMLElement) => void
   /** 定稿後替正文裡的前端區塊（圍欄裝的整份 HTML 文件）掛 iframe。 */
   mountFrontend?: (bubble: HTMLElement) => void
   /** 視窗化；沒給就全部掛著。 */
@@ -96,6 +98,7 @@ interface Entry {
   article: HTMLElement
   body: HTMLElement
   activatedHtml: string
+  ranScripts: string[]
   /** 視窗化：這個外框目前在不在視窗附近（觀察者最後一次說的）。 */
   near: boolean
   unobserve: (() => void) | null
@@ -211,6 +214,10 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     if (pendingRules(entry)) return
     const html = entry.state ? sourceHtml(entry.message) : ''
     if (!html || entry.activatedHtml === html || entry.message.state !== 'done') return
+    if (entry.ranScripts.length) {
+      deps.releaseScripts?.(entry.ranScripts, entry.article)
+      entry.ranScripts = []
+    }
     entry.activatedHtml = html
     if (deps.mountFrontend) deps.mountFrontend(entry.body)
     if (deps.runScripts) {
@@ -218,7 +225,10 @@ export function createMessageList(deps: MessageListDeps): MessageList {
       let m: RegExpExecArray | null
       SCRIPT_RE.lastIndex = 0
       while ((m = SCRIPT_RE.exec(html))) codes.push(m[1])
-      if (codes.length) deps.runScripts(entry.article, codes)
+      if (codes.length) {
+        entry.ranScripts = codes
+        deps.runScripts(entry.article, codes)
+      }
     }
   }
 
@@ -266,6 +276,11 @@ export function createMessageList(deps: MessageListDeps): MessageList {
   }
 
   const unmountApp = (entry: Entry) => {
+    if (entry.ranScripts.length) {
+      deps.releaseScripts?.(entry.ranScripts, entry.article)
+      entry.ranScripts = []
+    }
+    entry.activatedHtml = ''
     if (entry.app) { try { entry.app.unmount() } catch { /* 已經拆掉 */ } entry.app = null }
     entry.frame.innerHTML = ''
     entry.article = entry.frame
@@ -408,7 +423,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     seq++
     const frame = doc.createElement('div')
     frame.setAttribute('data-chat', 'message-frame')
-    return { message: m, frame, app: null, state: null, article: frame, body: frame, activatedHtml: '', near: false, unobserve: null }
+    return { message: m, frame, app: null, state: null, article: frame, body: frame, activatedHtml: '', ranScripts: [], near: false, unobserve: null }
   }
 
   /**
@@ -529,6 +544,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
       entry.message.view = view
       if (!entry.app) return
       applyState(entry, stateOf(entry.message))
+      if (entry.message.state === 'done') nextTick(() => { if (entry.app) activate(entry) })
     },
     remove,
     bubbleOf: (id) => { const e = entries.get(String(id)); return e && e.app ? e.article : null },

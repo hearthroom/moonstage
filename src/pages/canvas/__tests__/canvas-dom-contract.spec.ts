@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import postcss from 'postcss'
 
 import { CANVAS_SELECTOR_CONTRACT, ALWAYS_PRESENT_SELECTORS, selectorsForRegion } from '../canvas-dom-contract'
 import CanvasHeader from '../components/canvas-header.vue'
@@ -371,8 +372,8 @@ describe('畫布契約：輸入框是卡片腳本抓得到的形態', () => {
 // ── 樣式契約 ────────────────────────────────────────────────────────────
 //
 // 卡片不寫 layer，所以卡片的規則天然高於我們的 @layer lt-base。這是「讓位」
-// 唯一有效的機制：它跟先後順序、跟特異性都無關。我們一旦寫 !important 就把
-// 這條路封死了——卡片得寫 !important 才蓋得掉，而它在原平台不需要。
+// 唯一有效的機制：它跟先後順序、跟特異性都無關。美術規則不用 !important；
+// 唯一例外是原生更多面板的 hidden 行為，避免作者改 display 後關不起來。
 describe('畫布契約：頁面樣式讓位', () => {
   const css = readFileSync(resolve(__dirname, '../canvas.css'), 'utf8')
 
@@ -380,9 +381,17 @@ describe('畫布契約：頁面樣式讓位', () => {
     expect(css).toContain('@layer lt-base')
   })
 
-  it('沒有任何 !important', () => {
-    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '')
-    expect(stripped).not.toMatch(/!\s*important/)
+  it('只有原生更多面板關閉的行為保護使用 !important', () => {
+    const important: Array<{ selector: string; prop: string; value: string }> = []
+    postcss.parse(css).walkDecls(decl => {
+      if (!decl.important) return
+      const parent = decl.parent
+      important.push({ selector: parent?.type === 'rule' ? parent.selector : '', prop: decl.prop, value: decl.value })
+    })
+    expect(important).toEqual([{
+      selector: '.chat-bottom > .more-scope[data-chat="more-panel"][hidden]',
+      prop: 'display', value: 'none',
+    }])
   })
 
   it('I-2 的停止鍵可用性規則刻意留在 layer 外', () => {

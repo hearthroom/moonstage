@@ -108,6 +108,100 @@ export function setViewportHeight(refs: ShellRefs, height: number) {
   if (Number.isFinite(height) && height > 0) refs.root.style.setProperty('--chat-viewport-height', `${Math.round(height)}px`)
 }
 
+const NON_VISUAL_TAGS = new Set(['STYLE', 'SCRIPT', 'LINK', 'META', 'TITLE', 'TEMPLATE', 'NOSCRIPT', 'IFRAME'])
+const CAPTURE_RESIDUE_RE = /\(\[\\s\\S\][*+?]+\)/
+
+function inlinePxHeight(node: Element): number {
+  const style = node.getAttribute('style') || ''
+  const m = /(?:^|;)\s*(?:min-)?height\s*:\s*(\d+(?:\.\d+)?)px\b/i.exec(style)
+  return m ? Number(m[1]) : 0
+}
+
+function isOutOfFlowPosition(node: Element, win: Window | null): boolean {
+  const inlinePos = (node as HTMLElement).style?.position?.trim().toLowerCase()
+  if (inlinePos === 'fixed' || inlinePos === 'absolute') return true
+  const csPos = win?.getComputedStyle?.(node)?.position?.trim().toLowerCase()
+  return csPos === 'fixed' || csPos === 'absolute'
+}
+
+function hasFixedDescendant(node: Element, win: Window | null): boolean {
+  for (const child of Array.from(node.querySelectorAll('*'))) {
+    const inlinePos = (child as HTMLElement).style?.position?.trim().toLowerCase()
+    if (inlinePos === 'fixed') return true
+    if (win?.getComputedStyle?.(child)?.position?.trim().toLowerCase() === 'fixed') return true
+  }
+  return false
+}
+
+function classSignature(node: Element): string {
+  return Array.from(node.classList).filter(Boolean).sort().join('.')
+}
+
+function isLargeOrFormBlock(node: Element): boolean {
+  if (inlinePxHeight(node) >= 120) return true
+  const h = (node as HTMLElement).offsetHeight || (node as HTMLElement).scrollHeight || 0
+  if (h >= 120) return true
+  if (node.querySelector('input, select, textarea') !== null) return true
+  if (node.querySelectorAll('button, h1, h2, h3, details').length >= 2) return true
+  return node.outerHTML.length >= 400 || (node.textContent || '').trim().length >= 100
+}
+
+function matchesListBlock(node: Element, list: HTMLElement): boolean {
+  if (!isLargeOrFormBlock(node)) return false
+  if (node.id) {
+    const byId = Array.from(list.querySelectorAll('[id]')).find((n) => n !== node && n.id === node.id)
+    if (byId && isLargeOrFormBlock(byId)) return true
+  }
+  const cls = classSignature(node)
+  if (cls) {
+    const candidates = Array.from(list.getElementsByTagName(node.tagName))
+    if (candidates.some((n) => n !== node && classSignature(n) === cls && isLargeOrFormBlock(n))) return true
+  }
+  const norm = (node.textContent || '').replace(/[\s\uFEFF]+/g, '')
+  if (norm.length >= 20) {
+    const all = Array.from(list.querySelectorAll(node.tagName))
+    if (all.some((n) => n !== node && (n.textContent || '').replace(/[\s\uFEFF]+/g, '') === norm)) return true
+  }
+  return false
+}
+
+/**
+ * 沙箱功能欄（`[data-slot="statusbar"]`）掛載時，將與開場白／訊息列表重複的大型流內表單副本
+ * 及誤貼入功能欄的正則捕獲式殘字設為不可見（視覺高度 0），同時保留 `position: fixed` 懸浮控件與
+ * 緊湊型頂部流內狀態列（如卡 100377）。
+ */
+export function hideDuplicateStatusbarFlow(statusbar: HTMLElement | null, list: HTMLElement | null) {
+  if (!statusbar) return
+  const win = statusbar.ownerDocument?.defaultView ?? null
+  let hidAny = false
+  const children = Array.from(statusbar.children) as HTMLElement[]
+  for (const child of children) {
+    if (NON_VISUAL_TAGS.has(child.tagName)) continue
+    if (isOutOfFlowPosition(child, win) || hasFixedDescendant(child, win)) continue
+    const isCaptureResidue = CAPTURE_RESIDUE_RE.test(child.textContent || '')
+    const isDup = list ? matchesListBlock(child, list) : false
+    if (isCaptureResidue || isDup) {
+      child.hidden = true
+      child.setAttribute('data-lt-dup-hidden', '1')
+      child.style.setProperty('display', 'none', 'important')
+      hidAny = true
+    }
+  }
+  if (hidAny) {
+    for (const child of children) {
+      if (NON_VISUAL_TAGS.has(child.tagName) || child.hasAttribute('data-lt-dup-hidden')) continue
+      if (isOutOfFlowPosition(child, win) || hasFixedDescendant(child, win)) continue
+      const hasText = (child.textContent || '').replace(/[\s\uFEFF]+/g, '').length > 0
+      const hasMediaOrControl = child.querySelector('img, svg, canvas, video, audio, iframe, input, select, textarea, button') !== null
+      if (!hasText && !hasMediaOrControl && inlinePxHeight(child) === 0) {
+        child.hidden = true
+        child.setAttribute('data-lt-dup-hidden', '1')
+        child.style.setProperty('display', 'none', 'important')
+      }
+    }
+  }
+}
+
 /** 殼內的確認框（授權送出用）。回傳使用者按了哪個。 */
 export function confirmDialog(doc: Document, mount: HTMLElement, opts: { title: string; body: string; ok: string; cancel: string }): Promise<boolean> {
   return new Promise((resolve) => {

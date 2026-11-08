@@ -4,8 +4,12 @@
  * ── 為什麼整份包在 @layer 裡 ──
  * 卡片注入的 <style> 不寫 layer，而未分層的規則在串接順序上永遠贏過任何 layer，
  * 跟先後、跟特異性都無關。所以「頁面讓位給卡片」不靠 !important、不靠選擇器比大小，
- * 靠的就是這一層。這也是為什麼這份檔案裡一個 !important 都不能有：我們一寫，
- * 作者就得跟著寫，而他手上那張卡在原平台不需要寫。
+ * 靠的就是這一層。美術規則不能用 !important：我們一寫，作者就得跟著寫，
+ * 而他手上那張卡在原平台不需要寫。唯一的 !important 例外是下述原生面板的關閉行為。
+ *
+ * 原生「更多」面板的關閉。節點常駐供作者美化，但 hidden 時必須退出版面與命中測試；
+ * 作者的 display:flex/grid 只決定打開後的排版，不能讓關閉態常駐畫面。這條在 lt-base
+ * 內用 !important 保護原生 data-chat=more-panel，normal／sandbox 共用，不套到作者內容。
  *
  * ── layer 外面的基本可用性保護 ──
  * 平台彈層的實底由 canvas-popup.vue 的獨立背板守住（定位與隔離使用 inline style）。
@@ -312,7 +316,7 @@
 }
 
 /*
-  氣泡裡的圖片跟著氣泡寬走，高度自動。
+  氣泡裡的圖片跟著氣泡寬走。
 
   這條原本只在 @layer lt-base 裡：宿主任何一條沒分層的 img 重置（例如社群站為了
   作者資產的地圖模組寫的 `body:has(.play) img { max-width: none }`）都會贏過層內規則，
@@ -322,6 +326,14 @@
 */
 .canvas-root .mes_text img {
   max-width: 100%;
+}
+
+/*
+  高度只是預設，不是防爆寬的邊界。作者的 absolute/cover 圖片需要 height:100%
+  才能填滿面板並切換裁切位置；不能被這裡的 auto 蓋掉。:where 讓建置加上
+  .ms-stage 範圍後仍為零特異性，作者的圖片尺寸不受插入順序影響。
+*/
+:where(.canvas-root .mes_text img) {
   height: auto;
 }
 
@@ -1985,6 +1997,10 @@
 
   .more-scope[hidden] {
     display: none;
+  }
+
+  .chat-bottom > .more-scope[data-chat="more-panel"][hidden] {
+    display: none !important;
   }
 
   .more-scope .item {

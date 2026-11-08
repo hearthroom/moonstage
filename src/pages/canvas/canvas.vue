@@ -174,6 +174,8 @@
         :open="panel.sheet === 'model'"
         :title="t('canvas.panel.model')"
         :role-id="settingsRoleId"
+        :conversation-id="String(unref(conversationId) || '')"
+        :agent-cost-changed="modelCostQuoteChanged"
         :selected-value="selectedVariantValue"
         :model-name="formData.selectModelName"
         :score-text="modelScoreText"
@@ -796,15 +798,17 @@ async function loadMultiPassPreference(retryLeft = 1) {
       data: { roleId: id, model: formData.selectModel || '' },
       showLoading: false,
       quietTransport: true,
+      // A background refresh can fail after settings were saved successfully.
+      quietErrors: true,
     })
-    if (String(unref(settingsRoleId) || '') !== id) return
+    if (String(unref(settingsRoleId) || '') !== id || res?.statusCode !== 200) return
     applyMultiPassPreference(normalizeMultiPassPreference(res))
   } catch (e) {
     if (retryLeft > 0 && isTransportFailure(e)) {
       await new Promise((r) => setTimeout(r, 800))
       return loadMultiPassPreference(retryLeft - 1)
     }
-    // 拿不到就當作沒開：AI 記事本會提示要開 Agent 模式，但不給前往開啟的鍵（runtime 未知）。
+    // 保留最近確認的狀態；首次尚未知時沿用初始值，模型面板另有載入錯誤與重試。
     console.warn('[Canvas] 讀取 Agent 模式狀態失敗:', e)
   }
 }
@@ -2330,7 +2334,8 @@ function resumeAgentOperation(): boolean {
   // 那顆空的使用者泡泡自己就不會出現了。
   rewrite.value = true;
   contine.value = false;
-  pendingRewriteSnapshot = null;
+  // Keep the interrupted row before send() adopts it and clears its trail.
+  pendingRewriteSnapshot = createRewriteSnapshotForTarget(unref(talkList), target.chatId);
   rewriteTargetChatId.value = target.chatId;
   resumeFromOperationIdOverride = target.operationId;
   requestedOperationKindOverride = 'retry_generation';
@@ -3892,7 +3897,7 @@ function buildHudHost(): HudHost {
     setEditText: (text) => { menuDraft.value = text; return true; },
     submitEdit: (_id, text) => { menuDraft.value = text; onMenuConfirmEdit(); return true; },
     cancelEdit: () => { closeMessageMenu(); return true; },
-    selectModel: (modelId) => { onApplyModelSettings({ selectModel: modelId }); return true; },
+    selectModel: (modelId) => onApplyModelSettings({ selectModel: modelId }),
     loadConversations: () => loadArchives().then(() => true),
     selectConversation: (key) => onPickArchive(key).then(() => true),
     renameConversation: (key, title) => onRenameArchive(key, title).then(() => true),
@@ -5100,6 +5105,7 @@ function openModelSelect(focus: '' | 'lanes' = '') {
     return
   }
   modelPanelFocus.value = focus
+  modelCostQuoteChanged.value = false
   panel.value = openSheet(panel.value, 'model')
 }
 
@@ -8509,7 +8515,8 @@ function recoverPendingChatTurnBeforeAccepted(showNotice = true, errorMetadata: 
     [pending.userBubbleId, pending.aiBubbleId].filter(id => id !== undefined && id !== null && id !== '')
   );
   talkList.value = talkList.value.filter(item => !transientBubbleIds.has(item && item.id));
-  if (!content.value && pending.draft) content.value = pending.draft;
+  // Agent Continue reuses a submitted message; it does not own the composer's draft.
+  if (!content.value && pending.draft && !String(pending.payload?.resumeFromOperationId || '').trim()) content.value = pending.draft;
   if (pending.socketToken) {
     messageQueue.value = messageQueue.value.filter(entry => entry && entry.socketToken !== pending.socketToken);
   }
@@ -8524,12 +8531,12 @@ function recoverPendingChatTurnBeforeAccepted(showNotice = true, errorMetadata: 
   rewrite.value = false;
   contine.value = false;
   const explicitErrorType = String(pending.preAdmissionErrorType || '').trim();
-  if (explicitErrorType) {
+  if (explicitErrorType && explicitErrorType !== 'quote_changed') {
     // 伺服器已經明確講了原因（免費次數用完、點數不足這類），這種時候只彈一句
     // 「訊息未送出」等於把一個明確的答案顯示成斷線——使用者分不出是我們壞了
     // 還是他不能用。把原話印進錯誤氣泡，草稿仍然留在輸入框讓他換個模型再送。
     appendChatErrorBubble(explicitErrorType, resolveChatErrorMessage(explicitErrorType, t), errorMetadata);
-  } else if (showNotice) {
+  } else if (showNotice && explicitErrorType !== 'quote_changed') {
     message.warning(t('chat.messageNotSentDraftSaved'));
   }
   return true;
@@ -8643,10 +8650,17 @@ function recoverPendingTurnAfterMissingDurableAck(
 // gone already, so the line goes back to the composer as before. An agent Continue
 // (resumeFromOperationId) adopted a bubble that is still the server's turn.
 function restoreRefusedReplacement(pending: PendingChatTurn | null): boolean {
-  if (!pending || pending.preAdmissionTurnKept !== true) return false;
+  if (!pending) return false;
   if (!isReplacementOperationKind(pending.operationKind)) return false;
   if (!pending.rewriteSnapshot) return false;
-  if (String((pending.payload as any)?.resumeFromOperationId || '').trim()) return false;
+  const agentResume = String((pending.payload as any)?.resumeFromOperationId || '').trim();
+  // This runs only after the new intent was confirmed absent, before admission.
+  if (agentResume ? pending.preAdmissionErrorType !== 'quote_changed' : pending.preAdmissionTurnKept !== true) return false;
+  if (agentResume && pending.aiBubbleId != null) {
+    // An adopted row has no provisional marker. Reinsert its original snapshot
+    // instead of letting restoreRewriteCandidate mistake it for an untouched row.
+    talkList.value = talkList.value.filter(item => String(item?.id) !== String(pending.aiBubbleId));
+  }
   return discardPendingChatOperationCandidate(pending);
 }
 
@@ -8658,6 +8672,10 @@ function settleConfirmedPreAdmissionFailure(
   const errorType = String(
     capturedPending.preAdmissionErrorType || 'connection_error',
   ).trim();
+  if (errorType === 'quote_changed' && capturedPending.accepted !== true) {
+    openModelSelect();
+    modelCostQuoteChanged.value = true;
+  }
   const errorMessage = resolveChatErrorMessage(errorType, t);
   const operationProjection = createPreAdmissionOperationErrorProjection(
     talkList.value,
@@ -8675,7 +8693,7 @@ function settleConfirmedPreAdmissionFailure(
     pendingResendPayload.value = null;
     clearStreamState();
     removeOrphanPlaceholder();
-    appendChatErrorBubble(errorType, errorMessage, operationProjection);
+    if (errorType !== 'quote_changed') appendChatErrorBubble(errorType, errorMessage, operationProjection);
     closeWebSocket();
     return true;
   }
@@ -8685,22 +8703,22 @@ function settleConfirmedPreAdmissionFailure(
   const originalLine = String(capturedPending.rewriteSnapshot?.userBubble?.content ?? '');
   if (restoreRefusedReplacement(capturedPending)) {
     // 「編輯並重送」：氣泡換回原句，改過的字留在輸入框，不能丟。
-    if (storedDraft && storedDraft.trim() !== originalLine.trim() && !content.value) content.value = storedDraft;
+    if (!String(capturedPending.payload?.resumeFromOperationId || '').trim() && storedDraft && storedDraft.trim() !== originalLine.trim() && !content.value) content.value = storedDraft;
     pendingResendPayload.value = null;
     clearStreamState();
     removeOrphanPlaceholder();
-    appendChatErrorBubble(errorType, errorMessage, operationProjection);
+    if (errorType !== 'quote_changed') appendChatErrorBubble(errorType, errorMessage, operationProjection);
     closeWebSocket();
     return true;
   }
 
   const recovered = recoverPendingChatTurnBeforeAccepted(false, operationProjection);
   if (!recovered) {
-    if (storedDraft && !content.value) content.value = storedDraft;
+    if (storedDraft && !content.value && !String(capturedPending.payload?.resumeFromOperationId || '').trim()) content.value = storedDraft;
     ownershipRevision.value++; pendingChatTurn = null;
     clearStreamState();
     removeOrphanPlaceholder();
-    appendChatErrorBubble(errorType, errorMessage, operationProjection);
+    if (errorType !== 'quote_changed') appendChatErrorBubble(errorType, errorMessage, operationProjection);
   }
   closeWebSocket();
   return true;
@@ -10530,6 +10548,7 @@ useCanvasModalFocus(sandboxFrame, () => !!sandboxCard.value && !['model', 'respo
 
 // 模型選單這次要停在哪裡：'lanes' ＝目前這顆模型的線路清單。選單關掉就歸零，下次照一般方式開。
 const modelPanelFocus = ref<'' | 'lanes'>('')
+const modelCostQuoteChanged = ref(false)
 watch(() => panel.value.sheet, (sheet) => { if (sheet !== 'model') modelPanelFocus.value = '' })
 const presetDrawerOpen = ref(false)
 const moreParent = ref(false)
@@ -10805,8 +10824,10 @@ function askCapacityChoice(advice: CapacityAdvice | null, draft: string, bubbleI
 const capacityProps = computed(() => {
   const spec = capacitySpec.value
   // 錯誤沒帶大小時，用模型選單上那一檔的大小。
-  const fallbackTokens = spec.advice?.requiredTier
-    ? contextBudgetTokens(selectedVariant.value?.contextBudgetOptions, spec.advice.requiredTier)
+  const requiredTier = spec.advice?.requiredTier
+  const options = selectedVariant.value?.contextBudgetOptions
+  const fallbackTokens = requiredTier && Array.isArray(options)
+    ? options.find(option => Number(option?.value) === Number(requiredTier))?.tokens
     : null
   return {
     content: t('canvas.capacity.content'),
@@ -10824,10 +10845,13 @@ function closeCapacityChoice(restoreMore = false) {
 
 // 只寫動到的那一個欄位；存失敗就還原，畫面上的檔位不能停在沒存進去的值。
 async function saveCapacityPatch(patch: CapacityPatch): Promise<boolean> {
+  const targetRole = String(unref(settingsRoleId) || '')
+  const targetConversation = String(unref(conversationId) || '')
   const before = { context: formData.context, trimConstantLore: formData.trimConstantLore === true }
   if ('context' in patch) formData.context = patch.context
   if ('trimConstantLore' in patch) formData.trimConstantLore = patch.trimConstantLore
   const ok = await persistRoleSettings()
+  if (String(unref(settingsRoleId) || '') !== targetRole || String(unref(conversationId) || '') !== targetConversation) return false
   if (!ok) {
     formData.context = before.context
     formData.trimConstantLore = before.trimConstantLore
@@ -10859,7 +10883,7 @@ async function onCapacityPick(key: CapacityChoiceKey) {
     save: saveCapacityPatch,
     resend: resendAfterCapacityChoice,
   })
-  if (!done) capacitySpec.value = { ...capacitySpec.value, saving: false, error: t('canvas.capacity.saveFailed') }
+  if (!done) capacitySpec.value = { ...capacitySpec.value, saving: false, error: panel.value.sheet === 'capacity' ? t('canvas.capacity.saveFailed') : '' }
 }
 
 const resetChoices = ref({ clearNotepad: false, clearDirectives: false, clearResponseSettings: false })
@@ -11040,8 +11064,15 @@ const modelPanelLabels = computed(() => ({
   三個值一起寫是必要的：不同模型能吃的檔位不一樣，只換模型不換檔位會送出
   伺服器不認得的檔位。選單裡已經算好了，這裡照收。
 */
-function onApplyModelSettings(payload: any) {
+async function onApplyModelSettings(payload: any) {
   const next = payload || {}
+  const targetRole = String(unref(settingsRoleId) || '')
+  const targetConversation = String(unref(conversationId) || '')
+  const before = {
+    selectModel: formData.selectModel, selectModelName: formData.selectModelName,
+    context: formData.context, thinkingDepth: formData.thinkingDepth,
+    thinkingDepthManual: formData.thinkingDepthManual,
+  }
   /*
     只有玩家真的挑了另一條線路才動模型。
 
@@ -11066,12 +11097,31 @@ function onApplyModelSettings(payload: any) {
     formData.thinkingDepth = thinkingDepthForVariant(variant, previousDepth, formData.thinkingDepthManual === true)
     if (formData.thinkingDepth !== previousDepth) formData.thinkingDepthManual = false
   }
-  persistRoleSettings()
+  if (next.persisted === true) {
+    roleSettingsSnapshot = { ...roleSettingsSnapshot, ...currentRoleSettings() }
+    modelCostQuoteChanged.value = false
+    if (typeof next.multiPassEnabled === 'boolean') applyMultiPassPreference({ multiPassEnabled: next.multiPassEnabled, runtimeEnabled: multiPassRuntimeEnabled.value, modelSupported: multiPassModelSupported.value })
+  } else {
+    const attempted = { ...currentRoleSettings(), selectModelName: formData.selectModelName }
+    if (!await persistRoleSettings()) {
+      if (String(unref(settingsRoleId) || '') === targetRole && String(unref(conversationId) || '') === targetConversation) {
+        // A HUD choice is provisional until saved. Do not leave a rejected model
+        // in later persona/settings diffs, or overwrite a newer local choice.
+        const selectionKeys = ['selectModel', 'context', 'thinkingDepth', 'thinkingDepthManual'] as const
+        if (selectionKeys.every(key => formData[key] === attempted[key])) {
+          for (const key of selectionKeys) formData[key] = before[key]
+        }
+        if (formData.selectModel === before.selectModel) formData.selectModelName = before.selectModelName
+      }
+      return false
+    }
+  }
   // 目錄的標價是按上下文檔位算的，換了檔位就重抓一次，否則玩家在決定的那一刻
   // 看到的是舊價。
   loadModelCatalog()
   // 換了模型，Agent 模式支不支援也跟著變。
   loadMultiPassPreference()
+  return true
 }
 
 // ── 這張卡的遊玩設定 ───────────────────────────────────────────────────
@@ -11188,8 +11238,12 @@ watch(hasLogin, (loggedIn) => {
 })
 
 async function persistRoleSettings() {
+  const targetRole = String(unref(settingsRoleId) || '')
+  const targetConversation = String(unref(conversationId) || '')
+  const submitted = currentRoleSettings()
+  const before = roleSettingsSnapshot
   const payload = buildRoleSettingsSavePayload(
-    String(unref(settingsRoleId) || ''), roleSettingsSnapshot, currentRoleSettings(),
+    String(unref(settingsRoleId) || ''), before, submitted,
   )
   // 一個字都沒動就連請求都不發。
   if (!payload) return true
@@ -11198,15 +11252,39 @@ async function persistRoleSettings() {
       header: { 'content-type': 'application/json' },
       data: payload,
       showLoading: false,
+      quietErrors: true,
+    }).catch(error => {
+      // setupHttp rejects business conflicts. Feed the actual response through
+      // the same recovery path as hosts that resolve non-200 responses.
+      if (error?.statusCode === 409) return error
+      throw error
     })
+    if (String(unref(settingsRoleId) || '') !== targetRole || String(unref(conversationId) || '') !== targetConversation) return false
     if (res.statusCode !== 200) {
       // 稱呼與自我介紹會過內容審核，被擋下時伺服器講的是原因——照講給玩家聽，
       // 不要換成一句「儲存失敗」。
       const reason = (res.data && (res.data.error || res.data.message)) || ''
+      if (res.statusCode === 409 && reason === 'quote_changed') {
+        // Restore only this rejected selection. Metadata remains the player's
+        // draft, and an edit made while saving must not be rolled back.
+        const selectionKeys = ['selectModel', 'context', 'thinkingDepth', 'thinkingDepthManual'] as const
+        if (selectionKeys.every(key => formData[key] === submitted[key])) {
+          for (const key of selectionKeys) if (key in payload) formData[key] = before[key]
+          if ('selectModel' in payload) {
+            const variant = findVariant(modelGroups.value, formData.selectModel)
+            formData.selectModelName = variant ? composeModelDisplayName(variant, variant.family) : formData.selectModel
+          }
+        }
+        openModelSelect()
+        modelCostQuoteChanged.value = true
+        return false
+      }
       uni.showToast({ title: t('main.save_failed'), icon: 'error' })
       return false
     }
-    roleSettingsSnapshot = { ...roleSettingsSnapshot, ...currentRoleSettings() }
+    // A later local edit is not part of the completed request.
+    const { roleId: _savedRole, ...saved } = payload
+    roleSettingsSnapshot = { ...roleSettingsSnapshot, ...saved }
     return true
   } catch (e) {
     uni.showToast({ title: t('main.save_failed'), icon: 'error' })

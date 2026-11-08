@@ -72,14 +72,16 @@ function canRunScriptElements(doc: Document, win: Window & typeof globalThis): b
  * 語法錯誤（例如頂層 return，那是包在函式裡才合法的寫法）就退回包函式的間接 eval 再跑一次。
  * 執行期錯誤走 window 的 error 事件轉給 onError，不會中斷後面的腳本。
  */
-export function runInlineScript(code: string, ruleName: string, deps: RunScriptsDeps) {
+export function runInlineScript(code: string, ruleName: string, deps: RunScriptsDeps): boolean {
+  let failed = false
   if (!canRunScriptElements(deps.doc, deps.win)) {
-    try { (0, deps.win.eval)(wrapInlineScript(code)) } catch (e) { deps.onError(ruleName, e) }
-    return
+    try { (0, deps.win.eval)(wrapInlineScript(code)) } catch (e) { failed = true; deps.onError(ruleName, e) }
+    return !failed
   }
   let syntaxError: unknown = null
   const onErr = (ev: ErrorEvent) => {
     if (ev.error instanceof SyntaxError) { syntaxError = ev.error; ev.preventDefault(); return }
+    failed = true
     deps.onError(ruleName, ev.error || ev.message)
     ev.preventDefault()
   }
@@ -93,8 +95,9 @@ export function runInlineScript(code: string, ruleName: string, deps: RunScripts
     deps.win.removeEventListener('error', onErr)
   }
   if (syntaxError) {
-    try { (0, deps.win.eval)(wrapInlineScript(code)) } catch (e) { deps.onError(ruleName, e) }
+    try { (0, deps.win.eval)(wrapInlineScript(code)) } catch (e) { failed = true; deps.onError(ruleName, e) }
   }
+  return !failed
 }
 
 function markModule(el: HTMLScriptElement, script: AuthorScript) {
@@ -102,8 +105,10 @@ function markModule(el: HTMLScriptElement, script: AuthorScript) {
   if (script.nomodule) el.setAttribute('nomodule', '')
 }
 
-export function runAuthorScripts(scripts: AuthorScript[], deps: RunScriptsDeps) {
+export function runAuthorScripts(scripts: AuthorScript[], deps: RunScriptsDeps): Set<string> {
   const loaded = new Set<string>()
+  const attemptedInline = new Set<string>()
+  const succeededInline = new Set<string>()
   for (const script of scripts) {
     if (script.kind === 'external') {
       if (loaded.has(script.src)) continue
@@ -124,6 +129,9 @@ export function runAuthorScripts(scripts: AuthorScript[], deps: RunScriptsDeps) 
       deps.doc.head.appendChild(el)
       continue
     }
-    runInlineScript(script.code, script.ruleName, deps)
+    if (attemptedInline.has(script.code)) continue
+    attemptedInline.add(script.code)
+    if (runInlineScript(script.code, script.ruleName, deps)) succeededInline.add(script.code)
   }
+  return succeededInline
 }

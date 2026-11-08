@@ -28,11 +28,13 @@ export interface InstalledCard {
   styles: string[]
   /** 各規則抽出的腳本，按規則順序；外鏈與內聯都在。 */
   scripts: AuthorScript[]
+  /** 判斷指定文字（如功能欄或訊息原文）套用規則後命中的傳統內聯腳本。 */
+  matchedScripts(text: string, variants?: Record<string, string> | null): Set<string>
 }
 
-/** module：作者寫了 type="module"，要當 ES 模組跑（能 import）。nomodule：支援模組的瀏覽器不跑它。 */
+/** module：作者寫了 type="module"，要當 ES 模組跑（能 import）。nomodule：支援模組的瀏覽器不跑它。messageDom：與訊息區 HTML 元素同規則產出、且不含 sdk 的內聯腳本。 */
 export type AuthorScript =
-  | { kind: 'inline'; code: string; ruleName: string; module?: true; nomodule?: true }
+  | { kind: 'inline'; code: string; ruleName: string; module?: true; nomodule?: true; messageDom?: boolean }
   | { kind: 'external'; src: string; ruleName: string; module?: true; nomodule?: true }
 
 const STYLE_RE = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi
@@ -45,9 +47,16 @@ export function installCard(rules: SandboxRule[], policy: AuthorStylePolicy): In
   const styles: string[] = []
   const scripts: AuthorScript[] = []
   const stripped: SandboxRule[] = []
+  const scriptRules: SandboxRule[] = []
+  const inlineCodes: string[] = []
   for (const rule of Array.isArray(rules) ? rules : []) {
-    if (!rule || rule.enabled === false) { if (rule) stripped.push(rule); continue }
+    if (!rule || rule.enabled === false) {
+      if (rule) { stripped.push(rule); scriptRules.push(rule) }
+      continue
+    }
     const ruleName = String(rule.name || rule.id || '')
+    const ruleInline: Array<Extract<AuthorScript, { kind: 'inline' }>> = []
+    const scriptMarkers: string[] = []
     // 程式碼圍欄裡的 <style>／<script> 是字面文字：那是一整份要放進自己 iframe 的前端文件（前端區塊協議），
     // 抽出來當全頁樣式會把整個聊天頁弄壞、文件本身也少了樣式。
     const replace = withFencesProtected(String(rule.replace == null ? '' : rule.replace), (outside) => outside
@@ -64,13 +73,44 @@ export function installCard(rules: SandboxRule[], policy: AuthorStylePolicy): In
           // 只認 https（模組也一樣）；http 直接跳過（不跑、不報錯，除錯面板留一行由呼叫端處理）。
           if (/^https:\/\//i.test(url)) scripts.push({ kind: 'external', src: url, ruleName, ...flags })
         } else if (code.trim()) {
-          scripts.push({ kind: 'inline', code, ruleName, ...flags })
+          const entry: Extract<AuthorScript, { kind: 'inline' }> = { kind: 'inline', code, ruleName, ...flags }
+          scripts.push(entry)
+          ruleInline.push(entry)
+          if (!flags.module && !flags.nomodule) {
+            const idx = inlineCodes.length
+            inlineCodes.push(code)
+            scriptMarkers.push(`\uE000${idx}\uE001`)
+          }
         }
         return ''
       }))
+    if (ruleInline.length) {
+      const bodyProbe = withFencesProtected(replace, (outside) => outside
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/<head\b[^>]*>[\s\S]*?<\/head\s*>/gi, '')
+        .replace(/<\/?(?:!doctype|html|head|meta|title|link|base)\b[^>]*>/gi, ''))
+      if (/<[a-zA-Z][\w-]*[\s/>]/.test(bodyProbe)) {
+        for (const sc of ruleInline) {
+          if (!sc.module && !sc.nomodule && !/\bsdk\b/.test(sc.code)) sc.messageDom = true
+        }
+      }
+    }
     stripped.push({ ...rule, replace })
+    scriptRules.push({ ...rule, replace: replace + scriptMarkers.join('') })
   }
-  return { rules: stripped, styles, scripts }
+  const matchedScripts = (text: string, variants: Record<string, string> | null = null): Set<string> => {
+    const out = new Set<string>()
+    if (!text || !inlineCodes.length) return out
+    const applied = applyDisplayRules(text, scriptRules, { variants }).html as string
+    const re = /\uE000(\d+)\uE001/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(applied))) {
+      const code = inlineCodes[Number(m[1])]
+      if (code != null) out.add(code)
+    }
+    return out
+  }
+  return { rules: stripped, styles, scripts, matchedScripts }
 }
 
 export interface RenderMacros {
