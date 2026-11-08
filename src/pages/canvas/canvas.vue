@@ -558,7 +558,7 @@ import { chromeTopColor, syncChromeTone } from './canvas-chrome-tone'
 import CanvasConfirm from './components/canvas-confirm.vue'
 import CanvasCapacityChoice from './components/canvas-capacity-choice.vue'
 import {
-  applyCapacityChoice, capacityChoiceOptions, capacitySituation, capacityTitleKey, raisesContext,
+  applyCapacityChoice, capacityChoiceOptions, capacitySituation, capacityTitleKey,
   type CapacityAdvice, type CapacityChoiceKey, type CapacityPatch, type CapacitySituation,
 } from './canvas-capacity-choice'
 import CanvasModify from './components/canvas-modify.vue'
@@ -11097,9 +11097,10 @@ async function onApplyModelSettings(payload: any) {
   }
   const variant = findVariant(modelGroups.value, next.selectModel)
   if (variant) formData.selectModelName = composeModelDisplayName(variant, variant.family)
-  // 調高上下文容量就回到完整帶入（見 raisesContext）。選單自己存的那條路已經一起存了，
-  // 這裡讓本機快照跟上；由畫布存的那條路靠這一行把它放進要送的欄位。
-  if (raisesContext(before.context, next.context)) formData.trimConstantLore = false
+  // 調高上下文容量就回到完整帶入（同 canvas-capacity-choice 的 raisesContext；這裡直接比，
+  // 好幾個測試在沙箱裡跑這支函式）。選單自己存的那條路已經一起存了，這裡讓本機快照跟上；
+  // 由畫布存的那條路靠這一行把它放進要送的欄位。不是數字時比較結果為 false。
+  if (Number(next.context) > Number(before.context)) formData.trimConstantLore = false
   if (Number.isFinite(Number(next.context))) formData.context = Number(next.context)
   if (typeof next.thinkingDepth === 'string') {
     formData.thinkingDepth = next.thinkingDepth

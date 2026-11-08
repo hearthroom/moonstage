@@ -4,7 +4,7 @@ import ts from 'typescript'
 import { ref, unref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as settings from '../canvas-role-settings'
-import { applyCapacityChoice, raisesContext } from '../canvas-capacity-choice'
+import { applyCapacityChoice } from '../canvas-capacity-choice'
 
 // Run the actual canvas handlers, with only HTTP and surrounding UI replaced.
 const source = readFileSync('src/pages/canvas/canvas.vue', 'utf8')
@@ -20,7 +20,7 @@ const handlers = names.map(name => {
 function harness() {
   const original = { ...settings.ROLE_SETTINGS_DEFAULTS, selectModel: 'saved-lane', context: 1, thinkingDepth: 'high', thinkingDepthManual: true }
   const ctx: any = {
-    ...settings, unref, applyCapacityChoice, raisesContext,
+    ...settings, unref, applyCapacityChoice,
     formData: { ...original, selectModelName: 'Saved model' }, roleSettingsSnapshot: { ...original },
     settingsRoleId: ref('fixture-role'), conversationId: ref('fixture-conversation'),
     selectedVariantValue: ref('saved-lane'), modelGroups: ref([]),
