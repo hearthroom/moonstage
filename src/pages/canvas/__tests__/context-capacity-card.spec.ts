@@ -49,6 +49,14 @@ describe('capacity rejection card with advice', () => {
     expect(renderValue('getSystemMsgLabel', 'context_capacity_choice')).toBe(zh['canvas.capacity.titleStart'])
     const sheet = ['canvas.capacity.titleStart', 'canvas.capacity.titleLater', 'canvas.capacity.content', 'canvas.capacity.raise', 'canvas.capacity.raiseNoSize', 'canvas.capacity.raiseSub', 'canvas.capacity.trim', 'canvas.capacity.trimSub', 'canvas.capacity.choose', 'error.contextCapacitySettings']
     for (const key of sheet) for (const word of alarming) expect(t(key)).not.toContain(word)
+    // 標題常折成兩行，中文沒有斷詞：用看不見的連字號（U+2060）把詞黏住，只會在詞與詞之間換行。
+    // 看得到的字與 owner 定稿一字不差。
+    const WJ = '\u2060'
+    expect(zh['canvas.capacity.titleStart'].replaceAll(WJ, '')).toBe('這張卡在更大的上下文容量下體驗更佳')
+    expect(zh['canvas.capacity.titleLater'].replaceAll(WJ, '')).toBe('這段對話在更大的上下文容量下體驗更佳')
+    for (const key of ['canvas.capacity.titleStart', 'canvas.capacity.titleLater']) {
+      for (const word of ['上下文容量', '體驗', '更佳']) expect(zh[key]).toContain([...word].join(WJ))
+    }
     // 彈窗標題與泡泡標題用同一個判斷，兩種頁面（一般卡、沙箱卡）都一樣。
     expect(source).toMatch(/:title="t\(capacityTitleKey\(capacitySpec\.situation\)\)"/)
     expect(source).toMatch(/case 'capacity':[\s\S]{0,80}t\(capacityTitleKey\(capacitySpec\.value\.situation\)\)/)
