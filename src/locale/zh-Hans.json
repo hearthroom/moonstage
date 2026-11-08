@@ -11,7 +11,7 @@
 	"canvas.favorite.failed": "收藏没有成功，请再试一次。",
 	"canvas.roleLoadFailed": "角色卡加载失败，请刷新页面。",
 	"canvas.info.open": "卡片信息",
-	"error.contextCapacityTitle": "这段对话需要更大的上下文容量",
+	"error.contextCapacityTitle": "这段对话需要更大的上\u2060下\u2060文\u2060容\u2060量",
 	"error.contextCapacityExceeded": "调高上下文容量后再试一次。",
 	"error.contextCapacitySettings": "选一种方式就能继续。",
 	"canvas.capacity.titleStart": "这张卡在更大的上\u2060下\u2060文\u2060容\u2060量下体\u2060验更\u2060佳",

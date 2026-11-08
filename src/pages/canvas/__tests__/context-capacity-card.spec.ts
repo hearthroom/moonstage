@@ -5,6 +5,7 @@ import ChatSystemMessage from '../../../components/chat-system-message/chat-syst
 import { resolveChatErrorPresentation } from '../../../utils/chat-error-message'
 import { capacityTitleKey } from '../canvas-capacity-choice'
 import zh from '../../../locale/zh-Hant.json'
+import zhHans from '../../../locale/zh-Hans.json'
 
 // Exercise the actual inline presentation functions, not a parallel mapping.
 const source = fs.readFileSync('src/pages/canvas/canvas.vue', 'utf8')
@@ -56,6 +57,14 @@ describe('capacity rejection card with advice', () => {
     expect(zh['canvas.capacity.titleLater'].replaceAll(WJ, '')).toBe('這段對話在更大的上下文容量下體驗更佳')
     for (const key of ['canvas.capacity.titleStart', 'canvas.capacity.titleLater']) {
       for (const word of ['上下文容量', '體驗', '更佳']) expect(zh[key]).toContain([...word].join(WJ))
+    }
+    // 沒有選項的那張卡（跑到一半放不下）標題也會折行；簡中同一套。
+    expect(zh['error.contextCapacityTitle']).toContain([...'上下文容量'].join(WJ))
+    for (const key of ['canvas.capacity.titleStart', 'canvas.capacity.titleLater', 'error.contextCapacityTitle']) {
+      expect((zhHans as Record<string, string>)[key]).toContain([...'上下文容量'].join(WJ))
+    }
+    for (const key of ['canvas.capacity.titleStart', 'canvas.capacity.titleLater']) {
+      for (const word of ['体验', '更佳']) expect((zhHans as Record<string, string>)[key]).toContain([...word].join(WJ))
     }
     // 彈窗標題與泡泡標題用同一個判斷，兩種頁面（一般卡、沙箱卡）都一樣。
     expect(source).toMatch(/:title="t\(capacityTitleKey\(capacitySpec\.situation\)\)"/)
