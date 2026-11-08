@@ -62,7 +62,7 @@ export interface MessageListDeps {
    * 宿主沒給 html 時（獨立殼、測試）自己渲染正文。作者規則還沒跑完時回 `{ html, provisional: true }`
    * （暫時的畫面），結果到了殼會叫 refresh() 重畫。
    */
-  render(content: string, opts?: { streaming?: boolean; seed?: string; role?: string }): string | { html: string; provisional: boolean }
+  render(content: string, opts?: { streaming?: boolean; seed?: string; role?: SandboxMessageRole }): string | { html: string; provisional: boolean }
   strings: { generating: string }
   roleName: string
   roleAvatar: string

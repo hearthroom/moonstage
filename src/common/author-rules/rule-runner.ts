@@ -185,7 +185,8 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
     const rules = plainOf<unknown[]>(Array.isArray(req.rules) ? req.rules : null, 'r')
     const opts = req.options || {}
     const variants = plainOf<Record<string, string> | null>(opts.variants || null, 'v')
-    const jobOptions: RuleJobOptions = { variants: variants.plain }
+    const messageRole = opts.messageRole
+    const jobOptions: RuleJobOptions = { variants: variants.plain, messageRole }
     let macroKey = ''
     if (engine === 'tavern' && opts.macros) {
       const macros: Record<string, string> = {}
@@ -207,7 +208,7 @@ export function createRuleRunner(options: RuleRunnerOptions): RuleRunner {
     // Bind before cache lookup: terminal metadata may add the durable id without changing HTML.
     const drawIdentity = drawKey ? draws.bind(drawKey, opts.seed!, jobOptions.seedAliases || []) : undefined
     const text = typeof req.text === 'string' ? req.text : ''
-    const prefixKey = `${drawKey ? `${drawKey}:${drawEpoch}\u0001` : ''}${engineVersion}\u0001${engine}\u0001${rules.key}\u0001${variants.key}\u0001${macroKey}${seeded ? `\u0001s${drawIdentity || opts.seed}` : ''}`
+    const prefixKey = `${drawKey ? `${drawKey}:${drawEpoch}\u0001` : ''}${engineVersion}\u0001${engine}\u0001${rules.key}\u0001${variants.key}\u0001${messageRole || ''}\u0001${macroKey}${seeded ? `\u0001s${drawIdentity || opts.seed}` : ''}`
     return { prefixKey, key: `${prefixKey}\u0001${text}`, text, engine, rulesKey: rules.key, rules: rules.plain, options: jobOptions, drawKey, drawEpoch }
   }
 

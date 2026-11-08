@@ -118,3 +118,21 @@ describe('殼的正文渲染：規則在 worker 裡跑', () => {
     expect(body(s).innerHTML).toContain('<div class="panel">體力 10</div>')
   })
 })
+
+
+it('殼自行渲染：只套 AI 的規則不改玩家或系統列，同文快取隔離，功能欄照舊套用', async () => {
+  const { executor, finishAll } = manualExecutor()
+  const rules = [{ find: '戰報', replace: '<b>折疊</b>', targets: ['ai'] }]
+  const s = boot(config({ card: { rules, statusbar: '戰報' } }), executor)
+  s.handle({ type: 'messages', messages: [
+    { id: 'a', role: 'ai', content: '戰報', serverId: '1' },
+    { id: 'u', role: 'user', content: '戰報', serverId: null },
+    { id: 's', role: 'system', content: '戰報', serverId: null },
+  ] })
+  for (let i = 0; i < 5; i++) { finishAll(); await settle() }
+  expect(body(s, 0).innerHTML).toContain('<b>折疊</b>')
+  expect(body(s, 1).textContent).toContain('戰報')
+  expect(body(s, 1).innerHTML).not.toContain('<b>折疊</b>')
+  expect(body(s, 2).textContent).toContain('戰報')
+  expect(s.refs.statusbar!.innerHTML).toContain('<b>折疊</b>')
+})

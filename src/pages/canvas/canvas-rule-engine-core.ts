@@ -25,17 +25,26 @@ import {
   ROLLBACK_VOLUME,
 } from '@/utils/display-rule-engine.js'
 
+export type RuleMessageTarget = 'ai' | 'user' | 'system'
+
 export interface TavernRule {
   id?: string | number
   name?: string
   find?: string
   replace?: string
   enabled?: boolean
+  /** 缺欄位維持舊行為：套用全部訊息；空陣列不套任何訊息。 */
+  targets?: RuleMessageTarget[]
   /** 酒館：只在組提示詞時套用 */
   promptOnly?: boolean
   /** 酒館：從捕獲內容中刪除的字串 */
   trimStrings?: string[]
   [key: string]: any
+}
+
+/** 功能欄不帶 messageRole，保留整組規則；訊息才依作者選的對象篩選。 */
+export function ruleAppliesToMessage(rule: TavernRule, messageRole?: RuleMessageTarget): boolean {
+  return !messageRole || !Array.isArray(rule.targets) || rule.targets.includes(messageRole)
 }
 
 export interface MacroContext {
@@ -254,7 +263,7 @@ export function normalizeRules(rules: TavernRule[], macros: MacroContext) {
 export function applyTavernRules(
   text: string,
   rules: TavernRule[],
-  options: { macros?: MacroContext; variants?: any; pickRandom?: RandomPicker } = {},
+  options: { macros?: MacroContext; variants?: any; pickRandom?: RandomPicker; messageRole?: RuleMessageTarget } = {},
 ) {
   const macros = options.macros || {}
   const rollbacks: Array<{ ruleId: string; reason: string }> = []
@@ -263,7 +272,7 @@ export function applyTavernRules(
   const list = Array.isArray(rules) ? rules : []
   for (let ruleIndex = 0; ruleIndex < list.length; ruleIndex++) {
     const rule = list[ruleIndex] || {}
-    if (rule.enabled === false) continue
+    if (rule.enabled === false || !ruleAppliesToMessage(rule, options.messageRole)) continue
     if (rule.promptOnly === true) {
       reportSkipped(rule)
       continue

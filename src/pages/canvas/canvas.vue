@@ -2717,11 +2717,13 @@ const authorRules = {
   // 正在渲染的訊息 id（renderMarkdown 同步設定）：讓 {{random}} 在這則訊息裡固定，串流每一跳不重抽。
   seed: '',
   aliases: [] as string[],
-  display(text: string, streaming: boolean): string {
+  messageRole: undefined as 'ai' | 'user' | 'system' | undefined,
+  display(text: string, streaming: boolean, type = 0): string {
     if (!activeAuthorAsset.value.rules.length) return substituteMacros(text, authorRuleOptions().macros);
     const options = authorRules.seed ? { ...authorRuleOptions(), seed: authorRules.seed, seedAliases: authorRules.aliases, randomScope: String(unref(conversationId) || authorRules.seed) } : authorRuleOptions();
+    const messageRole = authorRules.messageRole || (type == 1 ? 'user' : type == 0 ? 'ai' : 'system');
     const out = authorRuleRunner.display(
-      { engine: 'tavern', text, rules: activeAuthorAsset.value.rules, options },
+      { engine: 'tavern', text, rules: activeAuthorAsset.value.rules, options: { ...options, messageRole } },
       { streaming },
     );
     if (out.provisional) authorRules.provisional++;
@@ -3510,22 +3512,23 @@ function hostOutsideAuthorScope(host, scope) {
 // 狀態一變就叫 bridge.refresh()（bridge 自己比對內容，沒變不發事件）。
 const hudBridgeRef = shallowRef<HudBridge | null>(null);
 // 每則訊息的 HTML 只在內容變了才重算：串流時每個 token 都會觸發 read()，不能每次重畫整串。
-const hudHtmlCache = new Map<string, { content: string; html: string; ruleEpoch: number | null; playerName: string | null; identity: string }>();
+const hudHtmlCache = new Map<string, { content: string; html: string; ruleEpoch: number | null; playerName: string | null; identity: string; messageRole: string }>();
 
 function hudMessageHtml(item: any): string {
   const key = hudCacheKey(item);
+  const messageRole = item.systemOnly ? 'system' : item.type == 1 ? 'user' : item.type == 0 ? 'ai' : 'system';
   const content = String(item.content || '');
   const hit = hudHtmlCache.get(key);
   const playerName = sandboxCard.value ? userDisplayName() : null;
   const identity = activeAuthorAsset.value.random ? String(item.chatId || item.assistantChatId || item.id || '') : '';
   // 暫時的規則結果（還在等 worker）只記到下一次 epoch：沙箱殼要換上完整套用的結果。
-  if (hit && hit.content === content && hit.playerName === playerName && hit.identity === identity && (hit.ruleEpoch == null || hit.ruleEpoch === authorRuleEpoch.value)) return hit.html;
+  if (hit && hit.messageRole === messageRole && hit.content === content && hit.playerName === playerName && hit.identity === identity && (hit.ruleEpoch == null || hit.ruleEpoch === authorRuleEpoch.value)) return hit.html;
   let html = '';
   try { html = String(renderMessage(item) || ''); } catch (e) { html = ''; }
   // 串流中的那一則交給 renderMessage 自己節流：它在間隔內回的是上一版畫面，記在這裡的話，
   // 間隔到期、字沒再變的那一次會一直拿到舊畫面。
   if (item.chatFinish || item.chatLoading) {
-    hudHtmlCache.set(key, { content, html, playerName, identity, ruleEpoch: renderIsProvisional(item) ? authorRuleEpoch.value : null });
+    hudHtmlCache.set(key, { content, html, playerName, identity, messageRole, ruleEpoch: renderIsProvisional(item) ? authorRuleEpoch.value : null });
   }
   return html;
 }
@@ -4374,7 +4377,7 @@ const highlightText = (content, type, cacheKey, streaming) => {
   // 「切開各自套」與「整段套」結果相同。會跨行的規則已在上面放棄快取。
   // 規則在 worker 裡跑（authorRules.display 不等它）：結果還沒回來時這裡拿到的是
   // 「上次套完的產物＋之後到的原文」，照樣走下面同一條渲染管線。
-  processedContent = authorRules.display(processedContent, !!cacheKey || !!streaming);
+  processedContent = authorRules.display(processedContent, !!cacheKey || !!streaming, type);
   if (activeAuthorAsset.value.rules.length) {
     // 酒館來源的卡在原平台是有沙盒的（它的 <style> 會被加訊息層前綴），
     // 所以它寫裸選擇器是安全的。這裡沒有沙盒，得替它補上那層前綴，
@@ -4830,6 +4833,7 @@ function renderMemoKey(item) {
     thinking: item.thinkingContent,
     finish: !!item.chatFinish,
     summary: !!item.isSummary,
+    messageRole: item.systemOnly ? 'system' : item.type == 1 ? 'user' : item.type == 0 ? 'ai' : 'system',
     version: activeAuthorAsset.value.version,
     script: displayScriptDirection.value,
     playerName: sandboxCard.value ? userDisplayName() : null,
@@ -4844,6 +4848,7 @@ function renderMemoHit(entry, key) {
     && entry.key.thinking === key.thinking
     && entry.key.finish === key.finish
     && entry.key.summary === key.summary
+    && entry.key.messageRole === key.messageRole
     && entry.key.version === key.version
     && entry.key.script === key.script
     && entry.key.playerName === key.playerName
@@ -5043,8 +5048,9 @@ const renderMarkdown = (item) => {
 
   // HTML 與純文字走同一條：規則套完才知道有沒有 <script>／<style>，所以腳本啟動
   // 看的是套完規則的結果，不是原文（見 activateMessageScripts）。
-  const cacheKey = (!item.chatFinish && item.id != null) ? (item.id + ':' + item.type + ':' + activeAuthorAsset.value.version) : null;
+  const cacheKey = (!item.chatFinish && item.id != null) ? (item.id + ':' + item.type + ':' + !!item.systemOnly + ':' + activeAuthorAsset.value.version) : null;
   // 腳本與前端區塊的啟動在 renderMessage：規則結果還沒回來的暫時畫面不啟動。
+  authorRules.messageRole = item.systemOnly ? 'system' : item.type == 1 ? 'user' : item.type == 0 ? 'ai' : 'system';
   authorRules.seed = randomSeedFor(item);
   authorRules.aliases = [item.id, item.chatId, item.assistantChatId, item.operationBubbleId]
     .filter((id) => id != null && id !== '').map(String);
@@ -5053,6 +5059,7 @@ const renderMarkdown = (item) => {
   } finally {
     authorRules.seed = '';
     authorRules.aliases = [];
+    authorRules.messageRole = undefined;
   }
 
 };

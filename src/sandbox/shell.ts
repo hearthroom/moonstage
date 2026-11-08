@@ -6,7 +6,7 @@
  *   createShell(config) → 建骨架、裝訊息作用域、建 sdk（掛到 window.sdk）、裝卡（樣式進
  *   author-css、腳本跑一次）→ 等宿主的 `messages` → 冷啟動每則 new→mount→done → `ready`。
  */
-import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, RequestOp, SandboxBackground, SandboxHelloConfig, SandboxMessage, ShellToHost, StageState } from './protocol'
+import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, RequestOp, SandboxBackground, SandboxHelloConfig, SandboxMessage, SandboxMessageRole, ShellToHost, StageState } from './protocol'
 import { createThemeBridge } from './theme-bridge'
 import { bindCardBlockTheme } from './card-block-theme'
 import { createEventBus } from './sdk/events'
@@ -304,13 +304,13 @@ export function createShell(options: CreateShellOptions): Shell {
   // 持久層在這個子網域上，宿主刪不到：先照握手給的範圍對一次（不同就清掉；沒給就刪掉、只用記憶體）再用。
   setAuthorRuleStorageScope(config.storageScope ?? null)
   const ruleRunner = options.ruleRunner || getAuthorRuleRunner()
-  const render = (content: string, opts: { streaming?: boolean; seed?: string; role?: string } = {}): string | { html: string; provisional: true } => {
+  const render = (content: string, opts: { streaming?: boolean; seed?: string; role?: SandboxMessageRole } = {}): string | { html: string; provisional: true } => {
     // seed＝訊息 id：{{random}} 在同一則訊息裡固定，串流每一跳不重抽。
     const out = ruleRunner.display(
-      { engine: 'display', text: content, rules: card.rules, options: { variants: config.variants || null, seed: opts.seed } },
+      { engine: 'display', text: content, rules: card.rules, options: { variants: config.variants || null, seed: opts.seed, messageRole: opts.role } },
       { streaming: !!opts.streaming },
     )
-    const matched = opts.role && !opts.streaming && !out.provisional ? Array.from(card.matchedScripts(content, config.variants || null)) : []
+    const matched = opts.role && !opts.streaming && !out.provisional ? Array.from(card.matchedScripts(content, config.variants || null, opts.role)) : []
     const scriptSuffix = matched.map((c) => `<script>${c}</script>`).join('')
     const html = applyStylePolicyToHtml(renderAppliedContent(out.html, { doc, macros, fencedDocument: stylePolicy.fencedDocument, convert, nativeBlocks: opts.role === 'ai', preserveAuthorHtml: card.scripts.length > 0 }), stylePolicy) + scriptSuffix
     return out.provisional ? { html, provisional: true } : html

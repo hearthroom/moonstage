@@ -75,5 +75,5 @@ export function applyTavernRulesAsync(
   rules: TavernRule[],
   options: RuleJobOptions = {},
 ): Promise<RuleResult> {
-  return getAuthorRuleRunner().apply({ engine: 'tavern', text, rules, options: { macros: options.macros, variants: options.variants } })
+  return getAuthorRuleRunner().apply({ engine: 'tavern', text, rules, options: { macros: options.macros, variants: options.variants, messageRole: options.messageRole } })
 }

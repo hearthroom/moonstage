@@ -151,3 +151,12 @@ describe('canonical metadata reaches random draw binding through render caches',
     expect(renders).toBe(2)
   })
 })
+
+it('sandbox 宿主同文同 id 的不同訊息角色不共用 HTML 快取', () => {
+  const { hudMessageHtml, context } = buildRenderMessage({ now: 1000 })
+  context.renderMarkdown = (item: any) => item.systemOnly ? '系統規則' : item.type === 0 ? 'AI 規則' : '玩家規則'
+  const common = { id: 'same', content: '戰報', chatFinish: true }
+  expect(hudMessageHtml({ ...common, type: 0 })).toBe('AI 規則')
+  expect(hudMessageHtml({ ...common, type: 1 })).toBe('玩家規則')
+  expect(hudMessageHtml({ ...common, type: 0, systemOnly: true })).toBe('系統規則')
+})

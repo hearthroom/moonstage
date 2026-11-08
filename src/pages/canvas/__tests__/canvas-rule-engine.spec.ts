@@ -156,3 +156,24 @@ describe('{{user}} 換成誰', () => {
   expect(applyTavernRules('x', [{ find: '/(x)/', replace: '{{user}} $1' }], { macros: { user: '$1 {{char}}', char: '星' } }).html)
     .toBe('$1 {{char}} x')
  })
+
+
+describe('顯示規則套用對象', () => {
+  const roles = ['ai', 'user', 'system'] as const
+  const combinations = [[], ['ai'], ['user'], ['system'], ['ai', 'user'], ['ai', 'system'], ['user', 'system'], ['ai', 'user', 'system']]
+  for (const targets of combinations) {
+    it(`只套指定對象 ${JSON.stringify(targets)}`, () => {
+      const rules = [{ find: '原文', replace: '替換', targets }]
+      for (const messageRole of roles) {
+        expect(applyTavernRules('原文', rules, { messageRole }).html)
+          .toBe(targets.includes(messageRole) ? '替換' : '原文')
+      }
+    })
+  }
+  it('舊規則缺欄位仍套三種訊息；功能欄不依對象篩選', () => {
+    for (const messageRole of roles) {
+      expect(applyTavernRules('原文', [{ find: '原文', replace: '替換' }], { messageRole }).html).toBe('替換')
+    }
+    expect(applyTavernRules('原文', [{ find: '原文', replace: '替換', targets: [] }]).html).toBe('替換')
+  })
+})

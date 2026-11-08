@@ -11,13 +11,15 @@
  * Seeded random choices are dealt per hit/token. The runner carries the conversation ledger between jobs;
  * worker and inline execution receive the same snapshot and return the updated ledger.
  */
-import { applyTavernRules, type MacroContext, type TavernRule } from '@/pages/canvas/canvas-rule-engine-core'
+import { applyTavernRules, ruleAppliesToMessage, type MacroContext, type TavernRule, type RuleMessageTarget } from '@/pages/canvas/canvas-rule-engine-core'
 import { applyDisplayRules } from '@/utils/display-rule-engine.js'
 import { createRandomDeck, type RandomDrawState } from './random-deck'
 
 export type RuleEngineKind = 'tavern' | 'display'
 
 export interface RuleJobOptions {
+  /** 訊息種類；功能欄不帶，保留整組規則。 */
+  messageRole?: RuleMessageTarget
   macros?: MacroContext
   variants?: Record<string, string> | null
   /** 同一則訊息固定的字串（訊息 id）：有就讓 {{random}} 在這則訊息裡穩定。 */
@@ -49,9 +51,9 @@ export function executeRuleJob(
   const deck = options.seed ? createRandomDeck(options.randomScope || options.seed, options.seed, options.randomState, options.seedAliases) : null
   const randomState = deck && options.randomScope ? { randomState: deck.state } : {}
   if (engine === 'display') {
-    const out = applyDisplayRules(text, rules, { variants: options.variants || null, pickRandom: deck?.pick }) as RuleResult
+    const out = applyDisplayRules(text, rules.filter(rule => ruleAppliesToMessage(rule, options.messageRole)), { variants: options.variants || null, pickRandom: deck?.pick }) as RuleResult
     return { html: out.html, rollbacks: out.rollbacks, ...randomState }
   }
-  const out = applyTavernRules(text, rules, { macros: options.macros || {}, variants: options.variants || null, pickRandom: deck?.pick })
+  const out = applyTavernRules(text, rules, { macros: options.macros || {}, variants: options.variants || null, pickRandom: deck?.pick, messageRole: options.messageRole })
   return { html: out.html, rollbacks: out.rollbacks, ...randomState }
 }

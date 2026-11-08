@@ -12,7 +12,7 @@
 import { convertTextNodes } from '@/common/display-script-walk'
 import { renderAuthorMarkdown } from '@/common/author-html-markdown'
 import MarkdownIt from 'markdown-it'
-import { substituteMacros } from '@/pages/canvas/canvas-rule-engine-core'
+import { ruleAppliesToMessage, substituteMacros, type RuleMessageTarget } from '@/pages/canvas/canvas-rule-engine-core'
 import { applyDisplayRules } from '@/utils/display-rule-engine.js'
 import type { SandboxRule } from './protocol'
 import { sanitizeAuthorHtml, stripUnknownTags } from './sanitize'
@@ -29,7 +29,7 @@ export interface InstalledCard {
   /** 各規則抽出的腳本，按規則順序；外鏈與內聯都在。 */
   scripts: AuthorScript[]
   /** 判斷指定文字（如功能欄或訊息原文）套用規則後命中的傳統內聯腳本。 */
-  matchedScripts(text: string, variants?: Record<string, string> | null): Set<string>
+  matchedScripts(text: string, variants?: Record<string, string> | null, messageRole?: RuleMessageTarget): Set<string>
 }
 
 /** module：作者寫了 type="module"，要當 ES 模組跑（能 import）。nomodule：支援模組的瀏覽器不跑它。messageDom：與訊息區 HTML 元素同規則產出、且不含 sdk 的內聯腳本。 */
@@ -98,10 +98,10 @@ export function installCard(rules: SandboxRule[], policy: AuthorStylePolicy): In
     stripped.push({ ...rule, replace })
     scriptRules.push({ ...rule, replace: replace + scriptMarkers.join('') })
   }
-  const matchedScripts = (text: string, variants: Record<string, string> | null = null): Set<string> => {
+  const matchedScripts = (text: string, variants: Record<string, string> | null = null, messageRole?: RuleMessageTarget): Set<string> => {
     const out = new Set<string>()
     if (!text || !inlineCodes.length) return out
-    const applied = applyDisplayRules(text, scriptRules, { variants }).html as string
+    const applied = applyDisplayRules(text, scriptRules.filter(rule => ruleAppliesToMessage(rule, messageRole)), { variants }).html as string
     const re = /\uE000(\d+)\uE001/g
     let m: RegExpExecArray | null
     while ((m = re.exec(applied))) {
@@ -119,6 +119,7 @@ export interface RenderMacros {
 }
 
 export interface RenderOptions {
+  messageRole?: RuleMessageTarget
   macros: RenderMacros
   preserveAuthorHtml?: boolean
   variants?: Record<string, string> | null
@@ -159,7 +160,7 @@ export function colorDialogueQuotes(root: Element) {
 
 /** 一則內容（訊息正文或功能欄）→ 可放進 innerHTML 的 HTML。規則在呼叫端的執行緒上同步套用。 */
 export function renderContent(content: string, rules: SandboxRule[], options: RenderOptions): string {
-  const applied = applyDisplayRules(content, rules, { variants: options.variants || null }).html as string
+  const applied = applyDisplayRules(content, rules.filter(rule => ruleAppliesToMessage(rule, options.messageRole)), { variants: options.variants || null }).html as string
   return renderAppliedContent(applied, options)
 }
 

@@ -57,6 +57,8 @@ export interface SandboxMessage {
 }
 
 export interface SandboxRule {
+  /** 缺欄位套全部訊息；空陣列不套訊息。功能欄忽略此欄位。 */
+  targets?: SandboxMessageRole[]
   id?: string | number
   name?: string
   find: string

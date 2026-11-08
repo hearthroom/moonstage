@@ -374,3 +374,22 @@ describe('queued random CG history follows first appearance order', () => {
     worker.dispose()
   })
 })
+
+
+describe('訊息套用對象經 worker 與快取保持隔離', () => {
+  it.each(['tavern', 'display'] as const)('%s 同文不同對象不共用規則結果', async (engine) => {
+    const worker = fakeWorker()
+    const runner = createRuleRunner({ executor: createWorkerExecutor({ createWorker: () => worker }) })
+    const rules = [{ find: '原文', replace: '替換', targets: ['ai'] }]
+    for (const messageRole of ['ai', 'user', 'system'] as const) {
+      const req = { engine, text: '原文', rules, options: { messageRole } }
+      const expected = messageRole === 'ai' ? '替換' : '原文'
+      expect((await runner.apply(req)).html).toBe(expected)
+      expect(runner.display(req)).toEqual({ html: expected, provisional: false })
+    }
+    expect(worker.posted.filter((m) => m.t === 'job')).toHaveLength(3)
+    // 功能欄沒有 messageRole，即使 targets 空仍照舊套用。
+    expect((await runner.apply({ engine, text: '原文', rules: [{ ...rules[0], targets: [] }] })).html).toBe('替換')
+    runner.dispose()
+  })
+})
