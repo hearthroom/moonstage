@@ -29,13 +29,13 @@ function sliceBetween(source: string, start: string, end: string): string {
 describe('desktop chat.vue · content_filter_input drives the filtered card without a retry CTA', () => {
   it('getSystemMsgKind maps content_filter_input to the same "filtered" kind as the existing output-side channel', () => {
     const chat = readChat()
-    const fn = sliceBetween(chat, 'function getSystemMsgKind(finishReason)', 'function getSystemMsgLabel(finishReason)')
+    const fn = sliceBetween(chat, 'function getSystemMsgKind(finishReason)', 'function getSystemMsgLabel(finishReason')
     expect(fn).toContain("'content_filter_input': 'filtered'")
   })
 
   it('getSystemMsgLabel reuses the existing systemMsg.filtered headline (no invented copy)', () => {
     const chat = readChat()
-    const fn = sliceBetween(chat, 'function getSystemMsgLabel(finishReason)', 'function getSystemMsgSub(')
+    const fn = sliceBetween(chat, 'function getSystemMsgLabel(finishReason', 'function getSystemMsgSub(')
     const line = fn.split('\n').find((l) => l.includes("'content_filter_input':"))
     expect(line).toBeTruthy()
     expect(line).toContain("t('systemMsg.filtered')")

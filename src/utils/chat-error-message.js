@@ -59,9 +59,10 @@ export function resolveChatErrorTypeFromFailure(failure) {
   return 'connection_error'
 }
 
-// 第一輪就裝不下時，伺服器在同一個錯誤信封（WebSocket error 事件、HTTP 422）裡附上建議：
-// 裝得下整張卡的最小檔位，以及用目前檔位精簡常駐設定是否裝得下。對話中途的容量錯誤不帶建議，
-// 這裡回 null，畫面維持原本的說法。
+// 送出前的容量檢查放不下時（每一輪都會檢查，不只第一輪），伺服器在同一個錯誤信封
+// （WebSocket error 事件、HTTP 422）裡附上建議：放得下的最小檔位，以及用目前檔位只帶部分
+// 常駐世界書是否放得下。這一輪跑到一半、整理記憶後仍放不下的錯誤不帶建議，這裡回 null，
+// 畫面維持原本的說法。
 export function resolveContextCapacityAdvice(source) {
   const data = source && typeof source === 'object' && source.data && typeof source.data === 'object'
     ? source.data

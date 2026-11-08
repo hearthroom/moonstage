@@ -27,13 +27,13 @@ function sliceBetween(source: string, start: string, end: string): string {
 describe('desktop chat.vue · reasoning_only_timeout copy (chat-operation-reliability 說明義務)', () => {
   it('getSystemMsgKind maps the timeout variant to the existing model-error visual (no new kind/CSS)', () => {
     const chat = readChat()
-    const fn = sliceBetween(chat, 'function getSystemMsgKind(finishReason)', 'function getSystemMsgLabel(finishReason)')
+    const fn = sliceBetween(chat, 'function getSystemMsgKind(finishReason)', 'function getSystemMsgLabel(finishReason')
     expect(fn).toContain("'reasoning_only_timeout': 'model-error'")
   })
 
   it('getSystemMsgLabel/getSystemMsgSub use dedicated i18n keys for the timeout case, distinct from ordinary reasoning_only', () => {
     const chat = readChat()
-    const labelFn = sliceBetween(chat, 'function getSystemMsgLabel(finishReason)', 'function getSystemMsgSub(')
+    const labelFn = sliceBetween(chat, 'function getSystemMsgLabel(finishReason', 'function getSystemMsgSub(')
     expect(labelFn).toContain("'reasoning_only_timeout':")
     expect(labelFn).toContain("t('chat.noFinalAnswerTimeout')")
 
@@ -52,7 +52,7 @@ describe('desktop chat.vue · reasoning_only_timeout copy (chat-operation-reliab
 
   it('does not touch the existing non-timeout reasoning_only copy (regression lock)', () => {
     const chat = readChat()
-    const labelFn = sliceBetween(chat, 'function getSystemMsgLabel(finishReason)', 'function getSystemMsgSub(')
+    const labelFn = sliceBetween(chat, 'function getSystemMsgLabel(finishReason', 'function getSystemMsgSub(')
     expect(labelFn).toContain("t('chat.noFinalAnswer')")
     const subFn = sliceBetween(chat, 'function getSystemMsgSub(', 'function getSystemMsgCtaLabel(')
     expect(subFn).toContain("t('chat.retryOrSwitchModel')")

@@ -84,7 +84,7 @@
         <chat-system-message
           v-if="item.type == 0 && item.chatFinish && !item.agentInterrupted && !['resume_unavailable', 'compact_no_input'].includes(item.finishReason) && getSystemMsgKind(item.finishReason) && !filterCardReplaced(item)"
           :kind="getSystemMsgKind(item.finishReason)"
-          :label="creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent, item.failurePhase) || getSystemMsgLabel(item.finishReason)"
+          :label="creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent, item.failurePhase) || getSystemMsgLabel(item.finishReason, item)"
           :sub="creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, failurePhase: item.failurePhase, summaryUncharged: item.summaryUncharged, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched, offersTraditional: filterCardFor(item, index).offersTraditional, traditionalFailed: filterCardFor(item, index).traditionalFailed }) || getSystemMsgSub(item.finishReason, item, index)"
           :links="creditsOverrideFor(item)?.links ?? []"
           :cta="getSystemMsgCta(item.finishReason, item, index)"
@@ -400,8 +400,8 @@
       <CanvasAssist v-bind="assistProps" @confirm="assistSession.confirm" @cancel="cancelAssist" @refresh="assistSession.refresh" @pick="assistSession.pick" />
     </CanvasPopup>
 
-    <!-- 第一輪就裝不下的卡：沙箱卡由殼畫同一個元件（buildPanelsState 的 'capacity'）。 -->
-    <CanvasPopup :open="panel.sheet === 'capacity'" v-if="!sandboxCard" :title="t('canvas.capacity.title')" heading
+    <!-- 送出前就放不下的一輪：沙箱卡由殼畫同一個元件（buildPanelsState 的 'capacity'）。 -->
+    <CanvasPopup :open="panel.sheet === 'capacity'" v-if="!sandboxCard" :title="t(capacityTitleKey(capacitySpec.situation))" heading
                  :close-label="t('main.cancel')" @close="closeCapacityChoice">
       <CanvasCapacityChoice v-bind="capacityProps" @pick="onCapacityPick" @cancel="closeCapacityChoice" />
     </CanvasPopup>
@@ -558,8 +558,8 @@ import { chromeTopColor, syncChromeTone } from './canvas-chrome-tone'
 import CanvasConfirm from './components/canvas-confirm.vue'
 import CanvasCapacityChoice from './components/canvas-capacity-choice.vue'
 import {
-  applyCapacityChoice, capacityChoiceOptions,
-  type CapacityAdvice, type CapacityChoiceKey, type CapacityPatch,
+  applyCapacityChoice, capacityChoiceOptions, capacitySituation, capacityTitleKey,
+  type CapacityAdvice, type CapacityChoiceKey, type CapacityPatch, type CapacitySituation,
 } from './canvas-capacity-choice'
 import CanvasModify from './components/canvas-modify.vue'
 import CanvasConversationList from './components/canvas-conversation-list.vue'
@@ -3095,7 +3095,7 @@ function buildPanelsState() {
     case 'assist':
       title = t('canvas.assist.title'); heading = true; props = assistProps.value; break;
     case 'capacity':
-      title = t('canvas.capacity.title'); heading = true; props = capacityProps.value; break;
+      title = t(capacityTitleKey(capacitySpec.value.situation)); heading = true; props = capacityProps.value; break;
     case 'confirm':
       title = confirmSpec.value.title;
       heading = true;
@@ -3719,7 +3719,7 @@ function systemNoticeFor(item: any, index: number) {
   const actions: Array<{ action: string; label: string }> = ctas.length ? ctas : (cta && ctaAction ? [{ action: ctaAction, label: cta }] : []);
   return {
     kind: getSystemMsgKind(item.finishReason),
-    label: creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent, item.failurePhase) || getSystemMsgLabel(item.finishReason),
+    label: creditsOverrideFor(item)?.title || operationFailureTitle(item.failureCause || item.finishReason, t, item.filterReason, !!item.thinkingContent, item.failurePhase) || getSystemMsgLabel(item.finishReason, item),
     sub: creditsOverrideFor(item)?.body || operationFailureSub(item.failureCause || item.finishReason, t, { filterReason: item.filterReason, failurePhase: item.failurePhase, summaryUncharged: item.summaryUncharged, canSwitch: canSwitchModelFor(item, index), actions: getSystemMsgCtas(item, index).map(entry => entry.action), settled: item.settled, chargeCredits: item.chargeCredits, hasReasoning: !!item.thinkingContent, offersStreamOff: filterCardFor(item, index).offersStreamOff, streamingOff: filterCardFor(item, index).streamingOff, switchedTo: filterCardFor(item, index).switched, offersTraditional: filterCardFor(item, index).offersTraditional, traditionalFailed: filterCardFor(item, index).traditionalFailed }) || getSystemMsgSub(item.finishReason, item, index),
     actions: actions.map((entry) => ({ action: String(entry.action), label: String(entry.label) })),
     // 內容限制卡：存偏好期間整列不能按、手機上主行動整行排第一。只在成立時才帶，其他卡跟以前一模一樣。
@@ -5169,7 +5169,9 @@ function getSystemMsgKind(finishReason) {
   };
   return (finishReason && finishReason !== 'stop') ? (map[finishReason] || 'model-error') : '';
 }
-function getSystemMsgLabel(finishReason) {
+function getSystemMsgLabel(finishReason, item = null) {
+  // 放不下的是這張卡還是這段對話，在出錯那一刻就判斷好存在泡泡上（capacitySituation）。
+  if (finishReason === 'context_capacity_choice') return t(capacityTitleKey(item?.capacitySituation));
   if (['content_filter', 'content_filter_input', 'refusal'].includes(finishReason)) return operationFailureTitle(finishReason, t);
   const map = {
     'content_filter':   t('systemMsg.filtered')     || 'AI 已終止本次回覆',
@@ -5199,7 +5201,6 @@ function getSystemMsgLabel(finishReason) {
     'insufficient_credits': t('chat.point_no_tips') || '點數已用完',
     'quota_exhausted':  t('chat.freeQuotaExhaustedTitle') || '免費額度已用完',
     'context_capacity_exceeded': t('error.contextCapacityTitle'),
-    'context_capacity_choice': t('error.contextCapacitySettingsTitle'),
     'compact_retryable': t('chat.compactFailed')    || '記錄失敗',
     'conversation_stale': t('error.replyNotGenerated'),
     'operation_in_progress': t('chat.operationPending') || '目前的聊天操作仍在進行中',
@@ -5258,8 +5259,8 @@ function getSystemMsgSub(finishReason, item = null, index = -1) {
     'insufficient_credits': t('chat.creditsNotEnoughSub'),
     'quota_exhausted':  t('chat.freeQuotaExhaustedSub'),
     'context_capacity_exceeded': t('error.contextCapacityExceeded'),
-    // 伺服器說了哪種玩法裝得下（第一輪）：問題在這張卡的大小，不在訊息長短或模型，
-    // 所以不再叫玩家縮短訊息或換模型；鍵打開選擇（見 askCapacityChoice）。
+    // 伺服器說了哪種玩法放得下：問題在這張卡或最近幾輪的大小，不在這則訊息或模型，
+    // 所以不叫玩家縮短訊息或換模型；鍵打開選擇（見 askCapacityChoice）。
     'context_capacity_choice': t('error.contextCapacitySettings'),
     'compact_retryable': t('error.compactRetryable')   || '記憶整理未完成，對話已恢復，請再發送一次',
     'rewrite_target_not_latest': t('chat.rewriteTargetChangedSub') || '對話內容已變更，請重新整理後編輯最新一則 AI 回覆',
@@ -5386,7 +5387,7 @@ function onSystemMsgCta(action, item, index) {
     return;
   }
   if (action === 'capacity_choice') {
-    askCapacityChoice(item?.capacityAdvice || null, String(item?.capacityDraft || ''), String(item?.id ?? ''));
+    askCapacityChoice(item?.capacityAdvice || null, String(item?.capacityDraft || ''), String(item?.id ?? ''), item?.capacitySituation);
     return;
   }
   if (action === 'refresh_history') {
@@ -5996,10 +5997,12 @@ function appendChatErrorBubble(errorType, errorMessage = '', metadata: Record<st
   if (errorType === 'author_private') return;
   removeOrphanPlaceholder();
   const presentation = resolveChatErrorPresentation(errorType, t);
-  // 第一輪就裝不下、伺服器也說了哪種玩法裝得下：卡片換成講這張卡的大小，並打開選擇。
+  // 送出前就放不下、伺服器也說了哪種玩法放得下：卡片說放不下的是這張卡還是這段對話，並打開選擇。
   // 錯誤從好幾條路走到這裡（對帳後才確認、舊伺服器、直接失敗），建議在收到錯誤事件時
   // 先記下，在這個唯一的出口取用。
   const capacity = errorType === 'context_capacity_exceeded' ? takePendingCapacityAdvice() : null;
+  // 錯誤泡泡推進去之前判斷：泡泡本身不算，但先判斷比較不依賴這條規則。
+  const situation = capacity ? capacitySituation(talkList.value, !!ajax.value.hasNextPage) : null;
   const bubbleId = nextBubbleId();
   talkList.value.push({
     id: bubbleId,
@@ -6012,7 +6015,7 @@ function appendChatErrorBubble(errorType, errorMessage = '', metadata: Record<st
     maskPosition: 1,
     ...metadata,
     finishReason: capacity ? 'context_capacity_choice' : presentation.finishReason,
-    ...(capacity ? { capacityAdvice: capacity.advice, capacityDraft: capacity.draft } : {}),
+    ...(capacity ? { capacityAdvice: capacity.advice, capacityDraft: capacity.draft, capacitySituation: situation } : {}),
     ...(errorType === 'insufficient_credits' ? { creditsShortfall: pendingCreditsShortfall } : {}),
     errorAction: presentation.action,
     isApplicationError: true,
@@ -6020,7 +6023,7 @@ function appendChatErrorBubble(errorType, errorMessage = '', metadata: Record<st
   });
   if (errorType === 'insufficient_credits') pendingCreditsShortfall = null;
   scrollToBottom();
-  if (capacity) askCapacityChoice(capacity.advice, capacity.draft, String(bubbleId));
+  if (capacity) askCapacityChoice(capacity.advice, capacity.draft, String(bubbleId), situation);
 }
 
 // finishReasonOverride：內容審查(輸入端)確定性拒絕等場景，改推 <chat-system-message>
@@ -10802,7 +10805,7 @@ async function onShortcut(key: string) {
 
 // ── 容量不夠時的選擇 ───────────────────────────────────────────────────
 //
-// 第一輪就裝不下的卡（常駐設定很大，預設 64K 裝不下）：伺服器說哪種玩法裝得下，
+// 送出前就放不下的一輪（第一輪是卡太大，聊到後面多半是最近幾輪很長）：伺服器說哪種玩法放得下，
 // 玩家選一個，存好設定後同一則訊息自動重送。這一輪在伺服器受理前就被拒了，
 // 沒有扣點、也沒有留下任何一則，重送就是重新送一次。
 //
@@ -10810,7 +10813,7 @@ async function onShortcut(key: string) {
 // （canvas-sandbox-host 只轉玩家與 AI 的訊息），面板才是唯一兩種頁面都走得到的路。
 // 一般卡的錯誤卡另有一顆鍵把它打開回來。
 let pendingCapacityAdvice: { advice: CapacityAdvice; draft: string } | null = null
-const capacitySpec = ref<{ advice: CapacityAdvice | null; draft: string; bubbleId: string; saving: boolean; error: string }>({ advice: null, draft: '', bubbleId: '', saving: false, error: '' })
+const capacitySpec = ref<{ advice: CapacityAdvice | null; draft: string; bubbleId: string; situation: CapacitySituation; saving: boolean; error: string }>({ advice: null, draft: '', bubbleId: '', situation: 'start', saving: false, error: '' })
 
 function rememberCapacityAdvice(advice: CapacityAdvice | null, draft: string) {
   pendingCapacityAdvice = advice ? { advice, draft } : null
@@ -10822,9 +10825,9 @@ function takePendingCapacityAdvice() {
   return taken
 }
 
-function askCapacityChoice(advice: CapacityAdvice | null, draft: string, bubbleId: string) {
+function askCapacityChoice(advice: CapacityAdvice | null, draft: string, bubbleId: string, situation?: CapacitySituation | null) {
   if (!advice) return
-  capacitySpec.value = { advice, draft, bubbleId, saving: false, error: '' }
+  capacitySpec.value = { advice, draft, bubbleId, situation: situation === 'later' ? 'later' : 'start', saving: false, error: '' }
   panel.value = openSheet(panel.value, 'capacity')
 }
 

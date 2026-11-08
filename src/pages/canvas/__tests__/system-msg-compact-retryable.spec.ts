@@ -57,7 +57,7 @@ describe('desktop chat.vue · SystemMessage card port (C2)', () => {
 
   it('getSystemMsgKind covers every mobile failure/notice kind, matching mobile 1:1 (content_filter/refusal/length/context_overflow/error/pause_turn/user_stop/rate_limit/server_error/network_error/compact_retryable)', () => {
     const chat = readChat()
-    const fn = sliceBetween(chat, 'function getSystemMsgKind(finishReason)', 'function getSystemMsgLabel(finishReason)')
+    const fn = sliceBetween(chat, 'function getSystemMsgKind(finishReason)', 'function getSystemMsgLabel(finishReason')
     expect(fn).toContain("'content_filter': 'filtered'")
     expect(fn).toContain("'refusal':")
     expect(fn).toContain("'length':         'length-cap'")
@@ -75,7 +75,7 @@ describe('desktop chat.vue · SystemMessage card port (C2)', () => {
 
   it('getSystemMsgLabel/getSystemMsgSub reuse existing locale keys ported verbatim from mobile (no invented copy)', () => {
     const chat = readChat()
-    const labelFn = sliceBetween(chat, 'function getSystemMsgLabel(finishReason)', 'function getSystemMsgSub(')
+    const labelFn = sliceBetween(chat, 'function getSystemMsgLabel(finishReason', 'function getSystemMsgSub(')
     expect(labelFn).toContain("t('systemMsg.filtered')")
     expect(labelFn).toContain("t('systemMsg.lengthCap')")
     expect(labelFn).toContain("t('systemMsg.modelError')")

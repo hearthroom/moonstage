@@ -8,7 +8,9 @@ import {
   applyCapacityChoice,
   capacityChoiceOptions,
   capacityChoicePatch,
+  capacitySituation,
   capacitySizeLabel,
+  capacityTitleKey,
 } from '../canvas-capacity-choice'
 
 const t = (key: string, params?: Record<string, unknown>) => (params ? `${key}(${JSON.stringify(params)})` : key)
@@ -86,5 +88,38 @@ describe('選了之後', () => {
     await expect(applyCapacityChoice({ key: 'trim', advice: { ...both, trimFits: false }, draft: '你好', save, resend })).resolves.toBe(false)
     expect(save).not.toHaveBeenCalled()
     expect(resend).not.toHaveBeenCalled()
+  })
+})
+
+// 送出前的容量檢查每一輪都跑：第一輪放不下是這張卡本身，聊到後面放不下是這段對話。
+// 標題要說對是哪一個，不能一律說成角色設定。
+describe('放不下的是什麼', () => {
+  const opening = { type: 0, content: '開場白' }
+  const player = { type: 1, content: '你好' }
+  const reply = { type: 0, content: '回覆' }
+  const errorBubble = { type: 0, content: '', systemOnly: true }
+
+  it('只有開場白、或玩家先開口的卡：是這張卡', () => {
+    expect(capacitySituation([opening], false)).toBe('start')
+    expect(capacitySituation([opening, player], false)).toBe('start')
+    expect(capacitySituation([player], false)).toBe('start')
+    expect(capacitySituation([opening, errorBubble, player], false)).toBe('start')
+    expect(capacitySituation([], false)).toBe('start')
+  })
+
+  it('已經有 AI 回過玩家、有摘要、或還有更舊的紀錄：是這段對話', () => {
+    expect(capacitySituation([opening, player, reply], false)).toBe('later')
+    expect(capacitySituation([player, reply], false)).toBe('later')
+    expect(capacitySituation([{ type: 0, content: '前情', isSummary: true }, player], false)).toBe('later')
+    expect(capacitySituation([player], true)).toBe('later')
+  })
+
+  it('還在載入的空白回覆不算回過', () => {
+    expect(capacitySituation([opening, player, { type: 0, content: '', chatLoading: true }], false)).toBe('start')
+  })
+
+  it('兩種情況各用一句標題', () => {
+    expect(capacityTitleKey('start')).toBe('canvas.capacity.titleStart')
+    expect(capacityTitleKey('later')).toBe('canvas.capacity.titleLater')
   })
 })
