@@ -540,6 +540,7 @@ import { detectAuthorOwnedRegions } from './canvas-author-regions'
 import { BACKGROUND_COLORS, backgroundChoiceFrom, backgroundPrefsPatch, readLocalChoice, resolvePlayerBackground, writeLocalChoice, CUSTOM_BACKGROUND_LIMIT, type BackgroundChoice, type BackgroundMode } from './canvas-player-background'
 import { resolveStageBackground } from './canvas-background'
 import { prepareBackgroundUpload } from './canvas-background-upload'
+import { prepStepText as formatPrepStep } from '@/utils/prep-step-text'
 import { stripUnknownTags, wrapDialogue } from './canvas-platform-defaults'
 import { drawNativeBlocks } from '@/common/native-blocks'
 import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, prologuePickSends, keepsPlayerDraft, showsOpening, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
@@ -925,77 +926,15 @@ const prepStepText = computed(() => {
   if (slowWaitActive.value && !prepStepStage.value) {
     return thinkingPhrase.value || t('multiPass.prepStillWorking')
   }
-  // 資源名：有的話文案就說得出它動的是哪一類東西，沒有就退回原本的通用句。
-  // 這是「忠實反映模型在做什麼」的關鍵——用戶付了錢，看不到它在幹嘛只會
-  // 覺得它在偷懶或卡住了。
-  const resName = {
-    setting: t('multiPass.prepResSetting'),
-    note: t('multiPass.prepResNote'),
-    shared: t('multiPass.prepResShared'),
-    past: t('multiPass.prepResPast'),
-    draft: t('multiPass.prepResDraft'),
-    mod: t('multiPass.prepResMod'),
-    requirement: t('multiPass.prepResRequirement'),
-    status: t('multiPass.prepResStatus'),
-    settled: t('multiPass.prepResSettled'),
-  }[prepStepResource.value] || ''
-
-  if (prepStepStage.value === 'looking_up') {
-    // {q}/{n}/{r} 是 vue-i18n 自己的插值佔位符——不帶參數呼叫 t() 時它會把
-    // 佔位符解析成空字串，後面再 .replace() 已經沒東西可替換（實測畫面出現
-    // 「正在查「」的設定」）。必須走 i18n 的參數 API，不能自己做字串替換。
-    if (prepStepQuery.value && resName) {
-      return t('multiPass.prepLookingUpIn', { r: resName, q: prepStepQuery.value })
-    }
-    return prepStepQuery.value
-      ? t('multiPass.prepLookingUpNamed', { q: prepStepQuery.value })
-      : t('multiPass.prepLookingUp')
-  }
-  // 寫入類的動作。原本這幾個工具一個進度事件都不發，模型每輪寫的筆記與草稿
-  // 用戶一次都看不到——畫面上當然接不上。
-  if (prepStepStage.value === 'noting') {
-    if (prepStepResource.value === 'shared') return t('multiPass.prepNotingShared')
-    // 說得出更新的是哪一類東西就說——「正在更新角色目前的狀態」比「正在記下重點」
-    // 具體得多，而具體正是這條流水帳唯一的價值。
-    return resName ? t('multiPass.prepNotingIn', { r: resName }) : t('multiPass.prepNoting')
-  }
-  if (prepStepStage.value === 'drafting') return t('multiPass.prepDrafting')
-  // 交給機率決定的三件事各說各的。併成一句就只能寫得含糊,而這條流水帳唯一的
-  // 價值就是具體——「擲骰決定結果」跟「封存一個暫時不揭曉的答案」對用戶的意義
-  // 完全不同。三句都不帶結果值:封存的答案不能洩,擲出的點數由正文自己說。
-  if (prepStepStage.value === 'rolling') return t('multiPass.prepRolling')
-  if (prepStepStage.value === 'sealing') return t('multiPass.prepSealing')
-  if (prepStepStage.value === 'revealing') return t('multiPass.prepRevealing')
-  if (prepStepStage.value === 'retrying') {
-    return t('multiPass.prepRetrying', {
-      s: String(prepRetryInSeconds.value),
-      a: String(prepRetryAttempt.value),
-      m: String(prepRetryMax.value),
-    })
-  }
-  if (prepStepStage.value === 'browsing') {
-    return resName ? t('multiPass.prepBrowsingIn', { r: resName }) : t('multiPass.prepBrowsing')
-  }
-  if (prepStepStage.value === 'reading') {
-    // 讀自己寫的草稿是「回頭審視」，不是「細看找到的資料」——同一個動詞套在
-    // 兩件不同的事上，畫面就會出現「正在細看自己的草稿」這種不對勁的話。
-    if (prepStepResource.value === 'draft') return t('multiPass.prepReviewingDraft')
-    return resName ? t('multiPass.prepReadingIn', { r: resName }) : t('multiPass.prepReading')
-  }
-  if (prepStepStage.value === 'found') {
-    // 零命中不是「找到 0 條」——那句話自相矛盾。查無結果本身是有效答案，
-    // 但要用「沒有」講，不要用「找到 0」講。
-    if (!prepStepCount.value) {
-      return resName
-        ? t('multiPass.prepFoundNoneIn', { r: resName })
-        : t('multiPass.prepFoundNone')
-    }
-    return resName
-      ? t('multiPass.prepFoundIn', { r: resName, n: String(prepStepCount.value) })
-      : t('multiPass.prepFound', { n: String(prepStepCount.value) })
-  }
-  if (prepStepStage.value === 'deciding') return t('multiPass.prepDeciding')
-  return ''
+  return formatPrepStep({
+    stage: prepStepStage.value,
+    resource: prepStepResource.value,
+    query: prepStepQuery.value,
+    count: prepStepCount.value,
+    attempt: prepRetryAttempt.value,
+    maxAttempts: prepRetryMax.value,
+    retryInSeconds: prepRetryInSeconds.value,
+  }, t)
 })
 // 三個條件的 AND 走共用實作，不在這裡手抄第二份。
 //
@@ -10149,7 +10088,7 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
   // 依據就是這份一直在長的清單（owner 2026-09-04）。
   const liveSteps = (item.chatLoading && lines.length && item.id === unref(currentChatId)) ? lines : null
   // 軌跡在上面一步一步列著，指示器不重複最後一步——但也不能光三個點沒有字
-  // （owner 2026-09-05）：準備中就寫「思考中」，其餘寫「正在回覆」。
+  // 準備軌跡有當前工作，指示器保留中性的「準備回覆中」與計時。
   // 整理劇情中（伺服器壓縮）時寫「整理劇情中…」，壓完換回上面那兩種。
   // 同時看全域的 isCompacting：清壓縮狀態的路徑有好幾條（錯誤、看門狗、斷線、停止），
   // 任何一條清掉，標籤就跟著換回來，不必每條都記得清氣泡上的標記。

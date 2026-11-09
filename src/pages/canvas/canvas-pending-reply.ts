@@ -84,6 +84,6 @@ export interface PendingReplyLabelInput {
 /** 指示器上那行字。 */
 export function pendingReplyLabel(input: PendingReplyLabelInput): string {
   if (input.phase === 'compacting') return input.t('chat.compacting')
-  if (input.hasLiveSteps) return input.t('chat.thinkingInProgress')
+  if (input.hasLiveSteps) return input.t('multiPass.prepInProgress')
   return input.prepStepText || input.phrase || input.t('chat.aiReplying')
 }

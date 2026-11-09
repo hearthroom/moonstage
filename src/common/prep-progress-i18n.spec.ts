@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { prepStepText } from '@/utils/prep-step-text'
 
 // 伺服器只送「資源類別」，不送文字。
 // 五語文案是前端資產，所以每加一個類別就有兩件事要做：resName 要認得它，五個語系
@@ -32,11 +33,15 @@ describe('準備進度的資源文案', () => {
     }
   })
 
-  it('chat 頁的 resName 認得每一個資源類別', () => {
-    const source = readFileSync(join(root, 'src', 'pages', 'canvas', 'canvas.vue'), 'utf8')
-    const map = source.slice(source.indexOf('const resName = {'))
+  it('即時與讀回共用的格式化器認得每一個資源類別', () => {
+    const strings = localeStrings('zh-Hant')
+    const t = (key: string, params?: Record<string, string>) => {
+      const text = strings[key] || key
+      return text.replace('{r}', params?.r || '')
+    }
     for (const category of RESOURCE_CATEGORIES) {
-      expect(map, `resName 沒有 ${category}`).toContain(`${category}: t('multiPass.prepRes`)
+      const key = `multiPass.prepRes${category[0].toUpperCase()}${category.slice(1)}`
+      expect(prepStepText({ stage: 'browsing', resource: category }, t)).toContain(strings[key])
     }
   })
 

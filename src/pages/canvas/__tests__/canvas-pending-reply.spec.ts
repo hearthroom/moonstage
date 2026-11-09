@@ -30,7 +30,7 @@ import {
 const T: Record<string, string> = {
   'chat.compacting': '整理劇情中…',
   'chat.aiReplying': '正在回覆',
-  'chat.thinkingInProgress': '思考中',
+  'multiPass.prepInProgress': '準備回覆中',
 }
 const t = (k: string) => T[k] || k
 
@@ -79,8 +79,8 @@ describe('等回覆的氣泡在整理劇情期間留著', () => {
     expect(list.map((r) => r.id)).toEqual(['u1', 'sum'])
   })
 
-  it('標籤：Agent 準備中寫思考中，有當下步驟用步驟文字，其餘用輪換的說法（沒有才寫正在回覆）', () => {
-    expect(pendingReplyLabel({ hasLiveSteps: true, phrase: '正細細斟酌用詞…', t })).toBe('思考中')
+  it('標籤：Agent 有軌跡時顯示準備回覆中，有當下步驟用步驟文字，其餘用輪換的說法（沒有才寫正在回覆）', () => {
+    expect(pendingReplyLabel({ hasLiveSteps: true, prepStepText: '等待模型回應', phrase: '正細細斟酌用詞…', t })).toBe('準備回覆中')
     expect(pendingReplyLabel({ hasLiveSteps: false, prepStepText: '回想先前的劇情', phrase: '正細細斟酌用詞…', t })).toBe('回想先前的劇情')
     expect(pendingReplyLabel({ hasLiveSteps: false, phrase: '正細細斟酌用詞…', t })).toBe('正細細斟酌用詞…')
     expect(pendingReplyLabel({ hasLiveSteps: false, t })).toBe('正在回覆')

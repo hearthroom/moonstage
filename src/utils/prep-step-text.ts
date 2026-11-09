@@ -30,6 +30,16 @@ type Translate = (key: string, params?: Record<string, string>) => string
 export function prepStepText(step: PrepStep | undefined, t: Translate): string {
   if (!step || typeof step !== 'object' || typeof t !== 'function') return ''
   const stage = step.stage || ''
+  switch (stage) {
+    case 'checking_format': return t('multiPass.prepCheckingFormat')
+    case 'organizing_format': return t('multiPass.prepOrganizingFormat')
+    case 'waiting_model': return t('multiPass.prepWaitingModel')
+    case 'model_working': return t('multiPass.prepModelWorking')
+    case 'model_thinking': return t('multiPass.prepModelThinking')
+    case 'reading_memory': return t('multiPass.prepReadingMemory')
+    case 'reviewing_lorebook': return t('multiPass.prepReviewingLorebook')
+  }
+
   const resource = step.resource || ''
   const query = step.query || step.keywords || ''
   const count = typeof step.count === 'number' ? step.count : 0
