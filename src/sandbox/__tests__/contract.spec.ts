@@ -24,6 +24,7 @@ import { buildShell } from '../render/shell-dom'
 import { shellStrings } from '../strings'
 import { SANDBOX_PROTOCOL_VERSION, SANDBOX_SUPPORTED_PROTOCOLS } from '../protocol'
 import { MESSAGE_SCOPE, stylePolicyFor } from '@/common/author-style-policy'
+import { OPENING_SANDBOX, OPENING_TEXT_MAX } from '@/common/opening-page'
 import { STANDARD_HTML_TAGS } from '@/pages/canvas/canvas-platform-defaults'
 import { CANVAS_SELECTOR_CONTRACT } from '@/pages/canvas/canvas-dom-contract'
 import {
@@ -226,6 +227,7 @@ function buildContract() {
   const caps = capabilitiesOf(sdk as unknown as Record<string, unknown>)
   const mmd = stylePolicyFor('mmd')
   const tavern = stylePolicyFor('tavern')
+  const fengyue = stylePolicyFor('fengyue')
   return {
     name: 'hearthroom-sandbox-contract',
     protocolVersion: SANDBOX_PROTOCOL_VERSION,
@@ -346,6 +348,16 @@ function buildContract() {
       default: 'mmd',
       mmd: { styleScope: mmd.scope, theme: mmd.theme, fencedDocument: mmd.fencedDocument, note: 'locked to dark: theme:change never fires for this format' },
       tavern: { styleScope: tavern.scope, theme: tavern.theme, fencedDocument: tavern.fencedDocument, note: `<style> selectors are prefixed with "${MESSAGE_SCOPE} "` },
+      fengyue: { styleScope: fengyue.scope, theme: fengyue.theme, fencedDocument: fengyue.fencedDocument, note: 'imported from AI Fengyue: page-wide styles that follow the host theme; tapping an opening choice sends it' },
+    },
+    openingPage: {
+      source: 'author asset openingPage (display only, never sent to the model)',
+      position: 'above the message list at the start of a conversation, in both the classic page and the sandbox shell',
+      frameSandbox: OPENING_SANDBOX,
+      paper: 'light (#fff background, #1f1f1f text) regardless of the host theme',
+      api: { 'hearthroom.fill(text)': 'puts text into the player input', 'hearthroom.send(text)': 'sends text as the player message right after the player clicked the page; otherwise fills' },
+      clipboardCopyFills: true,
+      textMaxChars: OPENING_TEXT_MAX,
     },
     rules: ruleFacts(),
     sanitizer: sanitizerFacts(),
@@ -360,7 +372,8 @@ function buildContract() {
       mountLayer: ['under', 'over', 'cover'],
       pageMode: ['classic', 'immersive', 'sandbox'],
       pageModeDefaultWhenEmpty: 'classic',
-      cardFormat: ['', 'mmd', 'tavern'],
+      cardFormat: ['', 'mmd', 'tavern', 'fengyue'],
+      openingPageMaxBytes: 512 * 1024,
       render: { endpoint: 'GET /open/v1/role/render', executesScripts: false, runsSanitizer: false, runsMarkdown: false, ruleStatuses: ['applied', 'unmatched', 'disabled', 'empty', 'rolled_back'], unsupportedScan: { classicOnly: ['sdk.save', 'sdk.cache', 'sdk.stage', 'sdk.message', 'sdk.input', 'sdk.composer', 'sdk.role', 'sdk.user', 'sdk.on(', 'sdk.debug', '[data-chat', '[data-slot', '--chat-'], everywhere: ['sdk.vars', '<abc_vars'] } },
     },
     import: { source: 'hand-maintained from hearthroom/cli internal/importer/mmd.go', mmdSixKey: { keys: ['chatVersion', 'pageDepth', 'statusbar', 'beginning', 'personality', 'regex_scripts'], chatVersion1: 'pageMode: sandbox', pageDepth: { '1|0|under|below': 'mountLayer under', '2|missing': 'mountLayer over' }, statusbar: 'mountTrigger', beginning: 'welcome.md', personality: 'not read by the CLI importer (persona comes from the separate TXT)', droppedRegexFields: ['trimStrings', 'markdownOnly', 'promptOnly', 'runOnEdit', 'substituteRegex', 'minDepth', 'maxDepth', 'id'] } },
