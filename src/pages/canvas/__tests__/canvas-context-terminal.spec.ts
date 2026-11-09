@@ -61,6 +61,17 @@ const terminal = { operationId: 'op-1', conversationId: 'conv-1', kind: 'send',
   contextUsage: { inputTokens: 200, outputTokens: 30, cachedTokens: 20, cacheWriteTokens: 0 } }
 
 describe('context usage on the newly completed reply', () => {
+  it.each(['stream', 'polled', 'wrapped'] as const)('%s summary failure ends loading and keeps stage/settlement without refresh', async (path) => {
+    const app=harness()
+    app.row.value.content=''
+    const failed={...terminal,state:'failed_retryable',finishReason:'length',failureCause:'output_limit',failurePhase:'compacting',summaryUncharged:false,settled:true,chargeCredits:0,allowedActions:['retry']}
+    const event=path==='polled'?normalizeChatOperationStatus(failed):path==='wrapped'?{schemaVersion:'outcome_v1',operation:failed}:failed
+    app.handle(event)
+    await nextTick()
+    expect(app.row.value).toMatchObject({chatFinish:true,chatLoading:false,failurePhase:'compacting',summaryUncharged:false,settled:true,chargeCredits:0,allowedActions:['retry']})
+    expect(app.clearStreamState).toHaveBeenCalledOnce()
+    expect(app.getHistoryMsg).toHaveBeenCalledOnce()
+  })
   it('executes the buffered empty-reply toast through the actual authoritative terminal handler', () => {
     const app = harness()
     app.row.value.content = ''

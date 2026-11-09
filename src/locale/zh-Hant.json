@@ -4434,5 +4434,8 @@
 	"modelSelect.agentCostConfirmBack": "返回設定",
 	"modelSelect.agentCostLoading": "正在估算每輪花費",
 	"modelSelect.agentCostLoadFailed": "費用估計無法載入",
-	"modelSelect.agentCostReload": "重新載入"
+	"modelSelect.agentCostReload": "重新載入",
+	"systemMsg.summaryLengthCap": "整理劇情超過長度上限",
+	"systemMsg.summaryLengthCapSub": "整理劇情時超過長度上限，可重試。",
+	"systemMsg.summaryLengthCapSubUncharged": "整理劇情時超過長度上限，未扣點。可重試。"
 }

@@ -42,6 +42,8 @@ export interface PendingChatTurn {
   chargeCredits?: number
   filterReason?: string
   failureCause?: string
+  failurePhase?: 'compacting'
+  summaryUncharged?: boolean
   messageKey?: string
   preAdmissionErrorType?: string
   // The server refused a regenerate before clearing the turn it replaces (turn_kept).
@@ -375,6 +377,8 @@ export interface ChatOperationStatus {
   chargeCredits?: number
   filterReason?: string
   failureCause?: string
+  failurePhase?: 'compacting'
+  summaryUncharged?: boolean
   messageKey?: string
   allowedActions?: string[]
   retryable?: boolean
@@ -431,6 +435,8 @@ export function normalizeChatOperationStatus(input: any): ChatOperationStatus | 
   }
   const shortfall = resolveCreditsShortfall({error_type:'insufficient_credits',credits_needed:source.creditsNeeded,credits_available:source.creditsAvailable,credits_min:source.creditsMin})
   if (shortfall && shortfall.needed > 0) normalized.creditsShortfall = shortfall
+  if (source.failurePhase === 'compacting') normalized.failurePhase = 'compacting'
+  if (typeof source.summaryUncharged === 'boolean') normalized.summaryUncharged = source.summaryUncharged
   if (typeof source.settled === 'boolean') normalized.settled = source.settled
   if (typeof source.chargeCredits === 'number' && Number.isSafeInteger(source.chargeCredits) && source.chargeCredits >= 0) normalized.chargeCredits = source.chargeCredits
   if (source.filterReason) normalized.filterReason = normalizeFilterReason(source.filterReason)
@@ -849,6 +855,8 @@ export function operationProjectionMetadata(status: ChatOperationStatus) {
     allowedActions: status.allowedActions ? [...status.allowedActions] : [],
     reasonCode: status.reasonCode || '',
     failureCause: status.failureCause || '',
+    failurePhase: status.failurePhase,
+    summaryUncharged: status.summaryUncharged,
     creditsShortfall: status.creditsShortfall,
     settled: status.settled,
     chargeCredits: status.chargeCredits,
@@ -890,6 +898,8 @@ export function operationStatusFromProjectionRow(row: any): ChatOperationStatus 
     finishReason: row.finishReason,
     reasonCode: row.reasonCode,
     failureCause: row.failureCause,
+    failurePhase: row.failurePhase,
+    summaryUncharged: row.summaryUncharged,
     creditsNeeded: row.creditsShortfall?.needed,
     creditsAvailable: row.creditsShortfall?.available,
     creditsMin: row.creditsShortfall?.minimum,
@@ -1267,6 +1277,10 @@ export function mergeOperationStatusIntoStreamEntry(
       : (Array.isArray(current.allowedActions) ? [...current.allowedActions] : undefined),
     reasonCode: status.reasonCode || current.reasonCode || '',
     failureCause: status.failureCause || current.failureCause || '',
+    settled: status.settled,
+    chargeCredits: status.chargeCredits,
+    failurePhase: status.failurePhase,
+    summaryUncharged: status.summaryUncharged,
     creditsShortfall: status.creditsShortfall || current.creditsShortfall,
     filterReason: normalizeFilterReason(status.filterReason || current.filterReason),
     messageKey: status.messageKey || current.messageKey || '',
@@ -1299,6 +1313,10 @@ export function operationResumeIdentity(entry: any) {
       : undefined,
     reasonCode: String(entry?.reasonCode || '').trim(),
     failureCause: String(entry?.failureCause || '').trim(),
+    failurePhase: entry?.failurePhase === 'compacting' ? 'compacting' : undefined,
+    summaryUncharged: typeof entry?.summaryUncharged === 'boolean' ? entry.summaryUncharged : undefined,
+    settled: entry?.settled,
+    chargeCredits: entry?.chargeCredits,
     creditsShortfall: entry?.creditsShortfall,
     filterReason: normalizeFilterReason(entry?.filterReason),
     messageKey: String(entry?.messageKey || '').trim(),

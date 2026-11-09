@@ -4434,5 +4434,8 @@
 	"modelSelect.agentCostConfirmBack": "返回设置",
 	"modelSelect.agentCostLoading": "正在估算每轮花费",
 	"modelSelect.agentCostLoadFailed": "费用估计无法加载",
-	"modelSelect.agentCostReload": "重新加载"
+	"modelSelect.agentCostReload": "重新加载",
+	"systemMsg.summaryLengthCap": "整理剧情超出长度上限",
+	"systemMsg.summaryLengthCapSub": "整理剧情时超出长度上限，可重试。",
+	"systemMsg.summaryLengthCapSubUncharged": "整理剧情时超出长度上限，未扣点。可重试。"
 }

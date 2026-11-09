@@ -4434,5 +4434,8 @@
 	"modelSelect.agentCostConfirmBack": "Back to settings",
 	"modelSelect.agentCostLoading": "Estimating cost per turn",
 	"modelSelect.agentCostLoadFailed": "Cost estimate couldn't be loaded",
-	"modelSelect.agentCostReload": "Reload"
+	"modelSelect.agentCostReload": "Reload",
+	"systemMsg.summaryLengthCap": "Story recap length limit reached",
+	"systemMsg.summaryLengthCapSub": "The story recap reached the length limit. Retry.",
+	"systemMsg.summaryLengthCapSubUncharged": "The story recap reached the length limit. No credits were charged. Retry."
 }

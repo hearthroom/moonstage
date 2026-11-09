@@ -14,7 +14,8 @@ export function filterKey(cause: unknown, reason: unknown): string {
  return 'systemMsg.filter' + FILTER_COPY[value]
 }
 /** Public causes only: never render raw provider errors or guess a network failure. */
-export function operationFailureTitle(cause: unknown, t: (key: string) => string, filterReason?: unknown, hasReasoning = false): string {
+export function operationFailureTitle(cause: unknown, t: (key: string) => string, filterReason?: unknown, hasReasoning = false, failurePhase?: unknown): string {
+  if (cause === 'output_limit' && failurePhase === 'compacting') return t('systemMsg.summaryLengthCap')
   if (hasReasoning && ['no_final_answer', 'empty_response', 'no_answer'].includes(String(cause))) return t('chat.noFinalAnswer')
   const restricted = filterKey(cause, filterReason)
   if (restricted) return t(restricted)
@@ -42,7 +43,10 @@ export function operationFailureTitle(cause: unknown, t: (key: string) => string
 /** Select copy from confirmed reasons, available actions and settlement evidence. */
 // offersStreamOff／streamingOff 來自卡上的鍵（canvas-filter-card），說明不會提到一顆卡上沒有的鍵。
 // 前置被擋的說明不點名按鍵，按鍵少一顆時同一句仍成立，所以沒有「不能切換」的變體。
-export function operationFailureSub(cause: unknown, t: (key: string) => string, opts: { agent?: boolean; filterReason?: unknown; canSwitch?: boolean; actions?: string[]; settled?: boolean; chargeCredits?: number; hasReasoning?: boolean; offersStreamOff?: boolean; streamingOff?: boolean; switchedTo?: '' | 'lane' | 'model'; offersTraditional?: boolean; traditionalFailed?: boolean } = {}): string {
+export function operationFailureSub(cause: unknown, t: (key: string) => string, opts: { agent?: boolean; failurePhase?: unknown; summaryUncharged?: boolean; filterReason?: unknown; canSwitch?: boolean; actions?: string[]; settled?: boolean; chargeCredits?: number; hasReasoning?: boolean; offersStreamOff?: boolean; streamingOff?: boolean; switchedTo?: '' | 'lane' | 'model'; offersTraditional?: boolean; traditionalFailed?: boolean } = {}): string {
+  if (cause === 'output_limit' && opts.failurePhase === 'compacting') {
+    return t(opts.summaryUncharged === true && opts.settled === true && opts.chargeCredits === 0 ? 'systemMsg.summaryLengthCapSubUncharged' : 'systemMsg.summaryLengthCapSub')
+  }
   if (opts.hasReasoning && ['no_final_answer', 'empty_response', 'no_answer'].includes(String(cause))) return t('chat.noFinalAnswerSub')
   const restricted = filterKey(cause, opts.filterReason)
   if (restricted === 'systemMsg.filterSummaryPolicy' && opts.switchedTo) return t('systemMsg.filterInputPolicy' + (opts.switchedTo === 'lane' ? 'SubSwitchedLane' : 'SubSwitchedModel'))
@@ -64,7 +68,10 @@ export function operationFailureSub(cause: unknown, t: (key: string) => string, 
     case 'content_filter':
       return opts.agent ? t('error.contentFilter') : ''
     case 'internal_error':
-      return opts.settled === true && opts.chargeCredits === 0 ? t('systemMsg.ourErrorSub') : ''
+      return opts.settled === true && opts.chargeCredits === 0
+        && opts.summaryUncharged !== false
+        && (opts.failurePhase !== 'compacting' || opts.summaryUncharged === true)
+        ? t('systemMsg.ourErrorSub') : ''
     case 'service_unavailable':
     case 'upstream_timeout':
     case 'stream_incomplete':

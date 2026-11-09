@@ -4434,5 +4434,8 @@
 	"modelSelect.agentCostConfirmBack": "설정으로 돌아가기",
 	"modelSelect.agentCostLoading": "한 턴 비용을 계산하는 중",
 	"modelSelect.agentCostLoadFailed": "비용 예상을 불러오지 못했어요",
-	"modelSelect.agentCostReload": "다시 불러오기"
+	"modelSelect.agentCostReload": "다시 불러오기",
+	"systemMsg.summaryLengthCap": "스토리 정리 길이 제한 도달",
+	"systemMsg.summaryLengthCapSub": "스토리를 정리하는 중 길이 제한에 도달했습니다. 다시 시도해 주세요.",
+	"systemMsg.summaryLengthCapSubUncharged": "스토리를 정리하는 중 길이 제한에 도달했습니다. 포인트는 차감되지 않았습니다. 다시 시도해 주세요."
 }

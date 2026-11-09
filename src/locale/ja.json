@@ -4434,5 +4434,8 @@
 	"modelSelect.agentCostConfirmBack": "設定に戻る",
 	"modelSelect.agentCostLoading": "1ターンの消費を見積もり中",
 	"modelSelect.agentCostLoadFailed": "費用の見積もりを読み込めませんでした",
-	"modelSelect.agentCostReload": "再読み込み"
+	"modelSelect.agentCostReload": "再読み込み",
+	"systemMsg.summaryLengthCap": "ストーリーの整理が長さの上限に到達",
+	"systemMsg.summaryLengthCapSub": "ストーリーの整理中に長さの上限に達しました。再試行してください。",
+	"systemMsg.summaryLengthCapSubUncharged": "ストーリーの整理中に長さの上限に達しました。ポイントは消費されていません。再試行してください。"
 }

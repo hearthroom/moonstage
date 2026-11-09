@@ -182,6 +182,22 @@ describe('systemNoticeFor：跟一般卡同一組函式算出來的卡', () => {
     expect(notice?.sub).not.toBe(t('chat.creditsNotEnoughSub'))
   })
 
+  it.each([true,false,undefined])('summary length failure uses the same settled copy in sandbox (%s)', (summaryUncharged) => {
+    const row=failed({finishReason:'length',failureCause:'output_limit',failurePhase:'compacting',summaryUncharged,settled:true,chargeCredits:0,allowedActions:['retry']})
+    const notice=resolver([user('u1'),row])(1)
+    expect(notice?.label).toBe(t('systemMsg.summaryLengthCap'))
+    expect(notice?.sub).toBe(t(summaryUncharged===true?'systemMsg.summaryLengthCapSubUncharged':'systemMsg.summaryLengthCapSub'))
+    expect(notice?.actions.map((entry:any)=>entry.action)).toEqual(['retry'])
+  })
+
+  it.each([false,undefined])('later internal failure does not erase recap settlement evidence (%s)', (summaryUncharged) => {
+    const row=failed({finishReason:'server_error',failureCause:'internal_error',failurePhase:'compacting',summaryUncharged,settled:true,chargeCredits:0,allowedActions:['retry']})
+    const notice=resolver([user('u1'),row])(1)
+    expect(notice?.sub).toBe(t('systemMsg.serverErrorSub'))
+    expect(notice?.sub).not.toBe(t('systemMsg.ourErrorSub'))
+    expect(notice?.actions.map((entry:any)=>entry.action)).toEqual(['retry'])
+  })
+
   it('點數不足、宿主給了說法與去處（綺夢社：今日任務、儲值）：照宿主的字畫，帶上連結', () => {
     const seen: unknown[] = []
     const ui = { creditsActions: (shortfall: unknown) => { seen.push(shortfall); return { title: '積分不夠聊這一輪', body: '這一輪大約要 300 積分，目前有 120。', links: [{ id: 'topup', label: '儲值', href: 'https://console.example/billing' }] } } }
