@@ -5943,6 +5943,8 @@ function adoptStartedConversation(started: any) {
     "pic": pic.value,
     'maskPosition': 1,
     'chatFinish': true,
+    // 新對話的開場那一列不經過歷史：開場數值隨開局回應一起來（卡片數值）。
+    ...(cardStateFromServer(started.openingCardState) ? { cardState: cardStateFromServer(started.openingCardState) } : {}),
   }
   // V3 welcome: push 路径不经过 SSE / mapRow，需要在这里手动建 ast
   // 否则 isMessageV3() && item.ast 双闸 fail，bubble 走 v-html 把 <scene>/<choice>
@@ -6009,6 +6011,8 @@ function chatStart(greetingIndex?: number) {
           "playstate": false,
           'maskPosition': 1,
           'chatFinish': true,
+          // 新對話的開場那一列不經過歷史：開場數值隨開局回應一起來（卡片數值）。
+          ...(cardStateFromServer(res.data.openingCardState) ? { cardState: cardStateFromServer(res.data.openingCardState) } : {}),
         }
         // V3 welcome: chatStart(no history) push 不经过 SSE / mapRow，需手动建 ast
         // 否则 isMessageV3() && item.ast 双闸 fail → v-html 把 <scene>/<choice>

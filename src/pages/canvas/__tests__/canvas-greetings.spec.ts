@@ -141,6 +141,9 @@ describe('開場選項（MMD prologue）', () => {
     expect(adopt).toContain('if (showsOpening(welcomeContent))')
     // 每一個把伺服器開場白放進對話列的地方都要先問
     expect(page.split('.defaultRelay').length - 1).toBe(page.split('showsOpening(welcomeContent)').length - 1)
+    // 新對話的開場那一列不經過歷史：卡片數值的開場值要從開局回應帶上去（QA 11-09：面板顯示骨架初值而不是開場白套用後的值）
+    expect(start).toContain('cardStateFromServer(res.data.openingCardState)')
+    expect(adopt).toContain('cardStateFromServer(started.openingCardState)')
   })
 
   it('替玩家送第一句時，輸入框裡有他自己的別的字就不送也不蓋', () => {
