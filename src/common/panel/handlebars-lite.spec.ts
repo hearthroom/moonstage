@@ -253,3 +253,24 @@ describe('bindPanelCopy', () => {
     expect(notify).not.toHaveBeenCalled()
   })
 })
+
+describe('sanitizer re-parse (mutation) safety', () => {
+  const live = (html: string) => {
+    const box = document.createElement('div')
+    box.innerHTML = html
+    return Array.from(box.querySelectorAll('*')).some((el) => Array.from(el.attributes).some((a) => /^on/i.test(a.name)) || el.localName === 'script')
+  }
+  it.each([
+    '<math><mtext><table><mglyph><style><img src=x onerror=alert(1)></style></mglyph></table></mtext></math>',
+    '<form><math><mtext></form><form><mglyph><style></math><img src=x onerror=alert(1)>',
+    '<svg></p><style><a id="</style><img src=1 onerror=alert(1)>">',
+    '<noscript><p title="</noscript><img src=x onerror=alert(1)>">',
+  ])('nothing executable survives being put into a div: %s', (payload) => {
+    const out = sanitizePanelHtml(payload)
+    expect(live(out)).toBe(false)
+    expect(live(sanitizePanelHtml(out))).toBe(false)
+  })
+  it('drops external stylesheets', () => {
+    expect(sanitizePanelHtml('<link rel="stylesheet" href="https://x.test/a.css"><b>x</b>')).toBe('<b>x</b>')
+  })
+})

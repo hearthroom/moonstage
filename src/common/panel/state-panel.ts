@@ -7,7 +7,7 @@
  * 載著這支掃描器；而一鍵複製的事件委派在 shadow root 外會被重新指向宿主節點，要另外處理。
  */
 import { renderPanel, type PanelRenderResult } from './handlebars-lite'
-import { applyStylePolicyToHtml } from '../author-style-policy'
+import { scopeCss } from '../author-style-scope'
 
 /** 皮膚容器的 class；皮膚 CSS 的每條規則都接在它後面。 */
 export const STATE_PANEL_SKIN_CLASS = 'lt-state-skin'
@@ -17,7 +17,19 @@ export type StatePanelAudience = 'author' | 'player'
 export function renderStatePanelSkin(template: string, data: unknown, changes: unknown[], audience: StatePanelAudience): PanelRenderResult {
   const result = renderPanel(template, data ?? {}, { changes, audience })
   if (result.error) return result
-  return { html: applyStylePolicyToHtml(result.html, { scope: `.${STATE_PANEL_SKIN_CLASS}`, fencedDocument: 'inline', theme: 'host' }) }
+  return { html: scopePanelStyles(result.html) }
+}
+
+const STYLE_TAG = /<style\b([^>]*)>([\s\S]*?)<\/style>/gi
+// 皮膚不載外部樣式：@import 會把整份未加前綴的樣式表拉進頁面。
+const IMPORT_RULE = /@import\b[^;]*;?/gi
+
+/**
+ * 皮膚是 HTML，不是 Markdown：每個 <style> 都加前綴，沒有「程式碼圍欄裡的不算」這種例外
+ * （訊息 HTML 的那條規則會讓 ``` 之後的 <style> 原樣作用在整頁）。
+ */
+function scopePanelStyles(html: string): string {
+  return html.replace(STYLE_TAG, (_whole, attrs: string, css: string) => `<style${attrs}>${scopeCss(css.replace(IMPORT_RULE, ''), `.${STATE_PANEL_SKIN_CLASS}`)}</style>`)
 }
 
 /** 面板外框的字（呼叫端給已經是玩家語系的樣板；{n}、{line}、{message}、{helper} 由面板代入）。 */

@@ -702,8 +702,8 @@ export function renderPanel(template: string, data: unknown, opts: PanelRenderOp
 // 清理：面板不執行 JS
 
 /** 連同內容整個移除的元素。 */
-const DROP_ELEMENTS = new Set(['script', 'iframe', 'frame', 'frameset', 'object', 'embed', 'base', 'meta'])
-const VOID_DROP_ELEMENTS = new Set(['frame', 'embed', 'base', 'meta'])
+const DROP_ELEMENTS = new Set(['script', 'iframe', 'frame', 'frameset', 'object', 'embed', 'base', 'meta', 'link'])
+const VOID_DROP_ELEMENTS = new Set(['frame', 'embed', 'base', 'meta', 'link'])
 /** 值會被當成網址（或 SVG 動畫寫進網址）的屬性。 */
 const URL_ATTRS = new Set(['href', 'src', 'xlink:href', 'action', 'formaction', 'data', 'poster', 'background', 'srcset', 'to', 'from', 'values', 'by'])
 
@@ -736,13 +736,21 @@ function sanitizeFragment(root: DocumentFragment | Element): void {
  * 沒有 DOM 時退回逐標籤的字串清理。
  */
 export function sanitizePanelHtml(html: string): string {
-  if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
-    const tpl = document.createElement('template')
-    if ('content' in tpl) {
-      tpl.innerHTML = html
-      sanitizeFragment(tpl.content)
-      return tpl.innerHTML
+  if (typeof document !== 'undefined' && document.implementation && typeof document.implementation.createHTMLDocument === 'function') {
+    // 呼叫端把結果以 innerHTML 放進一個 <div>：在同樣的情境（惰性文件裡的 <div>，不載圖、不跑腳本）
+    // 解析、清理、序列化，再重新解析一次直到結果不再變。有些標記（MathML／SVG 裡的 <style>、
+    // 表格重排）序列化後再解析會變成別的樹，只清一次會讓清掉的東西在畫面上復活。
+    const inert = document.implementation.createHTMLDocument('')
+    const box = inert.createElement('div')
+    let current = html
+    for (let pass = 0; pass < 4; pass++) {
+      box.innerHTML = current
+      sanitizeFragment(box)
+      const next = box.innerHTML
+      if (next === current) return next
+      current = next
     }
+    return ''
   }
   return sanitizeHtmlString(html)
 }

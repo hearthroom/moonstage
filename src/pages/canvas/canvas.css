@@ -6605,7 +6605,8 @@ iframe.lt-frontend__frame { display: block; width: 100%; min-height: 1px; border
     overflow: auto;
     overscroll-behavior: contain;
   }
-  .lt-state-skin { overflow-wrap: anywhere; }
+  /* contain: paint：皮膚裡的 position: fixed 以面板為準、畫不出面板外 */
+  .lt-state-skin { overflow-wrap: anywhere; contain: paint; }
   .lt-state-raw-label { font-size: 13px; font-weight: 600; margin-top: 8px; }
   .lt-state-json {
     margin: 0;
