@@ -22,6 +22,7 @@ import {
   buildPrologueList,
   shouldShowPrologue,
   prologuePickSends,
+  keepsPlayerDraft,
   MAX_GREETINGS,
   MAX_PROLOGUE,
   archivesShowStartedCard,
@@ -122,6 +123,13 @@ describe('開場選項（MMD prologue）', () => {
     expect(body).not.toContain('renderGreetingPreview')
     expect(body).not.toContain('chatStart(')
     expect(body).not.toContain('onActionBtnClick')
+  })
+
+  it('替玩家送第一句時，輸入框裡有他自己的別的字就不送也不蓋', () => {
+    expect(keepsPlayerDraft('', '出發')).toBe(false)
+    expect(keepsPlayerDraft('  ', '出發')).toBe(false)
+    expect(keepsPlayerDraft('出發', '出發')).toBe(false)
+    expect(keepsPlayerDraft('我想先問一下', '出發')).toBe(true)
   })
 
   it('AI 風月的卡點了直接送出（照風月的習慣）；MMD、酒館與沒宣告的卡維持填輸入框', () => {

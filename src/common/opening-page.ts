@@ -80,13 +80,22 @@ export interface OpeningPageMount {
 }
 
 /**
- * 「玩家剛點過」：iframe 裡的點擊會把使用者啟用狀態傳到外層每一層（HTML 的 activation notification），
- * 所以外層看自己的 navigator.userActivation 就知道。頁面自己用腳本送的 send 不會有這個狀態，只能填入，
- * 不會在玩家沒按的情況下花他的點數。
+ * 這一層剛有使用者操作：iframe 裡的點擊會把使用者啟用狀態傳到外層每一層（HTML 的 activation notification），
+ * 所以外層看自己的 navigator.userActivation 就知道。單看它不夠——玩家在外層打字也算啟用——
+ * 所以送出還要看焦點在不在首屏網頁上（見 clickedFrame）。沒有這個 API 的瀏覽器一律當沒操作，改成填入。
  */
 export function hasUserActivation(win: Window): boolean {
   const ua = (win.navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation
   return !!ua && ua.isActive === true
+}
+
+/**
+ * 玩家剛點了這個 iframe：這一層剛有操作，而且焦點在這個 iframe 上（點進 iframe 時，外層的 activeElement 就是它）。
+ * 頁面自己用腳本送的 send，或玩家在外層輸入框打字時頁面趁機送的 send，都過不了，只能填入，
+ * 不會在玩家沒按的情況下花他的點數。
+ */
+export function clickedFrame(win: Window, frame: HTMLIFrameElement): boolean {
+  return hasUserActivation(win) && win.document.activeElement === frame
 }
 
 /** 在 container 裡放一個首屏網頁 iframe，接好高度與填入／送出。回傳的 destroy 會拿掉 iframe 與監聽。 */
@@ -105,7 +114,7 @@ export function mountOpeningPage(
   if (options.title) frame.title = options.title
   frame.style.cssText = 'display:block;width:100%;height:160px;border:0;border-radius:12px;background:#fff'
   frame.srcdoc = openingSrcdoc(html)
-  const activated = options.activated ?? (() => hasUserActivation(win))
+  const activated = options.activated ?? (() => clickedFrame(win, frame))
   const onMessage = (event: MessageEvent) => {
     if (event.source !== frame.contentWindow) return
     const message = parseOpeningMessage(event.data)

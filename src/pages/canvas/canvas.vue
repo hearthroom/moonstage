@@ -62,7 +62,7 @@
     <CanvasStage v-if="!sandboxCard" :background="stageBackground" @scroll="onStageScroll">
       <CanvasIntro :text="introText" :open="introOpen" @toggle="introOpen = !introOpen" />
       <!-- 首屏網頁（AI 風月的「詳細介紹」）：只在對話的開頭（沒有更早的訊息要載）出現，接在介紹之後、開場白之前。 -->
-      <CanvasOpeningPage v-if="openingPage && !ajax.hasNextPage" :html="openingPage" :title="roleView?.roleName" @fill="fillComposer" @send="sendOpeningLine" />
+      <CanvasOpeningPage v-if="openingPage && !ajax.hasNextPage" :html="openingPage" :title="roleView?.roleName" @fill="fillComposer" @send="sendFromOpeningPage" />
 
       <!-- 前置被擋卡上的重送進行中，被擋那一列整列收起來（filterCardReplaced）：只收卡會留下一列空的「⋯」。 -->
       <template v-for="(item, index) in talkList" :key="item.id != null ? item.id : index">
@@ -542,7 +542,7 @@ import { resolveStageBackground } from './canvas-background'
 import { prepareBackgroundUpload } from './canvas-background-upload'
 import { stripUnknownTags, wrapDialogue } from './canvas-platform-defaults'
 import { drawNativeBlocks } from '@/common/native-blocks'
-import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, prologuePickSends, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
+import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, prologuePickSends, keepsPlayerDraft, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
 import { archiveRequestQuery, buildArchiveRows, isArchiveFull, nextArchiveAfterDelete } from './canvas-archives'
 import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
 import type { ArchiveRow } from './canvas-archives'
@@ -3371,7 +3371,8 @@ function mountSandbox(asset: any) {
           case 'prologue': onProloguePick(Number(key)); return;
           // 首屏網頁的填入／送出：送出只在玩家剛點過頁面時照做（點擊的啟用狀態會一路傳到這一層）。
           case 'opening-fill': fillComposer(String(key || '')); return;
-          case 'opening-send': if (hasUserActivation(window)) sendOpeningLine(String(key || '')); else fillComposer(String(key || '')); return;
+          // 殼已經確認玩家點的是首屏網頁；這一層再看剛有操作、焦點在殼的 iframe 上，才替玩家送出。
+          case 'opening-send': if (hasUserActivation(window) && !!sandboxFrame.value && document.activeElement === sandboxFrame.value) sendFromOpeningPage(String(key || '')); else fillComposer(String(key || '')); return;
         }
       },
       onComposer: (visible) => { sandboxComposerHidden.value = !visible; },
@@ -10050,6 +10051,12 @@ function onProloguePick(pi: number) {
 
 // 替玩家送出第一句（風月卡的開場選項、首屏網頁的按鈕）。跟 HUD 的送出同一條路；
 // 還不能送（唯讀、上一輪還在收尾）就退回填進輸入框，字不會不見。
+// 首屏網頁要求的送出：玩家點的是作者的網頁不是我們的按鈕，輸入框裡已經有他自己的別的字時不送也不蓋。
+function sendFromOpeningPage(text: string) {
+  if (!text || keepsPlayerDraft(content.value, text)) return
+  sendOpeningLine(text)
+}
+
 function sendOpeningLine(text: string) {
   if (!text) return
   if (!canGenerate.value || isTimelineMutationBlocked()) { fillComposer(text); return }

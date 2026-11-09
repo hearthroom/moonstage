@@ -3,7 +3,7 @@
  * 只有玩家剛點過時才會替他送出。
  */
 import { describe, it, expect, vi } from 'vitest'
-import { mountOpeningPage, openingSrcdoc, parseOpeningMessage, OPENING_BOOTSTRAP, OPENING_MESSAGE_TYPE, OPENING_SANDBOX } from '../opening-page'
+import { clickedFrame, mountOpeningPage, openingSrcdoc, parseOpeningMessage, OPENING_BOOTSTRAP, OPENING_MESSAGE_TYPE, OPENING_SANDBOX } from '../opening-page'
 import { stylePolicyFor } from '../author-style-policy'
 import { normalizeCardFormat } from '../card-format'
 
@@ -79,6 +79,26 @@ describe('parseOpeningMessage', () => {
     expect(parseOpeningMessage({ type: OPENING_MESSAGE_TYPE, kind: 'fill', text: '  ' })).toBeNull()
     expect(parseOpeningMessage({ type: OPENING_MESSAGE_TYPE, kind: 'height', height: 999999 })).toEqual({ kind: 'height', height: 20000 })
     expect(parseOpeningMessage(null)).toBeNull()
+  })
+})
+
+describe('clickedFrame', () => {
+  it('要剛有操作、而且焦點在這個 iframe 上：玩家在外層打字時頁面趁機送出，不算', () => {
+    const frame = document.createElement('iframe')
+    document.body.appendChild(frame)
+    const ua = { isActive: true }
+    Object.defineProperty(window.navigator, 'userActivation', { configurable: true, get: () => ua })
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.focus()
+    expect(clickedFrame(window, frame)).toBe(false)
+    Object.defineProperty(document, 'activeElement', { configurable: true, get: () => frame })
+    expect(clickedFrame(window, frame)).toBe(true)
+    ua.isActive = false
+    expect(clickedFrame(window, frame)).toBe(false)
+    delete (document as any).activeElement
+    delete (window.navigator as any).userActivation
+    frame.remove(); input.remove()
   })
 })
 

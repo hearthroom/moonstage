@@ -100,6 +100,12 @@ export function prologuePickSends(format: string | null | undefined): boolean {
   return format === 'fengyue'
 }
 
+/** 替玩家送出第一句之前：輸入框裡已經有玩家自己打的別的字，就不送也不蓋掉他的草稿。 */
+export function keepsPlayerDraft(draft: string | null | undefined, text: string): boolean {
+  const mine = String(draft ?? '').trim()
+  return !!mine && mine !== text.trim()
+}
+
 /**
  * 區塊什麼時候在畫面上。
  *
