@@ -40,7 +40,7 @@ try{var c=navigator.clipboard;if(c&&c.writeText){var w=c.writeText.bind(c);c.wri
 document.addEventListener('copy',function(){try{var a=document.activeElement,s='';
 if(a&&typeof a.value==='string'&&a.selectionStart!=null)s=a.value.slice(a.selectionStart,a.selectionEnd);
 if(!s)s=String(document.getSelection()||'');api.fill(s)}catch(e){}},true);
-var last=-1;function size(){var h=Math.ceil(Math.max(document.documentElement.scrollHeight,document.body?document.body.scrollHeight:0));if(h!==last){last=h;post({kind:'height',height:h})}}
+var last=-1;function size(){var b=document.body;var h=Math.ceil(b?b.scrollHeight:document.documentElement.scrollHeight);if(h!==last){last=h;post({kind:'height',height:h})}}
 if(window.ResizeObserver){new ResizeObserver(size).observe(document.documentElement)}
 window.addEventListener('load',size);setTimeout(size,0);
 })();`
@@ -112,7 +112,8 @@ export function mountOpeningPage(
   frame.setAttribute('allow', OPENING_ALLOW)
   frame.setAttribute('data-lt', 'opening-page')
   if (options.title) frame.title = options.title
-  frame.style.cssText = 'display:block;width:100%;height:160px;border:0;border-radius:12px;background:#fff'
+  // 先給一個小高度，等頁面回報內容高度再撐開：量的是 body（html 的 scrollHeight 不會小於 iframe 本身，框只會變大不會變小）
+  frame.style.cssText = 'display:block;width:100%;height:48px;border:0;border-radius:12px;background:#fff'
   frame.srcdoc = openingSrcdoc(html)
   const activated = options.activated ?? (() => clickedFrame(win, frame))
   const onMessage = (event: MessageEvent) => {

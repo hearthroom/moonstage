@@ -45,9 +45,9 @@ describe('頁面裡的腳本', () => {
     ])
   })
 
-  it('一開始就回報高度', () => {
+  it('一開始就回報內容高度：量 body，不量 html（html 的 scrollHeight 不會小於框本身，短內容的框會縮不回來）', () => {
     const { posted } = runBootstrap()
-    expect(posted).toContainEqual({ type: OPENING_MESSAGE_TYPE, kind: 'height', height: 321 })
+    expect(posted).toContainEqual({ type: OPENING_MESSAGE_TYPE, kind: 'height', height: 300 })
   })
 
   it('風月的開局生成器把字寫進剪貼簿：照樣寫，也填進輸入框', async () => {
