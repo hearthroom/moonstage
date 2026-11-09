@@ -1031,9 +1031,13 @@ export function mergeChatHistoryOperationProjections(
     const assistantIndex = exactHistoryRowIndex(rows, status.assistantChatId)
     if (assistantIndex >= 0) {
       const row = rows[assistantIndex]
+      const prepTrail = row.type === 0 && status.state === 'completed' && status.agentTurn === true
+        ? historyAgentPrepTrail(status, response, options)
+        : []
       rows[assistantIndex] = {
         ...row,
         ...operationProjectionMetadata(status),
+        ...(prepTrail.length ? { prepTrail, prepTrailCollapsed: true } : {}),
         finishReason: projectionFinishReason(
           status,
           row?.finishReason,
@@ -1086,6 +1090,16 @@ export function mergeChatHistoryOperationProjections(
 }
 
 
+function historyAgentPrepTrail(
+  status: ChatOperationStatus,
+  response: any,
+  options: { agentPrepTraces?: Record<string, any[]>; t?: (key: string, params?: Record<string, string>) => string },
+): string[] {
+  if (!options.t) return []
+  const traces = options.agentPrepTraces || response?.agentPrepTraces || {}
+  return prepTrailFromServerSteps(traces[status.operationId], options.t)
+}
+
 /**
  * 中斷但進度已保留的那一輪，額外要蓋上去的欄位。
  *
@@ -1099,16 +1113,10 @@ export function mergeChatHistoryOperationProjections(
 function interruptedAgentRowFields(
   status: ChatOperationStatus,
   response: any,
-  options: { t?: (key: string, params?: Record<string, string>) => string; agentPrepTrail?: string[] },
+  options: { agentPrepTraces?: Record<string, any[]>; t?: (key: string, params?: Record<string, string>) => string; agentPrepTrail?: string[] },
 ): Record<string, unknown> {
   if (status.reasonCode !== AGENT_PROGRESS_PRESERVED_REASON) return {}
-  // 生產路徑把軌跡放在 **options**（歷史回應的欄位由呼叫端取出來再傳進來）；
-  // response 那份只是保險。寫反的話伺服器軌跡永遠讀不到，而畫面會退化成一顆
-  // 系統藥丸——沒有錯誤、沒有日誌，只是那一層永遠不成立。
-  const traces = options.agentPrepTraces || response?.agentPrepTraces || {}
-  let trail = options.t
-    ? prepTrailFromServerSteps(traces[status.operationId], options.t)
-    : []
+  let trail = historyAgentPrepTrail(status, response, options)
   if (!trail.length && Array.isArray(options.agentPrepTrail)) {
     trail = options.agentPrepTrail.slice()
   }

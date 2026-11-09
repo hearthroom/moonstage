@@ -1275,6 +1275,43 @@ describe('desktop chat transport ownership state machine', () => {
   })
 })
 
+describe('完成的 Agent 準備軌跡讀回', () => {
+  it('本地化後只附到原本那則 AI 回覆，保持收起', () => {
+    const messages = [
+      { type: 1, chatId: 'user-1', content: '開始' },
+      { type: 0, chatId: 'assistant-1', content: '完成的正文' },
+      { type: 0, chatId: 'assistant-2', content: '其他正文' },
+    ]
+    const operation = {
+      conversationId: 'conv-1', operationId: 'op-1', kind: 'send',
+      state: 'completed', agentTurn: true, assistantChatId: 'assistant-1',
+      userChatId: 'user-1', allowedActions: [], version: 1,
+    }
+    const options = {
+      agentPrepTraces: {
+        'op-1': [{ stage: 'checking_format' }, { stage: 'waiting_model' }, { stage: 'done' }],
+        'op-absent': [{ stage: 'looking_up' }],
+      },
+      t: (key: string) => key,
+      agentPrepTrail: ['不屬於這輪的即時軌跡'],
+    }
+    const merged = mergeChatHistoryOperationProjections(messages, {
+      schemaVersion: 'outcome_v1', operationStatusAvailable: true, operations: [
+        operation, { ...operation, operationId: 'op-absent', assistantChatId: 'assistant-absent' },
+      ],
+    }, options)
+    expect(merged).toHaveLength(3)
+    expect(merged[1]).toMatchObject({
+      content: '完成的正文',
+      prepTrail: ['multiPass.prepCheckingFormat', 'multiPass.prepWaitingModel'],
+      prepTrailCollapsed: true,
+    })
+    expect(merged[0].prepTrail).toBeUndefined()
+    expect(merged[2].prepTrail).toBeUndefined()
+    expect(merged[1].agentInterrupted).toBeUndefined()
+  })
+})
+
 // ── agent 中斷／續跑（與 mobile 同構，2026-08-08 由 owner 實測驗收） ──────────
 describe('agent 中斷的那一輪', () => {
   it('停止不是伺服器錯誤——不能投影成紅色的失敗加「重試」', () => {

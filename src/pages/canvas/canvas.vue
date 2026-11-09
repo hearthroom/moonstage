@@ -7395,19 +7395,8 @@ function getHistoryMsg(preloadedFirstPage?: any) {
           t,
         } as any,
       );
-      // 準備軌跡先從伺服器讀回，再用記憶體那份補齊還沒落盤的最後幾步。
-      //
-      // 兩層都要：伺服器那份撐住「重整之後還在」（記憶體會被整條換掉），
-      // 記憶體那份撐住「剛跑完的那一刻」（最後一步可能還沒寫進資料庫）。
-      // 只有其中一層的話，各自會漏掉對方涵蓋的那個時刻。
-      // **伺服器軌跡的套用已撤回**（2026-08-08）。
-      //
-      // 兩個獨立的錯：prepTrail 存的是已經本地化好的**字串**，而伺服器送的是
-      // {stage, resource, …} 物件（渲染成原始 JSON）；以及停止的輪次沒有 AI 列，
-      // 退回掛到使用者那一則會讓 AI 的推理跑進使用者自己的氣泡裡。
-      //
-      // 重建時要先把 prepStepText 那個讀元件狀態的 computed 抽成純格式化函式，
-      // 並且給中斷的輪次一個 AI 側的氣泡。
+      // 已落盤的準備軌跡由歷史投影本地化並掛到同一輪。伺服器尚無資料時，
+      // 再以同一則訊息在記憶體裡的軌跡補齊。
       talkList.value = carryPrepTrailAcrossHistoryRebuild(mergedTimeline, lastKnownTimeline);
       if (operationProjectionUnavailable && pendingChatTurn) {
         requestPendingOperationReconciliation('history_projection_unavailable');
