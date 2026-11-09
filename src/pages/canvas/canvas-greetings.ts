@@ -100,6 +100,14 @@ export function prologuePickSends(format: string | null | undefined): boolean {
   return format === 'fengyue'
 }
 
+/**
+ * 這段開場白要不要畫成一則 AI 訊息。玩家先開口的卡（AI 風月匯入的那種）沒有開場白：
+ * 畫出來只會是一個空氣泡加操作鈕，看起來像 AI 說了空話。
+ */
+export function showsOpening(text: unknown): boolean {
+  return typeof text === 'string' && text.trim() !== ''
+}
+
 /** 替玩家送出第一句之前：輸入框裡已經有玩家自己打的別的字，就不送也不蓋掉他的草稿。 */
 export function keepsPlayerDraft(draft: string | null | undefined, text: string): boolean {
   const mine = String(draft ?? '').trim()

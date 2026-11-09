@@ -23,6 +23,7 @@ import {
   shouldShowPrologue,
   prologuePickSends,
   keepsPlayerDraft,
+  showsOpening,
   MAX_GREETINGS,
   MAX_PROLOGUE,
   archivesShowStartedCard,
@@ -123,6 +124,18 @@ describe('開場選項（MMD prologue）', () => {
     expect(body).not.toContain('renderGreetingPreview')
     expect(body).not.toContain('chatStart(')
     expect(body).not.toContain('onActionBtnClick')
+  })
+
+  it('沒有開場白的卡不畫空氣泡：開對話與預覽都先問 showsOpening', () => {
+    expect(showsOpening('')).toBe(false)
+    expect(showsOpening('  \n')).toBe(false)
+    expect(showsOpening(undefined)).toBe(false)
+    expect(showsOpening('雨還在下。')).toBe(true)
+    const page = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
+    const start = page.slice(page.indexOf('function chatStart('), page.indexOf('function appendChatErrorBubble('))
+    expect(start).toContain('if (showsOpening(welcomeContent))')
+    const preview = page.slice(page.indexOf('function renderGreetingPreview('), page.indexOf('function onGreetingSwipe('))
+    expect(preview).toContain('if (!showsOpening(text))')
   })
 
   it('替玩家送第一句時，輸入框裡有他自己的別的字就不送也不蓋', () => {

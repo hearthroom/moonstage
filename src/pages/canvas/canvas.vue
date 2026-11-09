@@ -542,7 +542,7 @@ import { resolveStageBackground } from './canvas-background'
 import { prepareBackgroundUpload } from './canvas-background-upload'
 import { stripUnknownTags, wrapDialogue } from './canvas-platform-defaults'
 import { drawNativeBlocks } from '@/common/native-blocks'
-import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, prologuePickSends, keepsPlayerDraft, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
+import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, prologuePickSends, keepsPlayerDraft, showsOpening, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
 import { archiveRequestQuery, buildArchiveRows, isArchiveFull, nextArchiveAfterDelete } from './canvas-archives'
 import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
 import type { ArchiveRow } from './canvas-archives'
@@ -5974,6 +5974,8 @@ function chatStart(greetingIndex?: number) {
         getHistoryMsg(res.data.firstPage);
       } else {
         const welcomeContent = res.data.defaultRelay;
+        // 沒有開場白（玩家先開口的卡）就不畫空氣泡；首屏網頁與開場選項照常在。
+        if (showsOpening(welcomeContent)) {
         let data: any = {
           "id": 0,
           "content": welcomeContent,
@@ -5987,6 +5989,7 @@ function chatStart(greetingIndex?: number) {
         // 否则 isMessageV3() && item.ast 双闸 fail → v-html 把 <scene>/<choice>
         // 渲染成纯文字（StoryCard 直接打开 URL 第一次 welcome 没样式 bug）
         unref(talkList).push(data);
+        }
         // 第一次打開一張角色卡也要停在底部。這條分支原本推完開場白就結束，
         // 於是沒歷史的角色卡停在頂端，開場白只露出一角。有歷史的那條走
         // getHistoryMsg，page 1 已經做了同樣三件事，這裡缺的就是它。
@@ -9976,6 +9979,7 @@ async function hasExistingConversation(): Promise<boolean> {
 
 function renderGreetingPreview() {
   const text = greeting.list[greeting.index] || ''
+  if (!showsOpening(text)) { talkList.value = []; return }
   talkList.value = [{
     id: 0,
     content: text,

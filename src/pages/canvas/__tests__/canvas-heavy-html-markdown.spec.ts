@@ -27,6 +27,7 @@ import { stripUnknownTags, wrapDialogue } from '../canvas-platform-defaults'
 import { drawNativeBlocks } from '../../../common/native-blocks'
 import { convertVisibleHtml, createDisplayScriptConverter, directionFor } from '../canvas-display-script'
 import { scopeCardHtml } from '../canvas-style-scope'
+import { showsOpening } from '../canvas-greetings'
 
 /*
   重 HTML（訊息以區塊 tag 開頭）也要過 Markdown。
@@ -196,7 +197,7 @@ describe('opening display script regression', () => {
     const start = page.indexOf('function renderGreetingPreview() {')
     const end = page.indexOf('function onGreetingSwipe(', start)
     if (start < 0 || end < 0) throw new Error('renderGreetingPreview source anchors missing')
-    const context = vm.createContext({ greeting: { list: [source], index: 0 }, talkList: { value: [] }, pic: { value: '' }, unref: (value: any) => value.value })
+    const context = vm.createContext({ greeting: { list: [source], index: 0 }, talkList: { value: [] }, pic: { value: '' }, unref: (value: any) => value.value, showsOpening })
     vm.runInContext(page.slice(start, end) + '\nrenderGreetingPreview();', context)
     return (context as any).talkList.value[0]
   }
