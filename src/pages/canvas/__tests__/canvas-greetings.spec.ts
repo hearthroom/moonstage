@@ -136,6 +136,11 @@ describe('開場選項（MMD prologue）', () => {
     expect(start).toContain('if (showsOpening(welcomeContent))')
     const preview = page.slice(page.indexOf('function renderGreetingPreview('), page.indexOf('function onGreetingSwipe('))
     expect(preview).toContain('if (!showsOpening(text))')
+    // 開新對話（存檔後開新的一段）也走同一條規則：QA 在傳統頁開新對話時看到過空氣泡
+    const adopt = page.slice(page.indexOf('function adoptStartedConversation('), page.indexOf('function chatStart('))
+    expect(adopt).toContain('if (showsOpening(welcomeContent))')
+    // 每一個把伺服器開場白放進對話列的地方都要先問
+    expect(page.split('.defaultRelay').length - 1).toBe(page.split('showsOpening(welcomeContent)').length - 1)
   })
 
   it('替玩家送第一句時，輸入框裡有他自己的別的字就不送也不蓋', () => {

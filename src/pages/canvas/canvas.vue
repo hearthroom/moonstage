@@ -5911,6 +5911,8 @@ function adoptStartedConversation(started: any) {
   talkList.value = [];
   openMore.value = false;
   const welcomeContent = started.defaultRelay;
+  // 沒有開場白（玩家先開口的卡）就不畫空氣泡，跟第一次進入同一條規則。
+  if (showsOpening(welcomeContent)) {
   let data: any = {
     "id": nextBubbleId(),
     randomOpening: true,
@@ -5924,6 +5926,7 @@ function adoptStartedConversation(started: any) {
   // 否则 isMessageV3() && item.ast 双闸 fail，bubble 走 v-html 把 <scene>/<choice>
   // 渲染成纯文字（issue: 新建对话第一句没样式）
   unref(talkList).push(data);
+  }
 
   // 換了一段對話等於換了一個捲動語境：使用者在舊對話裡往上滑過的話，
   // autoScrollEnabled 還停在 false，接下來這次捲底會被自己的 gate 擋掉，
