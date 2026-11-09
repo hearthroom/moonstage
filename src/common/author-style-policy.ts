@@ -42,6 +42,8 @@ export const MESSAGE_SCOPE = '.mes_text'
 const POLICIES: Record<CardFormat, AuthorStylePolicy> = {
   tavern: { scope: MESSAGE_SCOPE, fencedDocument: 'iframe', theme: 'host' },
   mmd: { scope: null, fencedDocument: 'inline', theme: 'dark' },
+  // 風月的聊天頁是淺色，內置 CSS 整頁生效：不加前綴，也不像 MMD 那樣鎖深色。
+  fengyue: { scope: null, fencedDocument: 'inline', theme: 'host' },
 }
 
 /** 接受原始字串（伺服器欄位）或已正規化的格式；不認得的當 MMD。 */

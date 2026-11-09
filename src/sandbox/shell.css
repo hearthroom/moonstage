@@ -168,3 +168,6 @@ iframe.lt-frontend__frame { display: block; width: 100%; min-height: 1px; border
 .mes_text pre:not(.lt-frontend) > code { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 }
+
+/* 首屏網頁（AI 風月的「詳細介紹」）：訊息列最上方，iframe 自己有圓角與白紙。 */
+[data-slot="opening"] { padding: 8px 12px 4px; }

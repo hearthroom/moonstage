@@ -67,13 +67,15 @@ export interface SandboxRule {
 }
 
 export interface SandboxCard {
-  /** 卡片格式（'mmd'｜'tavern'；沒有＝MMD）。決定規則裡的 <style> 落地時要不要加訊息層前綴（見 common/author-style-policy）。 */
+  /** 卡片格式（'mmd'｜'tavern'｜'fengyue'；沒有＝MMD）。決定規則裡的 <style> 落地時要不要加訊息層前綴（見 common/author-style-policy）。 */
   format?: string
   rules: SandboxRule[]
   /** 功能欄的原文；空字串＝整塊不存在。 */
   statusbar: string
   /** 宿主用一般卡的管線算好的狀態欄 HTML；有就直接掛，沒有殼才自己套規則。 */
   statusbarHtml?: string
+  /** 首屏網頁（作者資產 openingPage）：訊息區最上方的作者網頁，只顯示不送模型。空的就不畫。 */
+  openingPage?: string
 }
 
 export interface SandboxCapabilities {
@@ -284,7 +286,7 @@ export interface PanelsState {
 }
 
 /** 標準頁首與輸入區上的按鍵，交給宿主做。 */
-export type ChromeUiEvent = 'send' | 'stop' | 'continue' | 'more' | 'assist' | 'more-pick' | 'model' | 'context' | 'meter-hint-done' | 'shortcut' | 'back' | 'fullscreen' | 'favorite' | 'comments' | 'prologue' | 'paste-feedback'
+export type ChromeUiEvent = 'send' | 'stop' | 'continue' | 'more' | 'assist' | 'more-pick' | 'model' | 'context' | 'meter-hint-done' | 'shortcut' | 'back' | 'fullscreen' | 'favorite' | 'comments' | 'prologue' | 'paste-feedback' | 'opening-fill' | 'opening-send'
 
 /** 三個點選單從哪裡呼出（座標是 iframe 內的；宿主自己換算）。 */
 export type MessageMenuAnchor =

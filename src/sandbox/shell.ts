@@ -6,6 +6,7 @@
  *   createShell(config) → 建骨架、裝訊息作用域、建 sdk（掛到 window.sdk）、裝卡（樣式進
  *   author-css、腳本跑一次）→ 等宿主的 `messages` → 冷啟動每則 new→mount→done → `ready`。
  */
+import { mountOpeningPage } from '../common/opening-page'
 import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, RequestOp, SandboxBackground, SandboxHelloConfig, SandboxMessage, SandboxMessageRole, ShellToHost, StageState } from './protocol'
 import { createThemeBridge } from './theme-bridge'
 import { bindCardBlockTheme } from './card-block-theme'
@@ -695,6 +696,20 @@ export function createShell(options: CreateShellOptions): Shell {
       bus.emit('ready')
       transport.send({ type: 'ready' })
     }
+  }
+
+  // ── 首屏網頁（AI 風月的「詳細介紹」）：放在訊息列最上方，舊訊息往上載入時接在它下面。
+  // 頁面在自己的無同源 iframe 裡跑（common/opening-page）；填入與送出都交給宿主決定，
+  // 宿主跟一般頁同一段邏輯（送出只在玩家剛點過頁面時照做）。
+  const openingHtml = String(config.card.openingPage || '')
+  if (openingHtml.trim()) {
+    const slot = doc.createElement('div')
+    slot.setAttribute('data-slot', 'opening')
+    refs.list.before(slot)
+    mountOpeningPage(slot, openingHtml, {
+      fill: (text) => transport.send({ type: 'ui', event: 'opening-fill', key: text }),
+      send: (text) => transport.send({ type: 'ui', event: 'opening-send', key: text }),
+    }, { title: config.role?.name ? String(config.role.name) : undefined })
   }
 
   // ── 開場選項（MMD「你可以选择开场」）：跟普通頁同一份 DOM 與樣式（canvas.css 的 .prologue-*）。

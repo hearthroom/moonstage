@@ -21,6 +21,7 @@ import {
   greetingIndexForStart,
   buildPrologueList,
   shouldShowPrologue,
+  prologuePickSends,
   MAX_GREETINGS,
   MAX_PROLOGUE,
   archivesShowStartedCard,
@@ -121,6 +122,15 @@ describe('開場選項（MMD prologue）', () => {
     expect(body).not.toContain('renderGreetingPreview')
     expect(body).not.toContain('chatStart(')
     expect(body).not.toContain('onActionBtnClick')
+  })
+
+  it('AI 風月的卡點了直接送出（照風月的習慣）；MMD、酒館與沒宣告的卡維持填輸入框', () => {
+    expect(prologuePickSends('fengyue')).toBe(true)
+    for (const format of ['mmd', 'tavern', '', undefined, null]) expect(prologuePickSends(format as any)).toBe(false)
+    const page = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
+    const start = page.indexOf('function onProloguePick(')
+    const body = page.slice(start, page.indexOf('\n}', start))
+    expect(body).toContain('prologuePickSends(cardFormat.value)')
   })
 })
 

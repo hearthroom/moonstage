@@ -61,6 +61,8 @@
 
     <CanvasStage v-if="!sandboxCard" :background="stageBackground" @scroll="onStageScroll">
       <CanvasIntro :text="introText" :open="introOpen" @toggle="introOpen = !introOpen" />
+      <!-- 首屏網頁（AI 風月的「詳細介紹」）：只在對話的開頭（沒有更早的訊息要載）出現，接在介紹之後、開場白之前。 -->
+      <CanvasOpeningPage v-if="openingPage && !ajax.hasNextPage" :html="openingPage" :title="roleView?.roleName" @fill="fillComposer" @send="sendOpeningLine" />
 
       <!-- 前置被擋卡上的重送進行中，被擋那一列整列收起來（filterCardReplaced）：只收卡會留下一列空的「⋯」。 -->
       <template v-for="(item, index) in talkList" :key="item.id != null ? item.id : index">
@@ -540,7 +542,7 @@ import { resolveStageBackground } from './canvas-background'
 import { prepareBackgroundUpload } from './canvas-background-upload'
 import { stripUnknownTags, wrapDialogue } from './canvas-platform-defaults'
 import { drawNativeBlocks } from '@/common/native-blocks'
-import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
+import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, prologuePickSends, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
 import { archiveRequestQuery, buildArchiveRows, isArchiveFull, nextArchiveAfterDelete } from './canvas-archives'
 import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
 import type { ArchiveRow } from './canvas-archives'
@@ -550,6 +552,8 @@ import { convertAuthorMountHtml, hasAuthorMountCode } from './canvas-author-moun
 import { roleLoadFailureIsOurs, whenRoleDetail } from './canvas-role-ready'
 import { guestDraftStorage, saveGuestDraft, takeGuestDraft } from './canvas-guest'
 import CanvasPrologue from './components/canvas-prologue.vue'
+import CanvasOpeningPage from './components/canvas-opening-page.vue'
+import { hasUserActivation } from '../../common/opening-page'
 import { captureBodySnapshot, restoreBodySnapshot, sweepForeignNodes } from './canvas-body-snapshot'
 import CanvasPopup from './components/canvas-popup.vue'
 import CanvasModelPanel from './components/canvas-model-panel.vue'
@@ -2680,6 +2684,8 @@ function previewEcho() {
   }
 }
 
+/** 作者資產的首屏網頁（openingPage）；空字串＝沒有。 */
+const openingPage = ref('')
 function setActiveAuthorAsset(asset) {
   const rules = (asset && Array.isArray(asset.rules)) ? asset.rules : [];
   activeAuthorAsset.value = {
@@ -2690,6 +2696,8 @@ function setActiveAuthorAsset(asset) {
     // 伺服器算好的簡繁對照表：規則寫簡體、玩家看到繁體時仍要命中。
     variants: (asset && asset.variants) || null,
   };
+  // 首屏網頁跟規則一起換：換卡、重載、作者資產清掉時都跟著走。
+  openingPage.value = String((asset && asset.openingPage) || '');
   // 規則換了，之前用舊規則算出來的串流快取必須作廢。
   clearStreamCache();
 }
@@ -3310,6 +3318,7 @@ function mountSandbox(asset: any) {
             // 狀態欄也用一般卡的管線算（跟訊息同一套規則引擎與範圍處理），殼直接掛。
             // 顯示字形跟訊息一樣在正則之後轉（只轉文字節點）：否則功能欄是原文、正文是玩家的簡繁，同一頁兩種字。
             statusbarHtml: sandboxStatusbarHtml(),
+            openingPage: String(sandboxAsset?.openingPage || ''),
           },
           variants: sandboxAsset?.variants || null,
           composer: true,
@@ -3360,6 +3369,9 @@ function mountSandbox(asset: any) {
           case 'paste-feedback': onPasteFeedback(String(key || '')); return;
           case 'back': goBackToEntry(); return;
           case 'prologue': onProloguePick(Number(key)); return;
+          // 首屏網頁的填入／送出：送出只在玩家剛點過頁面時照做（點擊的啟用狀態會一路傳到這一層）。
+          case 'opening-fill': fillComposer(String(key || '')); return;
+          case 'opening-send': if (hasUserActivation(window)) sendOpeningLine(String(key || '')); else fillComposer(String(key || '')); return;
         }
       },
       onComposer: (visible) => { sandboxComposerHidden.value = !visible; },
@@ -10032,7 +10044,17 @@ const prologueItems = computed(() => (
 function onProloguePick(pi: number) {
   const text = prologue.value[pi]
   if (!text) return
-  fillComposer(text)
+  if (prologuePickSends(cardFormat.value)) sendOpeningLine(text)
+  else fillComposer(text)
+}
+
+// 替玩家送出第一句（風月卡的開場選項、首屏網頁的按鈕）。跟 HUD 的送出同一條路；
+// 還不能送（唯讀、上一輪還在收尾）就退回填進輸入框，字不會不見。
+function sendOpeningLine(text: string) {
+  if (!text) return
+  if (!canGenerate.value || isTimelineMutationBlocked()) { fillComposer(text); return }
+  content.value = text
+  onCanvasSend()
 }
 
 // ── 頁面狀態 ───────────────────────────────────────────────────────────

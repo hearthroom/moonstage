@@ -93,6 +93,14 @@ export function buildPrologueList(detail: any): string[] {
 }
 
 /**
+ * 點開場選項要不要直接送出。AI 風月的卡照風月的習慣：點了就當玩家第一句送出。
+ * MMD 與其他卡維持填進輸入框（2026-09-04 作者回報要的就是這個），作者要直接送出可以自己呼叫送出的 API。
+ */
+export function prologuePickSends(format: string | null | undefined): boolean {
+  return format === 'fengyue'
+}
+
+/**
  * 區塊什麼時候在畫面上。
  *
  * 有選項、而且玩家還沒說過第一句：一旦他送出了（自己打的或挑的），「選開場」就沒有

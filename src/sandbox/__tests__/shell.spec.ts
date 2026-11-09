@@ -1223,3 +1223,25 @@ describe('殼：訊息規則腳本與功能欄／SDK 去重（卡 100737／10074
     expect(preview.textContent).toContain('【姓名】QA自然輸入')
   })
 })
+
+// AI 風月卡的首屏網頁：訊息列最上方的作者網頁，在自己的無同源 iframe 裡；填入與送出交給宿主決定。
+describe('殼：首屏網頁', () => {
+  it('有首屏網頁就畫在訊息列之前，頁面送來的填入／送出原樣轉給宿主', () => {
+    const s = boot(config({ card: { rules: [], statusbar: '', format: 'fengyue', openingPage: '<p>TEST-INTRO</p>' } }))
+    const slot = s.refs.messages.querySelector('[data-slot="opening"]') as HTMLElement
+    expect(slot).not.toBeNull()
+    expect(slot.nextElementSibling).toBe(s.refs.list)
+    const frame = slot.querySelector('iframe') as HTMLIFrameElement
+    expect(frame.getAttribute('sandbox')).not.toContain('allow-same-origin')
+    expect(frame.srcdoc).toContain('<p>TEST-INTRO</p>')
+    sent = []
+    const post = (data: unknown) => window.dispatchEvent(new MessageEvent('message', { data, source: frame.contentWindow as Window }))
+    post({ type: 'hearthroom:opening', kind: 'fill', text: '身分：旅人' })
+    expect(sent).toContainEqual({ type: 'ui', event: 'opening-fill', key: '身分：旅人' })
+  })
+
+  it('沒有首屏網頁就不畫', () => {
+    const s = boot(config())
+    expect(s.refs.messages.querySelector('[data-slot="opening"]')).toBeNull()
+  })
+})

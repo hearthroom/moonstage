@@ -5,11 +5,13 @@
  * 叫「格式」不叫「來源」（owner 2026-09-06）：卡從 MMD 格式匯進來之後就是我們的卡，
  * 它帶著的是格式，不是出身。
  */
-export type CardFormat = 'mmd' | 'tavern'
+export type CardFormat = 'mmd' | 'tavern' | 'fengyue'
 
 /** 沒宣告時當 MMD——目前匯進來的多半是那一邊的，猜錯的代價也不對稱。 */
 export function normalizeCardFormat(raw: any): CardFormat {
   const value = typeof raw === 'string' ? raw.trim().toLowerCase() : ''
   if (value === 'tavern' || value === 'sillytavern' || value === 'st') return 'tavern'
+  // AI 風月匯入的卡：樣式整頁生效、深淺跟著宿主，開場選項點了直接送出（照風月的習慣）
+  if (value === 'fengyue') return 'fengyue'
   return 'mmd'
 }
