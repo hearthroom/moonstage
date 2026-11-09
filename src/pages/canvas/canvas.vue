@@ -2639,6 +2639,8 @@ function previewEcho() {
 
 /** 作者資產的首屏網頁（openingPage）；空字串＝沒有。 */
 const openingPage = ref('')
+/** 作者選的開局呈現（openingMode：greeting｜page）；空字串＝伺服器沒帶，照卡片格式。 */
+const openingMode = ref('')
 function setActiveAuthorAsset(asset) {
   const rules = (asset && Array.isArray(asset.rules)) ? asset.rules : [];
   activeAuthorAsset.value = {
@@ -2649,8 +2651,9 @@ function setActiveAuthorAsset(asset) {
     // 伺服器算好的簡繁對照表：規則寫簡體、玩家看到繁體時仍要命中。
     variants: (asset && asset.variants) || null,
   };
-  // 首屏網頁跟規則一起換：換卡、重載、作者資產清掉時都跟著走。
+  // 首屏網頁與開局呈現跟規則一起換：換卡、重載、作者資產清掉時都跟著走。
   openingPage.value = String((asset && asset.openingPage) || '');
+  openingMode.value = String((asset && asset.openingMode) || '');
   // 規則換了，之前用舊規則算出來的串流快取必須作廢。
   clearStreamCache();
 }
@@ -10072,7 +10075,7 @@ const prologueItems = computed(() => (
 function onProloguePick(pi: number) {
   const text = prologue.value[pi]
   if (!text) return
-  if (prologuePickSends(cardFormat.value)) sendOpeningLine(text)
+  if (prologuePickSends(openingMode.value, cardFormat.value)) sendOpeningLine(text)
   else fillComposer(text)
 }
 

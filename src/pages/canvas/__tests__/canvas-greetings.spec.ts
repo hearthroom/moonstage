@@ -153,13 +153,21 @@ describe('開場選項（MMD prologue）', () => {
     expect(keepsPlayerDraft('我想先問一下', '出發')).toBe(true)
   })
 
-  it('AI 風月的卡點了直接送出（照風月的習慣）；MMD、酒館與沒宣告的卡維持填輸入框', () => {
-    expect(prologuePickSends('fengyue')).toBe(true)
-    for (const format of ['mmd', 'tavern', '', undefined, null]) expect(prologuePickSends(format as any)).toBe(false)
+  it('開局呈現是開場網頁的卡點了直接送出；開場白的卡維持填輸入框，不看卡片格式', () => {
+    for (const format of ['fengyue', 'mmd', 'tavern', '']) {
+      expect(prologuePickSends('page', format)).toBe(true)
+      expect(prologuePickSends('greeting', format)).toBe(false)
+    }
     const page = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
     const start = page.indexOf('function onProloguePick(')
     const body = page.slice(start, page.indexOf('\n}', start))
-    expect(body).toContain('prologuePickSends(cardFormat.value)')
+    expect(body).toContain('prologuePickSends(openingMode.value, cardFormat.value)')
+  })
+
+  it('伺服器還沒帶開局呈現：照卡片格式，AI 風月的卡直接送出，其他填輸入框', () => {
+    expect(prologuePickSends('', 'fengyue')).toBe(true)
+    expect(prologuePickSends(undefined, 'fengyue')).toBe(true)
+    for (const format of ['mmd', 'tavern', '', undefined, null]) expect(prologuePickSends('', format as any)).toBe(false)
   })
 })
 

@@ -93,10 +93,13 @@ export function buildPrologueList(detail: any): string[] {
 }
 
 /**
- * 點開場選項要不要直接送出。AI 風月的卡照風月的習慣：點了就當玩家第一句送出。
- * MMD 與其他卡維持填進輸入框（2026-09-04 作者回報要的就是這個），作者要直接送出可以自己呼叫送出的 API。
+ * 點開場選項要不要直接送出：看作者在編輯頁選的開局呈現（作者資產 openingMode）。
+ * 開場網頁（page）點了就當玩家第一句送出；開場白（greeting）填進輸入框——MMD 與一般卡一直是這樣
+ * （2026-09-04 作者回報要的就是這個），作者要直接送出可以自己呼叫送出的 API。
+ * 還沒帶 openingMode 的伺服器：照以前看卡片格式，AI 風月的卡直接送出。
  */
-export function prologuePickSends(format: string | null | undefined): boolean {
+export function prologuePickSends(mode: string | null | undefined, format: string | null | undefined): boolean {
+  if (mode === 'page' || mode === 'greeting') return mode === 'page'
   return format === 'fengyue'
 }
 
