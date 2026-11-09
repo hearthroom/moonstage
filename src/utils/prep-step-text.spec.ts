@@ -30,4 +30,21 @@ describe('Agent preparation phase copy', () => {
   it('still renders the previously published generic stage', () => {
     expect(prepStepText({ stage: 'looking_up' }, t)).toBe('multiPass.prepLookingUp')
   })
+
+  it('uses a dedicated format label only when saving the reply format', () => {
+    const steps = [
+      { stage: 'noting', resource: 'requirement' },
+      { stage: 'reading', resource: 'requirement' },
+      { stage: 'noting', resource: 'note' },
+      { stage: 'noting', resource: 'shared' },
+    ]
+    const labels = [
+      'multiPass.prepNotingFormat',
+      'multiPass.prepReadingIn',
+      'multiPass.prepNotingIn',
+      'multiPass.prepNotingShared',
+    ]
+    expect(steps.map(step => prepStepText(step, t))).toEqual(labels)
+    expect(prepTrailFromServerSteps(steps, t)).toEqual(labels)
+  })
 })

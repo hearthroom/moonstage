@@ -60,6 +60,7 @@ export function prepStepText(step: PrepStep | undefined, t: Translate): string {
 
   if (stage === 'noting') {
     if (resource === 'shared') return t('multiPass.prepNotingShared')
+    if (resource === 'requirement') return t('multiPass.prepNotingFormat')
     return resName ? t('multiPass.prepNotingIn', { r: resName }) : t('multiPass.prepNoting')
   }
   if (stage === 'drafting') return t('multiPass.prepDrafting')
