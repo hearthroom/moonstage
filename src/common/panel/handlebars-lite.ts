@@ -19,7 +19,8 @@
  *   `{{#x}}…{{/x}}` 的 x 不是 helper 時照 Handlebars 的 blockHelperMissing：陣列逐項、物件換上下文、
  *   其餘真值照原上下文畫一次、假值畫 else。內建 helper 也可當區塊用（`{{#eq a b}}…{{/eq}}`），
  *   回傳值同樣套這個規則。
- * - helper：eq、ne（嚴格相等）、gt、gte、lt、lte（JS 比較運算）、and、or（可多參數）、not、lookup。
+ * - helper：eq、ne（嚴格相等，唯一的例外是數字與數字字串：50 與 "50" 視為相等——模型寫的 JSON 常把數字寫成字串）、
+ *   gt、gte、lt、lte（JS 比較運算）、and、or（可多參數）、not、lookup。
  *   可寫成子運算式 `(gt 好感度 50)`。字面值：數字、單雙引號字串、true／false／null／undefined。
  *   `key=value` 雜湊參數會解析，只有 `#if`／`#unless` 的 `includeZero` 有作用，其餘忽略。
  * - 真假：`!v` 或空陣列為假（0 為假，除非 includeZero=true）；`{}` 為真。and／or／not 用同一套。
@@ -93,8 +94,8 @@ const BLOCK_HELPERS = new Set(['if', 'unless', 'each', 'with'])
 
 type InlineHelper = (args: unknown[]) => unknown
 const INLINE_HELPERS: Record<string, InlineHelper> = {
-  eq: (a) => a[0] === a[1],
-  ne: (a) => a[0] !== a[1],
+  eq: (a) => sameValue(a[0], a[1]),
+  ne: (a) => !sameValue(a[0], a[1]),
   gt: (a) => (a[0] as number) > (a[1] as number),
   gte: (a) => (a[0] as number) >= (a[1] as number),
   lt: (a) => (a[0] as number) < (a[1] as number),
@@ -103,6 +104,20 @@ const INLINE_HELPERS: Record<string, InlineHelper> = {
   or: (a) => a.some(isTruthy),
   not: (a) => !isTruthy(a[0]),
   lookup: (a) => readProp(a[0], a[1]),
+}
+
+/** 嚴格相等；一邊是數字、另一邊是寫成同一個數的字串時也算相等（`50` 與 `"50"`、`1.5` 與 `" 1.5 "`）。 */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a === 'number' && typeof b === 'string') return numericString(b) === a
+  if (typeof a === 'string' && typeof b === 'number') return numericString(a) === b
+  return false
+}
+
+function numericString(s: string): number | null {
+  const t = s.trim()
+  if (!t || !/^[+-]?(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/i.test(t)) return null
+  return Number(t)
 }
 
 function isKnownHelper(name: string): boolean {

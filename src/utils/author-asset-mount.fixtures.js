@@ -20,6 +20,8 @@ const VALID_EVENTS = [
   'dispose',
   // 分享情境變了（推薦碼晚到）：重讀 stage.share，跟沙箱卡的 share:change 一樣
   'share:change',
+  // 卡片數值變了：{ messageId, data, changes }，跟沙箱卡的 state:change 同一份載荷（見 common/card-state.ts）
+  'state:change',
 ]
 
 const INVALID_EVENTS = ['message:mounted', 'ready', 'messageMount', '']

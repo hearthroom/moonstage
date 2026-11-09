@@ -11,6 +11,8 @@
 import type { HistoryCapabilities, HistoryChange } from '../common/history'
 import type { ShareState } from '../common/share-context'
 import type { SharedOp } from '../common/shared-state'
+import type { CardStateChange } from '../common/card-state'
+import type { StatePanelAudience, StatePanelLabels } from '../common/panel/state-panel'
 
 // v1 remains the bootstrap/legacy default; every live transport passes the
 // negotiated version explicitly. v2 adds authoritative author history.
@@ -140,6 +142,31 @@ export interface SandboxHelloConfig {
    * 跟殼上次記的不同就先清掉；沒給＝刪掉、只用記憶體（沒登入或舊宿主）。
    */
   storageScope?: string
+  /**
+   * 卡片數值（這張卡有數值時才有）。initial＝開場前的初始值（還沒有任何一則訊息帶數值時用）；
+   * panel＝作者寫了面板皮膚才有：模板、看的人是作者還是玩家（決定皮膚出錯時給誰看細節）、面板外框的字。
+   * 之後每則訊息的數值走 message 的 view.state 與 state 訊息。舊殼不認得這一欄，照舊不畫面板。
+   */
+  cardState?: SandboxCardStateConfig
+}
+
+export interface SandboxCardStateConfig {
+  initial?: unknown
+  panel?: { template: string; audience: StatePanelAudience; labels: StatePanelLabels }
+}
+
+/**
+ * 一則訊息帶的卡片數值。messageId 是宿主的訊息 id（伺服器的 id，跟一般頁 state:change 的 messageId 同一個）；
+ * 殼的訊息 id（l1、h123…）在 state 訊息的 id 欄。
+ */
+export interface SandboxCardState {
+  messageId: string
+  data: unknown
+  changes: CardStateChange[]
+  seq: number
+  source: string
+  /** 只有卡片作者拿得到：模型提了但沒採用的變更。 */
+  rejected?: unknown[]
 }
 
 /**
@@ -174,6 +201,8 @@ export interface MessageView {
   swipes?: { index: number; total: number } | null
   /** 這一列底下的系統訊息卡（一般卡的 <chat-system-message>）；沒有就不畫。 */
   systemNotice?: SystemNotice | null
+  /** 這一則記下的卡片數值（沒記就沒有）。之後變了由 state 訊息更新。 */
+  state?: SandboxCardState | null
 }
 
 /**
@@ -341,6 +370,11 @@ export type HostToShell =
   // 開場選項（MMD「你可以选择开场」）：空清單＝拿掉。玩家點一條回 ui prologue，key 是第幾條。
   | { type: 'prologue'; title: string; items: string[] }
   | { type: 'conversation.switch'; conversationId?: string }
+  /**
+   * 某則訊息的卡片數值變了（一輪跑完才記下、或重載後不同）：殼更新那則的數值，現值變了就發 state:change。
+   * state 是 null＝那則不再帶數值。舊殼不認得這個 type，照它對未知訊息的慣例忽略。
+   */
+  | { type: 'state'; id: string; state: SandboxCardState | null }
   /** 分享情境變了（例如推薦碼晚到、連結補上）：殼換掉現值並發 share:change。 */
   | { type: 'share'; share: ShareState }
   /** 宿主登出：殼刪掉作者規則的持久層、之後只用記憶體。 */

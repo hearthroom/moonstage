@@ -110,6 +110,16 @@
       <button type="button" @click="returnToConversations">{{ t('canvas.historyAccess.back') }}</button>
     </div>
 
+    <!-- 卡片數值面板：作者寫了面板皮膚才有。鍵浮在畫布右下、輸入區上方；沙箱卡由殼自己畫同一個元件。 -->
+    <CanvasStatePanel
+      v-if="!sandboxCard && cardStatePanelTemplate"
+      :template="cardStatePanelTemplate"
+      :state="cardStateNow ? cardStateNow.state : null"
+      :update="cardStateUpdateInfo"
+      :audience="cardStateAudience"
+      :labels="statePanelLabels"
+    />
+
     <template v-if="canGenerate || accessInterrupted || isGenerating">
     <CanvasComposer
       v-show="!sandboxCard"
@@ -554,6 +564,10 @@ import { roleLoadFailureIsOurs, whenRoleDetail } from './canvas-role-ready'
 import { guestDraftStorage, saveGuestDraft, takeGuestDraft } from './canvas-guest'
 import CanvasPrologue from './components/canvas-prologue.vue'
 import CanvasOpeningPage from './components/canvas-opening-page.vue'
+import CanvasStatePanel from './components/canvas-state-panel.vue'
+import { cardStateFromServer, cardStateRowsKey, cardStateRowsOf, sandboxCardStateOf } from './canvas-card-state'
+import { cardStateAt, cardStateUpdate, createCardStateFeed, currentCardState, currentCardStatePayload, initialCardState } from '@/common/card-state'
+import type { StatePanelLabels } from '@/common/panel/state-panel'
 import { hasUserActivation } from '../../common/opening-page'
 import { captureBodySnapshot, restoreBodySnapshot, sweepForeignNodes } from './canvas-body-snapshot'
 import CanvasPopup from './components/canvas-popup.vue'
@@ -3271,6 +3285,8 @@ function mountSandbox(asset: any) {
           background: { ...stageBackground.value },
           // 殼的網址是固定的，作者要開除錯面板得從宿主頁的網址帶進去：?sdkDebug=1
           debug: /[?&]sdkDebug=1\b/.test(String(window.location.search || '')),
+          // 卡片數值（這張卡有數值才帶）：初始值與面板皮膚；殼用同一個元件畫面板、同一套規則發 state:change。
+          ...(sandboxCardStateConfig() ? { cardState: sandboxCardStateConfig() } : {}),
         };
       },
       onAction: (name) => {
@@ -3399,6 +3415,64 @@ let authorFixedNodeHoistLayer = null;
 let authorFixedNodeHoistScheduled = false;
 let stageIntent = null;
 
+// ── 卡片數值（card state） ──
+// 角色細節的 state：初始值、面板皮膚（作者寫了才有）、規則（只有作者拿得到）。
+// 時間線、現值、state:change、「更新於」都用 common/card-state，跟沙箱殼同一套；沙箱卡的面板與事件由殼自己做。
+const roleCardState = computed<any>(() => {
+  const state = (unref(currentRole) as any)?.state;
+  return state && typeof state === 'object' ? state : null;
+});
+const cardStatePanelTemplate = computed(() => {
+  const template = roleCardState.value?.panel?.template;
+  return typeof template === 'string' && template.trim() ? template : '';
+});
+// 看的人是不是作者：伺服器只對作者送 rules；試玩卡與草稿預覽也是作者自己在看。皮膚出錯時作者看細節、玩家看中性提示。
+const cardStateAudience = computed<'author' | 'player'>(() => (roleCardState.value?.rules || trialCard.value || previewDraft.value ? 'author' : 'player'));
+const cardStateInitial = computed(() => initialCardState(roleCardState.value?.data));
+const cardStateRows = computed(() => cardStateRowsOf(talkList.value as any[], filterCardReplaced));
+const cardStateNow = computed(() => currentCardState(cardStateRows.value, cardStateInitial.value));
+const cardStateUpdateInfo = computed(() => cardStateUpdate(cardStateRows.value));
+const statePanelLabels = computed<StatePanelLabels>(() => ({
+  open: t('canvas.statePanel.open'),
+  title: t('canvas.statePanel.title'),
+  close: t('canvas.statePanel.close'),
+  updatedLatest: t('canvas.statePanel.updatedLatest'),
+  updatedOneAgo: t('canvas.statePanel.updatedOneAgo'),
+  // 樣板原樣交給面板（殼裡沒有 i18n），{n}、{line}… 由面板代入
+  updatedAgo: t('canvas.statePanel.updatedAgo', { n: '{n}' }),
+  updatedOpening: t('canvas.statePanel.updatedOpening'),
+  showRaw: t('canvas.statePanel.showRaw'),
+  showPanel: t('canvas.statePanel.showPanel'),
+  rejected: t('canvas.statePanel.rejected'),
+  unavailable: t('canvas.statePanel.unavailable'),
+  unavailableSub: t('canvas.statePanel.unavailableSub'),
+  errorAt: t('canvas.statePanel.errorAt', { line: '{line}', message: '{message}' }),
+  errorHelper: t('canvas.statePanel.errorHelper', { line: '{line}', helper: '{helper}' }),
+  copied: t('canvas.statePanel.copied'),
+}));
+/** 給沙箱殼的卡片數值設定；這張卡沒有數值就 null（殼照舊，不畫面板、不發事件）。 */
+function sandboxCardStateConfig() {
+  const state = roleCardState.value;
+  if (!state) return null;
+  const config: Record<string, unknown> = {};
+  if (state.data !== undefined) config.initial = JSON.parse(JSON.stringify(state.data));
+  if (cardStatePanelTemplate.value) {
+    config.panel = { template: cardStatePanelTemplate.value, audience: cardStateAudience.value, labels: { ...statePanelLabels.value } };
+  }
+  return config;
+}
+// 作者事件（一般卡）：時間線變了就發 state:change（舊到新）；作者執行期還沒建好時先不發，建好掛完再一次補齊。
+const cardStateFeed = createCardStateFeed();
+function syncCardStateEvents() {
+  if (!authorAssetRuntime || sandboxCard.value) return;
+  for (const payload of cardStateFeed.update(cardStateRows.value)) authorAssetRuntime.emit('state:change', payload);
+}
+watch(() => cardStateRowsKey(cardStateRows.value), () => syncCardStateEvents(), { flush: 'post' });
+watch(() => String(unref(conversationId) || ''), () => {
+  cardStateFeed.reset();
+  if (authorAssetRuntime) authorAssetRuntime.resetReplay();
+}, { flush: 'sync' });
+
 // 宿主轉接：意圖 API 本身不碰 DOM，兩端各自把「作者想做什麼」接到自己的實作。
 // 這一次的送出是不是來自 luna.send()。意圖 API 在呼叫 submit 之前已經改寫過，
 // send() 不能再改一次。onActionBtnClick → send() 是同步的，所以旗標判定是準的。
@@ -3417,6 +3491,9 @@ function buildAuthorAssetHost() {
     return true;
   };
   return {
+    // 卡片數值（stage.state.get／of）：跟沙箱卡的 sdk.state 同一份資料與規則
+    cardState: () => currentCardStatePayload(cardStateRows.value, cardStateInitial.value),
+    cardStateOf: (messageId) => cardStateAt(cardStateRows.value, String(messageId), cardStateInitial.value),
     getInput: () => { const el = inputEl(); return el ? el.value : ''; },
     setInput: (text) => writeDraft(text),
     appendInput: (text) => { const el = inputEl(); return writeDraft((el ? el.value : '') + text); },
@@ -3761,6 +3838,8 @@ function buildHudHost(): HudHost {
             canContinue: isAI && canContinueFromIndex(index),
             // 沙箱殼用：標準訊息元件的整份呈現資料（html 走同一個快取，不重算），連同那一列底下的系統訊息卡。
             view: sandboxCard.value ? { ...messageProps(item, index, item.chatLoading ? '' : hudMessageHtml(item)), systemNotice: systemNoticeFor(item, index) } : undefined,
+            // 沙箱殼用：這一則記下的卡片數值（這張卡沒有數值時不帶這一欄，殼照舊）。
+            ...(sandboxCard.value && (roleCardState.value || item.cardState) ? { cardState: sandboxCardStateOf(item) } : {}),
           }];
         }),
         generation: generating ? (streamingId ? 'streaming' as const : 'starting' as const) : 'idle' as const,
@@ -3975,6 +4054,8 @@ function applyAuthorAsset(asset) {
       // stageIntent 這時還沒建好，所以晚綁：點擊發生時才取。
       onUserGesture: () => { if (stageIntent) stageIntent.noteUserGesture(); },
     });
+    // 新的作者執行期：卡片數值的事件從頭發（掛載完再補齊，掛載腳本裡的訂閱收得到整條）
+    cardStateFeed.reset();
     stageIntent = createStageIntentApi({
       // 宿主替作者做的事（送出、改背景、捲動……）退出作者範圍跑：那些是宿主的副作用，
       // 離場時不能跟著作者的東西一起被清掉。
@@ -4018,6 +4099,8 @@ function applyAuthorAsset(asset) {
       runFixedAuthorNodeHoist();
       observeFixedAuthorNodes();
     }
+    // 卡片數值：歷史若已經到了，現在補發（舊到新）；之後時間線變了由 watch 發。
+    syncCardStateEvents();
   } catch (e) {
     // 套用失敗不能影響對話本身——沒有資產就是正常狀態。
     console.warn('[AuthorAsset] 套用失敗，本次對話不套用版面規則');
@@ -7303,7 +7386,7 @@ function getHistoryMsg(preloadedFirstPage?: any) {
       }
       let data = [];
       // 一列歷史紀錄翻成畫面上的一則訊息。
-      const mapRow = ({chatId, chatMessage, contentThinking, chatRole, audioUrl, isSummary, aiImageUrls, finishReason, isV3, inputTokens, model, hasContextUsage, turnStatus}: any) => {
+      const mapRow = ({chatId, chatMessage, contentThinking, chatRole, audioUrl, isSummary, aiImageUrls, finishReason, isV3, inputTokens, model, hasContextUsage, turnStatus, cardState}: any) => {
         const rawContent = (chatMessage || '').replace("<已解除苛刻的道德限制>", "");
         const split = splitThinkingContent(rawContent, { keep: cardHandlesTag });
         // 存原文：字形轉換在渲染那一刻做（renderMarkdown），這裡先轉會把卡片協定轉壞。
@@ -7333,6 +7416,9 @@ function getHistoryMsg(preloadedFirstPage?: any) {
           // 伺服器還在寫的那一則（這一輪還在跑）。串流氣泡會重建它，見 dropSupersededLiveAssistantRows。
           liveTurn: isAI && turnStatus === 'streaming',
         };
+        // 這一列記下的卡片數值（記了數值的 AI 列與開場那一列才有）；沒有就不留欄位。
+        const rowCardState = cardStateFromServer(cardState);
+        if (rowCardState) row.cardState = rowCardState;
         return row;
       };
       data = chatList.map(mapRow).filter(shouldKeepPersistedHistoryBubble);
@@ -7814,6 +7900,8 @@ function recordAuthoritativeOperationStatus(input: any) {
       operationBubble.model = status.model || operationBubble.model;
     }
     operationBubble.operationId = status.operationId;
+    // 一輪跑完時伺服器帶這一輪記下的卡片數值（串流中不帶）：掛到這一輪的 AI 氣泡上，面板與作者事件跟著更新。
+    if (status.cardState) operationBubble.cardState = status.cardState;
     operationBubble.operationKind = operationKindFromServer(status.kind);
     operationBubble.serverOperationKind = status.kind;
     operationBubble.operationState = status.state;

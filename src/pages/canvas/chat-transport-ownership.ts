@@ -1,3 +1,4 @@
+import { normalizeCardState, type CardStateSnapshot } from '@/common/card-state'
 import { resolveCreditsShortfall } from '../../utils/chat-error-message'
 import { normalizeFilterReason } from '../../utils/operation-failure-copy'
 import { prepTrailFromServerSteps } from '@/utils/prep-step-text'
@@ -395,6 +396,8 @@ export interface ChatOperationStatus {
   // 又被套上五分鐘上界。
   agentTurn?: boolean
   nonStreaming?: boolean
+  /** 這一輪記下的卡片數值（一輪跑完、有記數值時才有；串流中不帶）。 */
+  cardState?: CardStateSnapshot
   acceptedAt?: string
   terminalAt?: string
   lastUpdateTime?: string
@@ -491,6 +494,8 @@ export function normalizeChatOperationStatus(input: any): ChatOperationStatus | 
       .map((action: string) => action.trim())
   }
   if (typeof source.retryable === 'boolean') normalized.retryable = source.retryable
+  const cardState = normalizeCardState(source.cardState)
+  if (cardState) normalized.cardState = cardState
   return normalized
 }
 
@@ -1036,6 +1041,8 @@ export function mergeChatHistoryOperationProjections(
         : []
       rows[assistantIndex] = {
         ...row,
+        // 那一列自己沒帶數值、這一輪的狀態有：補上（列上帶的為準）
+        ...(status.cardState && !row?.cardState ? { cardState: status.cardState } : {}),
         ...operationProjectionMetadata(status),
         ...(prepTrail.length ? { prepTrail, prepTrailCollapsed: true } : {}),
         finishReason: projectionFinishReason(

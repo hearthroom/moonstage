@@ -7,7 +7,7 @@
  *   author-css、腳本跑一次）→ 等宿主的 `messages` → 冷啟動每則 new→mount→done → `ready`。
  */
 import { mountOpeningPage } from '../common/opening-page'
-import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, RequestOp, SandboxBackground, SandboxHelloConfig, SandboxMessage, SandboxMessageRole, ShellToHost, StageState } from './protocol'
+import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, MessageView, RequestOp, SandboxBackground, SandboxCardState, SandboxHelloConfig, SandboxMessage, SandboxMessageRole, ShellToHost, StageState } from './protocol'
 import { createThemeBridge } from './theme-bridge'
 import { bindCardBlockTheme } from './card-block-theme'
 import { createEventBus } from './sdk/events'
@@ -46,6 +46,8 @@ import { buildShell, confirmDialog, hideDuplicateStatusbarFlow, setComposerVisib
 import { createDebugPanel } from './debug'
 import { shellStrings } from './strings'
 import { createScriptTagLoader, scriptDirectionFor, type DisplayScriptLoader, type TextConverter } from './display-script'
+import CanvasStatePanel from '@/pages/canvas/components/canvas-state-panel.vue'
+import { cardStateAt, cardStateUpdate, createCardStateFeed, currentCardState, initialCardState, payloadOf as cardStatePayloadOf, type CardStateRow, type CardStateSnapshot, type CardStateUpdate } from '@/common/card-state'
 
 export interface ShellTransport {
   send(message: ShellToHost): void
@@ -251,6 +253,32 @@ export function createShell(options: CreateShellOptions): Shell {
     transport.send(key == null ? { type: 'ui', event } : { type: 'ui', event, key })
   }
 
+  // ── 卡片數值：每則訊息記的那一份（殼的訊息 id → 數值），時間線照畫面上的先後排。
+  //    現值、state:change、「更新於」都用 common/card-state 算，跟一般頁同一套。 ──
+  const cardStates = new Map<string, SandboxCardState>()
+  const cardInitial = config.cardState ? initialCardState(config.cardState.initial) : null
+  const cardFeed = createCardStateFeed()
+  const snapshotOf = (s: SandboxCardState): CardStateSnapshot => {
+    const out: CardStateSnapshot = { data: s.data, changes: Array.isArray(s.changes) ? s.changes : [], seq: Number(s.seq) || 0, source: String(s.source || '') }
+    if (Array.isArray(s.rejected)) out.rejected = s.rejected
+    return out
+  }
+  // 殼裡的列只知道殼的 id 與 serverId；數值記的 messageId（宿主 id）優先，其次 serverId，再沒有用殼的 id。
+  const cardOrder = () => (cardList ? cardList.ordered() : [])
+  const cardRows = (): CardStateRow[] => cardOrder().map((m) => {
+    const s = cardStates.get(m.id)
+    return { messageId: s ? String(s.messageId) : (m.serverId || m.id), role: m.role === 'user' ? 'user' : m.role === 'system' ? 'system' : 'ai', state: s ? snapshotOf(s) : null }
+  })
+  // of() 收宿主 id（serverId）或殼的 id
+  const cardStateOfId = (id: string) => {
+    const order = cardOrder()
+    const rows = cardRows()
+    let index = rows.findIndex((r) => r.messageId === id)
+    if (index < 0) index = order.findIndex((m) => m.id === id)
+    return index < 0 ? null : cardStateAt(rows, rows[index].messageId, cardInitial)
+  }
+  let cardList: { ordered(): Array<{ id: string; role: SandboxMessageRole; serverId: string | null }> } | null = null
+
   // 分享情境：握手給一次，之後宿主送 share 訊息換掉（推薦碼晚到）。
   let shareState: ShareState | null = config.share ?? null
   const historyRemote = createRemoteHistory(config.capabilities.history === 1, config.history, request)
@@ -283,6 +311,10 @@ export function createShell(options: CreateShellOptions): Shell {
     generation: () => ({ phase: genPhase, since: genSince, outcome: genOutcome }),
     capabilities: { saves: !!config.capabilities.saves, edit: !!config.capabilities.edit, send: config.capabilities.send !== false, archive: !!config.capabilities.archive, share: !!config.capabilities.share, shared: config.capabilities.shared === 1 },
     share: () => shareState,
+    cardState: {
+      get: () => { const cur = currentCardState(cardRows(), cardInitial); return cur ? cardStatePayloadOf(cur.messageId, cur.state) : null },
+      of: (id) => cardStateOfId(id),
+    },
     request,
     inGesture: () => gesture,
     askSendPermission: () => confirmDialog(doc, refs.root, { title: strings.allowSendTitle, body: strings.allowSendBody, ok: strings.allow, cancel: strings.deny }),
@@ -437,6 +469,50 @@ export function createShell(options: CreateShellOptions): Shell {
     mountFrontend,
     virtualize,
   })
+
+  cardList = list
+  const noteCardState = (id: string, state: SandboxCardState | null | undefined) => {
+    if (state && typeof state === 'object') cardStates.set(String(id), state)
+    else cardStates.delete(String(id))
+  }
+  const noteCardView = (id: string, view: MessageView | undefined) => {
+    if (view && Object.prototype.hasOwnProperty.call(view, 'state')) noteCardState(id, view.state)
+  }
+  // 面板（作者寫了皮膚才有）：跟一般頁同一個元件，插在輸入區前面，鍵浮在畫布右下。
+  const cardPanel = config.cardState && config.cardState.panel && String(config.cardState.panel.template || '').trim() ? config.cardState.panel : null
+  const cardPanelProps = reactive<{ state: CardStateSnapshot | null; update: CardStateUpdate }>({ state: null, update: { kind: 'opening' } })
+  let cardPanelApp: { unmount(): void } | null = null
+  let cardPanelAnchor: HTMLElement | null = null
+  if (cardPanel) {
+    const anchor = doc.createElement('div')
+    cardPanelAnchor = anchor
+    anchor.style.display = 'contents'
+    anchor.setAttribute('data-chat', 'state-panel')
+    refs.root.insertBefore(anchor, refs.composer)
+    const app = createApp({
+      render: () => h(CanvasStatePanel as unknown as Parameters<typeof h>[0], {
+        template: cardPanel.template,
+        audience: cardPanel.audience === 'author' ? 'author' : 'player',
+        labels: cardPanel.labels,
+        state: cardPanelProps.state,
+        update: cardPanelProps.update,
+      } as Record<string, unknown>),
+    })
+    app.config.warnHandler = () => {}
+    app.mount(anchor)
+    cardPanelApp = { unmount: () => { app.unmount(); anchor.remove() } }
+  }
+  // 訊息或數值變了：重算現值（面板）並發新的 state:change（規則見 createCardStateFeed）。
+  const syncCardState = () => {
+    const rows = cardRows()
+    if (cardPanel) {
+      const cur = currentCardState(rows, cardInitial)
+      cardPanelProps.state = cur ? cur.state : null
+      cardPanelProps.update = cardStateUpdate(rows)
+    }
+    for (const payload of cardFeed.update(rows)) bus.emit('state:change', payload)
+  }
+  syncCardState()
 
   const offRuleSettled = ruleRunner.onSettled(() => {
     if (statusbarPending && refs.statusbar) {
@@ -597,7 +673,8 @@ export function createShell(options: CreateShellOptions): Shell {
   //    訊息串只掃最後三則，而且只在訊息掛上與定稿時重量：MMD 卡常讓 AI 每輪重吐一次面板觸發標記，
   //    一般畫布會把展開出的 fixed 面板搬出訊息，殼不搬，面板就留在最新那則裡；串流每一跳都掃整串太貴。
   //    左右插槽是殼替側欄留的位置：插槽本身 0 寬，作者放進去的東西不必是 fixed，整個插槽當一條側欄量。 ──
-  const platformNodes = new Set<Element>([refs.header, refs.messages, refs.stage, refs.composer, refs.left, refs.right])
+  // 數值面板是平台的（開著時是 fixed 的彈層）：不當作者側欄量。
+  const platformNodes = new Set<Element>([refs.header, refs.messages, refs.stage, refs.composer, refs.left, refs.right, ...(cardPanelAnchor ? [cardPanelAnchor] : [])])
   const dockRoots = (): Element[] => [
     refs.statusbar, refs.headerExtra,
     ...Array.from(refs.root.children).filter((el) => !platformNodes.has(el) && el !== refs.statusbar),
@@ -753,12 +830,21 @@ export function createShell(options: CreateShellOptions): Shell {
         void clearAuthorRuleStorage()
         return
       case 'messages':
+        cardStates.clear()
+        for (const m of message.messages || []) noteCardView(m.id, m.view)
         coldStart(message.messages || [])
+        syncCardState()
         return
       case 'message.new':
+        noteCardView(message.message.id, message.message.view)
         if (message.before) list.insertBefore(message.message, message.before)
         else list.add(message.message)
         syncStatusbarDedupe()
+        syncCardState()
+        return
+      case 'state':
+        noteCardState(message.id, message.state)
+        syncCardState()
         return
       case 'history':
         history.more = !!message.more
@@ -770,15 +856,21 @@ export function createShell(options: CreateShellOptions): Shell {
         list.stream(message.id, message.content, message.view)
         return
       case 'message.done':
+        noteCardView(message.id, message.view)
         list.done(message.id, message.content, message.serverId, message.view)
         syncStatusbarDedupe()
+        syncCardState()
         return
       case 'message.view':
+        noteCardView(message.id, message.view)
         list.setView(message.id, message.view)
         syncStatusbarDedupe()
+        syncCardState()
         return
       case 'message.remove':
         list.remove(message.id)
+        cardStates.delete(String(message.id))
+        syncCardState()
         return
       case 'generation': {
         busy = !!message.busy
@@ -861,7 +953,10 @@ export function createShell(options: CreateShellOptions): Shell {
         history.loading = false
         messageScriptOwners.clear()
         list.clear()
+        cardStates.clear()
+        cardFeed.reset()
         bus.resetReplay()
+        syncCardState()
         // 載荷 { conversationId }（宿主有給才帶）：卡片用它對上 sdk.archive.list() 裡的那一段
         bus.emit('conversation:switch', message.conversationId ? { conversationId: String(message.conversationId) } : undefined)
         return
@@ -900,6 +995,7 @@ export function createShell(options: CreateShellOptions): Shell {
       try { disposeAuthorSideDock() } catch { /* 已經拆掉 */ }
       try { disposeBubbleFit() } catch { /* 已經拆掉 */ }
       if (panels) panels.unmount()
+      if (cardPanelApp) { try { cardPanelApp.unmount() } catch { /* 已經拆掉 */ } }
       if (docObserver) docObserver.disconnect()
       if (headerResize) headerResize.disconnect()
       doc.removeEventListener('click', onGesture, true)

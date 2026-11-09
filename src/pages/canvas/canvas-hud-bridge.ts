@@ -17,6 +17,8 @@
  * 的執行期解碼器過得了關；契約本身屬於外掛，這裡不擴充也不刪。
  */
 
+import type { SandboxCardState } from '@/sandbox/protocol'
+
 export const HUD_ACTIONS = [
   'sendMessage', 'setInputText', 'exit', 'copyMessage', 'stopGeneration', 'continueGeneration',
   'regenerateMessage', 'openEditMessage', 'setEditText', 'applyEditTransform', 'submitEditMessage',
@@ -56,6 +58,8 @@ export interface HudHostMessage {
   canContinue?: boolean
   /** 標準訊息元件的呈現資料（沙箱殼用：同一份 DOM 與樣式）。 */
   view?: Record<string, unknown>
+  /** 沙箱殼用：這一則記下的卡片數值（沒記就沒有）。 */
+  cardState?: SandboxCardState | null
 }
 
 export interface HudHostState {

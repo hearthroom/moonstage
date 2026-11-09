@@ -209,6 +209,21 @@ function createStageIntentApi(options) {
       results: delegate('shareTally', 'results'),
     },
 
+    /**
+     * 卡片數值：跟沙箱卡的 sdk.state 同一組語意。get() 是現值、of(messageId) 是那則訊息當下的值，
+     * 都是 { messageId, data, changes } 或 null（這張卡沒有數值、或 id 不認得）。變了發 state:change。
+     */
+    state: {
+      get: function () {
+        const r = call('cardState')
+        return r.ok && r.value && typeof r.value === 'object' ? r.value : null
+      },
+      of: function (messageId) {
+        const r = call('cardStateOf', [String(messageId == null ? '' : messageId)])
+        return r.ok && r.value && typeof r.value === 'object' ? r.value : null
+      },
+    },
+
     /** 全服投票、共鬥計數器、排行榜：跟沙箱卡的 sdk.shared 同一組方法。 */
     shared: {
       read: delegate('shared', 'read'),

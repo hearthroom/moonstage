@@ -2,10 +2,11 @@
  * 作者事件匯流排。
  *
  * 規則（作者的腳本依賴這些，別「順手修」）：
- *   - 事件名固定 16 個（model:change、generation:phase、generation:outcome、share:change 是後來加的）；訂閱不認得的名字不報錯、也永遠不觸發。
+ *   - 事件名固定 17 個（model:change、generation:phase、generation:outcome、share:change、state:change 是後來加的）；訂閱不認得的名字不報錯、也永遠不觸發。
  *   - 沒有 once／off：訂閱活到整個會話結束（腳本來源被換掉才清）。
  *   - `message:mount` 與 `message:done` 對晚訂閱者補發（所有已發過的、氣泡還在的）；
  *     `ready` 只發一次、不補發——作者靠 mount/done 做首屏。
+ *   - `state:change` 對晚訂閱者只補發最後一份（現值），不補整串；跟一般頁的作者事件同一條規則。
  *   - 回呼只拿一個實參（載荷）；第二個「氣泡根」是給訊息作用域用的，不傳給作者。
  *   - 回呼丟錯只廢它自己，其他訂閱照跑。
  */
@@ -26,11 +27,14 @@ export const SDK_EVENTS = [
   'generation:phase',
   'generation:outcome',
   'share:change',
+  'state:change',
 ] as const
 
 export type SdkEventName = (typeof SDK_EVENTS)[number]
 
 const REPLAY_EVENTS: SdkEventName[] = ['message:mount', 'message:done']
+/** 只補發最後一份的事件。 */
+const LATEST_REPLAY_EVENTS: SdkEventName[] = ['state:change']
 
 export type EventCallback = (payload?: unknown) => void
 
@@ -63,6 +67,7 @@ export function createEventBus(deps: EventBusDeps = {}): EventBus {
   const listeners = new Map<string, EventCallback[]>()
   const replay = new Map<SdkEventName, Array<{ key: string; payload: unknown; bubble: Element | null }>>()
   for (const ev of REPLAY_EVENTS) replay.set(ev, [])
+  const latest = new Map<SdkEventName, unknown>()
 
   const run = (event: string, cb: EventCallback, payload: unknown, bubble: Element | null) => {
     const invoke = () => {
@@ -88,9 +93,11 @@ export function createEventBus(deps: EventBusDeps = {}): EventBus {
         // 晚訂閱補發：只補這一個新回呼，別人已經收過。
         for (const item of history.slice()) run(name, cb, item.payload, item.bubble)
       }
+      if (latest.has(name as SdkEventName)) run(name, cb, latest.get(name as SdkEventName), null)
     },
     emit(event, payload, options = {}) {
       const bubble = options.bubble || null
+      if (LATEST_REPLAY_EVENTS.includes(event)) latest.set(event, payload)
       const history = replay.get(event)
       if (history) {
         const key = options.key || ''
@@ -110,6 +117,7 @@ export function createEventBus(deps: EventBusDeps = {}): EventBus {
     },
     resetReplay() {
       for (const history of replay.values()) history.length = 0
+      latest.clear()
     },
     clear() {
       listeners.clear()

@@ -142,6 +142,8 @@ interface Tracked {
   content: string
   finished: boolean
   viewKey: string
+  /** 上次送給殼的卡片數值（序列化）；變了送 state 訊息。 */
+  stateKey: string
 }
 
 const BACK_TIMEOUT_MS = 400
@@ -187,7 +189,18 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     return null
   }
   // Agent 進度陣列等巢狀值可能是 Vue proxy；訊息協議只傳 JSON 呈現資料，先脫離響應式物件。
-  const viewOf = (m: HudHostMessage): MessageView | undefined => (m.view ? JSON.parse(JSON.stringify(m.view)) as MessageView : undefined)
+  // 這張卡有數值時，呈現資料一併帶這一則的數值（view.state）：殼冷啟動與新氣泡一到就知道，不必等 state 訊息。
+  const viewOf = (m: HudHostMessage): MessageView | undefined => {
+    if (!m.view) return undefined
+    const view = JSON.parse(JSON.stringify(m.view)) as MessageView
+    if (m.cardState !== undefined) view.state = m.cardState ? JSON.parse(JSON.stringify(m.cardState)) : null
+    return view
+  }
+  const stateKeyOf = (m: HudHostMessage): string => (m.cardState ? JSON.stringify(m.cardState) : '')
+  // 沒帶呈現資料的訊息（舊宿主、測試）：數值單獨用 state 訊息補。
+  const postStateIfViewless = (m: HudHostMessage, shellId: string) => {
+    if (!m.view && m.cardState) post({ type: 'state', id: shellId, state: JSON.parse(JSON.stringify(m.cardState)) })
+  }
   const viewKeyOf = (m: HudHostMessage): string => (m.view ? JSON.stringify(m.view) : '')
   const toShell = (m: HudHostMessage, shellId: string): SandboxMessage => {
     const finished = finishedOf(m)
@@ -235,10 +248,11 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     lastOrder = list.map((m) => m.id)
     const messages = list.map((m, index) => {
       const shellId = index === 0 && m.opening && roleOf(m) === 'ai' ? 'greeting' : `h${m.id}`
-      tracked.set(m.id, { shellId, role: roleOf(m), content: m.text, finished: finishedOf(m), viewKey: viewKeyOf(m) })
+      tracked.set(m.id, { shellId, role: roleOf(m), content: m.text, finished: finishedOf(m), viewKey: viewKeyOf(m), stateKey: stateKeyOf(m) })
       return toShell(m, shellId)
     })
     post({ type: 'messages', messages })
+    list.forEach((m) => { const t = tracked.get(m.id); if (t) postStateIfViewless(m, t.shellId) })
     // 開場選項畫在訊息列之後，跟著全量訊息一起到；之後變了才由 sync 再送。
     syncPrologue(snapshot)
   }
@@ -283,10 +297,11 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       const finished = finishedOf(m)
       if (!t) {
         const shellId = `l${++liveSeq}`
-        tracked.set(m.id, { shellId, role: roleOf(m), content: m.text, finished, viewKey: viewKeyOf(m) })
+        tracked.set(m.id, { shellId, role: roleOf(m), content: m.text, finished, viewKey: viewKeyOf(m), stateKey: stateKeyOf(m) })
         const before = nextKnown[index]
         post(before ? { type: 'message.new', message: toShell(m, shellId), before } : { type: 'message.new', message: toShell(m, shellId) })
         if (finished && roleOf(m) === 'ai' && m.text) post({ type: 'message.done', id: shellId, content: m.text, serverId: serverIdOf(m) })
+        postStateIfViewless(m, shellId)
         return
       }
       if (t.finished) {
@@ -294,10 +309,11 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
         if (t.content !== m.text) {
           post({ type: 'message.remove', id: t.shellId })
           const shellId = `l${++liveSeq}`
-          tracked.set(m.id, { shellId, role: roleOf(m), content: m.text, finished, viewKey: viewKeyOf(m) })
+          tracked.set(m.id, { shellId, role: roleOf(m), content: m.text, finished, viewKey: viewKeyOf(m), stateKey: stateKeyOf(m) })
           const before = nextKnown[index]
           post(before ? { type: 'message.new', message: toShell(m, shellId), before } : { type: 'message.new', message: toShell(m, shellId) })
           if (roleOf(m) === 'ai') post({ type: 'message.done', id: shellId, content: m.text, serverId: serverIdOf(m), view: viewOf(m) })
+          postStateIfViewless(m, shellId)
           return
         }
         // 正文沒變、呈現資料變了（可重生成的鍵亮起、上下文用量、思考過程…）：只換呈現。
@@ -321,6 +337,16 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       const key = viewKeyOf(m)
       if (key !== t.viewKey) { t.viewKey = key; if (m.view) post({ type: 'message.view', id: t.shellId, view: viewOf(m)! }) }
     })
+    // 卡片數值：一輪跑完才記下（operationStatus 晚於定稿）、或重載後不同，就送 state。
+    // 上面送 done／view 時呈現資料已帶新值的話，殼收到同一份不會重發事件。
+    for (const m of list) {
+      const t = tracked.get(m.id)
+      if (!t) continue
+      const key = stateKeyOf(m)
+      if (key === t.stateKey) continue
+      t.stateKey = key
+      post({ type: 'state', id: t.shellId, state: m.cardState ? JSON.parse(JSON.stringify(m.cardState)) : null })
+    }
   }
 
   let lastReadOnly = false

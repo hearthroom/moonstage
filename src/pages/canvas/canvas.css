@@ -6531,3 +6531,112 @@ iframe.lt-frontend__frame { display: block; width: 100%; min-height: 1px; border
 :where(.agent-resume-card__btn[data-lt-tone="dark"]) { color: #e8eaed; }
 :where(.agent-resume-card__btn[data-lt-contrast="high"][data-lt-tone="light"]) { color: #000; }
 :where(.agent-resume-card__btn[data-lt-contrast="high"][data-lt-tone="dark"]) { color: #fff; }
+
+/*
+  卡片數值面板（canvas-state-panel.vue）：一般頁與沙箱殼同一份。鍵貼在畫布右下、輸入區上方——
+  錨點是插在輸入區前面的 0 高度列，鍵往上浮；跟輸入區同一層（z 20），作者的 under 層蓋不到、over／cover 照舊在上。
+  鍵的底與字用輸入區那一組，跟著卡片主題，在任何背景上都讀得清楚。面板本身是標準彈層（.u-popup__content）。
+  殼不載 canvas-theme-vars.css：每個 var() 都帶退路。
+*/
+@layer lt-base {
+  .lt-state-anchor {
+    position: relative;
+    flex: none;
+    height: 0;
+    z-index: 20;
+  }
+  .lt-state-btn {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid var(--lt-canvas-composer-border, rgba(255, 255, 255, 0.10));
+    background: var(--lt-canvas-composer-bg, rgba(15, 18, 23, 0.82));
+    color: var(--lt-canvas-composer-fg, var(--lt-canvas-fg, #e8eaed));
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+  }
+  .lt-state-btn svg { width: 20px; height: 20px; }
+  .lt-state-btn:focus-visible,
+  .lt-state-raw-toggle:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+  .lt-state-panel {
+    position: relative;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    margin-top: 12px;
+  }
+  .lt-state-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--lt-canvas-muted, inherit);
+  }
+  .lt-state-updated { min-width: 0; overflow-wrap: anywhere; }
+  .lt-state-raw-toggle {
+    flex: none;
+    min-height: 30px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--lt-canvas-sheet-line, rgba(255, 255, 255, 0.14));
+    background: var(--lt-canvas-sheet-item-bg, transparent);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .lt-state-skin,
+  .lt-state-raw,
+  .lt-state-error {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .lt-state-skin { overflow-wrap: anywhere; }
+  .lt-state-raw-label { font-size: 13px; font-weight: 600; margin-top: 8px; }
+  .lt-state-json {
+    margin: 0;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--lt-canvas-sheet-item-bg, rgba(255, 255, 255, 0.06));
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .lt-state-error { padding: 12px; border-radius: 12px; background: var(--lt-canvas-sheet-item-bg, rgba(255, 255, 255, 0.06)); }
+  .lt-state-error-title { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+  .lt-state-error-sub { margin: 4px 0 0; font-size: 13px; line-height: 1.4; color: var(--lt-canvas-muted, inherit); }
+  .lt-state-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translate(-50%, 0);
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--lt-canvas-sheet-pop-bg, rgba(0, 0, 0, 0.78));
+    color: var(--lt-canvas-sheet-fg, #fff);
+    font-size: 13px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 160ms ease;
+  }
+  .lt-state-toast[data-show="on"] { opacity: 1; }
+  :lang(ko) .lt-state-updated, :lang(ko) .lt-state-error-title, :lang(ko) .lt-state-error-sub { word-break: keep-all; }
+  :lang(ja) .lt-state-updated, :lang(ja) .lt-state-error-title, :lang(ja) .lt-state-error-sub { word-break: auto-phrase; }
+  @media (prefers-reduced-motion: reduce) { .lt-state-toast { transition: none; } }
+}

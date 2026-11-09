@@ -8,6 +8,7 @@ import * as ui from '../chat-operation-ui-state'
 import * as first from '../canvas-first-page'
 import * as recovery from '../chat-history-recovery'
 import { incompleteTerminalHistoryOperation } from '../chat-history-snapshot'
+import { cardStateFromServer } from '../canvas-card-state'
 
 // Exercise the actual page-one response handler, including its asynchronous retry.
 // The transport is controlled; mapping, ownership, projections and timers are real.
@@ -32,7 +33,7 @@ function harness(responses: any[], pending = true) {
   const clear = vi.fn((options: any = {}) => { ctx.isStreamActive.value = false; if (!options.preservePersistedOperation) stored = null })
   const ctx: any = {
     ownershipRevision: {value:0},
-    ...ownership, ...ui, ...first, ...recovery, incompleteTerminalHistoryOperation,
+    ...ownership, ...ui, ...first, ...recovery, incompleteTerminalHistoryOperation, cardStateFromServer,
     ajax: ref({ flag: true, page: 1, rows: 20 }), conversationGeneration: ref(1), conversationId: ref('conv'),
     historyRequestSequence: 0, activeHistoryRequestKey: '', historyRecoveryAttemptedKey: '', historyRecoveryKey: '',
     historySnapshotPollScheduler: ownership.createOperationStatusPollScheduler(),

@@ -35,7 +35,15 @@ const AUTHOR_EVENTS = [
   'dispose',
   // 分享情境變了（推薦碼晚到）：重讀 stage.share，跟沙箱卡的 share:change 一樣
   'share:change',
+  // 卡片數值變了：{ messageId, data, changes }，跟沙箱卡的 state:change 同一份載荷（見 common/card-state.ts）
+  'state:change',
 ]
+
+/**
+ * 晚訂閱補發最後一份的事件：作者腳本可能在數值到了之後才訂閱（掛載腳本比歷史慢、或延後載入），
+ * 補發最新那一份，它一訂閱就知道現值，不必再去找別的入口讀。只補最後一份，不補整串。
+ */
+const LATEST_REPLAY_EVENTS = ['state:change']
 
 const CONTAINER_ATTR = 'data-stage-author-layer'
 // 平台不替作者決定 pointer-events。
@@ -82,6 +90,8 @@ function createAuthorAssetRuntime(options) {
   // 單例哨兵：重複 mount 不重建容器、不重複注入腳本。
   const containers = {}
   const subscribers = {}
+  // 補發用：LATEST_REPLAY_EVENTS 每個事件最後發出的那一份（沒人訂閱時也記）
+  const latestPayloads = {}
   // 只還原本執行期自己寫過的變數。沒寫過的一律不碰——宣稱「還原到初始狀態」是做不到的。
   const touchedVars = new Map()
   let mounted = false
@@ -208,7 +218,28 @@ function createAuthorAssetRuntime(options) {
     if (typeof handler !== 'function') return false
     if (!subscribers[event]) subscribers[event] = []
     subscribers[event].push(handler)
+    if (LATEST_REPLAY_EVENTS.indexOf(event) >= 0 && Object.prototype.hasOwnProperty.call(latestPayloads, event)) {
+      // 只補給這一個新訂閱者，別人已經收過
+      deliver(event, handler, latestPayloads[event])
+    }
     return true
+  }
+
+  function deliver(event, handler, payload) {
+    try {
+      // 訂閱回呼是作者的程式碼，同樣跑在作者範圍裡
+      runAuthorCode(function () { handler(payload) })
+      return true
+    } catch (e) {
+      // 吞掉但不靜默：交給呼叫端的 onError 決定要不要記錄。
+      if (typeof config.onError === 'function') config.onError(event, e)
+      return false
+    }
+  }
+
+  /** 換對話：補發記錄清掉（訂閱不清），新對話的數值到了會再發。 */
+  function resetReplay() {
+    Object.keys(latestPayloads).forEach((key) => { delete latestPayloads[key] })
   }
 
   /**
@@ -216,19 +247,13 @@ function createAuthorAssetRuntime(options) {
    */
   function emit(event, payload) {
     if (disposed && event !== 'dispose') return 0
+    if (LATEST_REPLAY_EVENTS.indexOf(event) >= 0) latestPayloads[event] = payload
     const list = subscribers[event]
     if (!list || !list.length) return 0
     let delivered = 0
-    for (let i = 0; i < list.length; i++) {
-      try {
-        // 訂閱回呼是作者的程式碼，同樣跑在作者範圍裡
-        const handler = list[i]
-        runAuthorCode(function () { handler(payload) })
-        delivered++
-      } catch (e) {
-        // 吞掉但不靜默：交給呼叫端的 onError 決定要不要記錄。
-        if (typeof config.onError === 'function') config.onError(event, e)
-      }
+    const handlers = list.slice()
+    for (let i = 0; i < handlers.length; i++) {
+      if (deliver(event, handlers[i], payload)) delivered++
     }
     return delivered
   }
@@ -368,6 +393,7 @@ function createAuthorAssetRuntime(options) {
     Object.keys(subscribers).forEach((key) => {
       delete subscribers[key]
     })
+    resetReplay()
     mounted = false
   }
 
@@ -375,6 +401,7 @@ function createAuthorAssetRuntime(options) {
     mount: mount,
     subscribe: subscribe,
     emit: emit,
+    resetReplay: resetReplay,
     setThemeVar: setThemeVar,
     setColumnMetrics: setColumnMetrics,
     setPageVisible: setPageVisible,
@@ -403,6 +430,7 @@ function countAuthorContainers(doc) {
 export {
   AUTHOR_LAYERS,
   AUTHOR_EVENTS,
+  LATEST_REPLAY_EVENTS,
   CONTAINER_ATTR,
   createAuthorAssetRuntime,
   countAuthorContainers,

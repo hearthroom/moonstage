@@ -617,3 +617,27 @@
 }
 .lt-choice { padding: 8px 14px
 }
+.lt-state-btn {
+    padding: 0
+}
+.lt-state-panel {
+    margin-top: 12px
+}
+.lt-state-raw-toggle {
+    padding: 4px 12px
+}
+.lt-state-raw-label { margin-top: 8px
+}
+.lt-state-json {
+    margin: 0;
+    padding: 12px
+}
+.lt-state-error { padding: 12px
+}
+.lt-state-error-title { margin: 0
+}
+.lt-state-error-sub { margin: 4px 0 0
+}
+.lt-state-toast {
+    padding: 6px 14px
+}

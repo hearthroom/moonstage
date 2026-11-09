@@ -116,6 +116,8 @@ export interface MessageList {
   /** 掛著的氣泡根；視窗化拆掉的（空殼）回 null。 */
   bubbleOf(id: string): HTMLElement | null
   ids(): string[]
+  /** 畫面上的先後（載入更早的歷史插在前面也算對）：id 與角色。 */
+  ordered(): Array<{ id: string; role: SandboxMessageRole; serverId: string | null }>
   /** 目前真的掛著氣泡的 id（視窗化用；沒視窗化＝全部）。 */
   mountedIds(): string[]
   clear(): void
@@ -549,6 +551,11 @@ export function createMessageList(deps: MessageListDeps): MessageList {
     remove,
     bubbleOf: (id) => { const e = entries.get(String(id)); return e && e.app ? e.article : null },
     ids: () => Array.from(entries.keys()),
+    ordered: () => order()
+      .slice()
+      // 外框在列表裡的實際位置：Map 的插入順序在「插到某則之前」時不是畫面順序
+      .sort((x, y) => (x.frame.compareDocumentPosition(y.frame) & 4 ? -1 : x.frame === y.frame ? 0 : 1))
+      .map((e) => ({ id: e.message.id, role: e.message.role, serverId: e.message.serverId == null ? null : String(e.message.serverId) })),
     mountedIds: () => order().filter((e) => !!e.app).map((e) => e.message.id),
     refresh() {
       for (const entry of entries.values()) {

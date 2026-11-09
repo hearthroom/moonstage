@@ -24,6 +24,7 @@ import type { EventBus } from './events'
 import type { GenerationOutcome } from '../protocol'
 import { shareLinkOf, shareStateOf, SHARE_QR_MAX_CHARS, type ShareAudience, type SharePoll, type ShareQr, type ShareState } from '../../common/share-context'
 import { createSharedApi, type SharedApi, type SharedOp, type ShareTallyApi } from '../../common/shared-state'
+import type { CardStatePayload } from '../../common/card-state'
 
 export const SAVE_KEY_RE = /^[A-Za-z0-9_-]{1,64}$/
 export const SAVE_MAX_KEYS = 10
@@ -82,6 +83,8 @@ export interface SdkHost {
   capabilities: { saves: boolean; edit: boolean; send: boolean; archive?: boolean; share?: boolean; shared?: boolean }
   /** 分享情境的現值（握手給、之後宿主可更新，例如推薦碼晚到）；每次讀都問。 */
   share?: () => ShareState | null
+  /** 卡片數值：現值與某則訊息當下的值（殼記的；這張卡沒有數值時回 null）。 */
+  cardState?: { get(): CardStatePayload | null; of(messageId: string): CardStatePayload | null }
   /** 宿主代辦：送出、改寫、存檔寫入。 */
   request(op: 'message.send' | 'message.edit' | 'save.set' | 'save.remove' | 'archive.list' | 'archive.save' | 'archive.fork' | 'archive.open' | 'archive.new' | 'archive.rename' | 'archive.remove' | 'generation.act' | 'share.qr' | 'history.list' | 'history.subscribe' | 'history.unsubscribe' | SharedOp, args: unknown[]): Promise<unknown>
   /** 現在是不是在使用者手勢裡（點擊當下）。 */
@@ -156,6 +159,12 @@ export interface Sdk {
   } & ShareTallyApi
   /** 全服投票、共鬥計數器、排行榜（design §7.3）：key 要先在作者的 rules.json 宣告；讀取所有人都可以，寫入要登入且玩過這張卡。 */
   shared: SharedApi
+  /**
+   * 卡片數值：get() 是現值、of(messageId) 是那則訊息當下的值（它自己記的，或之前最近的一份）；
+   * 都回 { messageId, data, changes } 或 null。messageId 是伺服器的訊息 id（訊息載荷的 serverId），
+   * of() 也收殼的訊息 id。變了發 state:change，晚訂閱補發現值。
+   */
+  state: { get(): CardStatePayload | null; of(messageId: string): CardStatePayload | null }
   on(event: string, cb: (payload?: unknown) => void): void
   debug: { log(...args: unknown[]): void }
   version: string
@@ -439,6 +448,10 @@ export function createSdk(host: SdkHost, bus: EventBus): SdkController {
       ...sharedRemote.tally,
     },
     shared: sharedRemote.shared,
+    state: {
+      get: () => (host.cardState ? host.cardState.get() : null),
+      of: (messageId) => (host.cardState ? host.cardState.of(String(messageId ?? '')) : null),
+    },
     on: (event, cb) => bus.on(event, cb),
     debug: { log: (...args) => host.debug(...args) },
     version: '1',

@@ -32,6 +32,8 @@ function applyAsset(asset: any, locale = 'zh-Hant', doc = document, win: any = w
     authorRuleOptions: () => ({}), detectAuthorOwnedRegions: () => [],
     displayScript: createDisplayScriptConverter(locale === 'zh-Hant' ? 's2t' : 't2s'),
     needsKaiFallback: () => false,
+    // 卡片數值的作者事件（新執行期從頭發、掛完補齊）：這裡只驗掛載，不驗事件
+    cardStateFeed: { reset: vi.fn() }, syncCardStateEvents: vi.fn(),
   }
   for (const name of ['measureAuthorColumn', 'observeAuthorColumn', 'observeComposerOverhang', 'observeAuthorSideDock', 'observeCardTheme', 'runFixedAuthorNodeHoist', 'observeFixedAuthorNodes']) context[name] = vi.fn()
   vm.runInNewContext(ts.transpileModule(source.slice(start, end) + '\nthis.applyAsset = applyAuthorAsset;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context)

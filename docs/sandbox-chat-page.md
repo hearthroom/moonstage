@@ -68,6 +68,7 @@ Hearthroom        匯入／匯出認 chatVersion；編輯器「聊天頁版本�
 | `prologue` | `{ title, items }` 開場選項（MMD「你可以选择开场」）；`items` 空＝拿掉 | 跟全量 `messages` 一起到，之後變了才送（玩家說出第一句後送空清單） |
 | `conversation.switch` | — | 切存檔：殼清氣泡、關舞台、清補發記錄，之後宿主再送 `messages` |
 | `share` | `{ share: {enabled, context, url, audience, poll?} }` | 分享情境變了（推薦碼晚到）：殼換掉現值並發 `share:change`；hello 之前不送 |
+| `state` | `{ id, state: {messageId, data, changes, seq, source, rejected?} \| null }` | 某則訊息的卡片數值變了（一輪跑完才記下、重載後不同）：殼更新那則、現值變了發 `state:change`。冷啟動與新氣泡的數值隨 `view.state` 一起到；`hello.config.cardState` 帶初始值與面板皮膚（`panel: {template, audience, labels}`）。沒有數值的卡不帶這些欄位、不送這個訊息；舊殼不認得 `state`，照未知訊息忽略 |
 | `back` | — | 宿主的返回：舞台開著殼先關舞台並回 `back-handled: true`；否則回 false 由宿主導頁 |
 | `dispose` | — | 離開頁面 |
 
@@ -118,6 +119,7 @@ SDK 有 18 個鍵、54 個能力，其中 22 個為非同步；完整清單由 `
 | `share.enabled/context/audience`、`share.link(context?)`、`share.qr(text)` | 實作 | 分享情境。`context`：從帶 `?share=<碼>` 的連結開卡時那個碼，否則 `null`（平台開關關著、看自己的紀錄時也是 `null`；有沒有存檔不管，由卡片決定）。碼只許 `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`（`~` 開頭留給平台短碼），宿主驗過才給。`audience`：這張卡現在誰打得開（`author`／`link`／`public`，宿主不知道是 `null`）。`link(context?)` **同步**回這張卡的分享連結（宿主站的卡片頁，帶玩家的推薦碼），給了情境就加 `share=`——點擊裡直接拿去 `navigator.share`；碼不合規則 `SHARE_CONTEXT_INVALID`；平台開關關著不丟錯、回不帶情境的一般連結；宿主沒接（`capabilities.share` 為假）或給不出連結 `HOST_DENIED`。`qr(text)` 回 `{size, path}`（`size`×`size` 格的 SVG path），1–1024 字，否則 `INVALID_ARGS`；殼送 `request share.qr` 由宿主畫。值來自 `hello.config.share`，之後 `share` 訊息更新並發 `share:change`。情境碼從不進模型 |
 | `share.poll`、`share.tallyLink(context, pollKey)`、`share.respond(option)`、`share.results()` | 需 transport v2 | 分享回流，詳見「共用狀態」。`poll` 是朋友從平台短碼連結開卡時可以回答的那一題 `{key, options}`，否則 `null` |
 | `shared.read/vote/add/leaderboard` | 需 transport v2 | 全服投票、共鬥計數器、排行榜，詳見「共用狀態」 |
+| `state.get()`、`state.of(messageId)` | 實作 | 卡片數值。都回 `{ messageId, data, changes }` 或 `null`（這張卡沒有數值）。`get()` 是現值（最後一則帶數值的訊息那一份，還沒有就是初始值、`messageId: null`）；`of(id)` 是那則訊息當下的值（它自己記的，或之前最近的一份）。`messageId` 是伺服器的訊息 id（訊息載荷的 `serverId`），`of()` 也收殼的訊息 id；不認得的 id 回 `null`。一般卡的 `stage.state.get/of` 同一份資料與規則 |
 | `history.capabilities/list/onChange` | 需 transport v2 | 只讀目前使用者、目前卡片、目前會話的完整有效訊息；先探測能力，按同一 revision 讀完分頁。`onChange` 回傳取消訂閱函式；詳見「可靠歷史」。 |
 | `on(event, fn)` | 實作 | 見事件表 |
 | `debug.log(...)` | 實作 | 殼內面板 + 轉宿主 console |
@@ -128,8 +130,8 @@ SDK 有 18 個鍵、54 個能力，其中 22 個為非同步；完整清單由 `
 `save.get/keys` 在存檔尚未載入時同步丟 `HOST_DENIED`（跟原站一致，作者會用 try）。
 限頻（60 秒窗）：`save.set` 20、`message.send` 手勢 3／自動 3、`message.edit` 10、`archive.*` 的變更合計 10、`generation.act` 3 → `RATE_LIMITED`。
 
-事件（16）：`ready`、`message:new`、`message:done`、`message:stream`、`message:mount`、`message:unmount`、
-`input:change`、`conversation:switch`（載荷 `{conversationId}`，宿主有給才帶）、`theme:change`、`back`、`stage:close`、`dispose`、`model:change`（載荷同 `model.get()`，模型名或點數變了才發）、`generation:phase`（載荷 `{phase, since}`，階段變了才發；不補發，晚到的腳本用 `generation.get()`）、`generation:outcome`（載荷同 `generation.get().outcome`，可能是 `null`；結局變了才發，例如失敗卡出現、玩家重試後收掉；不補發）、`share:change`（無載荷，分享情境變了才發，重讀 `sdk.share`）。
+事件（17）：`ready`、`message:new`、`message:done`、`message:stream`、`message:mount`、`message:unmount`、
+`input:change`、`conversation:switch`（載荷 `{conversationId}`，宿主有給才帶）、`theme:change`、`back`、`stage:close`、`dispose`、`model:change`（載荷同 `model.get()`，模型名或點數變了才發）、`generation:phase`（載荷 `{phase, since}`，階段變了才發；不補發，晚到的腳本用 `generation.get()`）、`generation:outcome`（載荷同 `generation.get().outcome`，可能是 `null`；結局變了才發，例如失敗卡出現、玩家重試後收掉；不補發）、`share:change`（無載荷，分享情境變了才發，重讀 `sdk.share`）、`state:change`（載荷 `{messageId, data, changes}`，跟一般卡的 `stage.on('state:change')` 逐字相同：冷啟動時每則帶數值的訊息各一次、舊到新；之後新的一輪才發；重新生成、回溯、刪除讓現值那一份不在了，就整條重發一次、最新的在最後；載入更早的歷史不發；晚訂閱只補發最後一份）。
 
 順序與補發規則（作者腳本依賴這些）：
 

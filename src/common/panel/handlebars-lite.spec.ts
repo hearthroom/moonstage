@@ -103,6 +103,13 @@ describe('renderPanel: helpers', () => {
     expect(html('{{eq a 5}}|{{gt a 10}}|{{not t}}', data)).toBe('true|false|false')
   })
 
+  it('eq/ne treat a number and the same number written as a string as equal; everything else stays strict', () => {
+    const data = { n: 50, s: '50', f: 1.5, z: 0, b: true, t: 'abc' }
+    expect(html('{{eq n "50"}}|{{eq s 50}}|{{eq f " 1.5 "}}|{{ne n "50"}}|{{eq s "50.0"}}', data)).toBe('true|true|true|false|false')
+    expect(html('{{eq z ""}}|{{eq z false}}|{{eq b "true"}}|{{eq t 0}}|{{eq n "5e1"}}|{{eq n "0x32"}}', data)).toBe('false|false|false|false|true|false')
+    expect(html('{{#if (eq 好感度 "60")}}y{{else}}n{{/if}}', { 好感度: 60 })).toBe('y')
+  })
+
   it('inline helpers work as blocks too', () => {
     expect(html('{{#eq v 1}}one{{else}}other{{/eq}}', { v: 1 })).toBe('one')
     expect(html('{{#gt v 1}}big{{else}}small{{/gt}}', { v: 1 })).toBe('small')

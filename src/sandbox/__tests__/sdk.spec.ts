@@ -47,19 +47,19 @@ const expectCode = async (p: Promise<unknown> | (() => unknown), code: string) =
 }
 
 describe('sdk 的形狀', () => {
-  it('恰好 18 個鍵、54 個能力、version 是值 "1"、沒有 once/off', () => {
+  it('恰好 19 個鍵、56 個能力、version 是值 "1"、沒有 once/off', () => {
     const { sdk } = createSdk(fakeHost(), createEventBus())
-    expect(Object.keys(sdk).sort()).toEqual(['archive', 'cache', 'composer', 'debug', 'generation', 'history', 'input', 'message', 'model', 'on', 'role', 'save', 'share', 'shared', 'stage', 'text', 'user', 'version'])
+    expect(Object.keys(sdk).sort()).toEqual(['archive', 'cache', 'composer', 'debug', 'generation', 'history', 'input', 'message', 'model', 'on', 'role', 'save', 'share', 'shared', 'stage', 'state', 'text', 'user', 'version'])
     const caps = [
       ...Object.keys(sdk.input).map((k) => `input.${k}`), ...Object.keys(sdk.composer).map((k) => `composer.${k}`),
       ...Object.keys(sdk.message).map((k) => `message.${k}`), ...Object.keys(sdk.cache).map((k) => `cache.${k}`),
       ...Object.keys(sdk.save).map((k) => `save.${k}`), ...Object.keys(sdk.stage).map((k) => `stage.${k}`),
       ...Object.keys(sdk.text).map((k) => `text.${k}`), ...Object.keys(sdk.archive).map((k) => `archive.${k}`),
-      ...Object.keys(sdk.shared).map((k) => `shared.${k}`),
+      ...Object.keys(sdk.shared).map((k) => `shared.${k}`), ...Object.keys(sdk.state).map((k) => `state.${k}`),
       'share.link', 'share.qr', 'share.tallyLink', 'share.respond', 'share.results', 'history.capabilities', 'history.list', 'history.onChange',
       'role.get', 'user.get', 'model.get', 'generation.get', 'generation.act', 'on', 'debug.log', 'version',
     ]
-    expect(caps.length).toBe(54)
+    expect(caps.length).toBe(56)
     expect(sdk.version).toBe('1')
     expect((sdk as unknown as { once?: unknown }).once).toBeUndefined()
     expect((sdk as unknown as { off?: unknown }).off).toBeUndefined()

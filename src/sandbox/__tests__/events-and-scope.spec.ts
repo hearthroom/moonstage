@@ -4,8 +4,21 @@ import { createEventBus, SDK_EVENTS } from '../sdk/events'
 import { installMessageScope } from '../scope'
 
 describe('事件匯流排：補發規則', () => {
-  it('16 個事件名固定', () => {
-    expect(SDK_EVENTS).toEqual(['ready', 'message:new', 'message:done', 'message:stream', 'message:mount', 'message:unmount', 'input:change', 'conversation:switch', 'theme:change', 'back', 'stage:close', 'dispose', 'model:change', 'generation:phase', 'generation:outcome', 'share:change'])
+  it('17 個事件名固定', () => {
+    expect(SDK_EVENTS).toEqual(['ready', 'message:new', 'message:done', 'message:stream', 'message:mount', 'message:unmount', 'input:change', 'conversation:switch', 'theme:change', 'back', 'stage:close', 'dispose', 'model:change', 'generation:phase', 'generation:outcome', 'share:change', 'state:change'])
+  })
+
+  it('state:change 對晚訂閱者只補發最後一份；切會話清掉', () => {
+    const bus = createEventBus()
+    bus.emit('state:change', { messageId: '1' })
+    bus.emit('state:change', { messageId: '3' })
+    const seen: string[] = []
+    bus.on('state:change', (p) => seen.push((p as { messageId: string }).messageId))
+    expect(seen).toEqual(['3'])
+    bus.resetReplay()
+    const after: unknown[] = []
+    bus.on('state:change', (p) => after.push(p))
+    expect(after).toEqual([])
   })
 
   it('mount／done 對晚訂閱者補發；ready 不補發；不認得的事件名不報錯', () => {
