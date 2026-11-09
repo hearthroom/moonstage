@@ -1289,7 +1289,11 @@ describe('完成的 Agent 準備軌跡讀回', () => {
     }
     const options = {
       agentPrepTraces: {
-        'op-1': [{ stage: 'checking_format' }, { stage: 'waiting_model' }, { stage: 'done' }],
+        'op-1': [
+          { stage: 'checking_format' }, { stage: 'waiting_model' },
+          { stage: 'retrying', attempt: 1, maxAttempts: 3, retryInSeconds: 2 },
+          { stage: 'waiting_model' }, { stage: 'done' },
+        ],
         'op-absent': [{ stage: 'looking_up' }],
       },
       t: (key: string) => key,

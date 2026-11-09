@@ -1097,7 +1097,13 @@ function historyAgentPrepTrail(
 ): string[] {
   if (!options.t) return []
   const traces = options.agentPrepTraces || response?.agentPrepTraces || {}
-  return prepTrailFromServerSteps(traces[status.operationId], options.t)
+  const steps = traces[status.operationId]
+  if (status.state !== 'completed' || !Array.isArray(steps)) {
+    return prepTrailFromServerSteps(steps, options.t)
+  }
+  // Live countdowns expire. A completed reply retains only its preparation steps.
+  const trail = prepTrailFromServerSteps(steps.filter(step => step?.stage !== 'retrying'), options.t)
+  return trail.filter((line, index) => line !== trail[index - 1])
 }
 
 /**
