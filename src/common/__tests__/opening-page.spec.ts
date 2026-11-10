@@ -103,12 +103,12 @@ describe('clickedFrame', () => {
 })
 
 describe('mountOpeningPage', () => {
-  function setup(activated: boolean) {
+  function setup(activated: boolean, maxHeight = 1000) {
     const box = document.createElement('div')
     document.body.appendChild(box)
     const fill = vi.fn()
     const send = vi.fn()
-    const page = mountOpeningPage(box, '<p>首屏</p>', { fill, send }, { activated: () => activated })
+    const page = mountOpeningPage(box, '<p>首屏</p>', { fill, send }, { activated: () => activated, maxHeight: () => maxHeight })
     const post = (data: unknown, source: unknown = page.frame.contentWindow) =>
       window.dispatchEvent(new MessageEvent('message', { data, source: source as Window }))
     return { box, page, fill, send, post }
@@ -129,6 +129,55 @@ describe('mountOpeningPage', () => {
     post({ type: OPENING_MESSAGE_TYPE, kind: 'fill', text: '冒充' }, window)
     expect(fill).not.toHaveBeenCalled()
     page.destroy()
+  })
+
+  // 風月的做法：首屏是一個聊天區高度的框，內容超過就在框裡捲。作者照「一個視窗」寫頁面（min-height:88vh、
+  // position:fixed 的頂欄底欄），框跟著內容撐高的話，vh 會跟著框變大、再把框撐得更高，一路放大到視窗的十幾倍。
+  describe('框的高度', () => {
+    const height = (n: number) => ({ type: OPENING_MESSAGE_TYPE, kind: 'height', height: n })
+
+    it('一開始就是上限高度；內容再高也停在上限，在框裡捲', () => {
+      const { page, post } = setup(true, 600)
+      expect(page.frame.style.height).toBe('600px')
+      post(height(12930))
+      expect(page.frame.style.height).toBe('600px')
+      page.destroy()
+    })
+
+    it('短頁縮到內容高；頁面還沒排版時回報的 0 不算', () => {
+      const { page, post } = setup(true, 600)
+      post(height(0))
+      expect(page.frame.style.height).toBe('600px')
+      post(height(300))
+      expect(page.frame.style.height).toBe('300px')
+      page.destroy()
+    })
+
+    it('剛縮完回報又變小：內容跟著框縮（vh、height:100%），回到上限並固定', () => {
+      vi.useFakeTimers()
+      const { page, post } = setup(true, 600)
+      post(height(300))
+      post(height(160))
+      expect(page.frame.style.height).toBe('600px')
+      post(height(100))
+      post(height(5000))
+      expect(page.frame.style.height).toBe('600px')
+      page.destroy()
+      vi.useRealTimers()
+    })
+
+    it('縮完過一陣子內容才變短（玩家收合一段）：照常縮', () => {
+      vi.useFakeTimers()
+      const { page, post } = setup(true, 600)
+      post(height(300))
+      vi.advanceTimersByTime(2000)
+      post(height(200))
+      expect(page.frame.style.height).toBe('200px')
+      post(height(450))
+      expect(page.frame.style.height).toBe('450px')
+      page.destroy()
+      vi.useRealTimers()
+    })
   })
 
   it('玩家剛點過才送出；沒點過的送出改成填入', () => {

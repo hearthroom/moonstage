@@ -7,8 +7,13 @@
  * 不直接塞進畫布或沙箱殼：這些頁面是寫給獨立文件的，`body{}`、`*{}` 重設與 `html{height:100%}`
  * 放進來會改掉整頁的樣式。底色固定是淺色紙：風月的聊天頁是淺色，作者照淺底配色，跟著我們的深色走字會看不見。
  *
+ * 框多高：跟風月一樣，上限是「聊天區看得到的高度」與「視窗高的 70%」較小的那個，內容超過就在框裡捲。作者照「一個視窗」寫這些頁面
+ * （min-height:88vh 的封面、position:fixed 的頂欄與底欄、全屏的開場遮罩），框跟著內容撐高的話，
+ * vh 會跟著框變大、又把框撐得更高（卡片 101005 撐到視窗的十幾倍），fixed 的底欄也掉到看不到的地方。
+ * 短頁照舊縮到內容高（見 createFrameSizer）。
+ *
  * 頁面能做的事只有三件，都經 postMessage 告訴外層：
- *   - 回報自己的高度（外層據此撐開 iframe，頁面不出捲軸）
+ *   - 回報自己的高度（外層據此決定 iframe 多高，見上）
  *   - `hearthroom.fill(text)`：把一句話填進玩家的輸入框
  *   - `hearthroom.send(text)`：把一句話當玩家的第一句送出（外層只在玩家剛點過時照做，否則改成填入）
  * 風月的開局生成器是「拼好文字、複製到剪貼簿、讓玩家貼上」：頁面寫進剪貼簿的那段字也一併填進輸入框，
@@ -19,6 +24,11 @@ export const OPENING_MESSAGE_TYPE = 'hearthroom:opening'
 /** 一次填入／送出的字數上限，避免頁面把整份文件塞進輸入框。 */
 export const OPENING_TEXT_MAX = 8000
 const HEIGHT_MAX = 20000
+const HEIGHT_MIN = 40
+/** 框的上限至少這麼高：聊天區量不到或很矮時（橫向手機、鍵盤開著）首屏仍看得到一段。 */
+const CAP_MIN = 240
+/** 剛縮小之後這段時間內回報變得更小，算是內容跟著框縮（vh、height:100%），不是玩家收合。 */
+const SHRINK_ECHO_MS = 1000
 
 export type OpeningMessage =
   | { kind: 'height'; height: number }
@@ -74,6 +84,58 @@ export interface OpeningHandlers {
   send(text: string): void
 }
 
+/**
+ * 框的高度怎麼跟著頁面回報走。
+ *
+ * 一開始就給上限高度：照視窗寫的頁面（vh、100%）量到的就是上限以上，一步到位，不會一格一格往上撐。
+ * 回報比上限小就縮到內容高；但縮完立刻又回報更小，代表內容是跟著框縮的（50vh 的區塊之類），
+ * 再縮下去只會越縮越小——這時回到上限並固定，跟風月一樣在框裡捲。
+ */
+export function createFrameSizer(cap: number, now: () => number = () => Date.now()) {
+  let limit = Math.max(CAP_MIN, Math.round(cap))
+  let current = limit
+  let measured = limit
+  let locked = false
+  let shrunkTo = 0
+  let shrunkAt = 0
+  return {
+    get height() { return current },
+    /** 頁面回報內容高度；回傳框該有的高度。 */
+    report(reported: number): number {
+      // 0 是頁面還沒排版（srcdoc 剛開始解析），不代表內容是空的。
+      if (locked || !(reported > 0)) return current
+      measured = reported
+      if (shrunkTo && reported < shrunkTo && now() - shrunkAt < SHRINK_ECHO_MS) {
+        locked = true
+        shrunkTo = 0
+        current = limit
+        return current
+      }
+      const next = Math.min(Math.max(reported, HEIGHT_MIN), limit)
+      if (next < current) { shrunkTo = reported; shrunkAt = now() } else shrunkTo = 0
+      current = next
+      return current
+    },
+    /** 聊天區變寬變窄（轉向、拉視窗）時換上限。 */
+    setCap(nextCap: number): number {
+      limit = Math.max(CAP_MIN, Math.round(nextCap))
+      current = locked ? limit : Math.min(Math.max(measured, HEIGHT_MIN), limit)
+      return current
+    },
+  }
+}
+
+/** 框的上限：聊天區（往上第一個會捲的容器）看得到的高度與視窗高的 70%，取小的；風月桌機與手機都是這樣量的。 */
+export function openingFrameCap(el: HTMLElement): number {
+  const win = el.ownerDocument.defaultView as Window
+  const byWindow = win.innerHeight * 0.7
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const overflowY = win.getComputedStyle(p).overflowY
+    if ((overflowY === 'auto' || overflowY === 'scroll') && p.clientHeight > 0) return Math.min(p.clientHeight, byWindow)
+  }
+  return byWindow
+}
+
 export interface OpeningPageMount {
   frame: HTMLIFrameElement
   destroy(): void
@@ -103,7 +165,7 @@ export function mountOpeningPage(
   container: HTMLElement,
   html: string,
   handlers: OpeningHandlers,
-  options: { title?: string; activated?: () => boolean } = {},
+  options: { title?: string; activated?: () => boolean; maxHeight?: () => number } = {},
 ): OpeningPageMount {
   const doc = container.ownerDocument
   const win = doc.defaultView as Window
@@ -112,24 +174,36 @@ export function mountOpeningPage(
   frame.setAttribute('allow', OPENING_ALLOW)
   frame.setAttribute('data-lt', 'opening-page')
   if (options.title) frame.title = options.title
-  // 先給一個小高度，等頁面回報內容高度再撐開：量的是 body（html 的 scrollHeight 不會小於 iframe 本身，框只會變大不會變小）
-  frame.style.cssText = 'display:block;width:100%;height:48px;border:0;border-radius:12px;background:#fff'
+  frame.style.cssText = 'display:block;width:100%;border:0;border-radius:12px;background:#fff'
   frame.srcdoc = openingSrcdoc(html)
   const activated = options.activated ?? (() => clickedFrame(win, frame))
+  container.appendChild(frame)
+  // 上限在掛上之後量（要知道聊天區多高）。只在寬度變了才重量：手機開鍵盤只改高度，框不該跟著跳。
+  const maxHeight = options.maxHeight ?? (() => openingFrameCap(container))
+  const sizer = createFrameSizer(maxHeight())
+  const setHeight = (h: number) => { frame.style.height = `${h}px` }
+  setHeight(sizer.height)
+  let width = win.innerWidth
+  const onResize = () => {
+    if (win.innerWidth === width) return
+    width = win.innerWidth
+    setHeight(sizer.setCap(maxHeight()))
+  }
   const onMessage = (event: MessageEvent) => {
     if (event.source !== frame.contentWindow) return
     const message = parseOpeningMessage(event.data)
     if (!message) return
-    if (message.kind === 'height') frame.style.height = `${Math.max(message.height, 40)}px`
+    if (message.kind === 'height') setHeight(sizer.report(message.height))
     else if (message.kind === 'send' && activated()) handlers.send(message.text)
     else handlers.fill(message.text)
   }
   win.addEventListener('message', onMessage)
-  container.appendChild(frame)
+  win.addEventListener('resize', onResize)
   return {
     frame,
     destroy() {
       win.removeEventListener('message', onMessage)
+      win.removeEventListener('resize', onResize)
       frame.remove()
     },
   }
