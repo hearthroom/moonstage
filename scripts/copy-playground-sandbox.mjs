@@ -2,15 +2,17 @@ import { cpSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const SANDBOX_ASSETS = ['sandbox.js', 'sandbox.css', 'sandbox-zh.js'];
+
 export function copyPlaygroundSandbox(source, webRoot) {
   const page = readFileSync(join(source, 'index.html'), 'utf8');
   if (!page.includes('<title>chat sandbox</title>') ||
-      !['sandbox.js', 'sandbox.css'].every(name => existsSync(join(source, name)))) {
+      !SANDBOX_ASSETS.every(name => existsSync(join(source, name)))) {
     throw new Error('Sandbox build is incomplete');
   }
   const target = join(webRoot, 'sandbox');
   mkdirSync(target, { recursive: true });
-  for (const name of ['index.html', 'sandbox.js', 'sandbox.css'])
+  for (const name of ['index.html', ...SANDBOX_ASSETS])
     cpSync(join(source, name), join(target, name));
 }
 
