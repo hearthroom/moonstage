@@ -224,7 +224,7 @@ JSON、WASM 等檔案（含 `WebAssembly.instantiateStreaming`），別的外站
   定稿 `message.done`（一則只一次；已定稿的內容變了＝改寫，換一顆新氣泡）、消失 `message.remove`；
   `generation`／`input` 只在變化時送。殼的 `request` 對應 `hud.sendMessage`／`hud.openEdit`+`submitEdit`／
   `SandboxSavesStore`；`action` 對應既有面板開關；`back` 先問殼（舞台開著殼會關）再導頁。
-  只認 `event.source === iframe.contentWindow` 且 origin 相符的訊息；握手逾時（10 秒）顯示提示。
+  只認 `event.source === iframe.contentWindow` 且 origin 相符的訊息；握手逾時（20 秒）顯示提示：畫面還沒載入、對話還在，附「重新載入畫面」（換 iframe 的 key 重建、用同一份作者資產重新掛殼，不重整整頁）。
   殼那一側每 500ms 重喊 `ready-shell` 直到 `hello` 到（最多 10 秒），宿主對重複的 `ready-shell` 只回一次 `hello`。
   冷啟動等歷史：握手或切會話後，宿主列表還是空的（歷史在載）或還是切換前那一份時不送全量、也不做差分，
   最多等 `coldStartTimeoutMs`（10 秒，同握手逾時）；歷史一到才送 `messages`，殼收到才發 `ready`——`ready` 最後且不補發的契約靠這個。

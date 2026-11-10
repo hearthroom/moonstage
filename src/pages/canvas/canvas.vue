@@ -38,18 +38,28 @@
 
     <!-- 沙箱卡（pageMode=sandbox）：整個聊天頁交給殼，跑在跨源 iframe 裡。殼用的是跟這一頁同一套標準元件
          （頁首、訊息、輸入區），資料由 canvas-sandbox-host 用 postMessage 餵進去、按鍵事件轉回這裡執行；
-         面板與彈層仍在這一頁（蓋在 iframe 上）。殼在時限內沒握手（網址錯、被擋）就顯示提示，
-         玩家至少知道為什麼跟作者說的不一樣。 -->
+         面板與彈層仍在這一頁（蓋在 iframe 上）。殼在時限內沒握手（網路慢、網址錯、被擋）就顯示提示，
+         說畫面還沒載入、對話還在，並給「重新載入畫面」：只重建 iframe 再握手一次，不重整整頁。 -->
     <div v-if="sandboxCard" class="canvas-sandbox-frame" :class="{ 'is-full': sandboxStage === 'full' }" data-lt="sandbox-frame">
       <!-- 提示蓋在 iframe 上而不是取代它：殼晚到（首次載入慢）仍能接上，接上就把提示收掉。 -->
       <div v-if="sandboxFailed" class="canvas-sandbox-notice" data-lt="sandbox-notice" role="status">
-        {{ t('canvas.sandbox.unsupported') }}
+        <span class="canvas-sandbox-notice__text">{{ t('canvas.sandbox.timeout') }}</span>
+        <div
+          class="canvas-sandbox-notice__reload"
+          data-lt="sandbox-reload"
+          role="button"
+          tabindex="0"
+          @click="reloadSandbox"
+          @keydown.enter.prevent="reloadSandbox"
+          @keydown.space.prevent="reloadSandbox"
+        >{{ t('canvas.sandbox.reload') }}</div>
       </div>
       <!-- 殼網址定了才建 iframe，換網址就重建：iframe 的 sandbox 屬性只在導航開始時生效，
-           先以空屬性存在、再更新 src 的話，殼頁會用「不准腳本」載入（Vue 先改 src 再改 sandbox）。 -->
+           先以空屬性存在、再更新 src 的話，殼頁會用「不准腳本」載入（Vue 先改 src 再改 sandbox）。
+           sandboxReloads 是「重新載入畫面」的次數：同一個網址也要換一個新的 iframe。 -->
       <iframe
         v-if="sandboxUrl"
-        :key="sandboxUrl"
+        :key="sandboxUrl + '#' + sandboxReloads"
         ref="sandboxFrame"
         class="canvas-sandbox-iframe"
         :src="sandboxUrl"
@@ -2734,6 +2744,7 @@ watch(() => contentShown({
 }), (shown) => { if (shown) contentReady.mark(); }, { immediate: true });
 onUnmounted(() => contentReady.dispose());
 const sandboxUrl = ref('');
+const sandboxReloads = ref(0);
 const sandboxAttr = ref('');
 const sandboxFrame = ref<HTMLIFrameElement | null>(null);
 const sandboxHostRef = shallowRef<SandboxHost | null>(null);
@@ -3344,6 +3355,13 @@ function mountSandbox(asset: any) {
     host.start();
     observeSandboxTheme(host);
   });
+}
+
+// 「重新載入畫面」：殼沒握手上時，用同一份作者資產重新掛殼；換 key 讓 iframe 重建、重新計時握手，對話不受影響。
+function reloadSandbox() {
+  if (!sandboxAsset || !sandboxCard.value) return;
+  sandboxReloads.value++;
+  mountSandbox(sandboxAsset);
 }
 
 // 狀態一變就讓橋差分一次；sync() 裡讀到的 ref 都在這個 effect 的追蹤範圍內。

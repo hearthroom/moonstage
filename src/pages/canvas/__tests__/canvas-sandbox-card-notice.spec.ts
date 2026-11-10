@@ -24,7 +24,8 @@ function functionBody(anchor: string): string {
  *   1. 舊頁的規則引擎與作者程式碼一律不啟動——那些規則是寫給沙箱殼的固定節點與 sdk 的，硬套只會壞；
  *      改成掛殼（mountSandbox）。
  *   2. 原生訊息列表與輸入區讓位給 iframe；殼沒握手上才顯示提示。
- *   3. 五語都有這句提示。
+ *      提示說實話（畫面還沒載入、對話還在），附「重新載入畫面」：重建 iframe 再握手一次，不重整整頁。
+ *   3. 五語都有提示與按鈕文案。
  */
 describe('新版沙箱卡：掛殼、不套舊頁規則', () => {
   it('applyAuthorAsset 看到 sandbox 就掛殼並 return，不建規則執行環境', () => {
@@ -41,7 +42,7 @@ describe('新版沙箱卡：掛殼、不套舊頁規則', () => {
   it('模板：沙箱卡時只有訊息列表換成 iframe；頁首與輸入區仍是宿主的（作者開全螢幕舞台或收起輸入區才藏）；握手失敗才顯示提示', () => {
     expect(CANVAS).toMatch(/<div v-if="sandboxCard" class="canvas-sandbox-frame"/)
     // 提示蓋在 iframe 上而不是取代它：殼晚到仍能接上
-    expect(CANVAS).toMatch(/<iframe\s+v-if="sandboxUrl"\s+:key="sandboxUrl"\s+ref="sandboxFrame"/)
+    expect(CANVAS).toMatch(/<iframe\s+v-if="sandboxUrl"\s+:key="sandboxUrl \+ '#' \+ sandboxReloads"\s+ref="sandboxFrame"/)
     expect(CANVAS).toContain("onHandshake: () => { sandboxFailed.value = false; }")
     expect(CANVAS).toMatch(/<CanvasStage v-if="!sandboxCard"/)
     // 頁首與輸入區在沙箱模式下由殼用同一套標準元件畫（資料走 hud.read().chrome）；這一頁自己的只藏不拆
@@ -51,14 +52,30 @@ describe('新版沙箱卡：掛殼、不套舊頁規則', () => {
     expect(CANVAS).toContain("chrome: 'shell' as const")
     expect(CANVAS).toContain('chrome: sandboxCard.value ? buildChromeState() : undefined')
     expect(CANVAS).toMatch(/<div v-if="sandboxFailed" class="canvas-sandbox-notice" data-lt="sandbox-notice"/)
-    expect(CANVAS).toContain("t('canvas.sandbox.unsupported')")
+    expect(CANVAS).toContain("t('canvas.sandbox.timeout')")
+    expect(CANVAS).not.toContain("canvas.sandbox.unsupported")
   })
 
-  it('五語都有提示文案', () => {
+  it('提示裡的「重新載入畫面」：換 iframe 的 key 重建、用同一份作者資產重新掛殼，鍵盤也按得到', () => {
+    const notice = CANVAS.slice(CANVAS.indexOf('<div v-if="sandboxFailed"'), CANVAS.indexOf('<iframe', CANVAS.indexOf('<div v-if="sandboxFailed"')))
+    expect(notice).toContain("t('canvas.sandbox.reload')")
+    expect(notice).toMatch(/role="button"[\s\S]*tabindex="0"/)
+    expect(notice).toMatch(/@click="reloadSandbox"/)
+    expect(notice).toMatch(/@keydown\.enter\.prevent="reloadSandbox"/)
+    const body = functionBody('function reloadSandbox()')
+    expect(body).toMatch(/sandboxReloads\.value\+\+/)
+    expect(body).toMatch(/mountSandbox\(sandboxAsset\)/)
+    // mountSandbox 本來就先把 sandboxFailed 收回 false、重新計時握手
+    expect(functionBody('function mountSandbox(asset: any)')).toContain('sandboxFailed.value = false')
+  })
+
+  it('五語都有提示與按鈕文案', () => {
     for (const loc of ['zh-Hant', 'zh-Hans', 'en', 'ja', 'ko']) {
       const messages = JSON.parse(fs.readFileSync(path.join(ROOT, `src/locale/${loc}.json`), 'utf8'))
-      expect(typeof messages['canvas.sandbox.unsupported'], loc).toBe('string')
-      expect(messages['canvas.sandbox.unsupported'].length, loc).toBeGreaterThan(10)
+      expect(typeof messages['canvas.sandbox.timeout'], loc).toBe('string')
+      expect(messages['canvas.sandbox.timeout'].length, loc).toBeGreaterThan(10)
+      expect(typeof messages['canvas.sandbox.reload'], loc).toBe('string')
+      expect(messages['canvas.sandbox.unsupported'], loc).toBeUndefined()
     }
   })
 })

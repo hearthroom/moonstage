@@ -1308,6 +1308,28 @@
     color: var(--lt-canvas-muted);
     background: color-mix(in srgb, var(--lt-canvas-accent) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--lt-canvas-accent) 35%, transparent);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+
+  .canvas-sandbox-notice__text {
+    flex: 1 1 200px;
+  }
+
+  /* 「重新載入畫面」：跟中斷卡的「繼續」同一套圓角與品牌色，是這張提示唯一的行動。 */
+  .canvas-sandbox-notice__reload {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 32px;
+    flex: 0 0 auto;
+    padding: 6px 14px;
+    border-radius: 9999px;
+    background: var(--lt-canvas-accent);
+    color: var(--lt-canvas-accent-fg, #0F1419);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
   }
 
   /* ── 輸入區 ───────────────────────────────────────────────────── */
@@ -6520,8 +6542,8 @@ iframe.lt-frontend__frame { display: block; width: 100%; min-height: 1px; border
 }
 
 @layer lt-base {
- @media (pointer: coarse) { .agent-resume-card__btn, .agent-resume-card__alt { min-height: 44px; } }
- .agent-resume-card__btn:focus-visible, .agent-resume-card__alt:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+ @media (pointer: coarse) { .agent-resume-card__btn, .agent-resume-card__alt, .canvas-sandbox-notice__reload { min-height: 44px; } }
+ .agent-resume-card__btn:focus-visible, .agent-resume-card__alt:focus-visible, .canvas-sandbox-notice__reload:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 }
 
 :where(.agent-resume-card[data-lt-contrast="high"][data-lt-tone="light"]) { color: #000; }

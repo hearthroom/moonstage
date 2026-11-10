@@ -39,6 +39,9 @@
     margin: 8px 16px 12px;
     padding: 10px 14px
 }
+.canvas-sandbox-notice__reload {
+    padding: 6px 14px
+}
 .chat-bottom {
     padding-bottom: var(--lt-viewport-safe-area-bottom, env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px)))
 }
