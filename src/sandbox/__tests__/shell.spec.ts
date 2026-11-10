@@ -746,14 +746,14 @@ describe('殼：開場選項（MMD prologue）', () => {
     s.handle({ type: 'prologue', title: '第一句', items: ['我想搭船。', '我留下來。'] })
     await nextTick()
     expect(s.refs.messages.querySelector('[data-lt="prologue"]')).toBeNull()
-    const row = s.refs.composer.querySelector('[data-lt="first-line"]') as HTMLElement
+    const row = s.refs.composer.querySelector('[data-lt="prologue"]') as HTMLElement
     expect(row).not.toBeNull()
     // 在快捷列與輸入區之上：開場網頁貼到這一排為止
     expect(row.nextElementSibling?.classList.contains('shortcut-bar-wrapper')).toBe(true)
     const toggle = row.querySelector('.composer-choices__toggle') as HTMLElement
     expect(toggle.textContent!.trim()).toBe('第一句')
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    const list = row.querySelector('[data-lt="prologue"]') as HTMLElement
+    const list = row.querySelector('.prologue-scope') as HTMLElement
     expect(list.style.display).toBe('none')
     toggle.click()
     await nextTick()
@@ -768,7 +768,7 @@ describe('殼：開場選項（MMD prologue）', () => {
     expect(list.style.display).toBe('none')
     s.handle({ type: 'prologue', title: '第一句', items: [] })
     await nextTick()
-    expect(s.refs.composer.querySelector('[data-lt="first-line"]')).toBeNull()
+    expect(s.refs.composer.querySelector('[data-lt="prologue"]')).toBeNull()
     s.dispose()
   })
 })

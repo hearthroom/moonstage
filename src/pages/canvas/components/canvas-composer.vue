@@ -32,8 +32,9 @@
       <!-- 第一句選項（有開場網頁的卡，例如風月匯入）：一顆下拉鈕緊貼在快捷列與輸入區上方，開場網頁一路貼到這一排。
            照風月做成下拉：選項常是整段文字，點一條就當第一句送出，展開後每條整段顯示，玩家讀完才點。
            一般卡的開場選項仍是訊息列之後的獨立區塊（canvas-prologue）。
-           清單沿用 .prologue-scope／.prologue-content，作者寫給開場選項的樣式照樣打得到。 -->
-      <div v-if="choices && choices.items.length" ref="choicesEl" class="composer-choices" data-lt="first-line"
+           清單沿用 .prologue-scope／.prologue-content，作者寫給開場選項的樣式照樣打得到。
+           data-lt="prologue" 掛在一直看得到的這一排（新手導覽指向它），不掛在收起時隱藏的清單上。 -->
+      <div v-if="choices && choices.items.length" ref="choicesEl" class="composer-choices" data-lt="prologue"
            @keydown.esc="onChoicesEsc" @focusout="onChoicesFocusOut">
         <div
           class="composer-choices__toggle"
@@ -54,7 +55,6 @@
           v-show="choicesOpen"
           :id="choicesId"
           class="prologue-scope prologue-scope--dock"
-          data-lt="prologue"
           role="group"
           :aria-label="choices.title"
         >
