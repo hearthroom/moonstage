@@ -49,12 +49,44 @@ function makeApi(over) {
 
 describe('luna intent api', () => {
   describe('輸入框', () => {
-    it('get / set / append 轉給宿主', () => {
-      const a = makeApi()
+    it('get / set / append / add / insert / clear / focus / blur / getCursor / setCursor 轉給宿主（相容 sdk.input 介面）', () => {
+      let cursor = 0
+      const a = makeApi({
+        host: {
+          focusInput: () => { a.calls.push(['focusInput']); return true },
+          blurInput: () => { a.calls.push(['blurInput']); return true },
+          getCursor: () => cursor,
+          setCursor: (n) => { cursor = n; a.calls.push(['setCursor', n]); return true },
+        },
+      })
       expect(a.api.input.set('你好')).toBe(true)
       expect(a.api.input.get()).toBe('你好')
       expect(a.api.input.append('世界')).toBe(true)
       expect(a.draft()).toBe('你好世界')
+      expect(a.api.input.add('！')).toBe(true)
+      expect(a.draft()).toBe('你好世界！')
+      cursor = 2
+      expect(a.api.input.getCursor()).toBe(2)
+      expect(a.api.input.insert('，')).toBe(true)
+      expect(a.draft()).toBe('你好，世界！')
+      expect(a.api.input.getCursor()).toBe(3)
+      expect(a.api.input.setCursor(1)).toBe(true)
+      expect(a.api.input.getCursor()).toBe(1)
+      expect(a.api.input.focus()).toBe(true)
+      expect(a.api.input.blur()).toBe(true)
+      expect(a.api.input.clear()).toBe(true)
+      expect(a.draft()).toBe('')
+    })
+
+    it('message.send(text) 相容 sdk.message.send：先填入文字再於手勢期間送出；非手勢期間拒絕且不覆寫玩家草稿', async () => {
+      const a = makeApi()
+      a.api.input.set('玩家寫一半的草稿')
+      await expect(a.api.message.send('非手勢偷送')).rejects.toMatchObject({ code: ERR_NOT_GESTURE })
+      expect(a.draft()).toBe('玩家寫一半的草稿')
+      a.noteUserGesture()
+      await expect(a.api.message.send('注入並送出')).resolves.toBeTruthy()
+      expect(a.calls).toContainEqual(['setInput', '注入並送出'])
+      expect(a.calls).toContainEqual(['submit', '注入並送出'])
     })
 
     it('輸入法組字期間拒絕寫入，回 false 不拋錯', () => {

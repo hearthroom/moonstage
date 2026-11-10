@@ -137,6 +137,59 @@ function createStageIntentApi(options) {
       append: function (text) {
         return writeInput('appendInput', text)
       },
+      add: function (text) {
+        return writeInput('appendInput', text)
+      },
+      insert: function (text) {
+        const piece = String(text == null ? '' : text)
+        const cur = api.input.get()
+        const pos = Math.max(0, Math.min(cur.length, api.input.getCursor()))
+        const ok = writeInput('setInput', cur.slice(0, pos) + piece + cur.slice(pos))
+        if (ok) call('setCursor', [pos + piece.length])
+        return ok
+      },
+      clear: function () {
+        return writeInput('setInput', '')
+      },
+      focus: function () {
+        return call('focusInput').ok
+      },
+      blur: function () {
+        return call('blurInput').ok
+      },
+      getCursor: function () {
+        const r = call('getCursor')
+        return r.ok && typeof r.value === 'number' && Number.isFinite(r.value) ? r.value : api.input.get().length
+      },
+      setCursor: function (pos) {
+        const n = Number(pos)
+        if (!Number.isFinite(n) || n < 0) return false
+        return call('setCursor', [Math.floor(n)]).ok
+      },
+    },
+
+    message: {
+      send: function (text) {
+        if (now() - lastGestureAt > GESTURE_WINDOW_MS) {
+          return Promise.reject({ code: ERR_NOT_GESTURE })
+        }
+        if (isComposing()) return Promise.reject({ code: ERR_COMPOSING })
+        if (!allowSend()) {
+          return Promise.reject({ code: ERR_RATE_LIMITED })
+        }
+        if (text != null) {
+          if (!call('setInput', [String(text)]).ok) return Promise.reject({ code: ERR_UNSUPPORTED })
+        }
+        const current = api.input.get()
+        const rewritten = runBeforeSend(current)
+        if (rewritten !== current) {
+          if (isComposing()) return Promise.reject({ code: ERR_COMPOSING })
+          call('setInput', [rewritten])
+        }
+        const r = call('submit')
+        if (!r.ok) return Promise.reject({ code: ERR_UNSUPPORTED })
+        return Promise.resolve(r.value)
+      },
     },
 
     /**
@@ -146,23 +199,7 @@ function createStageIntentApi(options) {
      * 會變成自問自答，所以非手勢一律拒絕。
      */
     send: function () {
-      if (now() - lastGestureAt > GESTURE_WINDOW_MS) {
-        return Promise.reject({ code: ERR_NOT_GESTURE })
-      }
-      if (!allowSend()) {
-        return Promise.reject({ code: ERR_RATE_LIMITED })
-      }
-      const current = api.input.get()
-      const rewritten = runBeforeSend(current)
-      if (rewritten !== current) {
-        // 改寫後先回填輸入框再送：使用者送出的就是他看得到的那串字，
-        // 不存在「顯示一套、送出另一套」。
-        if (isComposing()) return Promise.reject({ code: ERR_COMPOSING })
-        call('setInput', [rewritten])
-      }
-      const r = call('submit')
-      if (!r.ok) return Promise.reject({ code: ERR_UNSUPPORTED })
-      return Promise.resolve(r.value)
+      return api.message.send()
     },
 
     background: {

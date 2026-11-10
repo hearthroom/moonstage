@@ -77,8 +77,8 @@ export function buildShell(doc: Document, mount: HTMLElement, options: BuildShel
   const toolbar = el(doc, 'div', { 'data-slot': 'toolbar' })
   const row = el(doc, 'div', { 'data-chat': 'composer-row' })
   const more = el(doc, 'button', { 'data-chat': 'more', type: 'button', title: options.strings.more }, '＋')
-  const input = el(doc, 'textarea', { 'data-chat': 'input', rows: '1', placeholder: options.strings.placeholder })
-  const send = el(doc, 'button', { 'data-chat': 'send', type: 'button' }, options.strings.send)
+  const input = el(doc, 'textarea', { id: 'send_textarea', class: 'uni-textarea-textarea', 'data-chat': 'input', rows: '1', placeholder: options.strings.placeholder })
+  const send = el(doc, 'button', { id: 'send_but', 'data-chat': 'send', type: 'button' }, options.strings.send)
   row.append(more, input, send)
   composer.append(toolbar, row)
   composer.hidden = !options.composerVisible

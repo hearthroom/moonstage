@@ -238,9 +238,21 @@ export function createShell(options: CreateShellOptions): Shell {
     const inner = composerVm.value && composerVm.value.textareaEl
     return (inner && (inner.el || inner.$el)) || null
   }
+  const protoInputDesc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(refs.input), 'value')
+    || (typeof HTMLTextAreaElement !== 'undefined' ? Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value') : undefined)
+  const getRawShellInput = () => (protoInputDesc?.get ? protoInputDesc.get.call(refs.input) : '')
+  const setRawShellInput = (t: string) => { if (protoInputDesc?.set) protoInputDesc.set.call(refs.input, t) }
   const input = {
-    get: () => (standardChrome ? inputValue.value : refs.input.value),
-    set: (t: string) => { if (standardChrome) inputValue.value = t; else refs.input.value = t },
+    get: () => (standardChrome ? inputValue.value : getRawShellInput()),
+    set: (t: string) => {
+      if (standardChrome) {
+        inputValue.value = t
+        const el = standardTextarea()
+        if (el && el.value !== t) el.value = t
+      } else {
+        setRawShellInput(t)
+      }
+    },
     focus: () => { const el = standardChrome ? standardTextarea() : refs.input; if (el) el.focus() },
     blur: () => { const el = standardChrome ? standardTextarea() : refs.input; if (el) el.blur() },
     getCursor: () => { const el = standardChrome ? standardTextarea() : refs.input; return el ? (el.selectionStart ?? 0) : input.get().length },
@@ -566,16 +578,36 @@ export function createShell(options: CreateShellOptions): Shell {
   // input:change 只在值真的變了才發：冷啟動時宿主同步一次空草稿、殼自己也有初始的空值，
   // 沒有這道去重會在 mount 與 done 之間多冒出兩則空的 input:change。
   let lastInputEmitted = input.get()
+  let lastInputSent = input.get()
   const emitInputChange = () => {
     if (input.get() === lastInputEmitted) return
     lastInputEmitted = input.get()
     bus.emit('input:change', input.get())
   }
   const emitInput = () => {
+    const cur = input.get()
     emitInputChange()
-    transport.send({ type: 'input', value: input.get() })
+    if (cur === lastInputSent) return
+    lastInputSent = cur
+    transport.send({ type: 'input', value: cur })
+  }
+  if (protoInputDesc?.get && protoInputDesc?.set && !Object.prototype.hasOwnProperty.call(refs.input, 'value')) {
+    Object.defineProperty(refs.input, 'value', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return getRawShellInput()
+      },
+      set(next: unknown) {
+        const str = next == null ? '' : String(next)
+        const prev = getRawShellInput()
+        setRawShellInput(str)
+        if (!standardChrome && str !== prev) emitInput()
+      },
+    })
   }
   refs.input.addEventListener('input', emitInput)
+  refs.input.addEventListener('change', emitInput)
   refs.input.addEventListener('compositionstart', () => { composing = true })
   refs.input.addEventListener('compositionend', () => { composing = false })
   const sendFromComposer = () => {
@@ -904,6 +936,7 @@ export function createShell(options: CreateShellOptions): Shell {
         return
       case 'input':
         input.set(String(message.value ?? ''))
+        lastInputSent = input.get()
         emitInputChange()
         return
       case 'chrome': {

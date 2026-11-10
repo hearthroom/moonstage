@@ -3518,6 +3518,16 @@ function buildAuthorAssetHost() {
     getInput: () => { const el = inputEl(); return el ? el.value : ''; },
     setInput: (text) => writeDraft(text),
     appendInput: (text) => { const el = inputEl(); return writeDraft((el ? el.value : '') + text); },
+    focusInput: () => { const el = inputEl(); if (!el) return false; el.focus(); return true; },
+    blurInput: () => { const el = inputEl(); if (!el) return false; el.blur(); return true; },
+    getCursor: () => { const el = inputEl(); return el ? (el.selectionStart ?? el.value.length) : 0; },
+    setCursor: (pos) => {
+      const el = inputEl();
+      if (!el) return false;
+      const p = Math.max(0, Math.min(Number(pos) || 0, el.value.length));
+      try { el.setSelectionRange(p, p); } catch (e) { /* 沒聚焦時部分瀏覽器會丟 */ }
+      return true;
+    },
     // 送出後把草稿清掉。App 自己送出時清的是它的反應式狀態，而作者這條路徑是
     // 直接寫 DOM 的 textarea，兩者不同步——不補這一下，作者按鈕送出後輸入框會
     // 留著剛剛那句話，使用者以為沒送出去而再按一次。
@@ -4084,6 +4094,9 @@ function applyAuthorAsset(asset) {
       runtime: authorAssetRuntime,
     });
     window.stage = stageIntent.api;
+    // 有些 MMD 卡在 classic 模式下也直接呼叫 window.sdk.input.*／window.sdk.on(...)；
+    // 一般頁將 window.sdk 指向同一份意圖 API，讓這類雙模式寫法的腳本直接生效。
+    (window as any).sdk = stageIntent.api;
     // HUD 外掛的原生橋：資料從真實狀態來，動作直接呼叫既有函式（見 canvas-hud-bridge.ts）。
     // 掛在外掛約定的全域名下，它的 Host 啟動時先找這個，找不到才退回抓 DOM。
     // 要在掛載作者資產之前放好：CDN 模式的載入腳本就是從掛載內容裡跑起來的。
@@ -4376,6 +4389,7 @@ function disposeAuthorAsset() {
   authorAssetRuntime = null;
   stageIntent = null;
   if (typeof window !== 'undefined' && window.stage) { try { delete window.stage; } catch (e) { window.stage = undefined; } }
+  if (typeof window !== 'undefined' && (window as any).sdk) { try { delete (window as any).sdk; } catch (e) { (window as any).sdk = undefined; } }
   if (hudBridgeRef.value) {
     try { hudBridgeRef.value.destroy(); } catch (e) { /* 收尾不得拋錯 */ }
     hudBridgeRef.value = null;

@@ -1,5 +1,5 @@
 <template>
-  <div ref="composerEl" class="composer-scope">
+  <div ref="composerEl" class="composer-scope composer" :data-chat="chat ? undefined : 'composer'">
     <!--
       停止鍵刻意放在 .chat-bottom 外面。
       作者的卡片會寫 `.kg .chat-bottom{…}`，也有卡片整塊藏掉底部自己畫一套；
@@ -133,7 +133,7 @@
           <div class="uni-textarea" :class="stateClass">
             <div
               id="chat-input-scope"
-              class="chat-input-scope has-toolbar composer-field"
+              class="chat-input-scope chat-input has-toolbar composer-field"
               :class="stateClass"
               @pointerdown="onScopePointerDown"
             >
@@ -181,7 +181,7 @@
               </div>
 
               <div class="chatMsgTextarea" :style="expanded ? undefined : collapsedInputStyle">
-                <div class="uni-textarea-wrapper">
+                <div id="moonstage-input" class="uni-textarea-wrapper textarea-wrapper input-wrapper">
                   <div v-show="!value" class="uni-textarea-placeholder input-placeholder">{{ placeholder }}</div>
                   <CanvasTextarea
                     ref="textareaEl"
@@ -512,11 +512,13 @@ const sendAriaLabel = computed(() => (props.sendState === 'continue' ? (props.la
 // 展開＝輸入框有焦點。折疊態只畫一行預覽，點它就把焦點交給真的輸入框。
 // 「多行」看內容不看狀態：MMD 一段長文折行也算多行，這裡以換行或長度判。
 const expanded = ref(false)
-// 舊卡的分支按鈕用 offsetParent 篩選輸入框。折疊時仍保留可聚焦的佈局節點，
-// 讓它們寫進真正的草稿；focus 會沿 onFocus 展開，畫面仍只露原本的預覽列。
+// 舊卡的分支按鈕用 offsetParent 篩選輸入框；也有卡片用
+// getBoundingClientRect() 的 r.width > 40 && r.height > 8 篩選。折疊時以透明＋裁切
+// 疊在輸入區內，不佔文流、不吃點擊，但保留真實的佈局寬高與 offsetParent。
 const collapsedInputStyle = {
-  position: 'absolute' as const, width: '1px', height: '1px',
-  overflow: 'hidden', clipPath: 'inset(50%)', pointerEvents: 'none' as const,
+  position: 'absolute' as const, left: '0', right: '0', top: '0', bottom: '0',
+  minWidth: '48px', minHeight: '24px',
+  overflow: 'hidden', clipPath: 'inset(50%)', opacity: '0', pointerEvents: 'none' as const,
 }
 const multiline = computed(() => props.value.includes('\n') || props.value.length > 60)
 const stateClass = computed(() => ({ 'is-expanded': expanded.value, 'is-multiline': multiline.value }))
@@ -536,7 +538,7 @@ function autosize() {
   const el = textareaNode()
   if (!el) return
   el.style.height = 'auto'
-  el.style.height = el.scrollHeight + 'px'
+  if (el.scrollHeight > 0) el.style.height = el.scrollHeight + 'px'
 }
 
 watch(() => props.value, () => nextTick(autosize))

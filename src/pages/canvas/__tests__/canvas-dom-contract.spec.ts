@@ -334,7 +334,7 @@ describe('畫布契約：輸入框是卡片腳本抓得到的形態', () => {
     expect(ph!.textContent).toContain('說點什麼')
   })
 
-  it('原生 input 事件（卡片腳本寫值後 dispatch 的那個）會被聽到', async () => {
+  it('原生 input 事件（卡片腳本寫值後 dispatch 的那個）會被聽到，且不與 .value setter 重複送出', async () => {
     const wrapper = mount(CanvasComposer, {
       props: { value: '', placeholder: 'x', sendState: 'send', generating: false },
     })
@@ -342,7 +342,29 @@ describe('畫布契約：輸入框是卡片腳本抓得到的形態', () => {
     ta.value = '卡片寫進來的字'
     ta.dispatchEvent(new Event('input', { bubbles: true }))
     await wrapper.vm.$nextTick()
-    expect(wrapper.emitted('update:value')?.[0]).toEqual(['卡片寫進來的字'])
+    expect(wrapper.emitted('update:value')).toEqual([['卡片寫進來的字']])
+  })
+
+  it('卡片腳本直接設 ta.value 而不 dispatch input 事件時，一樣會更新草稿', async () => {
+    const wrapper = mount(CanvasComposer, {
+      props: { value: '', placeholder: 'x', sendState: 'send', generating: false },
+    })
+    const ta = wrapper.element.querySelector('textarea#send_textarea') as HTMLTextAreaElement
+    ta.value = 'Synthetic opening'
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('update:value')).toEqual([['Synthetic opening']])
+  })
+
+  it('卡片腳本用 HTMLTextAreaElement.prototype.value setter 寫值並 dispatch change 事件時，一樣會更新草稿', async () => {
+    const wrapper = mount(CanvasComposer, {
+      props: { value: '', placeholder: 'x', sendState: 'send', generating: false },
+    })
+    const ta = wrapper.element.querySelector('textarea#send_textarea') as HTMLTextAreaElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    setter.call(ta, '透過 prototype setter + change 寫入')
+    ta.dispatchEvent(new Event('change', { bubbles: true }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('update:value')).toEqual([['透過 prototype setter + change 寫入']])
   })
 
   it('卡片腳本點 .send-msg .btn-icon 就等於按下送出', async () => {
@@ -354,6 +376,45 @@ describe('畫布契約：輸入框是卡片腳本抓得到的形態', () => {
     btn.click()
     await wrapper.vm.$nextTick()
     expect(wrapper.emitted('send')).toBeTruthy()
+  })
+
+  it('卡片腳本在同一 tick 內寫 ta.value 並觸發送出（父層同 tick 清回空字串）後，DOM 與去重狀態會在微任務尾端歸零，下一輪點同一個按鈕仍能送出', async () => {
+    let draft = ''
+    const sent: string[] = []
+    const wrapper = mount({
+      components: { CanvasComposer },
+      data() {
+        return { value: '' }
+      },
+      methods: {
+        onUpdate(v: string) {
+          draft = v
+          this.value = v
+        },
+        onSend() {
+          sent.push(draft)
+          draft = ''
+          this.value = ''
+        },
+      },
+      template: '<CanvasComposer :value="value" placeholder="x" sendState="send" :generating="false" @update:value="onUpdate" @send="onSend" />',
+    })
+    const ta = wrapper.element.querySelector('textarea#send_textarea') as HTMLTextAreaElement
+    const sendBtn = wrapper.element.querySelector('#send_but') as HTMLElement
+
+    // 第一輪：同一個同步 tick 內填值＋點送出（父層 value 經歷 '' -> '探索四周' -> ''）
+    ta.value = '探索四周'
+    sendBtn.click()
+    await wrapper.vm.$nextTick()
+    expect(sent).toEqual(['探索四周'])
+    expect(ta.value).toBe('')
+
+    // 第二輪：再點同一個按鈕（寫入相同字串 '探索四周'），不能被 lastEmitted 誤擋
+    ta.value = '探索四周'
+    sendBtn.click()
+    await wrapper.vm.$nextTick()
+    expect(sent).toEqual(['探索四周', '探索四周'])
+    expect(ta.value).toBe('')
   })
 
   it('停止鍵不在卡片會整塊隱藏的 .chat-bottom 裡（I-2）', () => {

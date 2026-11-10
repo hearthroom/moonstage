@@ -1266,3 +1266,52 @@ describe('殼：首屏網頁', () => {
     expect(slot.hidden).toBe(false)
   })
 })
+
+describe('殼：MMD／酒館找輸入框與直接設 .value 相容性', () => {
+  it('standard chrome 下常見選擇器都找得到同一顆 textarea，且直接設 ta.value（不 dispatch input）也會同步 sdk.input 與宿主', async () => {
+    const header = { roleName: 'Example', avatar: '', badge: '', backLabel: 'Back' }
+    const composer = { placeholder: '說點什麼', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Assist', perTurn: 'Per turn' } }
+    const s = boot(config({ chromeState: { header, composer }, card: { rules: [], statusbar: '' } }))
+    await nextTick()
+    const selectors = [
+      '#send_textarea',
+      'textarea.uni-textarea-textarea',
+      '.chatMsgTextarea textarea',
+      '.chat-input-scope textarea',
+      '.composer textarea',
+      '.chat-input textarea',
+      '[data-chat="composer"] textarea',
+      '[data-chat="input"]',
+      '#moonstage-input textarea.uni-textarea-textarea',
+    ]
+    const ta = s.refs.composer.querySelector('#send_textarea') as HTMLTextAreaElement
+    expect(ta).toBeTruthy()
+    for (const sel of selectors) {
+      expect(s.refs.root.querySelector(sel), `${sel} 應命中輸入框`).toBe(ta)
+    }
+    sent = []
+    ta.value = 'Synthetic opening'
+    await nextTick()
+    expect(s.sdk.input.get()).toBe('Synthetic opening')
+    expect(sent.filter((m) => m.type === 'input')).toEqual([{ type: 'input', value: 'Synthetic opening' }])
+
+    // 同一同步 tick 內設 ta.value 又呼叫 sdk.input.clear()，DOM 與 sdk.input 都立即歸零，再設同字串不會被攔
+    ta.value = 'Same draft'
+    s.sdk.input.clear()
+    expect(ta.value).toBe('')
+    expect(s.sdk.input.get()).toBe('')
+    ta.value = 'Same draft'
+    expect(s.sdk.input.get()).toBe('Same draft')
+  })
+
+  it('shell 陽春 chrome 下 #send_textarea／.uni-textarea-textarea／#send_but 也對齊，且直接設 .value 會同步 sdk.input 與宿主', () => {
+    const s = boot(config())
+    expect(s.refs.root.querySelector('#send_textarea')).toBe(s.refs.input)
+    expect(s.refs.root.querySelector('textarea.uni-textarea-textarea')).toBe(s.refs.input)
+    expect(s.refs.root.querySelector('#send_but')).toBe(s.refs.send)
+    sent = []
+    s.refs.input.value = '直接寫進陽春殼'
+    expect(s.sdk.input.get()).toBe('直接寫進陽春殼')
+    expect(sent.filter((m) => m.type === 'input')).toEqual([{ type: 'input', value: '直接寫進陽春殼' }])
+  })
+})

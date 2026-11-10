@@ -99,4 +99,25 @@ describe('HTML card parity custom elements', () => {
 
     alert.remove()
   })
+
+  it('fills textarea#send_textarea or textarea[data-chat="input"] when hc-btn is clicked', () => {
+    const textarea = document.createElement('textarea')
+    textarea.id = 'send_textarea'
+    textarea.setAttribute('data-chat', 'input')
+    let inputCount = 0
+    textarea.addEventListener('input', () => { inputCount++ })
+    document.body.appendChild(textarea)
+
+    const btn = document.createElement('hc-btn')
+    btn.setAttribute('send', '觀察四周')
+    btn.textContent = '觀察四周'
+    document.body.appendChild(btn)
+
+    btn.shadowRoot.querySelector('button').click()
+    expect(textarea.value).toBe('觀察四周')
+    expect(inputCount).toBe(1)
+
+    btn.remove()
+    textarea.remove()
+  })
 })
