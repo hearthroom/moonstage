@@ -218,12 +218,48 @@ describe('mountOpeningPage', () => {
     let measured = 0
     const page = mountOpeningPage(box, '<p>首屏</p>', { fill() {}, send() {} }, { maxHeight: () => { measured++; return 600 } })
     const before = measured
+    // 第一個觀察器看聊天區裡的內容；第二個看聊天區本身（見下一條）。
     shown = false
-    callbacks.forEach((cb) => cb())
+    callbacks[0]()
     expect(measured).toBe(before)
     shown = true
-    callbacks.forEach((cb) => cb())
+    callbacks[0]()
     expect(measured).toBe(before + 1)
+    page.destroy()
+    scroller.remove()
+    vi.unstubAllGlobals()
+  })
+
+  it('聊天區變矮而視窗沒變（輸入區多了一排第一句選項）：重量框；視窗高度變了（鍵盤開合）不動', () => {
+    const observers: Array<{ cb: () => void; targets: Element[] }> = []
+    const RO = class {
+      targets: Element[] = []
+      constructor(cb: () => void) { observers.push({ cb, targets: this.targets }) }
+      observe(el: Element) { this.targets.push(el) }
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', RO)
+    const scroller = document.createElement('div')
+    scroller.style.overflowY = 'auto'
+    Object.defineProperty(scroller, 'clientHeight', { value: 700 })
+    Object.defineProperty(scroller, 'clientWidth', { value: 390 })
+    const box = document.createElement('div')
+    scroller.appendChild(box)
+    document.body.appendChild(scroller)
+    box.getClientRects = () => [box.getBoundingClientRect()] as unknown as DOMRectList
+    let cap = 600
+    const page = mountOpeningPage(box, '<p>首屏</p>', { fill() {}, send() {} }, { maxHeight: () => cap })
+    const area = observers.find((o) => o.targets.includes(scroller))
+    expect(area).toBeTruthy()
+    cap = 560
+    area!.cb()
+    expect(page.frame.style.height).toBe('560px')
+    const innerHeight = window.innerHeight
+    Object.defineProperty(window, 'innerHeight', { value: innerHeight - 300, configurable: true })
+    cap = 300
+    area!.cb()
+    expect(page.frame.style.height).toBe('560px')
+    Object.defineProperty(window, 'innerHeight', { value: innerHeight, configurable: true })
     page.destroy()
     scroller.remove()
     vi.unstubAllGlobals()

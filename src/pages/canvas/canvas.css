@@ -97,6 +97,11 @@
   padding-inline: calc((100% - min(100%, var(--lt-canvas-column-width, 100%))) / 2);
 }
 
+/* 第一句選項那一排（有開場網頁的卡）跟快捷列同一種：滿寬、欄距用內距收。 */
+.composer-choices {
+  padding-inline: calc((100% - min(100%, var(--lt-canvas-column-width, 100%))) / 2);
+}
+
 /*
   彈層裡「淡一階的字」是相對的，不是一個固定的顏色。
 
@@ -612,6 +617,23 @@
     display: flex;
     flex-direction: column;
     gap: var(--lt-canvas-row-gap);
+  }
+
+  /* 開場網頁還在、它下面沒有別的訊息（開場網頁卡還沒送出第一句）：對話欄底部不留內距與列距，
+     開場網頁一路貼到輸入區（第一句選項在輸入區最上面那一排）。一般頁是 .opening-page，沙箱殼是
+     [data-slot="opening"] 後面接一個空的訊息列。作者把輸入區往上推的那一段（overhang）照留。 */
+  #chat:has(.opening-page + .chat-scroll-anchor),
+  #chat:has([data-slot="opening"]:not([hidden]) + [data-chat="list"]:empty) {
+    --lt-chat-pad-bottom: var(--lt-canvas-composer-overhang, 0px);
+  }
+
+  .opening-page + .chat-scroll-anchor,
+  [data-slot="opening"]:not([hidden]) + [data-chat="list"]:empty + .chat-scroll-anchor {
+    margin-top: calc(-1 * var(--lt-canvas-row-gap, 0px));
+  }
+
+  [data-slot="opening"]:not([hidden]) + [data-chat="list"]:empty {
+    display: none;
   }
 
   .chat-scroll-anchor {
@@ -1177,6 +1199,76 @@
 
   .prologue-content:hover {
     border-color: var(--lt-canvas-fg);
+  }
+
+  .prologue-content:focus-visible {
+    outline: 2px solid var(--lt-canvas-accent);
+    outline-offset: 1px;
+  }
+
+  /* 第一句選項（有開場網頁的卡）：輸入區最上面一顆下拉鈕，跟快捷列同一種底色，開場網頁貼到這一排為止。
+     清單往上展開、蓋在開場網頁上（風月也是浮層蓋著詳細介紹），每條整段顯示。 */
+  .composer-choices {
+    position: relative;
+    background: var(--lt-canvas-composer-bg);
+  }
+
+  .composer-choices__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    box-sizing: border-box;
+    margin: 8px 12px 0;
+    padding: 4px 10px 4px 12px;
+    border-radius: 9999px;
+    border: 1px solid var(--lt-canvas-line);
+    background: transparent;
+    color: var(--lt-canvas-composer-fg, var(--lt-canvas-fg));
+    font: inherit;
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .composer-choices__toggle:focus-visible {
+    outline: 2px solid var(--lt-canvas-accent);
+    outline-offset: 1px;
+  }
+
+  .composer-choices__chevron {
+    width: 14px;
+    height: 14px;
+    transition: transform 150ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .composer-choices__toggle.is-open .composer-choices__chevron {
+    transform: rotate(180deg);
+  }
+
+  .prologue-scope--dock {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    /* 跟下拉鈕對齊欄邊：left 的百分比跟 .composer-choices 的欄距內距同一個基準 */
+    left: calc((100% - min(100%, var(--lt-canvas-column-width, 100%))) / 2 + 12px);
+    width: min(560px, calc(min(100%, var(--lt-canvas-column-width, 100%)) - 24px));
+    max-height: min(60vh, 480px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 8px;
+    border-radius: var(--lt-canvas-menu-radius, 12px);
+    border: 1px solid var(--lt-canvas-line);
+    background: var(--lt-canvas-menu-bg, var(--lt-canvas-composer-bg));
+    color: var(--lt-canvas-menu-fg, var(--lt-canvas-fg));
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  }
+
+  .prologue-scope--dock .prologue-content {
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.6;
   }
 
   /* ── 角色介紹 ─────────────────────────────────────────────────── */

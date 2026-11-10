@@ -4011,6 +4011,7 @@
 	"canvas.greeting.prev": "上一段开场",
 	"canvas.greeting.next": "下一段开场",
 	"canvas.prologue.title": "你可以选择开场",
+	"canvas.prologue.firstLine": "第一句",
 	"canvas.menu.title": "这条消息",
 	"canvas.menu.rewind": "倒回这里",
 	"canvas.menu.rewindConfirm": "故事会倒回这一条，后面的内容不会留下。",

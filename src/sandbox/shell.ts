@@ -237,6 +237,8 @@ export function createShell(options: CreateShellOptions): Shell {
   const modelNow = () => ({ name: String(chromeState.composer?.modelName || ''), cost: String(chromeState.composer?.modelScore || '') })
   const modelKey = () => { const m = modelNow(); return m.name + '\u0000' + m.cost }
   const inputValue = ref('')
+  /** 有開場網頁的卡：第一句選項畫在標準輸入區最上面一排（見 renderPrologue）；null＝不畫。 */
+  const dockedChoices = ref<{ title: string; items: string[] } | null>(null)
   const composerVm = ref<{ textareaEl?: { el?: HTMLTextAreaElement; $el?: HTMLTextAreaElement } } | null>(null)
   const standardTextarea = (): HTMLTextAreaElement | null => {
     const inner = composerVm.value && composerVm.value.textareaEl
@@ -687,6 +689,8 @@ export function createShell(options: CreateShellOptions): Shell {
         onContext: () => sendUi('context'),
         onMeterHintDone: () => sendUi('meter-hint-done'),
         onShortcut: (key: string) => sendUi('shortcut', key),
+        choices: dockedChoices.value,
+        onChoice: (index: number) => { sendUi('prologue', String(index)); input.focus() },
         onPasteFeedback: (reason: 'failed' | 'empty') => sendUi('paste-feedback', reason),
       } as Record<string, unknown>),
     })
@@ -839,6 +843,11 @@ export function createShell(options: CreateShellOptions): Shell {
   let prologueEl: HTMLElement | null = null
   const renderPrologue = (title: string, items: string[]) => {
     if (prologueEl) { prologueEl.remove(); prologueEl = null }
+    // 有開場網頁的卡：選項跟一般頁一樣放進輸入區最上面一排，開場網頁貼到那一排為止；殼自己的陽春輸入區沒有那一排，照舊放訊息列後面。
+    if (openingHtml.trim() && standardChrome) {
+      dockedChoices.value = items.length ? { title, items } : null
+      return
+    }
     if (!items.length) return
     const scope = doc.createElement('div')
     scope.className = 'prologue-scope'

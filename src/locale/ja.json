@@ -4011,6 +4011,7 @@
 	"canvas.greeting.prev": "前のオープニング",
 	"canvas.greeting.next": "次のオープニング",
 	"canvas.prologue.title": "開幕を選ぶ",
+	"canvas.prologue.firstLine": "最初のひとこと",
 	"canvas.menu.title": "このメッセージ",
 	"canvas.menu.rewind": "ここまで戻す",
 	"canvas.menu.rewindConfirm": "ここまで物語を戻します。これより後の内容は残りません。",

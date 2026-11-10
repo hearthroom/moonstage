@@ -17,6 +17,10 @@
     padding: 12px max(12px, var(--lt-canvas-dock-right, 0px)) var(--lt-chat-pad-bottom) max(12px, var(--lt-canvas-dock-left, 0px));
     box-sizing: border-box
 }
+.opening-page + .chat-scroll-anchor,
+  [data-slot="opening"]:not([hidden]) + [data-chat="list"]:empty + .chat-scroll-anchor {
+    margin-top: calc(-1 * var(--lt-canvas-row-gap, 0px))
+}
 .lt-prep-live {
     padding: 10px 12px
 }
@@ -31,6 +35,10 @@
 }
 .agent-resume-card:has(.agent-resume-card__alt) .agent-resume-card__actions {
     margin-left: auto
+}
+.composer-choices__toggle {
+    margin: 8px 12px 0;
+    padding: 4px 10px 4px 12px
 }
 .canvas-sandbox-frame {
     padding-bottom: var(--lt-viewport-safe-area-bottom, env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px)))

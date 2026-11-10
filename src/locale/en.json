@@ -4011,6 +4011,7 @@
 	"canvas.greeting.prev": "Previous opening",
 	"canvas.greeting.next": "Next opening",
 	"canvas.prologue.title": "Choose an opening",
+	"canvas.prologue.firstLine": "First line",
 	"canvas.menu.title": "Message actions",
 	"canvas.menu.rewind": "Rewind to here",
 	"canvas.menu.rewindConfirm": "The story goes back to this message. Everything after it is dropped.",

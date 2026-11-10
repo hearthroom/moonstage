@@ -113,7 +113,7 @@
 
       <!-- MMD 的「你可以選擇開場」：訊息列之後的獨立區塊（照 MMD 的 DOM 位置）。
            點一條把那句話填進輸入框，由玩家自己送出——不是換開場白。 -->
-      <CanvasPrologue v-if="canGenerate" :title="prologueTitle" :items="prologueItems" @pick="onProloguePick" />
+      <CanvasPrologue v-if="canGenerate && !openingDocked" :title="prologueTitle" :items="prologueItems" @pick="onProloguePick" />
     </CanvasStage>
 
     <div v-if="!canGenerate" class="lt-history-access" :class="{'lt-history-access--rejected':accessInterrupted}" :role="accessInterrupted ? 'alert' : 'status'">
@@ -150,6 +150,8 @@
       :balance-hint="modelBalanceHint"
       :meter-hint="meterHint"
       :labels="composerLabels"
+      :choices="canGenerate && openingDocked ? { title: prologueTitle, items: prologueItems } : null"
+      @choice="onProloguePick"
       @update:value="content = $event"
       @send="onCanvasSend"
       @continue="onCanvasSend"
@@ -10114,7 +10116,10 @@ function cancelAssist() { assistSession.cancel(); if(!assistSession.state.visibl
 
 const prologue = ref<string[]>([])
 const composerRef = ref<any>(null)
-const prologueTitle = computed(() => t('canvas.prologue.title'))
+// 有開場網頁的卡（風月的「詳細介紹」）：選項是玩家的第一句，改放輸入區最上面一排、標題叫「第一句」，
+// 開場網頁一路貼到那一排；一般卡照 MMD 的「你可以選擇開場」放在訊息列後面。沙箱殼收到同一個標題，自己決定放哪。
+const openingDocked = computed(() => !!openingPage.value.trim())
+const prologueTitle = computed(() => t(openingDocked.value ? 'canvas.prologue.firstLine' : 'canvas.prologue.title'))
 const prologueItems = computed(() => (
   shouldShowPrologue(prologue.value, talkList.value)
     ? prologue.value.map((line) => convertPlainText(line, displayScript))

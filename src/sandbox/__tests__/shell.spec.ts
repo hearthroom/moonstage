@@ -737,6 +737,40 @@ describe('殼：開場選項（MMD prologue）', () => {
     s.handle({ type: 'prologue', title: '选择开场', items: [] })
     expect(s.refs.messages.querySelector('[data-lt="prologue"]')).toBeNull()
   })
+
+  // owner 2026-11-11：有開場網頁的卡，選項在網頁與輸入區之間佔一大塊、露出背景；改成輸入區最上面一排。
+  it('有開場網頁的卡：選項收在標準輸入區最上面的下拉，不畫在訊息列後面；展開後點一條一樣回報第幾條並收起；清空就拿掉', async () => {
+    const header = { roleName: 'Example', avatar: '', badge: '', backLabel: 'Back' }
+    const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Assist', perTurn: 'Per turn' } }
+    const s = boot(config({ chromeState: { header, composer }, card: { rules: [], statusbar: '', format: 'fengyue', openingPage: '<p>首屏</p>' } }))
+    s.handle({ type: 'prologue', title: '第一句', items: ['我想搭船。', '我留下來。'] })
+    await nextTick()
+    expect(s.refs.messages.querySelector('[data-lt="prologue"]')).toBeNull()
+    const row = s.refs.composer.querySelector('[data-lt="first-line"]') as HTMLElement
+    expect(row).not.toBeNull()
+    // 在快捷列與輸入區之上：開場網頁貼到這一排為止
+    expect(row.nextElementSibling?.classList.contains('shortcut-bar-wrapper')).toBe(true)
+    const toggle = row.querySelector('.composer-choices__toggle') as HTMLElement
+    expect(toggle.textContent!.trim()).toBe('第一句')
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    const list = row.querySelector('[data-lt="prologue"]') as HTMLElement
+    expect(list.style.display).toBe('none')
+    toggle.click()
+    await nextTick()
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(list.style.display).toBe('')
+    const items = [...list.querySelectorAll('.prologue-content')] as HTMLElement[]
+    expect(items.map((n) => n.textContent)).toEqual(['我想搭船。', '我留下來。'])
+    sent = []
+    items[1].click()
+    await nextTick()
+    expect(sent).toContainEqual({ type: 'ui', event: 'prologue', key: '1' })
+    expect(list.style.display).toBe('none')
+    s.handle({ type: 'prologue', title: '第一句', items: [] })
+    await nextTick()
+    expect(s.refs.composer.querySelector('[data-lt="first-line"]')).toBeNull()
+    s.dispose()
+  })
 })
 
 // 沙箱卡看不到宿主的系統訊息卡：第一輪容量不夠時的選擇要走面板，殼用同一個元件畫。

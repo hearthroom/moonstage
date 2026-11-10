@@ -29,6 +29,48 @@
     </div>
 
     <div class="chat-bottom">
+      <!-- 第一句選項（有開場網頁的卡，例如風月匯入）：一顆下拉鈕緊貼在快捷列與輸入區上方，開場網頁一路貼到這一排。
+           照風月做成下拉：選項常是整段文字，點一條就當第一句送出，展開後每條整段顯示，玩家讀完才點。
+           一般卡的開場選項仍是訊息列之後的獨立區塊（canvas-prologue）。
+           清單沿用 .prologue-scope／.prologue-content，作者寫給開場選項的樣式照樣打得到。 -->
+      <div v-if="choices && choices.items.length" ref="choicesEl" class="composer-choices" data-lt="first-line">
+        <div
+          class="composer-choices__toggle"
+          :class="{ 'is-open': choicesOpen }"
+          role="button"
+          tabindex="0"
+          :aria-expanded="choicesOpen ? 'true' : 'false'"
+          :aria-controls="choicesId"
+          @click="toggleChoices"
+          @keydown.enter.prevent="toggleChoices"
+          @keydown.space.prevent="toggleChoices"
+        >
+          <span class="composer-choices__label">{{ choices.title }}</span>
+          <svg class="composer-choices__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 15l6-6 6 6" /></svg>
+        </div>
+        <div
+          v-show="choicesOpen"
+          :id="choicesId"
+          class="prologue-scope prologue-scope--dock"
+          data-lt="prologue"
+          role="group"
+          :aria-label="choices.title"
+          @keydown.esc.stop.prevent="closeChoices(true)"
+        >
+          <div
+            v-for="(item, ci) in choices.items"
+            :key="'choice-' + ci"
+            class="prologue-content"
+            role="button"
+            tabindex="0"
+            @click.stop="pickChoice(ci)"
+            @keydown.enter.prevent.stop="pickChoice(ci)"
+            @keydown.space.prevent.stop="pickChoice(ci)"
+          >{{ item }}</div>
+        </div>
+      </div>
+
       <!-- 快捷功能欄。卡片實際寫的是 `.shortcut-button-scope .item`（舊名），
            MMD 現在的 DOM 是 `.shortcut-bar > .shortcut-btn`——兩套都要在，
            否則作者手上那張卡的規則會落空。 -->
@@ -453,6 +495,8 @@ const props = withDefaults(defineProps<{
   assistBusy?: boolean
   /** 幫答每次的點數，顯示在 .beta-badge；空字串＝不顯示數字 */
   assistCost?: string | number
+  /** 第一句選項：有開場網頁的卡才給；null 或空清單不畫。點一條送出 choice（第幾條），怎麼處理由頁面決定。 */
+  choices?: { title: string; items: string[] } | null
   /** continue：Agent 暫停時送出鍵變成「繼續」的那個名字（讀屏念的）；沒給就念送出。 */
   labels?: { stop: string; more: string; send: string; paste: string; clear: string; model: string; assist: string; perTurn: string; continue?: string }
 }>(), {
@@ -469,6 +513,7 @@ const props = withDefaults(defineProps<{
   assistEnabled: true,
   assistBusy: false,
   assistCost: '',
+  choices: null,
   labels: () => ({ stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Let AI draft a reply', perTurn: 'Credits per turn', continue: 'Continue' }),
 })
 
@@ -484,12 +529,45 @@ const emit = defineEmits<{
   (e: 'context'): void
   (e: 'meter-hint-done'): void
   (e: 'shortcut', key: string): void
+  (e: 'choice', index: number): void
   (e: 'focus'): void
   (e: 'blur'): void
   (e: 'paste-feedback', reason: 'failed' | 'empty'): void
 }>()
 
 const stopEl = ref<HTMLElement | null>(null)
+
+// ── 第一句選項的下拉 ───────────────────────────────────────────────
+// 點清單外面、按 Esc、焦點移進開場網頁（iframe 拿走焦點時這一層的 window 失焦）都收起來。
+const choicesEl = ref<HTMLElement | null>(null)
+const choicesOpen = ref(false)
+const choicesId = `lt-first-line-${Math.random().toString(36).slice(2, 8)}`
+function onChoicesOutside(e: Event) {
+  if (choicesEl.value && !choicesEl.value.contains(e.target as Node)) closeChoices(false)
+}
+function onChoicesBlur() { closeChoices(false) }
+function closeChoices(refocus: boolean) {
+  if (!choicesOpen.value) return
+  choicesOpen.value = false
+  const doc = choicesEl.value?.ownerDocument
+  doc?.removeEventListener('pointerdown', onChoicesOutside, true)
+  doc?.defaultView?.removeEventListener('blur', onChoicesBlur)
+  if (refocus) choicesEl.value?.querySelector<HTMLElement>('.composer-choices__toggle')?.focus()
+}
+function toggleChoices() {
+  if (choicesOpen.value) { closeChoices(false); return }
+  choicesOpen.value = true
+  const doc = choicesEl.value?.ownerDocument
+  doc?.addEventListener('pointerdown', onChoicesOutside, true)
+  doc?.defaultView?.addEventListener('blur', onChoicesBlur)
+  nextTick(() => choicesEl.value?.querySelector<HTMLElement>('.prologue-content')?.focus())
+}
+function pickChoice(index: number) {
+  closeChoices(false)
+  emit('choice', index)
+}
+watch(() => props.choices?.items.length || 0, (n) => { if (!n) closeChoices(false) })
+onBeforeUnmount(() => closeChoices(false))
 const composerEl = ref<HTMLElement | null>(null)
 watch(() => props.balanceHint, () => {
   nextTick(() => syncChromeTone(composerEl.value))
