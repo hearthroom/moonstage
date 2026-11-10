@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { transpileModule, ModuleKind, ScriptTarget } from 'typescript'
 import { effectScope, nextTick, ref, watch } from 'vue'
 import { expect, it } from 'vitest'
+import { compileRuleCssDialects } from '@/common/rule-css-dialect'
 
 // Run the real host skin lifecycle with synthetic author CSS; no card scripts or API.
 const source = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
@@ -21,7 +22,7 @@ it('applies sandbox card styling to response preferences and restores the host o
  let state: any
  try {
   scope.run(() => {
-   state = new Function('ref', 'watch', 'sandboxCard', 'panel', 'sandboxAsset', lifecycle + '\nreturn { sandboxDocState };')(ref, watch, sandboxCard, panel, asset)
+   state = new Function('ref', 'watch', 'sandboxCard', 'panel', 'sandboxAsset', 'compileRuleCssDialects', lifecycle + '\nreturn { sandboxDocState };')(ref, watch, sandboxCard, panel, asset, compileRuleCssDialects)
   })
   state.sandboxDocState.value = { html: { className: 'test-card-theme', data: { 'data-card-theme': 'night' } }, body: { className: 'test-card-body', data: {} } }
   panel.value = { sheet: 'response-settings' }
@@ -45,5 +46,28 @@ it('applies sandbox card styling to response preferences and restores the host o
   document.documentElement.className = before.html
   document.body.className = before.body
   document.documentElement.removeAttribute('data-card-theme')
+ }
+})
+
+it('the host skin uses Fengyue CSS as translated, never as written', async () => {
+ const scope = effectScope()
+ const panel = ref({ sheet: '' })
+ const asset = { rules: [{ id: 'fy', cssDialect: 'fengyue', replace: '$1<style>body{background:red} #ai-chat-input{background:#fff}</style>' }] }
+ let state: any
+ try {
+  scope.run(() => {
+   state = new Function('ref', 'watch', 'sandboxCard', 'panel', 'sandboxAsset', 'compileRuleCssDialects', lifecycle + '\nreturn { sandboxDocState };')(ref, watch, ref(true), panel, asset, compileRuleCssDialects)
+  })
+  state.sandboxDocState.value = { html: { className: '', data: {} }, body: { className: '', data: {} } }
+  panel.value = { sheet: 'response-settings' }
+  await nextTick()
+  const css = document.querySelector('style[data-lt="sandbox-skin"]')?.textContent || ''
+  expect(css).toContain('@layer lt-author-fengyue')
+  expect(css).not.toContain('background:red')
+  expect(css).not.toContain('#ai-chat-input')
+ } finally {
+  panel.value = { sheet: '' }
+  await nextTick()
+  scope.stop()
  }
 })
