@@ -1244,4 +1244,25 @@ describe('殼：首屏網頁', () => {
     const s = boot(config())
     expect(s.refs.messages.querySelector('[data-slot="opening"]')).toBeNull()
   })
+
+  it('玩家還沒送出第一句時展開；送出第一句後收起，開新對話再展開', () => {
+    const s = boot(config({ card: { rules: [], statusbar: '', format: 'fengyue', openingPage: '<p>TEST-INTRO</p>' } }))
+    const slot = s.refs.messages.querySelector('[data-slot="opening"]') as HTMLElement
+    expect(slot.hidden).toBe(false)
+
+    s.handle({ type: 'messages', messages: [{ id: 'g0', role: 'ai', content: '開場', serverId: 's0', state: 'done' }] })
+    expect(slot.hidden).toBe(false)
+
+    s.handle({ type: 'message.new', message: { id: 'u1', role: 'user', content: '第一句', serverId: 's1', state: 'done' } })
+    expect(slot.hidden).toBe(true)
+
+    s.handle({ type: 'message.remove', id: 'u1' })
+    expect(slot.hidden).toBe(false)
+
+    s.handle({ type: 'messages', messages: [{ id: 'u2', role: 'user', content: '已送過的歷史', serverId: 's2', state: 'done' }] })
+    expect(slot.hidden).toBe(true)
+
+    s.handle({ type: 'conversation.switch', conversationId: 'c-new' })
+    expect(slot.hidden).toBe(false)
+  })
 })

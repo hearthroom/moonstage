@@ -61,8 +61,8 @@
 
     <CanvasStage v-if="!sandboxCard" :background="stageBackground" @scroll="onStageScroll">
       <CanvasIntro :text="introText" :open="introOpen" @toggle="introOpen = !introOpen" />
-      <!-- 首屏網頁（AI 風月的「詳細介紹」）：只在對話的開頭（沒有更早的訊息要載）出現，接在介紹之後、開場白之前。 -->
-      <CanvasOpeningPage v-if="openingPage && !ajax.hasNextPage" :html="openingPage" :title="roleView?.roleName" @fill="fillComposer" @send="sendFromOpeningPage" />
+      <!-- 首屏網頁（AI 風月的「詳細介紹」）：只在對話的開頭、且玩家還沒送出第一句時展開；送出後收起。 -->
+      <CanvasOpeningPage v-if="shouldShowOpeningPage(openingPage, talkList) && !ajax.hasNextPage" :html="openingPage" :title="roleView?.roleName" @fill="fillComposer" @send="sendFromOpeningPage" />
 
       <!-- 前置被擋卡上的重送進行中，被擋那一列整列收起來（filterCardReplaced）：只收卡會留下一列空的「⋯」。 -->
       <template v-for="(item, index) in talkList" :key="item.id != null ? item.id : index">
@@ -553,7 +553,7 @@ import { prepareBackgroundUpload } from './canvas-background-upload'
 import { prepStepText as formatPrepStep } from '@/utils/prep-step-text'
 import { stripUnknownTags, wrapDialogue } from './canvas-platform-defaults'
 import { drawNativeBlocks } from '@/common/native-blocks'
-import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, prologuePickSends, keepsPlayerDraft, showsOpening, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
+import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, shouldShowOpeningPage, prologuePickSends, keepsPlayerDraft, showsOpening, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
 import { archiveRequestQuery, buildArchiveRows, isArchiveFull, nextArchiveAfterDelete } from './canvas-archives'
 import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
 import type { ArchiveRow } from './canvas-archives'

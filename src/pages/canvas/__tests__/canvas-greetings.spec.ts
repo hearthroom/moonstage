@@ -21,6 +21,7 @@ import {
   greetingIndexForStart,
   buildPrologueList,
   shouldShowPrologue,
+  shouldShowOpeningPage,
   prologuePickSends,
   keepsPlayerDraft,
   showsOpening,
@@ -112,6 +113,17 @@ describe('開場選項（MMD prologue）', () => {
     expect(shouldShowPrologue(prologue, [{ type: 0 }])).toBe(true)
     expect(shouldShowPrologue(prologue, [{ type: 0 }, { type: 1 }])).toBe(false)
     expect(shouldShowPrologue([], [{ type: 0 }])).toBe(false)
+  })
+
+  it('開場網頁在玩家還沒送出第一句時展開；送出後收起（一般畫布與沙箱殼同一條規則）', () => {
+    expect(shouldShowOpeningPage('<div>首屏網頁</div>', [])).toBe(true)
+    expect(shouldShowOpeningPage('<div>首屏網頁</div>', [{ type: 0 }, { role: 'assistant' }])).toBe(true)
+    expect(shouldShowOpeningPage('<div>首屏網頁</div>', [{ type: 0 }, { type: 1 }])).toBe(false)
+    expect(shouldShowOpeningPage('<div>首屏網頁</div>', [{ role: 'user' }])).toBe(false)
+    expect(shouldShowOpeningPage('', [])).toBe(false)
+    expect(shouldShowOpeningPage('   ', [])).toBe(false)
+    const page = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
+    expect(page).toContain('shouldShowOpeningPage(openingPage, talkList) && !ajax.hasNextPage')
   })
 
   it('點一條是填輸入框，不是換開場白：頁面的處理函式不碰開場白狀態', () => {

@@ -130,6 +130,20 @@ export function shouldShowPrologue(prologue: string[], messages: Array<{ type?: 
 }
 
 /**
+ * 開場網頁（作者資產 openingPage）什麼時候在畫面上。
+ *
+ * 跟開場選項同一條規則：玩家還沒送出第一句時展開在最上方；一旦送出第一句（自己打的或點開場選項送出的），
+ * 開場網頁就收起，不再佔住對話頂部。一般卡的簡介（CanvasIntro）與 AI 開場白不走這條。
+ */
+export function shouldShowOpeningPage(
+  html: string | null | undefined,
+  messages: Array<{ type?: any; role?: string } | null | undefined>,
+): boolean {
+  if (typeof html !== 'string' || !html.trim()) return false
+  return !messages.some((m) => m && (String(m.type) === '1' || m.role === 'user'))
+}
+
+/**
  * 存檔清單的回應說不說得出「這張卡已經開過對話」。只有開場白、還沒送過一句的那段也算：
  * 它已經在伺服器上，再押後就是在它上面蓋一個選開場白的畫面，而對話沒開。
  * 看不懂的回應當成「開過」：照舊開對話、載歷史，最壞只是少一次選開場白的機會。

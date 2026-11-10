@@ -7,6 +7,7 @@
  *   author-css、腳本跑一次）→ 等宿主的 `messages` → 冷啟動每則 new→mount→done → `ready`。
  */
 import { mountOpeningPage } from '../common/opening-page'
+import { shouldShowOpeningPage } from '@/pages/canvas/canvas-greetings'
 import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, MessageView, RequestOp, SandboxBackground, SandboxCardState, SandboxHelloConfig, SandboxMessage, SandboxMessageRole, ShellToHost, StageState } from './protocol'
 import { createThemeBridge } from './theme-bridge'
 import { bindCardBlockTheme } from './card-block-theme'
@@ -764,29 +765,36 @@ export function createShell(options: CreateShellOptions): Shell {
   postDocState()
   postChromeColor()
 
+  // ── 首屏網頁（AI 風月的「詳細介紹」）：放在訊息列最上方，玩家還沒送出第一句時展開；
+  // 一旦送出第一句（自己打的或點開場選項送出的），開場網頁就收起（跟一般頁的 CanvasOpeningPage 同一條規則）。
+  // 頁面在自己的無同源 iframe 裡跑（common/opening-page）；填入與送出都交給宿主決定，
+  // 宿主跟一般頁同一段邏輯（送出只在玩家剛點過頁面時照做）。
+  const openingHtml = String(config.card.openingPage || '')
+  let openingSlot: HTMLElement | null = null
+  if (openingHtml.trim()) {
+    const slot = doc.createElement('div')
+    slot.setAttribute('data-slot', 'opening')
+    refs.list.before(slot)
+    openingSlot = slot
+    mountOpeningPage(slot, openingHtml, {
+      fill: (text) => transport.send({ type: 'ui', event: 'opening-fill', key: text }),
+      send: (text) => transport.send({ type: 'ui', event: 'opening-send', key: text }),
+    }, { title: config.role?.name ? String(config.role.name) : undefined })
+  }
+  const syncOpeningSlot = () => {
+    if (openingSlot) openingSlot.hidden = !shouldShowOpeningPage(openingHtml, cardOrder())
+  }
+
   let readySent = false
   const coldStart = (messages: SandboxMessage[]) => {
     list.reset(messages)
+    syncOpeningSlot()
     syncStatusbarDedupe()
     if (!readySent) {
       readySent = true
       bus.emit('ready')
       transport.send({ type: 'ready' })
     }
-  }
-
-  // ── 首屏網頁（AI 風月的「詳細介紹」）：放在訊息列最上方，舊訊息往上載入時接在它下面。
-  // 頁面在自己的無同源 iframe 裡跑（common/opening-page）；填入與送出都交給宿主決定，
-  // 宿主跟一般頁同一段邏輯（送出只在玩家剛點過頁面時照做）。
-  const openingHtml = String(config.card.openingPage || '')
-  if (openingHtml.trim()) {
-    const slot = doc.createElement('div')
-    slot.setAttribute('data-slot', 'opening')
-    refs.list.before(slot)
-    mountOpeningPage(slot, openingHtml, {
-      fill: (text) => transport.send({ type: 'ui', event: 'opening-fill', key: text }),
-      send: (text) => transport.send({ type: 'ui', event: 'opening-send', key: text }),
-    }, { title: config.role?.name ? String(config.role.name) : undefined })
   }
 
   // ── 開場選項（MMD「你可以选择开场」）：跟普通頁同一份 DOM 與樣式（canvas.css 的 .prologue-*）。
@@ -839,6 +847,7 @@ export function createShell(options: CreateShellOptions): Shell {
         noteCardView(message.message.id, message.message.view)
         if (message.before) list.insertBefore(message.message, message.before)
         else list.add(message.message)
+        syncOpeningSlot()
         syncStatusbarDedupe()
         syncCardState()
         return
@@ -870,6 +879,7 @@ export function createShell(options: CreateShellOptions): Shell {
       case 'message.remove':
         list.remove(message.id)
         cardStates.delete(String(message.id))
+        syncOpeningSlot()
         syncCardState()
         return
       case 'generation': {
@@ -956,6 +966,7 @@ export function createShell(options: CreateShellOptions): Shell {
         cardStates.clear()
         cardFeed.reset()
         bus.resetReplay()
+        syncOpeningSlot()
         syncCardState()
         // 載荷 { conversationId }（宿主有給才帶）：卡片用它對上 sdk.archive.list() 裡的那一段
         bus.emit('conversation:switch', message.conversationId ? { conversationId: String(message.conversationId) } : undefined)
