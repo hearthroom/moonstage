@@ -51,6 +51,8 @@ export function compileReplaceStyles(replace: string, dialect: CssDialect): stri
   if (text.indexOf('<style') < 0 && text.indexOf('<STYLE') < 0) return text
   return withFencesProtected(text, (outside) => outside.replace(STYLE_TAG, (whole, attrs: string, css: string) => {
     if (hasCompiledDialect(attrs)) return whole
+    // 樣式內容來自擷取群組或巨集（$1、$name、{{…}}）：替換前看不到真正的 CSS，留給卡片格式那一層照舊處理。
+    if (/\$(?:\d|[A-Za-z_])|\{\{/.test(css)) return whole
     return `<style${attrs} ${CSS_DIALECT_ATTR}="${dialect}">${compileDialectCss(css, dialect)}</style>`
   }))
 }

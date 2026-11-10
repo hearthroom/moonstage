@@ -62,3 +62,10 @@ describe('卡片格式那一層看到標記就不再處理', () => {
     expect(card.styles[1]).toBe('.mes_text p{color:red}')
   })
 })
+
+describe('樣式內容來自擷取群組', () => {
+  it('<style>$1</style> 替換前看不到 CSS：不轉、不標記，留給卡片格式', () => {
+    const r = rule({ cssDialect: 'fengyue', replace: '<style>$1</style>' })
+    expect(compileRuleCssDialects([r])[0]).toBe(r)
+  })
+})

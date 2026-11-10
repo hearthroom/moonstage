@@ -16,8 +16,8 @@
  * 2. 風月元素 id 換成我們的節點（ID_MAP）。沒有對應的風月 id 整條選擇器丟掉；作者自己內容裡的 id 不動。
  * 3. 權重照風月：容器與每個風月 id 都換成 `:where(我們的節點):not(#lt-fy)`——`:where` 本身不算權重，
  *    `:not(#…)` 剛好補一個 id 的權重——所以同一份 CSS 內部誰蓋誰跟在風月上一樣。
- * 4. 按鈕這類節點我們的內部結構和尺寸跟風月不同：只留上色宣告，位置與尺寸類的丟掉
- *    （例：每套官方主題都對送出鍵寫 position:relative; top:-4px; width:32px）。
+ * 4. 按鈕這類節點我們的內部結構和尺寸跟風月不同：位置、尺寸、顯示方式、變形與外距丟掉，
+ *    顏色、邊框、圓角、陰影、字型與內距留著（例：每套官方主題都對送出鍵寫 position:relative; top:-4px; width:32px）。
  * 5. 去掉 !important，整份包進 @layer lt-author-fengyue。層的順序在平台層 lt-base 之後，所以蓋過平台預設；
  *    作者其他寫法的 <style> 不分層，永遠蓋過這一層，不論選擇器權重——「顯示規則最高」的水位線。
  *    !important 一定要去：分層裡的 !important 會反過來贏過不分層的 !important，正則就壓不住了；
@@ -84,7 +84,7 @@ const SHORTCUT_ID = /^customized-shortcut-command-button-\d+$/
 const FENGYUE_ID = /^(customized-|ai-|header-setting-|toggle-sub-buttons$|chat-input-more-menu$|installedBuiltInCss$)/
 
 /** 會移動或改尺寸的宣告：按鈕類（paint）只上色時丟掉。 */
-const LAYOUT_PROP = /^(position|top|left|right|bottom|inset|width|height|min-width|min-height|max-width|max-height|display|flex|flex-[a-z-]+|grid|grid-[a-z-]+|order|float|margin|margin-[a-z-]+|transform|translate|rotate|scale|overflow|overflow-[xy]|visibility|z-index|vertical-align|align-self|justify-self|place-self)$/i
+const LAYOUT_PROP = /^(?:-[a-z]+-)?(position|top|left|right|bottom|inset|inset-[a-z-]+|width|height|min-width|min-height|max-width|max-height|inline-size|block-size|aspect-ratio|display|flex|flex-[a-z-]+|grid|grid-[a-z-]+|order|float|margin|margin-[a-z-]+|transform|transform-[a-z-]+|translate|rotate|scale|overflow|overflow-[xy]|visibility|z-index|vertical-align|align-self|justify-self|place-self)$/i
 
 function mapId(id: string): [string, Tier] | null | undefined {
   if (ID_MAP[id]) return ID_MAP[id]
@@ -109,7 +109,9 @@ export function translateSelector(raw: string): { selector: string; tier: Tier }
   }
   let tier: Tier = 'full'
   let dropped = false
-  let mapped = sel.replace(/#([A-Za-z_][\w-]*)/g, (whole, id: string) => {
+  // 引號裡的 # 是屬性值（a[href="#ai-x"]），不是 id。
+  let mapped = sel.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|#([A-Za-z_][\w-]*)/g, (whole, id: string | undefined) => {
+    if (!id) return whole
     const hit = mapId(id)
     if (hit === undefined) return whole
     if (hit === null) { dropped = true; return whole }
@@ -160,14 +162,18 @@ function parse(css: string): Node[] {
     // 讀整個區塊
     const bodyStart = ++i
     let depth = 1
+    let par = 0
     q = null
     while (i < src.length && depth > 0) {
       const ch = src[i]
       if (q) { if (ch === '\\') i++; else if (ch === q) q = null; i++; continue }
       if (ch === '"' || ch === "'") { q = ch; i++; continue }
       if (src.startsWith('/*', i)) { const e = src.indexOf('*/', i + 2); i = e < 0 ? src.length : e + 2; continue }
-      if (ch === '{') depth++
-      else if (ch === '}') depth--
+      // 沒加引號的 url(…) 裡可能有大括號：括號裡的不算區塊。
+      if (ch === '(') par++
+      else if (ch === ')') par = Math.max(0, par - 1)
+      else if (par === 0 && ch === '{') depth++
+      else if (par === 0 && ch === '}') depth--
       i++
     }
     out.push({ prelude, body: src.slice(bodyStart, depth === 0 ? i - 1 : i) })
@@ -194,7 +200,8 @@ function splitTop(text: string, sep: string): string[] {
 }
 
 function stripComments(text: string): string {
-  return text.replace(/\/\*[\s\S]*?(\*\/|$)/g, '')
+  // 引號裡的 /* 是字串內容，不是註解。
+  return text.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\/\*[\s\S]*?(?:\*\/|$)/g, (m) => (m.startsWith('/*') ? '' : m))
 }
 
 /** 宣告區塊：去 !important；paint 時丟掉位置與尺寸類。區塊裡有巢狀規則就只去 !important。 */
@@ -221,7 +228,7 @@ function translateNodes(nodes: Node[], imports: string[]): string {
       if (/^@import\b/i.test(head)) imports.push(head + ';')
       continue
     }
-    if (/^@(media|supports|container|layer|scope|document)\b/i.test(head)) {
+    if (/^@(media|supports|container|layer|scope|document|starting-style)\b/i.test(head)) {
       const inner = translateNodes(parse(node.body), imports)
       if (inner.trim()) out += `${head} {\n${inner}}\n`
       continue

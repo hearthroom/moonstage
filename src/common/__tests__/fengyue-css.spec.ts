@@ -106,3 +106,29 @@ describe('整段轉譯', () => {
     expect(out).toContain(`${ROOT} .x { color: red; }`)
   })
 })
+
+describe('審查後補的邊界', () => {
+  it('按鈕類也丟掉帶瀏覽器前綴的變形、長寬比與 inset-*', () => {
+    const out = translateFengyueCss('#ai-send-button{-webkit-transform:scale(2);aspect-ratio:1;inset-inline-start:0;color:#fff}')
+    expect(out).toContain('color:#fff')
+    for (const p of ['transform', 'aspect-ratio', 'inset-inline']) expect(out).not.toContain(p)
+  })
+
+  it('字串裡的 /* 不是註解，後面的規則照樣在頂層', () => {
+    const out = translateFengyueCss('.a{content:"/*";color:red} .b{color:blue}')
+    expect(out).toContain(`${ROOT} .b { color:blue; }`)
+  })
+
+  it('沒加引號的 url(…) 裡的大括號不吃掉後面的規則', () => {
+    const out = translateFengyueCss('.a{background:url(data:image/svg+xml;utf8,<svg>{x}</svg>)} .b{color:blue}')
+    expect(out).toContain(`${ROOT} .b { color:blue; }`)
+  })
+
+  it('屬性值裡的 #ai-… 不是風月元素，整條不被丟掉', () => {
+    expect(translateSelector('a[href="#ai-x"]')?.selector).toBe(`${ROOT} a[href="#ai-x"]`)
+  })
+
+  it('@starting-style 裡的規則一樣接上根', () => {
+    expect(translateFengyueCss('@starting-style{ .st-bar{opacity:0} }')).toContain(`@starting-style {\n${ROOT} .st-bar { opacity:0; }`)
+  })
+})

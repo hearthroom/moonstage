@@ -2976,7 +2976,8 @@ let sandboxSkinBefore: { html: string; body: string; htmlData: Record<string, st
 const SANDBOX_STYLE_RE = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi;
 
 function sandboxCardCss(): string {
-  const rules = Array.isArray(sandboxAsset?.rules) ? sandboxAsset.rules : [];
+  // 規則自己標了 CSS 寫法的先照那個寫法轉好（風月寫法不會原樣漆到宿主頁）。
+  const rules = compileRuleCssDialects(Array.isArray(sandboxAsset?.rules) ? sandboxAsset.rules : []);
   const chunks: string[] = [];
   for (const r of rules) {
     const rep = String((r && (r.replace ?? r.replaceString)) || '');
