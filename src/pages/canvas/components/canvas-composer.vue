@@ -33,7 +33,8 @@
            照風月做成下拉：選項常是整段文字，點一條就當第一句送出，展開後每條整段顯示，玩家讀完才點。
            一般卡的開場選項仍是訊息列之後的獨立區塊（canvas-prologue）。
            清單沿用 .prologue-scope／.prologue-content，作者寫給開場選項的樣式照樣打得到。 -->
-      <div v-if="choices && choices.items.length" ref="choicesEl" class="composer-choices" data-lt="first-line">
+      <div v-if="choices && choices.items.length" ref="choicesEl" class="composer-choices" data-lt="first-line"
+           @keydown.esc="onChoicesEsc" @focusout="onChoicesFocusOut">
         <div
           class="composer-choices__toggle"
           :class="{ 'is-open': choicesOpen }"
@@ -42,8 +43,8 @@
           :aria-expanded="choicesOpen ? 'true' : 'false'"
           :aria-controls="choicesId"
           @click="toggleChoices"
-          @keydown.enter.prevent="toggleChoices"
-          @keydown.space.prevent="toggleChoices"
+          @keydown.enter.prevent="!$event.repeat && toggleChoices()"
+          @keydown.space.prevent="!$event.repeat && toggleChoices()"
         >
           <span class="composer-choices__label">{{ choices.title }}</span>
           <svg class="composer-choices__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -56,7 +57,6 @@
           data-lt="prologue"
           role="group"
           :aria-label="choices.title"
-          @keydown.esc.stop.prevent="closeChoices(true)"
         >
           <div
             v-for="(item, ci) in choices.items"
@@ -65,8 +65,8 @@
             role="button"
             tabindex="0"
             @click.stop="pickChoice(ci)"
-            @keydown.enter.prevent.stop="pickChoice(ci)"
-            @keydown.space.prevent.stop="pickChoice(ci)"
+            @keydown.enter.prevent.stop="!$event.repeat && pickChoice(ci)"
+            @keydown.space.prevent.stop="!$event.repeat && pickChoice(ci)"
           >{{ item }}</div>
         </div>
       </div>
@@ -561,6 +561,19 @@ function toggleChoices() {
   doc?.addEventListener('pointerdown', onChoicesOutside, true)
   doc?.defaultView?.addEventListener('blur', onChoicesBlur)
   nextTick(() => choicesEl.value?.querySelector<HTMLElement>('.prologue-content')?.focus())
+}
+// 按住 Enter 展開時，後續的重複按鍵會落在剛拿到焦點的第一條上：只認第一下（見模板的 repeat 判斷）。
+function onChoicesEsc(e: KeyboardEvent) {
+  if (!choicesOpen.value) return
+  e.preventDefault()
+  e.stopPropagation()
+  closeChoices(true)
+}
+// 焦點離開整個下拉（Tab 出去、點進開場網頁）就收起；在下拉裡面移動不算。
+function onChoicesFocusOut(e: FocusEvent) {
+  const next = e.relatedTarget as Node | null
+  if (next && choicesEl.value?.contains(next)) return
+  closeChoices(false)
 }
 function pickChoice(index: number) {
   closeChoices(false)
