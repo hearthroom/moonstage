@@ -192,6 +192,33 @@ describe('mountOpeningPage', () => {
     })
   })
 
+  it('首屏藏起來之後（沙箱殼送出第一句後只藏不拆），聊天內容再怎麼變都不重量框', () => {
+    const callbacks: Array<() => void> = []
+    const RO = class { constructor(cb: () => void) { callbacks.push(cb) } observe() {} disconnect() {} }
+    vi.stubGlobal('ResizeObserver', RO)
+    const scroller = document.createElement('div')
+    scroller.style.overflowY = 'auto'
+    Object.defineProperty(scroller, 'clientHeight', { value: 700 })
+    Object.defineProperty(scroller, 'clientWidth', { value: 390 })
+    const box = document.createElement('div')
+    scroller.appendChild(box)
+    document.body.appendChild(scroller)
+    let shown = true
+    box.getClientRects = () => (shown ? [box.getBoundingClientRect()] : []) as unknown as DOMRectList
+    let measured = 0
+    const page = mountOpeningPage(box, '<p>首屏</p>', { fill() {}, send() {} }, { maxHeight: () => { measured++; return 600 } })
+    const before = measured
+    shown = false
+    callbacks.forEach((cb) => cb())
+    expect(measured).toBe(before)
+    shown = true
+    callbacks.forEach((cb) => cb())
+    expect(measured).toBe(before + 1)
+    page.destroy()
+    scroller.remove()
+    vi.unstubAllGlobals()
+  })
+
   it('玩家剛點過才送出；沒點過的送出改成填入', () => {
     const clicked = setup(true)
     clicked.post({ type: OPENING_MESSAGE_TYPE, kind: 'send', text: '出發' })

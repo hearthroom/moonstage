@@ -137,6 +137,11 @@ function chatScroller(el: HTMLElement): HTMLElement | null {
   return null
 }
 
+/** 值沒變就不寫：寫樣式會讓整頁重排，這支在聊天內容每次變高時都會跑。 */
+function setStyle(el: HTMLElement, prop: 'width' | 'margin', value: string) {
+  if (el.style[prop] !== value) el.style[prop] = value
+}
+
 /** 框上方只隔著訊息區的內距（沒有別的內容）時，往上貼齊聊天區頂端；隔著序章之類的內容就不動。 */
 const FLUSH_TOP_MAX = 32
 
@@ -150,8 +155,8 @@ export function fitOpeningFrame(container: HTMLElement, frame: HTMLIFrameElement
   const win = container.ownerDocument.defaultView as Window
   const scroller = chatScroller(container)
   if (!scroller) {
-    frame.style.width = '100%'
-    frame.style.margin = '0'
+    setStyle(frame, 'width', '100%')
+    setStyle(frame, 'margin', '0px')
     return win.innerHeight
   }
   const s = scroller.getBoundingClientRect()
@@ -160,8 +165,8 @@ export function fitOpeningFrame(container: HTMLElement, frame: HTMLIFrameElement
   const left = c.left + (parseFloat(cs.paddingLeft) || 0) - (s.left + scroller.clientLeft)
   const above = c.top + (parseFloat(cs.paddingTop) || 0) - (s.top + scroller.clientTop) + scroller.scrollTop
   const pullUp = above > 0 && above <= FLUSH_TOP_MAX ? above : 0
-  frame.style.width = `${scroller.clientWidth}px`
-  frame.style.margin = `${-Math.round(pullUp)}px 0 0 ${-Math.round(left)}px`
+  setStyle(frame, 'width', `${scroller.clientWidth}px`)
+  setStyle(frame, 'margin', `${-Math.round(pullUp)}px 0px 0px ${-Math.round(left)}px`)
   // 框下方的內容：聊天區內容的下緣（含內距）減掉框的下緣；跟框本身多高無關，框變高變矮都量得一樣。
   let contentBottom = 0
   for (const child of Array.from(scroller.children)) contentBottom = Math.max(contentBottom, child.getBoundingClientRect().bottom)
@@ -221,6 +226,8 @@ export function mountOpeningPage(
   let width = win.innerWidth
   let cap = Math.round(maxHeight())
   const refit = () => {
+    // 沙箱殼在玩家送出第一句後只把首屏藏起來、不拆：藏著的時候不量，否則之後整段對話每長一行都要重排一次。
+    if (!container.getClientRects().length) return
     const next = Math.round(maxHeight())
     if (next === cap) return
     cap = next
