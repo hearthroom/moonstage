@@ -3,7 +3,7 @@
  * 只有玩家剛點過時才會替他送出。
  */
 import { describe, it, expect, vi } from 'vitest'
-import { clickedFrame, mountOpeningPage, openingSrcdoc, parseOpeningMessage, OPENING_BOOTSTRAP, OPENING_MESSAGE_TYPE, OPENING_SANDBOX } from '../opening-page'
+import { clickedFrame, createFrameSizer, mountOpeningPage, openingSrcdoc, parseOpeningMessage, OPENING_BOOTSTRAP, OPENING_MESSAGE_TYPE, OPENING_SANDBOX } from '../opening-page'
 import { stylePolicyFor } from '../author-style-policy'
 import { normalizeCardFormat } from '../card-format'
 
@@ -164,6 +164,18 @@ describe('mountOpeningPage', () => {
       expect(page.frame.style.height).toBe('600px')
       page.destroy()
       vi.useRealTimers()
+    })
+
+    it('頂著上限的框，上限變了就跟著新上限（轉向、拉寬視窗）；沒頂著的照內容高', () => {
+      const atCap = createFrameSizer(600)
+      atCap.report(600)
+      expect(atCap.setCap(400)).toBe(400)
+      atCap.report(400)
+      expect(atCap.setCap(900)).toBe(900)
+      const short = createFrameSizer(600)
+      short.report(300)
+      expect(short.setCap(900)).toBe(300)
+      expect(short.setCap(250)).toBe(250)
     })
 
     it('縮完過一陣子內容才變短（玩家收合一段）：照常縮', () => {

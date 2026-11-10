@@ -7,7 +7,8 @@
  * 不直接塞進畫布或沙箱殼：這些頁面是寫給獨立文件的，`body{}`、`*{}` 重設與 `html{height:100%}`
  * 放進來會改掉整頁的樣式。底色固定是淺色紙：風月的聊天頁是淺色，作者照淺底配色，跟著我們的深色走字會看不見。
  *
- * 框多高：跟風月一樣，上限是「聊天區看得到的高度」與「視窗高的 70%」較小的那個，內容超過就在框裡捲。作者照「一個視窗」寫這些頁面
+ * 框多大：貼滿聊天欄——寬對齊聊天區左右兩緣，高的上限到輸入列上緣，內容超過就在框裡捲（風月也是固定框、框內捲）。
+ * 作者照「一個視窗」寫這些頁面
  * （min-height:88vh 的封面、position:fixed 的頂欄與底欄、全屏的開場遮罩），框跟著內容撐高的話，
  * vh 會跟著框變大、又把框撐得更高（卡片 101005 撐到視窗的十幾倍），fixed 的底欄也掉到看不到的地方。
  * 短頁照舊縮到內容高（見 createFrameSizer）。
@@ -116,24 +117,57 @@ export function createFrameSizer(cap: number, now: () => number = () => Date.now
       current = next
       return current
     },
-    /** 聊天區變寬變窄（轉向、拉視窗）時換上限。 */
+    /** 聊天區變寬變窄（轉向、拉視窗）時換上限。原本頂著上限的（照視窗寫的頁面量到的就是框高）跟著新上限走。 */
     setCap(nextCap: number): number {
+      const atCap = locked || current >= limit
       limit = Math.max(CAP_MIN, Math.round(nextCap))
-      current = locked ? limit : Math.min(Math.max(measured, HEIGHT_MIN), limit)
+      current = atCap ? limit : Math.min(Math.max(measured, HEIGHT_MIN), limit)
       return current
     },
   }
 }
 
-/** 框的上限：聊天區（往上第一個會捲的容器）看得到的高度與視窗高的 70%，取小的；風月桌機與手機都是這樣量的。 */
-export function openingFrameCap(el: HTMLElement): number {
+/** 聊天區：往上第一個會捲、而且已經排好版的容器。 */
+function chatScroller(el: HTMLElement): HTMLElement | null {
   const win = el.ownerDocument.defaultView as Window
-  const byWindow = win.innerHeight * 0.7
   for (let p = el.parentElement; p; p = p.parentElement) {
     const overflowY = win.getComputedStyle(p).overflowY
-    if ((overflowY === 'auto' || overflowY === 'scroll') && p.clientHeight > 0) return Math.min(p.clientHeight, byWindow)
+    if ((overflowY === 'auto' || overflowY === 'scroll') && p.clientHeight > 0 && p.clientWidth > 0) return p
   }
-  return byWindow
+  return null
+}
+
+/** 框上方只隔著訊息區的內距（沒有別的內容）時，往上貼齊聊天區頂端；隔著序章之類的內容就不動。 */
+const FLUSH_TOP_MAX = 32
+
+/**
+ * 框貼滿聊天欄：用負邊距抵掉訊息區的左右內距，寬＝聊天區寬。高的上限＝聊天區高扣掉框上方用掉的距離與框下方的內容
+ * （開場選項、內距）：開場時整列剛好放進聊天區，框頂貼著頁首、下方內容貼著輸入列，不必捲。
+ * 框下方的內容多到框剩不到聊天區一半（作者另寫了長的 AI 開場白）就不扣，框照聊天區高，下方內容往下捲。
+ * 回傳高度上限。找不到聊天區（還沒排版）就照容器寬、以視窗高為上限。
+ */
+export function fitOpeningFrame(container: HTMLElement, frame: HTMLIFrameElement): number {
+  const win = container.ownerDocument.defaultView as Window
+  const scroller = chatScroller(container)
+  if (!scroller) {
+    frame.style.width = '100%'
+    frame.style.margin = '0'
+    return win.innerHeight
+  }
+  const s = scroller.getBoundingClientRect()
+  const c = container.getBoundingClientRect()
+  const cs = win.getComputedStyle(container)
+  const left = c.left + (parseFloat(cs.paddingLeft) || 0) - (s.left + scroller.clientLeft)
+  const above = c.top + (parseFloat(cs.paddingTop) || 0) - (s.top + scroller.clientTop) + scroller.scrollTop
+  const pullUp = above > 0 && above <= FLUSH_TOP_MAX ? above : 0
+  frame.style.width = `${scroller.clientWidth}px`
+  frame.style.margin = `${-Math.round(pullUp)}px 0 0 ${-Math.round(left)}px`
+  // 框下方的內容：聊天區內容的下緣（含內距）減掉框的下緣；跟框本身多高無關，框變高變矮都量得一樣。
+  let contentBottom = 0
+  for (const child of Array.from(scroller.children)) contentBottom = Math.max(contentBottom, child.getBoundingClientRect().bottom)
+  const below = Math.max(0, contentBottom + (parseFloat(win.getComputedStyle(scroller).paddingBottom) || 0) - frame.getBoundingClientRect().bottom)
+  const full = scroller.clientHeight - Math.max(0, above - pullUp)
+  return full - below >= full / 2 ? full - below : full
 }
 
 export interface OpeningPageMount {
@@ -174,21 +208,33 @@ export function mountOpeningPage(
   frame.setAttribute('allow', OPENING_ALLOW)
   frame.setAttribute('data-lt', 'opening-page')
   if (options.title) frame.title = options.title
-  frame.style.cssText = 'display:block;width:100%;border:0;border-radius:12px;background:#fff'
+  frame.style.cssText = 'display:block;width:100%;border:0;background:#fff'
   frame.srcdoc = openingSrcdoc(html)
   const activated = options.activated ?? (() => clickedFrame(win, frame))
   container.appendChild(frame)
-  // 上限在掛上之後量（要知道聊天區多高）。只在寬度變了才重量：手機開鍵盤只改高度，框不該跟著跳。
-  const maxHeight = options.maxHeight ?? (() => openingFrameCap(container))
+  // 位置與上限在掛上之後量（要知道聊天區多寬多高）。之後只在視窗變寬變窄、或聊天區內容變高變矮時重量：
+  // 手機開鍵盤只改視窗高度，框不該跟著跳。
+  const maxHeight = options.maxHeight ?? (() => fitOpeningFrame(container, frame))
   const sizer = createFrameSizer(maxHeight())
   const setHeight = (h: number) => { frame.style.height = `${h}px` }
   setHeight(sizer.height)
   let width = win.innerWidth
+  let cap = Math.round(maxHeight())
+  const refit = () => {
+    const next = Math.round(maxHeight())
+    if (next === cap) return
+    cap = next
+    setHeight(sizer.setCap(next))
+  }
   const onResize = () => {
     if (win.innerWidth === width) return
     width = win.innerWidth
-    setHeight(sizer.setCap(maxHeight()))
+    refit()
   }
+  // 框下方的內容（開場選項、作者的 AI 開場白）是之後才畫上的：內容高度一變就重算上限。框自己變高變矮不影響上限，不會來回跳。
+  const content = typeof ResizeObserver === 'function' ? new ResizeObserver(() => refit()) : null
+  const scroller = chatScroller(container)
+  if (content && scroller) for (const child of Array.from(scroller.children)) content.observe(child)
   const onMessage = (event: MessageEvent) => {
     if (event.source !== frame.contentWindow) return
     const message = parseOpeningMessage(event.data)
@@ -204,6 +250,7 @@ export function mountOpeningPage(
     destroy() {
       win.removeEventListener('message', onMessage)
       win.removeEventListener('resize', onResize)
+      content?.disconnect()
       frame.remove()
     },
   }

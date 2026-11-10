@@ -170,5 +170,6 @@ iframe.lt-frontend__frame { display: block; width: 100%; min-height: 1px; border
 }
 
 /* 首屏網頁（AI 風月的「詳細介紹」）：訊息列最上方，iframe 自己有圓角與白紙；玩家送出第一句後收起。 */
-[data-slot="opening"] { padding: 8px 12px 4px; }
+/* 首屏網頁貼滿聊天欄：框自己抵掉訊息區的內距（common/opening-page fitOpeningFrame），這裡不再加。 */
+[data-slot="opening"] { padding: 0; }
 [data-slot="opening"][hidden] { display: none; }

@@ -29,5 +29,6 @@ onBeforeUnmount(() => { mounted?.destroy(); mounted = null })
 </script>
 
 <style scoped>
-.opening-page { margin: 8px 12px 4px; }
+/* 貼滿聊天欄：框自己抵掉訊息區的內距（common/opening-page fitOpeningFrame），這裡不再加。 */
+.opening-page { margin: 0; }
 </style>
