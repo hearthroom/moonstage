@@ -160,3 +160,19 @@ describe('文字可讀：輸入框與氣泡', () => {
     expect(out).not.toContain('#1f2328')
   })
 })
+
+// QA 2026-11-11：賽博朋克在站台淺色時，深藍輸入列上的燈泡與「＋」跟著站台用深色，幾乎看不見。
+describe('輸入列上的圖示跟著輸入框的字色', () => {
+  const ROW = `${ROOT} ${like('.send-msg')}`
+  it('作者設的字色也給輸入列（圖示用 currentColor）', () => {
+    expect(translateFengyueCss('#ai-chat-input{background:rgba(13, 20, 45, 0.85);color:#C8F0FF}')).toContain(`${ROW} { color:#C8F0FF; }`)
+  })
+  it('補上的字色也給輸入列；:focus 這類狀態規則不給', () => {
+    const out = translateFengyueCss('#ai-chat-input{background:#0D142D} #ai-chat-input:focus{color:#fff}')
+    expect(out).toContain(`${ROW} { color:#f2f2f5; }`)
+    expect(out).not.toContain(`${ROW} { color:#fff; }`)
+  })
+  it('深色分支照樣帶深色標記', () => {
+    expect(translateFengyueCss('.dark #ai-chat-input{color:#eee}')).toContain(`${ROOT}[data-lt-theme="dark"] ${like('.send-msg')} { color:#eee; }`)
+  })
+})

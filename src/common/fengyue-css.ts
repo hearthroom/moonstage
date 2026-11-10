@@ -310,6 +310,12 @@ function translateNodes(nodes: Node[], imports: string[]): string {
     const composer = parts.filter((p) => p.text === 'composer' && !p.selector.includes('.uni-textarea-placeholder'))
     const textDecls = own.filter((d) => TEXT_PROP.test(propOf(d)))
     if (composer.length && textDecls.length) out += `${composer.map((p) => `${p.selector} .uni-textarea-textarea`).join(',\n')} {${block(textDecls)}}\n`
+    // 輸入列上的燈泡、字數、「＋」用 currentColor，跟著輸入列的字色：給它同一個字色，深底上才看得到（QA 2026-11-11）。
+    // 只給沒有狀態的規則（:focus 時改色不該連圖示一起閃）。
+    const field = like('.composer-field')
+    const rowColor = own.filter((d) => propOf(d) === 'color').pop()
+    const rows = composer.filter((p) => p.selector.endsWith(field)).map((p) => p.selector.slice(0, -field.length) + like('.send-msg'))
+    if (rowColor && rows.length) out += `${rows.join(',\n')} {${block([rowColor])}}\n`
   }
   return out
 }
