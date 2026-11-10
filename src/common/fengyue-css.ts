@@ -86,6 +86,17 @@ const FENGYUE_ID = /^(customized-|ai-|header-setting-|toggle-sub-buttons$|chat-i
 /** 會移動或改尺寸的宣告：按鈕類（paint）只上色時丟掉。 */
 const LAYOUT_PROP = /^(?:-[a-z]+-)?(position|top|left|right|bottom|inset|inset-[a-z-]+|width|height|min-width|min-height|max-width|max-height|inline-size|block-size|aspect-ratio|display|flex|flex-[a-z-]+|grid|grid-[a-z-]+|order|float|margin|margin-[a-z-]+|transform|transform-[a-z-]+|translate|rotate|scale|overflow|overflow-[xy]|visibility|z-index|vertical-align|align-self|justify-self|place-self)$/i
 
+/** 帶文字的節點：設了底色卻沒設字色時要補可讀的字色（見 readableColor）。 */
+type TextNode = 'composer' | 'bubble'
+const TEXT_NODE: Record<string, TextNode> = {
+  'ai-chat-input': 'composer',
+  'ai-input-content': 'composer',
+  'customized-answer-content': 'bubble',
+  'customized-question-content': 'bubble',
+  'customized-answer-content-markdown': 'bubble',
+  'customized-question-content-markdown': 'bubble',
+}
+
 function mapId(id: string): [string, Tier] | null | undefined {
   if (ID_MAP[id]) return ID_MAP[id]
   if (SHORTCUT_ID.test(id)) return ['.shortcut-btn', 'paint']
@@ -93,7 +104,7 @@ function mapId(id: string): [string, Tier] | null | undefined {
 }
 
 /** 一條選擇器 → 我們的選擇器；null＝在風月不生效或我們沒有對應，丟掉。 */
-export function translateSelector(raw: string): { selector: string; tier: Tier } | null {
+export function translateSelector(raw: string): { selector: string; tier: Tier; text?: TextNode } | null {
   let sel = raw.trim()
   if (!sel) return null
   let dark = false
@@ -108,6 +119,7 @@ export function translateSelector(raw: string): { selector: string; tier: Tier }
     sel = sel.trim()
   }
   let tier: Tier = 'full'
+  let text: TextNode | undefined
   let dropped = false
   // 引號裡的 # 是屬性值（a[href="#ai-x"]），不是 id。
   let mapped = sel.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|#([A-Za-z_][\w-]*)/g, (whole, id: string | undefined) => {
@@ -116,6 +128,7 @@ export function translateSelector(raw: string): { selector: string; tier: Tier }
     if (hit === undefined) return whole
     if (hit === null) { dropped = true; return whole }
     if (hit[1] === 'paint') tier = 'paint'
+    if (TEXT_NODE[id]) text = TEXT_NODE[id]
     return like(hit[0])
   })
   if (dropped) return null
@@ -124,10 +137,11 @@ export function translateSelector(raw: string): { selector: string; tier: Tier }
     .replace(/(:where\(\.composer-field\):not\(#lt-fy\))::?placeholder/g, '$1 .uni-textarea-placeholder')
     .replace(/(:where\(\.composer-field\):not\(#lt-fy\)):focus(?![\w-])/g, '$1:focus-within')
   const root = like(ROOT) + (dark ? DARK : '')
-  if (attachToRoot) return { selector: root + mapped, tier }
+  const extra = text ? { text } : {}
+  if (attachToRoot) return { selector: root + mapped, tier, ...extra }
   // 作者自己寫了容器 id：已經換成根，不再接一次。
-  if (mapped.startsWith(like(ROOT))) return { selector: dark ? mapped.replace(like(ROOT), root) : mapped, tier }
-  return { selector: mapped ? `${root} ${mapped}` : root, tier }
+  if (mapped.startsWith(like(ROOT))) return { selector: dark ? mapped.replace(like(ROOT), root) : mapped, tier, ...extra }
+  return { selector: mapped ? `${root} ${mapped}` : root, tier, ...extra }
 }
 
 // ── 掃描 ──
@@ -204,19 +218,63 @@ function stripComments(text: string): string {
   return text.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\/\*[\s\S]*?(?:\*\/|$)/g, (m) => (m.startsWith('/*') ? '' : m))
 }
 
-/** 宣告區塊：去 !important；paint 時丟掉位置與尺寸類。區塊裡有巢狀規則就只去 !important。 */
-function rewriteDeclarations(body: string, tier: Tier): string {
-  if (body.includes('{')) return body.replace(/\s*!\s*important\b/gi, '')
-  const decls = splitTop(stripComments(body), ';')
+/** 宣告區塊拆成一條條：去 !important；paint 時丟掉位置與尺寸類。區塊裡有巢狀規則回 null（只去 !important，原樣留著）。 */
+function splitDeclarations(body: string, tier: Tier): string[] | null {
+  if (body.includes('{')) return null
+  return splitTop(stripComments(body), ';')
     .map((d) => d.trim())
     .filter(Boolean)
-    .filter((d) => {
-      if (tier !== 'paint') return true
-      const prop = d.slice(0, Math.max(0, d.indexOf(':'))).trim()
-      return !LAYOUT_PROP.test(prop)
-    })
+    .filter((d) => tier !== 'paint' || !LAYOUT_PROP.test(propOf(d)))
     .map((d) => d.replace(/\s*!\s*important\b/gi, ''))
-  return decls.length ? ' ' + decls.join('; ') + '; ' : ''
+}
+
+const propOf = (decl: string) => decl.slice(0, Math.max(0, decl.indexOf(':'))).trim().toLowerCase()
+const valueOf = (decl: string) => decl.slice(decl.indexOf(':') + 1).trim()
+const block = (decls: string[]) => ' ' + decls.join('; ') + '; '
+
+/** 輸入框的字型與字色要落到我們的 textarea 本身（風月的 #ai-chat-input 就是 textarea，我們的對到外框）。 */
+const TEXT_PROP = /^(?:-webkit-text-fill-color|color|caret-color|font|font-[a-z-]+|letter-spacing|text-shadow)$/
+
+// ── 讀得到的字色 ──
+// 只設底色、沒設字色時，字色會是平台的（深色模式是淺字），淺色底上幾乎看不見（QA 2026-11-11）。
+// 風月本身在卡片有 CSS 時把氣泡字固定成深色；這裡改成照底色深淺挑一個讀得到的。
+const NAMED: Record<string, [number, number, number, number]> = { white: [255, 255, 255, 1], black: [0, 0, 0, 1], transparent: [0, 0, 0, 0] }
+
+function firstColor(value: string): [number, number, number, number] | null {
+  const m = /#([0-9a-f]{3,8})\b|rgba?\(([^)]*)\)|hsla?\(([^)]*)\)|\b(white|black|transparent)\b/i.exec(value)
+  if (!m) return null
+  if (m[1]) {
+    let h = m[1]
+    if (h.length === 3 || h.length === 4) h = h.split('').map((c) => c + c).join('')
+    if (h.length !== 6 && h.length !== 8) return null
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16), h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1]
+  }
+  if (m[2]) {
+    const n = m[2].split(/[\s,/]+/).filter(Boolean)
+    const alpha = n[3] == null ? 1 : n[3].endsWith('%') ? parseFloat(n[3]) / 100 : parseFloat(n[3])
+    return [parseFloat(n[0]), parseFloat(n[1]), parseFloat(n[2]), alpha]
+  }
+  if (m[3]) {
+    const n = m[3].split(/[\s,/]+/).filter(Boolean)
+    const l = parseFloat(n[2]) / 100
+    const alpha = n[3] == null ? 1 : n[3].endsWith('%') ? parseFloat(n[3]) / 100 : parseFloat(n[3])
+    return [l * 255, l * 255, l * 255, alpha] // 只看明度
+  }
+  return NAMED[m[4].toLowerCase()]
+}
+
+const DARK_TEXT = '#1f2328'
+const LIGHT_TEXT = '#f2f2f5'
+
+/** 規則設了看得出深淺的底色、卻沒設字色：回一個讀得到的字色；否則 null。 */
+function readableColor(decls: string[]): string | null {
+  if (decls.some((d) => propOf(d) === 'color')) return null
+  const bg = decls.filter((d) => /^background(-color|-image)?$/.test(propOf(d))).pop()
+  if (!bg) return null
+  const c = firstColor(valueOf(bg))
+  if (!c || c[3] < 0.5) return null
+  const lum = (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255
+  return lum > 0.55 ? DARK_TEXT : LIGHT_TEXT
 }
 
 function translateNodes(nodes: Node[], imports: string[]): string {
@@ -238,13 +296,20 @@ function translateNodes(nodes: Node[], imports: string[]): string {
       out += `${head} {${node.body}}\n`
       continue
     }
-    const parts = splitTop(stripComments(head), ',').map(translateSelector).filter((p): p is { selector: string; tier: Tier } => !!p)
+    const parts = splitTop(stripComments(head), ',').map(translateSelector).filter((p): p is NonNullable<ReturnType<typeof translateSelector>> => !!p)
     if (!parts.length) continue
     // 同一條規則的選擇器裡只要有一個是按鈕類，整條就只上色（寧可少套，不讓版面錯位）。
     const tier: Tier = parts.some((p) => p.tier === 'paint') ? 'paint' : 'full'
-    const decls = rewriteDeclarations(node.body, tier)
-    if (!decls.trim()) continue
-    out += `${parts.map((p) => p.selector).join(',\n')} {${decls}}\n`
+    const decls = splitDeclarations(node.body, tier)
+    if (decls === null) { out += `${parts.map((p) => p.selector).join(',\n')} {${node.body.replace(/\s*!\s*important\b/gi, '')}}\n`; continue }
+    if (!decls.length) continue
+    const fallback = parts.some((p) => p.text) ? readableColor(decls) : null
+    const own = fallback ? [...decls, `color:${fallback}`] : decls
+    out += `${parts.map((p) => p.selector).join(',\n')} {${block(own)}}\n`
+    // 輸入框：字色、字型也寫到 textarea 本身（提示字是另一個 div，跟著外框的字色走）。
+    const composer = parts.filter((p) => p.text === 'composer' && !p.selector.includes('.uni-textarea-placeholder'))
+    const textDecls = own.filter((d) => TEXT_PROP.test(propOf(d)))
+    if (composer.length && textDecls.length) out += `${composer.map((p) => `${p.selector} .uni-textarea-textarea`).join(',\n')} {${block(textDecls)}}\n`
   }
   return out
 }

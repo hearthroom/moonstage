@@ -32,9 +32,9 @@ describe('選擇器：照風月的作用範圍', () => {
 
 describe('選擇器：風月元素 id → 我們的節點', () => {
   it('氣泡、正文、輸入框照搬所有宣告', () => {
-    expect(translateSelector('#customized-answer-content')).toEqual({ selector: `${ROOT} ${like('.mes[data-lt-role="ai"] .mes_text')}`, tier: 'full' })
+    expect(translateSelector('#customized-answer-content')).toEqual({ selector: `${ROOT} ${like('.mes[data-lt-role="ai"] .mes_text')}`, tier: 'full', text: 'bubble' })
     expect(translateSelector('#customized-question-content-markdown p')?.selector).toBe(`${ROOT} ${like('.mes[data-lt-role="user"] .lt-bubble-body')} p`)
-    expect(translateSelector('#ai-chat-input')).toEqual({ selector: `${ROOT} ${like('.composer-field')}`, tier: 'full' })
+    expect(translateSelector('#ai-chat-input')).toEqual({ selector: `${ROOT} ${like('.composer-field')}`, tier: 'full', text: 'composer' })
   })
 
   it('按鈕類只上色', () => {
@@ -130,5 +130,33 @@ describe('審查後補的邊界', () => {
 
   it('@starting-style 裡的規則一樣接上根', () => {
     expect(translateFengyueCss('@starting-style{ .st-bar{opacity:0} }')).toContain(`@starting-style {\n${ROOT} .st-bar { opacity:0; }`)
+  })
+})
+
+// QA 2026-11-11：只設淺色底的輸入框，輸入的字還是平台深色模式的淺字，幾乎看不見。
+describe('文字可讀：輸入框與氣泡', () => {
+  const TEXTAREA = `${ROOT} ${like('.composer-field')} .uni-textarea-textarea`
+
+  it('輸入框規則的文字屬性也落到我們的 textarea 上', () => {
+    const out = translateFengyueCss('#ai-chat-input{background:#fff;color:#2C4A6B;caret-color:#4A90E2;font-size:15px}')
+    expect(out).toContain(`${TEXTAREA} { color:#2C4A6B; caret-color:#4A90E2; font-size:15px; }`)
+  })
+
+  it('只設淺色底、沒設字色：補深色字（輸入框與 textarea 都補）', () => {
+    const out = translateFengyueCss('#ai-chat-input{background:rgb(189, 232, 242)}')
+    expect(out).toContain(`${ROOT} ${like('.composer-field')} { background:rgb(189, 232, 242); color:#1f2328; }`)
+    expect(out).toContain(`${TEXTAREA} { color:#1f2328; }`)
+  })
+
+  it('深色底補淺色字；漸層看第一個顏色；透明底不補', () => {
+    expect(translateFengyueCss('#customized-answer-content{background:linear-gradient(160deg, #0D1B2A 0%, #1B263B 100%)}')).toContain('color:#f2f2f5')
+    expect(translateFengyueCss('#customized-answer-content{background-color:#FFF8E7}')).toContain('color:#1f2328')
+    expect(translateFengyueCss('#customized-answer-content{background:transparent}')).not.toContain('color:')
+  })
+
+  it('作者自己設了字色就不動', () => {
+    const out = translateFengyueCss('#customized-answer-content{background:#fff;color:#c33}')
+    expect(out).toContain('color:#c33')
+    expect(out).not.toContain('#1f2328')
   })
 })
