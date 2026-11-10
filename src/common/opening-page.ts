@@ -93,7 +93,7 @@ export interface OpeningHandlers {
  * 再縮下去只會越縮越小——這時回到上限並固定，跟風月一樣在框裡捲。
  */
 export function createFrameSizer(cap: number, now: () => number = () => Date.now()) {
-  let limit = Math.max(CAP_MIN, Math.round(cap))
+  let limit = Math.max(CAP_MIN, Math.floor(cap))
   let current = limit
   let measured = limit
   let locked = false
@@ -117,11 +117,14 @@ export function createFrameSizer(cap: number, now: () => number = () => Date.now
       current = next
       return current
     },
-    /** 聊天區變寬變窄（轉向、拉視窗）時換上限。原本頂著上限的（照視窗寫的頁面量到的就是框高）跟著新上限走。 */
+    /**
+     * 聊天區或框周圍的內容變了，換上限。頁面量到的剛好是框高（照視窗寫的頁面，內容跟著框走）或已固定的，跟著新上限走；
+     * 其他照內容高——頁面內容沒變就不會再回報，這裡拉高了就再也縮不回來。
+     */
     setCap(nextCap: number): number {
-      const atCap = locked || current >= limit
-      limit = Math.max(CAP_MIN, Math.round(nextCap))
-      current = atCap ? limit : Math.min(Math.max(measured, HEIGHT_MIN), limit)
+      const followsFrame = locked || Math.abs(measured - limit) <= 1
+      limit = Math.max(CAP_MIN, Math.floor(nextCap))
+      current = followsFrame ? limit : Math.min(Math.max(measured, HEIGHT_MIN), limit)
       return current
     },
   }
@@ -224,11 +227,11 @@ export function mountOpeningPage(
   const setHeight = (h: number) => { frame.style.height = `${h}px` }
   setHeight(sizer.height)
   let width = win.innerWidth
-  let cap = Math.round(maxHeight())
+  let cap = Math.floor(maxHeight())
   const refit = () => {
     // 沙箱殼在玩家送出第一句後只把首屏藏起來、不拆：藏著的時候不量，否則之後整段對話每長一行都要重排一次。
     if (!container.getClientRects().length) return
-    const next = Math.round(maxHeight())
+    const next = Math.floor(maxHeight())
     if (next === cap) return
     cap = next
     setHeight(sizer.setCap(next))

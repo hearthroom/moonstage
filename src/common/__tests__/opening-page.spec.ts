@@ -178,6 +178,16 @@ describe('mountOpeningPage', () => {
       expect(short.setCap(250)).toBe(250)
     })
 
+    it('短頁的上限先降後升（打開又收起上方的介紹）：回到內容高，不被拉成新上限；比上限高的頁也只撐到內容高', () => {
+      const short = createFrameSizer(550)
+      short.report(450)
+      expect(short.setCap(380)).toBe(380)
+      expect(short.setCap(550)).toBe(450)
+      const tall = createFrameSizer(600)
+      tall.report(700)
+      expect(tall.setCap(900)).toBe(700)
+    })
+
     it('縮完過一陣子內容才變短（玩家收合一段）：照常縮', () => {
       vi.useFakeTimers()
       const { page, post } = setup(true, 600)
