@@ -21,6 +21,8 @@ import { installCard, renderAppliedContent } from './rules'
 import { createLiveHtml } from './render/live-html'
 import { getAuthorRuleRunner, setAuthorRuleStorageScope, clearAuthorRuleStorage, type RuleRunner } from '@/common/author-rules'
 import { applyStylePolicyToHtml, stylePolicyFor } from '@/common/author-style-policy'
+import { compileRuleCssDialects } from '@/common/rule-css-dialect'
+import { normalizeCardFormat } from '@/common/card-format'
 import { buildFrontendDocument, FRONTEND_BLOCK_CLASS, mountFrontendBlocks } from '@/common/frontend-block'
 import { runAuthorScripts, runInlineScript } from './author-scripts'
 import { createMessageList } from './render/message-list'
@@ -133,7 +135,9 @@ export function createShell(options: CreateShellOptions): Shell {
   const standardChrome = config.chrome !== 'host' && !!config.chromeState
   refs.root.setAttribute('data-chrome', config.chrome === 'host' ? 'host' : (standardChrome ? 'standard' : 'shell'))
   // 殼的根同時是標準畫布的根（.canvas-root.chat）：canvas.css 的變數與訊息區規則才套得上。
-  refs.root.classList.add('canvas-root', 'chat', 'lt-format-mmd')
+  // lt-format-mmd 只給 MMD 卡（同一般頁）：它帶著 MMD 的正文盒模型還原，風月與酒館的卡在原平台都是 border-box。
+  refs.root.classList.add('canvas-root', 'chat')
+  if (normalizeCardFormat(config.card.format) === 'mmd') refs.root.classList.add('lt-format-mmd')
   const themeBridge = createThemeBridge(refs.root, win, refs.authorCss)
   const applyThemeVars = themeBridge.update
   applyThemeVars(config.themeVars)
@@ -342,7 +346,8 @@ export function createShell(options: CreateShellOptions): Shell {
   // ── 裝卡：樣式、腳本（在任何 DOM 內容之前）。 ──
   // 卡片格式決定 <style> 怎麼落地（政策表在 common/author-style-policy）；殼自己不判斷格式。
   const stylePolicy = stylePolicyFor(config.card.format)
-  const card = installCard(config.card.rules || [], stylePolicy)
+  // 規則自己標了 CSS 寫法的先照那個寫法轉好（common/rule-css-dialect），其餘照卡片格式。
+  const card = installCard(compileRuleCssDialects(config.card.rules || []), stylePolicy)
   refs.authorCss.textContent = card.styles.join('\n')
   const macros = { user: config.user.nickname || '', char: config.role.name || '' }
   // 規則交給 worker（跟一般卡同一個排程器）：這裡從不等規則，結果還沒回來就先畫「上次套完的產物＋之後到的原文」，

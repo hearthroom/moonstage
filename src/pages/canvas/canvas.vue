@@ -13,6 +13,7 @@
     class="canvas-root chat"
     :class="{ 'is-touch': isTouchDevice, 'is-fullscreen': fullscreenActive, 'lt-format-mmd': cardFormat === 'mmd', 'lt-theme-dark': themeLocked }"
     :data-lt-author-owns="authorOwnedRegions || null"
+    :data-lt-theme="pageTheme"
   >
     <CanvasHeader
       v-show="!sandboxCard"
@@ -556,6 +557,7 @@ import { scopeCardHtml, normalizeCardFormat, type CardFormat } from './canvas-st
 import { withFencesProtected } from '@/common/markdown-fences'
 import { tagFrontendBlocks, mountFrontendBlocks } from '@/common/frontend-block'
 import { stylePolicyFor } from '@/common/author-style-policy'
+import { compileRuleCssDialects } from '@/common/rule-css-dialect'
 import { detectAuthorOwnedRegions } from './canvas-author-regions'
 import { BACKGROUND_COLORS, backgroundChoiceFrom, backgroundPrefsPatch, readLocalChoice, resolvePlayerBackground, writeLocalChoice, CUSTOM_BACKGROUND_LIMIT, type BackgroundChoice, type BackgroundMode } from './canvas-player-background'
 import { resolveStageBackground } from './canvas-background'
@@ -2652,7 +2654,8 @@ const openingPage = ref('')
 /** 作者選的開局呈現（openingMode：greeting｜page）；空字串＝伺服器沒帶，照卡片格式。 */
 const openingMode = ref('')
 function setActiveAuthorAsset(asset) {
-  const rules = (asset && Array.isArray(asset.rules)) ? asset.rules : [];
+  // 規則自己標了 CSS 寫法的，<style> 先照那個寫法轉好（common/rule-css-dialect）；之後的卡片格式作用域會略過它們。
+  const rules = compileRuleCssDialects((asset && Array.isArray(asset.rules)) ? asset.rules : []);
   activeAuthorAsset.value = {
     rules: rules,
     version: (asset && asset.version) || 0,
@@ -9984,6 +9987,19 @@ const enterBodySnapshot = captureBodySnapshot(typeof document !== 'undefined' ? 
 const cardFormat = ref<CardFormat>('mmd')
 // 畫布鎖定暗色（格式政策的 theme）：class 掛在畫布根上，canvas-theme-vars.css 的暗色預設在那裡再宣告一次。
 const themeLocked = computed(() => stylePolicyFor(cardFormat.value).theme === 'dark');
+// 畫布根上的深淺標記 data-lt-theme（沙箱殼的根也有同一個）：風月寫法 CSS 的 .dark 分支對到這裡
+// （common/fengyue-css）。判斷方式跟殼一樣（detectSandboxTheme），站台切深淺時跟著換。
+const pageTheme = ref<'dark' | 'light'>('dark');
+let pageThemeObserver: MutationObserver | null = null;
+const refreshPageTheme = () => { pageTheme.value = detectSandboxTheme(); };
+onMounted(() => {
+  refreshPageTheme();
+  if (typeof MutationObserver !== 'function' || typeof document === 'undefined') return;
+  pageThemeObserver = new MutationObserver(refreshPageTheme);
+  pageThemeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-mode', 'data-theme', 'data-color-scheme', 'class'] });
+});
+onUnmounted(() => { if (pageThemeObserver) { pageThemeObserver.disconnect(); pageThemeObserver = null; } });
+watch(cardFormat, refreshPageTheme);
 
 // ── 開場白 ─────────────────────────────────────────────────────────────
 const greeting = reactive({ list: [] as string[], index: 0 })

@@ -16,7 +16,7 @@ import { ruleAppliesToMessage, substituteMacros, type RuleMessageTarget } from '
 import { applyDisplayRules } from '@/utils/display-rule-engine.js'
 import type { SandboxRule } from './protocol'
 import { sanitizeAuthorHtml, stripUnknownTags } from './sanitize'
-import { applyStylePolicy, type AuthorStylePolicy } from '@/common/author-style-policy'
+import { applyStylePolicy, hasCompiledDialect, type AuthorStylePolicy } from '@/common/author-style-policy'
 import { withFencesProtected } from '@/common/markdown-fences'
 import { tagFrontendBlocks } from '@/common/frontend-block'
 import { drawNativeBlocks } from '@/common/native-blocks'
@@ -37,7 +37,7 @@ export type AuthorScript =
   | { kind: 'inline'; code: string; ruleName: string; module?: true; nomodule?: true; messageDom?: boolean }
   | { kind: 'external'; src: string; ruleName: string; module?: true; nomodule?: true }
 
-const STYLE_RE = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi
+const STYLE_RE = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi
 const SCRIPT_RE = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi
 const SRC_RE = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i
 const TYPE_RE = /\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i
@@ -60,7 +60,8 @@ export function installCard(rules: SandboxRule[], policy: AuthorStylePolicy): In
     // 程式碼圍欄裡的 <style>／<script> 是字面文字：那是一整份要放進自己 iframe 的前端文件（前端區塊協議），
     // 抽出來當全頁樣式會把整個聊天頁弄壞、文件本身也少了樣式。
     const replace = withFencesProtected(String(rule.replace == null ? '' : rule.replace), (outside) => outside
-      .replace(STYLE_RE, (_m, css: string) => { styles.push(applyStylePolicy(css, policy)); return '' })
+      // 規則自己標了寫法的（rule-css-dialect）已經轉好，不再套卡片格式。
+      .replace(STYLE_RE, (_m, attrs: string, css: string) => { styles.push(hasCompiledDialect(attrs) ? css : applyStylePolicy(css, policy)); return '' })
       .replace(SCRIPT_RE, (_m, attrs: string, code: string) => {
         const src = SRC_RE.exec(attrs || '')
         const url = src ? (src[1] || src[2] || src[3] || '') : ''

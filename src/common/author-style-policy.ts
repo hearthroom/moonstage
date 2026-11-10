@@ -39,6 +39,17 @@ export interface AuthorStylePolicy {
 /** 訊息層前綴。酒館用 `.mes_text `，我們兩個聊天頁的氣泡都掛著這個 class。 */
 export const MESSAGE_SCOPE = '.mes_text'
 
+/**
+ * 規則自己標了 CSS 寫法（rule-css-dialect）時，它的 <style> 在進畫布前就照那個寫法轉好並帶上這個屬性；
+ * 卡片格式這一層看到它就不再處理。
+ */
+export const CSS_DIALECT_ATTR = 'data-lt-css'
+const DIALECT_ATTR_RE = /(?:^|\s)data-lt-css(?=[\s=>]|$)/i
+
+export function hasCompiledDialect(attrs: string): boolean {
+  return DIALECT_ATTR_RE.test(String(attrs || ''))
+}
+
 const POLICIES: Record<CardFormat, AuthorStylePolicy> = {
   tavern: { scope: MESSAGE_SCOPE, fencedDocument: 'iframe', theme: 'host' },
   mmd: { scope: null, fencedDocument: 'inline', theme: 'dark' },
@@ -64,5 +75,5 @@ export function applyStylePolicyToHtml(html: string, policy: AuthorStylePolicy):
   const text = String(html == null ? '' : html)
   if (!policy.scope || text.indexOf('<style') < 0) return text
   // 程式碼圍欄裡的 <style> 是字面文字（前端區塊協議會把整份文件放進自己的 iframe），不加前綴。
-  return withFencesProtected(text, (outside) => outside.replace(STYLE_TAG, (_whole, attrs: string, css: string) => `<style${attrs}>${scopeCss(css, policy.scope as string)}</style>`))
+  return withFencesProtected(text, (outside) => outside.replace(STYLE_TAG, (whole, attrs: string, css: string) => hasCompiledDialect(attrs) ? whole : `<style${attrs}>${scopeCss(css, policy.scope as string)}</style>`))
 }

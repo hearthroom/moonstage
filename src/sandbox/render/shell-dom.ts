@@ -51,7 +51,8 @@ export function buildShell(doc: Document, mount: HTMLElement, options: BuildShel
   const authorCss = el(doc, 'style', { 'data-chat': 'author-css' })
   doc.head.appendChild(authorCss)
 
-  const root = el(doc, 'div', { 'data-chat': 'root', 'data-theme': options.theme, 'data-composer': options.composerVisible ? 'visible' : 'hidden' })
+  // data-lt-theme：兩個聊天頁共用的深淺標記（風月寫法的 .dark 對到這裡，見 common/fengyue-css）。
+  const root = el(doc, 'div', { 'data-chat': 'root', 'data-theme': options.theme, 'data-lt-theme': options.theme, 'data-composer': options.composerVisible ? 'visible' : 'hidden' })
 
   const header = el(doc, 'header', { 'data-chat': 'header' })
   const headerBack = el(doc, 'button', { 'data-chat': 'header-back', type: 'button', title: options.strings.back }, '‹')
@@ -102,6 +103,7 @@ export function setComposerVisible(refs: ShellRefs, visible: boolean) {
 
 export function setTheme(refs: ShellRefs, theme: SandboxTheme) {
   refs.root.setAttribute('data-theme', theme)
+  refs.root.setAttribute('data-lt-theme', theme)
 }
 
 export function setViewportHeight(refs: ShellRefs, height: number) {

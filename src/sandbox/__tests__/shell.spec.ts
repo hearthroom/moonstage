@@ -1315,3 +1315,28 @@ describe('殼：MMD／酒館找輸入框與直接設 .value 相容性', () => {
     expect(sent.filter((m) => m.type === 'input')).toEqual([{ type: 'input', value: '直接寫進陽春殼' }])
   })
 })
+
+// MMD 的正文盒模型還原只給 MMD 卡（同一般頁）；深淺標記 data-lt-theme 兩頁共用（風月寫法的 .dark 對到這裡）。
+describe('殼：格式標記與深淺標記', () => {
+  it('只有 MMD 卡的根掛 lt-format-mmd', () => {
+    expect(boot(config({ card: { rules: [], statusbar: '', format: 'mmd' } })).refs.root.classList.contains('lt-format-mmd')).toBe(true)
+    expect(boot(config({ card: { rules: [], statusbar: '', format: 'fengyue' } })).refs.root.classList.contains('lt-format-mmd')).toBe(false)
+    expect(boot(config({ card: { rules: [], statusbar: '', format: 'tavern' } })).refs.root.classList.contains('lt-format-mmd')).toBe(false)
+  })
+
+  it('data-lt-theme 跟著宿主切深淺', () => {
+    const s = boot(config({ card: { rules: [], statusbar: '', format: 'fengyue' } }))
+    const before = s.refs.root.getAttribute('data-lt-theme')
+    expect(before).toBe(s.refs.root.getAttribute('data-theme'))
+    s.handle({ type: 'theme', theme: before === 'dark' ? 'light' : 'dark', vars: {} } as any)
+    expect(s.refs.root.getAttribute('data-lt-theme')).toBe(before === 'dark' ? 'light' : 'dark')
+  })
+
+  it('風月寫法的規則：樣式轉到我們的節點並包進自己的層', () => {
+    const s = boot(config({ card: { rules: [{ id: 'fy', name: 'fy', find: '/([\\s\\S])$/', replace: '$1<style>#ai-chat-input{background:#fff}</style>', enabled: true, cssDialect: 'fengyue' }], statusbar: '', format: 'mmd' } }))
+    const css = s.refs.authorCss.textContent || ''
+    expect(css).toContain('@layer lt-author-fengyue')
+    expect(css).toContain(':where(.composer-field):not(#lt-fy)')
+    expect(css).not.toContain('#ai-chat-input')
+  })
+})

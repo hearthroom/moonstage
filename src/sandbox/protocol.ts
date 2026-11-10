@@ -66,6 +66,8 @@ export interface SandboxRule {
   find: string
   replace: string
   enabled?: boolean
+  /** 這條規則裡 <style> 的寫法：fengyue／tavern／mmd；缺欄位照卡片格式（common/rule-css-dialect）。 */
+  cssDialect?: string
 }
 
 export interface SandboxCard {

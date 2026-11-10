@@ -24,6 +24,8 @@ import { buildShell } from '../render/shell-dom'
 import { shellStrings } from '../strings'
 import { SANDBOX_PROTOCOL_VERSION, SANDBOX_SUPPORTED_PROTOCOLS } from '../protocol'
 import { MESSAGE_SCOPE, stylePolicyFor } from '@/common/author-style-policy'
+import { FENGYUE_LAYER, translateFengyueCss } from '@/common/fengyue-css'
+import { LEGACY_FENGYUE_CSS_RULE_ID } from '@/common/rule-css-dialect'
 import { OPENING_SANDBOX, OPENING_TEXT_MAX } from '@/common/opening-page'
 import { STANDARD_HTML_TAGS } from '@/pages/canvas/canvas-platform-defaults'
 import { CANVAS_SELECTOR_CONTRACT } from '@/pages/canvas/canvas-dom-contract'
@@ -109,7 +111,7 @@ function nodeFacts() {
   return {
     dataChat: Array.from(new Set([...chat, 'list', 'message-frame', 'message', 'message-avatar', 'message-body', 'author-script', 'panels', 'sdk-debug'])).sort(),
     dataSlot: Array.from(new Set(slots)).sort(),
-    root: { attributes: ['data-theme', 'data-composer', 'data-chrome', 'data-busy'], classes: ['canvas-root', 'chat', 'lt-format-mmd'] },
+    root: { attributes: ['data-theme', 'data-lt-theme', 'data-composer', 'data-chrome', 'data-busy'], classes: ['canvas-root', 'chat'], mmdFormatOnlyClasses: ['lt-format-mmd'] },
     message: { attributes: ['data-from', 'data-state', 'data-msg-id'], from: ['ai', 'user', 'system'], state: ['pending', 'streaming', 'done'], body: { generatingAttribute: 'data-generating' } },
     statusbarSlotOnlyWhenFunctionBarNonEmpty: true,
     stage: { attribute: 'data-stage', states: ['closed', 'content', 'full'] },
@@ -157,6 +159,35 @@ function ruleFacts() {
     chineseVariantClasses: true,
     userMessagesAlsoPassThroughRules: true,
     streaming: 'rules run on the streamed text too; a half-open trailing tag is hidden until the result settles',
+  }
+}
+
+function cssDialectFacts() {
+  // 從真的轉譯器取：容器前綴、死規則、按鈕類只上色、去 !important、包層。
+  const sample = translateFengyueCss('body{color:red} #ai-send-button{top:-4px;background:#fff !important} .dark #customized-answer-content{color:#fff}')
+  expect(sample).not.toContain('body')
+  expect(sample).not.toContain('top:')
+  expect(sample).not.toContain('important')
+  expect(sample.startsWith(`@layer ${FENGYUE_LAYER} {`)).toBe(true)
+  return {
+    source: 'src/common/rule-css-dialect.ts, src/common/fengyue-css.ts',
+    field: 'cssDialect on each display rule',
+    values: ['fengyue', 'tavern', 'mmd'],
+    whenMissing: 'the card format decides (cardFormat section)',
+    legacyRuleIdTreatedAsFengyue: LEGACY_FENGYUE_CSS_RULE_ID,
+    appliesTo: '<style> inside the rule replacement, outside code fences; both the classic page and the sandbox shell',
+    tavern: `selectors prefixed with "${MESSAGE_SCOPE} "`,
+    mmd: 'as written',
+    fengyue: {
+      layer: FENGYUE_LAYER,
+      layers: ['platform defaults (lt-base)', 'site theme and source-platform conditions', '--chat-* variables', `fengyue CSS (${FENGYUE_LAYER})`, 'every other author <style> (unlayered, wins regardless of selector weight)'],
+      importantStripped: true,
+      deadSelectors: ['body', 'html', ':root'],
+      darkBranch: '.dark / html.dark → [data-lt-theme="dark"] on the chat root',
+      unknownFengyueIdsDropped: true,
+      authorContentIdsKept: true,
+      buttonsKeepColourOnly: true,
+    },
   }
 }
 
@@ -233,7 +264,7 @@ function buildContract() {
     protocolVersion: SANDBOX_PROTOCOL_VERSION,
     sdkVersion: sdk.version,
     generatedBy: 'src/sandbox/__tests__/contract.spec.ts (UPDATE_CONTRACT=1)',
-    sources: ['src/sandbox/sdk/create-sdk.ts', 'src/sandbox/sdk/events.ts', 'src/sandbox/sdk/errors.ts', 'src/common/share-context.ts', 'src/common/shared-state.ts', 'src/sandbox/sanitize.ts', 'src/sandbox/render/shell-dom.ts', 'src/sandbox/shell.css', 'src/sandbox/shell.ts', 'src/sandbox/author-scripts.ts', 'src/sandbox/rules.ts', 'src/utils/display-rule-engine.js', 'src/common/author-style-policy.ts', 'src/pages/canvas/canvas-platform-defaults.ts', 'docs/sandbox-chat-page.md'],
+    sources: ['src/sandbox/sdk/create-sdk.ts', 'src/sandbox/sdk/events.ts', 'src/sandbox/sdk/errors.ts', 'src/common/share-context.ts', 'src/common/shared-state.ts', 'src/sandbox/sanitize.ts', 'src/sandbox/render/shell-dom.ts', 'src/sandbox/shell.css', 'src/sandbox/shell.ts', 'src/sandbox/author-scripts.ts', 'src/sandbox/rules.ts', 'src/utils/display-rule-engine.js', 'src/common/author-style-policy.ts', 'src/common/rule-css-dialect.ts', 'src/common/fengyue-css.ts', 'src/pages/canvas/canvas-platform-defaults.ts', 'docs/sandbox-chat-page.md'],
     supportedProtocols: [...SANDBOX_SUPPORTED_PROTOCOLS],
     sdk: {
       keys: caps.keys,
@@ -362,6 +393,7 @@ function buildContract() {
       textMaxChars: OPENING_TEXT_MAX,
     },
     rules: ruleFacts(),
+    cssDialect: cssDialectFacts(),
     sanitizer: sanitizerFacts(),
     scripts: scriptFacts(),
     provider: {
@@ -375,6 +407,7 @@ function buildContract() {
       pageMode: ['classic', 'immersive', 'sandbox'],
       pageModeDefaultWhenEmpty: 'classic',
       cardFormat: ['', 'mmd', 'tavern', 'fengyue'],
+      ruleCssDialect: ['', 'fengyue', 'tavern', 'mmd'],
       openingPageMaxBytes: 512 * 1024,
       render: { endpoint: 'GET /open/v1/role/render', executesScripts: false, runsSanitizer: false, runsMarkdown: false, ruleStatuses: ['applied', 'unmatched', 'disabled', 'empty', 'rolled_back'], unsupportedScan: { classicOnly: ['sdk.save', 'sdk.cache', 'sdk.stage', 'sdk.message', 'sdk.input', 'sdk.composer', 'sdk.role', 'sdk.user', 'sdk.on(', 'sdk.debug', '[data-chat', '[data-slot', '--chat-'], everywhere: ['sdk.vars', '<abc_vars'] } },
     },
