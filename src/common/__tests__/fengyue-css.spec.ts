@@ -48,7 +48,7 @@ describe('選擇器：風月元素 id → 我們的節點', () => {
   })
 
   it('我們沒有的風月介面（退點、沉浸圖、調試…）整條丟掉', () => {
-    for (const sel of ['#customized-truncate-refund-button', '#customized-prompt-debug-button:hover', '.dark #customized-immersive-image-button svg', '#header-setting-button']) {
+    for (const sel of ['#customized-truncate-refund-button', '#customized-prompt-debug-button:hover', '.dark #customized-immersive-image-button svg', '#header-setting-button', '#customized-message-answer-actions']) {
       expect(translateSelector(sel)).toBeNull()
     }
   })

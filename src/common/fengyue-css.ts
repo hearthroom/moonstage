@@ -58,9 +58,8 @@ const ID_MAP: Record<string, [string, Tier]> = {
   'customized-answer-avatar': [`${AI} .mesAvatarWrapper`, 'paint'],
   'customized-question-avatar': [`${ME} .mesAvatarWrapper`, 'paint'],
   'customized-answer-content-thinking-block-container': ['.mes_reasoning_details', 'paint'],
-  // 動作列：風月是一排小按鈕，我們只有一顆「⋯」；樣式落在「⋯」本身，不漆整列（整列漆了會在⋯外多一圈膠囊）。
-  'customized-message-answer-actions': [`${AI} .extraMesButtonsHint`, 'paint'],
-  'customized-message-question-actions': [`${ME} .extraMesButtonsHint`, 'paint'],
+  // 訊息動作列不對應：風月是一排淺色小按鈕，我們只有一顆「⋯」。漆整列會在「⋯」外多一圈膠囊，
+  // 漆在「⋯」上則它的點變得看不見（2026-11-10 離線沙箱實測三套官方主題）。
   'customized-reload-button': ['.lt-msg-regen', 'paint'],
   'customized-opening-statement-selector': ['.swipeRightBlock', 'paint'],
   'customized-model-selector': ['.mind-type', 'paint'],
