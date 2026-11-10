@@ -1231,6 +1231,17 @@
     cursor: pointer;
   }
 
+  /* 看起來跟快捷鍵一樣高（28px），點得到的範圍往外多 6px（約 40px 高），手指不必點準那條細邊。 */
+  .composer-choices__toggle {
+    position: relative;
+  }
+
+  .composer-choices__toggle::before {
+    content: '';
+    position: absolute;
+    inset: -6px -4px;
+  }
+
   .composer-choices__toggle:focus-visible {
     outline: 2px solid var(--lt-canvas-accent);
     outline-offset: 1px;
