@@ -22,6 +22,7 @@ import { createLiveHtml } from './render/live-html'
 import { getAuthorRuleRunner, setAuthorRuleStorageScope, clearAuthorRuleStorage, type RuleRunner } from '@/common/author-rules'
 import { applyStylePolicyToHtml, stylePolicyFor } from '@/common/author-style-policy'
 import { compileRuleCssDialects } from '@/common/rule-css-dialect'
+import { compileCardCss, createCardCssMount, resolveCardCssAsset } from '@/common/card-css'
 import { normalizeCardFormat } from '@/common/card-format'
 import { buildFrontendDocument, FRONTEND_BLOCK_CLASS, mountFrontendBlocks } from '@/common/frontend-block'
 import { runAuthorScripts, runInlineScript } from './author-scripts'
@@ -347,7 +348,10 @@ export function createShell(options: CreateShellOptions): Shell {
   // 卡片格式決定 <style> 怎麼落地（政策表在 common/author-style-policy）；殼自己不判斷格式。
   const stylePolicy = stylePolicyFor(config.card.format)
   // 規則自己標了 CSS 寫法的先照那個寫法轉好（common/rule-css-dialect），其餘照卡片格式。
-  const card = installCard(compileRuleCssDialects(config.card.rules || []), stylePolicy)
+  const cssAsset = resolveCardCssAsset(config.card)
+  const cardCssMount = createCardCssMount(doc)
+  cardCssMount.set(compileCardCss(cssAsset))
+  const card = installCard(compileRuleCssDialects(cssAsset.rules), stylePolicy)
   refs.authorCss.textContent = card.styles.join('\n')
   const macros = { user: config.user.nickname || '', char: config.role.name || '' }
   // 規則交給 worker（跟一般卡同一個排程器）：這裡從不等規則，結果還沒回來就先畫「上次套完的產物＋之後到的原文」，
@@ -1057,6 +1061,7 @@ export function createShell(options: CreateShellOptions): Shell {
       if (disposeGeometryDebug) disposeGeometryDebug()
       refs.root.remove()
       refs.authorCss.remove()
+      cardCssMount.dispose()
     },
   }
 }

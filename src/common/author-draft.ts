@@ -17,6 +17,8 @@ export interface AuthorDraft {
   /** 卡片格式（MMD 或酒館的寫法）；決定 CSS 要不要加作用域前綴（見 canvas-style-scope） */
   cardFormat: CardFormat
   rules: TavernRule[]
+  cardCss?: string
+  cardCssDialect?: string
   mountTrigger: string
   mountLayer: DraftMountLayer
   /** 沉浸模式：作者宣告的滿版乾淨畫布（舊頁的一種版面） */
@@ -452,6 +454,8 @@ export function importAuthorDraft(text: string, fallbackName = ''): AuthorDraft 
       immersive: asset.pageMode === 'immersive',
       chatPage: asset.pageMode === 'sandbox' ? 'sandbox' : 'classic',
       opening: str(asset.opening),
+      ...(Object.prototype.hasOwnProperty.call(asset, 'cardCss') ? { cardCss: str(asset.cardCss) } : {}),
+      ...(typeof asset.cardCssDialect === 'string' ? { cardCssDialect: asset.cardCssDialect } : {}),
     }
   }
 
@@ -591,7 +595,7 @@ export function draftToTrialPayload(draft: AuthorDraft): Record<string, any> | n
       })),
     }
   }
-  if (draft.rules.length) {
+  if (draft.rules.length || Object.prototype.hasOwnProperty.call(draft, 'cardCss')) {
     payload.authorAsset = {
       rules: draft.rules.map((r) => ({
         id: String(r.id),
@@ -603,6 +607,8 @@ export function draftToTrialPayload(draft: AuthorDraft): Record<string, any> | n
       })),
       mountTrigger: draft.mountTrigger,
       mountLayer: draft.mountLayer,
+      ...(Object.prototype.hasOwnProperty.call(draft, 'cardCss') ? { cardCss: str(draft.cardCss) } : {}),
+      ...(typeof draft.cardCssDialect === 'string' ? { cardCssDialect: draft.cardCssDialect } : {}),
     }
   }
   return payload
@@ -658,6 +664,10 @@ export function mergeAuthorDraft(base: AuthorDraft, incoming: AuthorDraft): Auth
     merged.immersive = incoming.immersive
     merged.chatPage = incoming.chatPage
     merged.cardFormat = incoming.cardFormat
+    if (Object.prototype.hasOwnProperty.call(incoming, 'cardCss')) {
+      merged.cardCss = incoming.cardCss
+      merged.cardCssDialect = incoming.cardCssDialect
+    }
     merged.format = incoming.format
     if (incoming.opening) merged.opening = incoming.opening
   }
@@ -688,6 +698,8 @@ export function draftToAuthorAsset(draft: AuthorDraft) {
     mountLayer: draft.mountLayer,
     pageMode: draft.chatPage === 'sandbox' ? 'sandbox' : draft.immersive ? 'immersive' : 'classic',
     cardFormat: draft.cardFormat,
+    ...(Object.prototype.hasOwnProperty.call(draft, 'cardCss') ? { cardCss: str(draft.cardCss) } : {}),
+    ...(typeof draft.cardCssDialect === 'string' ? { cardCssDialect: draft.cardCssDialect } : {}),
   }
 }
 
