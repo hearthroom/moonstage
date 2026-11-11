@@ -11,6 +11,8 @@
  * 量測與寫回在 canvas.vue。
  */
 
+import { managedCardVariables } from '@/common/card-appearance'
+
 export interface CardThemeSample {
   bubbleBorderColor?: string
   bubbleBorderWidth?: string
@@ -181,7 +183,9 @@ export function readCardThemeSample(doc: Document): CardThemeSample {
 
 /** 把量到的值寫在根節點上；這次沒量到的就拿掉，退回 CSS 的預設。只動 names 列的那幾個。 */
 export function writeCardThemeVars(root: HTMLElement, vars: CardThemeVars, names: Array<keyof CardThemeVars> = CARD_THEME_VAR_NAMES): void {
+  const managed = managedCardVariables(root)
   for (const name of names) {
+    if (managed.has(name)) { root.style.removeProperty(name); continue }
     const value = vars[name]
     if (value) {
       if (root.style.getPropertyValue(name) !== value) root.style.setProperty(name, value)

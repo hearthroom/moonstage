@@ -4,6 +4,7 @@ import { transpileModule, ModuleKind, ScriptTarget } from 'typescript'
 import { effectScope, nextTick, ref, watch } from 'vue'
 import { expect, it } from 'vitest'
 import { compileRuleCssDialects } from '@/common/rule-css-dialect'
+import { compileCardCss, resolveCardCssAsset } from '@/common/card-css'
 
 // Run the real host skin lifecycle with synthetic author CSS; no card scripts or API.
 const source = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
@@ -22,7 +23,7 @@ it('applies sandbox card styling to response preferences and restores the host o
  let state: any
  try {
   scope.run(() => {
-   state = new Function('ref', 'watch', 'sandboxCard', 'panel', 'sandboxAsset', 'compileRuleCssDialects', lifecycle + '\nreturn { sandboxDocState };')(ref, watch, sandboxCard, panel, asset, compileRuleCssDialects)
+   state = new Function('ref', 'watch', 'sandboxCard', 'panel', 'sandboxAsset', 'compileRuleCssDialects', 'compileCardCss', 'resolveCardCssAsset', lifecycle + '\nreturn { sandboxDocState };')(ref, watch, sandboxCard, panel, asset, compileRuleCssDialects, compileCardCss, resolveCardCssAsset)
   })
   state.sandboxDocState.value = { html: { className: 'test-card-theme', data: { 'data-card-theme': 'night' } }, body: { className: 'test-card-body', data: {} } }
   panel.value = { sheet: 'response-settings' }
@@ -56,7 +57,7 @@ it('the host skin uses Fengyue CSS as translated, never as written', async () =>
  let state: any
  try {
   scope.run(() => {
-   state = new Function('ref', 'watch', 'sandboxCard', 'panel', 'sandboxAsset', 'compileRuleCssDialects', lifecycle + '\nreturn { sandboxDocState };')(ref, watch, ref(true), panel, asset, compileRuleCssDialects)
+   state = new Function('ref', 'watch', 'sandboxCard', 'panel', 'sandboxAsset', 'compileRuleCssDialects', 'compileCardCss', 'resolveCardCssAsset', lifecycle + '\nreturn { sandboxDocState };')(ref, watch, ref(true), panel, asset, compileRuleCssDialects, compileCardCss, resolveCardCssAsset)
   })
   state.sandboxDocState.value = { html: { className: '', data: {} }, body: { className: '', data: {} } }
   panel.value = { sheet: 'response-settings' }

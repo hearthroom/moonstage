@@ -80,6 +80,7 @@ const ID_MAP: Record<string, [string, Tier]> = {
   'customized-variable-panel-floating-button': ['.lt-state-btn', 'paint'],
 }
 const SHORTCUT_ID = /^customized-shortcut-command-button-\d+$/
+const knownHook = (id: string): [string, Tier] | undefined => Object.prototype.hasOwnProperty.call(ID_MAP, id) ? ID_MAP[id] : SHORTCUT_ID.test(id) ? ['.shortcut-btn', 'paint'] : undefined
 /** 風月介面的 id 前綴。這些 id 沒對應就整條丟；不是這些前綴的 id 是作者內容自己的，原樣留著。 */
 const FENGYUE_ID = /^(customized-|ai-|header-setting-|toggle-sub-buttons$|chat-input-more-menu$|installedBuiltInCss$)/
 
@@ -104,7 +105,7 @@ function mapId(id: string): [string, Tier] | null | undefined {
 }
 
 /** 一條選擇器 → 我們的選擇器；null＝在風月不生效或我們沒有對應，丟掉。 */
-export function translateSelector(raw: string): { selector: string; tier: Tier; text?: TextNode } | null {
+export function translateSelector(raw: string, knownOnly = false): { selector: string; tier: Tier; text?: TextNode } | null {
   let sel = raw.trim()
   if (!sel) return null
   let dark = false
@@ -124,7 +125,7 @@ export function translateSelector(raw: string): { selector: string; tier: Tier; 
   // 引號裡的 # 是屬性值（a[href="#ai-x"]），不是 id。
   let mapped = sel.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|#([A-Za-z_][\w-]*)/g, (whole, id: string | undefined) => {
     if (!id) return whole
-    const hit = mapId(id)
+    const hit = knownOnly ? knownHook(id) : mapId(id)
     if (hit === undefined) return whole
     if (hit === null) { dropped = true; return whole }
     if (hit[1] === 'paint') tier = 'paint'
@@ -146,7 +147,7 @@ export function translateSelector(raw: string): { selector: string; tier: Tier; 
 
 // ── 掃描 ──
 
-interface Node { prelude: string; body: string | null } // body null＝以分號結尾的 at-rule（@import 等）
+interface Node { prelude: string; body: string | null; start?: number; end?: number; bodyStart?: number; bodyEnd?: number } // body null＝以分號結尾的 at-rule（@import 等）
 
 function parse(css: string): Node[] {
   const src = String(css == null ? '' : css)
@@ -172,7 +173,7 @@ function parse(css: string): Node[] {
     }
     const prelude = src.slice(start, i).trim()
     if (i >= src.length) break
-    if (src[i] === ';') { out.push({ prelude, body: null }); i++; continue }
+    if (src[i] === ';') { out.push({ prelude, body: null, start, end: i + 1 }); i++; continue }
     // 讀整個區塊
     const bodyStart = ++i
     let depth = 1
@@ -190,7 +191,8 @@ function parse(css: string): Node[] {
       else if (par === 0 && ch === '}') depth--
       i++
     }
-    out.push({ prelude, body: src.slice(bodyStart, depth === 0 ? i - 1 : i) })
+    const bodyEnd = depth === 0 ? i - 1 : i
+    out.push({ prelude, body: src.slice(bodyStart, bodyEnd), start, end: i, bodyStart, bodyEnd })
   }
   return out
 }
@@ -277,7 +279,7 @@ function readableColor(decls: string[]): string | null {
   return lum > 0.55 ? DARK_TEXT : LIGHT_TEXT
 }
 
-function translateNodes(nodes: Node[], imports: string[]): string {
+function translateNodes(nodes: Node[], imports: string[], knownOnly = false): string {
   let out = ''
   for (const node of nodes) {
     const head = node.prelude
@@ -287,7 +289,7 @@ function translateNodes(nodes: Node[], imports: string[]): string {
       continue
     }
     if (/^@(media|supports|container|layer|scope|document|starting-style)\b/i.test(head)) {
-      const inner = translateNodes(parse(node.body), imports)
+      const inner = translateNodes(parse(node.body), imports, knownOnly)
       if (inner.trim()) out += `${head} {\n${inner}}\n`
       continue
     }
@@ -296,7 +298,7 @@ function translateNodes(nodes: Node[], imports: string[]): string {
       out += `${head} {${node.body}}\n`
       continue
     }
-    const parts = splitTop(stripComments(head), ',').map(translateSelector).filter((p): p is NonNullable<ReturnType<typeof translateSelector>> => !!p)
+    const parts = splitTop(stripComments(head), ',').map((selector) => translateSelector(selector, knownOnly)).filter((p): p is NonNullable<ReturnType<typeof translateSelector>> => !!p)
     if (!parts.length) continue
     // 同一條規則的選擇器裡只要有一個是按鈕類，整條就只上色（寧可少套，不讓版面錯位）。
     const tier: Tier = parts.some((p) => p.tier === 'paint') ? 'paint' : 'full'
@@ -326,4 +328,62 @@ export function translateFengyueCss(css: string): string {
   const body = translateNodes(parse(css), imports)
   if (!body.trim() && !imports.length) return ''
   return (imports.length ? imports.join('\n') + '\n' : '') + (body.trim() ? `@layer ${FENGYUE_LAYER} {\n${body}}\n` : '')
+}
+
+/** 只認公開對照表內的 ID token，字串／屬性／註解不是來源指紋。 */
+function hasKnownHook(selector: string): boolean {
+  let found = false
+  stripComments(selector).replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[[^\]]*\]|#([A-Za-z_][\w-]*)/g, (whole, id: string | undefined) => {
+    if (id && knownHook(id)) found = true
+    return whole
+  })
+  return found
+}
+
+/**
+ * 沒有來源提示的 CSS：只轉已知風月掛點。其他選擇器交回現有卡片政策，
+ * 不猜整段的來源，也不讓逗號同組的本站規則跟著被去 important／限制版面。
+ */
+export function adaptFengyueSelectors(css: string, native: (css: string) => string): string {
+  const source = String(css == null ? '' : css)
+  const edits: Array<{ start: number; end: number; text: string }> = []
+  for (const node of parse(source)) {
+    if (node.body === null || node.start == null || node.end == null) continue
+    if (/^@(media|supports|container|layer|scope|document|starting-style)\b/i.test(node.prelude)) {
+      const body = adaptFengyueSelectors(node.body, native)
+      if (body !== node.body && node.bodyStart != null && node.bodyEnd != null) edits.push({ start: node.start, end: node.end, text: source.slice(node.start, node.bodyStart) + body + source.slice(node.bodyEnd, node.end) })
+      continue
+    }
+    if (node.prelude.startsWith('@')) continue
+    const selectors = splitTop(stripComments(node.prelude), ',')
+    if (!selectors.some(hasKnownHook)) continue
+    const replacement = selectors.map((selector) => {
+      if (!hasKnownHook(selector)) return native(`${selector.trim()}{${node.body}}`)
+      const translated = translateNodes([{ prelude: selector, body: node.body }], [], true)
+      return translated ? `@layer ${FENGYUE_LAYER} {\n${translated}}\n` : ''
+    }).join('\n')
+    edits.push({ start: node.start, end: node.end, text: replacement })
+  }
+  if (!edits.length) return native(source)
+  let cursor = 0
+  let out = ''
+  for (const edit of edits) {
+    out += native(source.slice(cursor, edit.start)) + edit.text
+    cursor = edit.end
+  }
+  return out + native(source.slice(cursor))
+}
+
+/** 根層 @import 與正文分開，不能把宣告字串／註解裡的文字當成匯入。 */
+export function splitCssImports(css: string): { imports: string[]; body: string } {
+  const imports: string[] = []
+  let body = ''
+  let cursor = 0
+  for (const node of parse(css)) {
+    if (node.body !== null || !/^@import\b/i.test(node.prelude) || node.start == null || node.end == null) continue
+    body += css.slice(cursor, node.start)
+    imports.push(node.prelude)
+    cursor = node.end
+  }
+  return { imports, body: body + css.slice(cursor) }
 }

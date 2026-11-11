@@ -80,6 +80,9 @@ export interface SandboxCard {
   statusbarHtml?: string
   /** 首屏網頁（作者資產 openingPage）：訊息區最上方的作者網頁，只顯示不送模型。空的就不畫。 */
   openingPage?: string
+  /** 整張卡的作者樣式，每頁一次；來源相容提示只供匯入／舊資料保留。 */
+  cardCss?: string
+  cardCssDialect?: string
 }
 
 export interface SandboxCapabilities {
