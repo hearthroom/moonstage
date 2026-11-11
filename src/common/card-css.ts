@@ -1,7 +1,6 @@
 /** 作者資產中的整卡樣式：原文保留，畫面只掛一份，不進訊息或模型。 */
-import { applyStylePolicy, stylePolicyFor } from './author-style-policy'
 import { compileDialectCss, LEGACY_FENGYUE_CSS_RULE_ID, normalizeCssDialect } from './rule-css-dialect'
-import { splitCssImports } from './fengyue-css'
+import { adaptFengyueSelectors, splitCssImports } from './fengyue-css'
 import { nativeCardRootVariables, splitCardAppearanceCss } from './card-appearance'
 
 export const CARD_CSS_LAYER = 'lt-card-css'
@@ -70,7 +69,7 @@ export function compileCardCss(asset: CardCssAsset): string {
     const legacy = compileDialectCss(css, dialect)
     return appearance ? `@layer lt-base, ${CARD_CSS_LAYER}, lt-author-fengyue;\n${legacy}\n@layer ${CARD_CSS_LAYER} {\n${withoutImportant(appearance)}\n}` : legacy
   }
-  const adapted = applyStylePolicy(withoutImportant(css), stylePolicyFor('mmd'))
+  const adapted = adaptFengyueSelectors(withoutImportant(css), native => native)
   // 卡片樣式在平台之上、顯示規則之下；來源原文不動。import 必須留在 layer 外。
   const { imports, body } = splitCssImports(adapted)
   return `@layer lt-base, ${CARD_CSS_LAYER}, lt-author-fengyue;\n${imports.map(layeredImport).join('\n')}${imports.length ? '\n' : ''}@layer ${CARD_CSS_LAYER} {\n${body}\n${withoutImportant(appearance)}\n}`

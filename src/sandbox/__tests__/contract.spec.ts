@@ -175,7 +175,7 @@ function cssDialectFacts() {
     source: 'src/common/rule-css-dialect.ts, src/common/fengyue-css.ts',
     field: 'cssDialect on each display rule',
     values: ['fengyue', 'tavern', 'mmd'],
-    whenMissing: 'known Fengyue ID selectors are adapted individually; every other selector follows the card format (cardFormat section), without classifying the whole style',
+    whenMissing: 'display rules keep the existing card-format policy (cardFormat section); no automatic selector adaptation',
     legacyRuleIdTreatedAsFengyue: LEGACY_FENGYUE_CSS_RULE_ID,
     appliesTo: '<style> inside the rule replacement, outside code fences; both the classic page and the sandbox shell',
     tavern: `selectors prefixed with "${MESSAGE_SCOPE} "`,
@@ -397,6 +397,7 @@ function buildContract() {
     },
     cardCss: {
       source: 'author asset cardCss (raw CSS, display only, never sent to the model)',
+      whenMissingHint: 'only this new field adapts known Fengyue ID selectors individually; native selectors remain as written',
       maxBytes: 512 * 1024,
       mount: 'one style per page in both the classic page and sandbox shell; independent of messages',
       layer: CARD_CSS_LAYER,
