@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import ts from 'typescript'
 import { parse } from '@vue/compiler-sfc'
 import { resolve } from 'node:path'
+import { buildGreetingList, greetingIndexForStart, hasAlternates, shouldDeferStart, showsOpening, stepGreeting } from '../canvas-greetings'
+import { conversationRoleId } from '../canvas-role-settings'
 
 // Execute the page's actual action handlers with controlled transport and UI boundaries.
 const page = parse(readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')).descriptor.scriptSetup!.content
@@ -15,9 +17,14 @@ function handler(name: string, bindings: Record<string, any>) {
 function fixture() {
   const post = vi.fn().mockResolvedValue({ statusCode: 200, data: { conversationId: 'new' } })
   const error = vi.fn()
+  const get = vi.fn().mockImplementation(async (url: string) => ({ statusCode: 200, data: url === '/owned'
+    ? { conversationId: 'current', roleId: 'source-role' }
+    : { characterRoleId: 'source-role', roleWelcome: 'main' } }))
   const bindings = {
-    _this: { http: { post }, requestUrl: { saveAndStartNew: '/new' } },
+    _this: { http: { post, get }, requestUrl: { saveAndStartNew: '/new', ownedConversation: '/owned', getRoleDetail: '/detail' } },
     conversationId: { value: 'current' }, pendingGreetingStart: { value: false },
+    pendingNewConversationFrom: { value: '' }, greetingStartBusy: { value: false },
+    greeting: { list: ['main'], index: 0 }, shouldDeferStart, buildGreetingList, conversationRoleId,
     archiveBusy: { value: false }, canGenerate: { value: true },
     unref: (r: any) => r.value, t: (key: string) => key,
     message: { error }, adoptStartedConversation: vi.fn(), askArchivesFull: vi.fn(),
@@ -27,7 +34,7 @@ function fixture() {
     resolveChatErrorMessage: () => 'generic', resolveChatErrorTypeFromFailure: () => 'generic',
   }
   Object.assign(bindings, { postArchiveAction: handler('postArchiveAction', bindings) })
-  return { bindings, post, error, run: () => handler('saveAndStartNew', bindings)() }
+  return { bindings, post, get, error, run: () => handler('saveAndStartNew', bindings)() }
 }
 describe('new conversation action', () => {
   it('creates the selected opening when there is no conversation to retire', async () => {
@@ -66,10 +73,146 @@ describe('new conversation action', () => {
     f.post.mockReturnValue(new Promise(resolve => { complete = resolve }))
     const first = f.run()
     const second = f.run()
+    await vi.waitFor(() => expect(f.post).toHaveBeenCalledTimes(1))
     expect(f.post).toHaveBeenCalledTimes(1)
     complete({ statusCode: 200, data: { conversationId: 'new' } })
     await Promise.all([first, second])
     expect(f.bindings.adoptStartedConversation).toHaveBeenCalledOnce()
+  })
+})
+
+describe('choose an opening after New conversation', () => {
+  function chooserFixture() {
+    const f = fixture()
+    const b = f.bindings as Record<string, any>
+    Object.assign(b, {
+      greeting: { list: ['main', 'alternate one', 'alternate two'], index: 0 },
+      talkList: { value: [{ id: 'old', type: 1, content: 'old history' }] },
+      pic: { value: '' }, content: { value: 'player draft' }, hasLogin: { value: true },
+      historyConversation: { value: true }, openMore: { value: true },
+      ajax: { value: { flag: true, hasNextPage: true } },
+      autoScrollEnabled: { value: false }, isUserAtBottom: { value: false },
+      teardownStreamForConversationSwitch: vi.fn(),
+      uni: { $emit: vi.fn(), showToast: vi.fn() },
+      nextTick: (f: () => void) => f(), scrollToBottom: vi.fn(), loadArchives: vi.fn(),
+      followConversationRole: () => false,
+      cardStateFromServer: () => null, nextBubbleId: () => 123,
+      showsOpening, stepGreeting, greetingIndexForStart, hasAlternates,
+      onActionBtnClick: vi.fn(),
+    })
+    f.get.mockImplementation(async (url: string) => ({ statusCode: 200, data: url === '/owned'
+      ? { conversationId: 'current', roleId: 'source-role' }
+      : { characterRoleId: 'source-role', roleWelcome: 'main', welcomeAlternates: ['alternate one', 'alternate two'] } }))
+    for (const name of ['renderGreetingPreview', 'onGreetingSwipe', 'adoptStartedConversation', 'startPendingGreeting', 'onCanvasSend']) {
+      b[name] = handler(name, b)
+    }
+    return { ...f, b }
+  }
+  it('shows a selectable preview without committing the default opening, then creates the selected opening once', async () => {
+    const f = chooserFixture()
+    await f.run()
+    expect(f.b.pendingGreetingStart.value).toBe(true)
+    expect(f.b.conversationId.value).toBe('')
+    expect(f.post).not.toHaveBeenCalled()
+    expect(f.b.talkList.value[0].content).toBe('main')
+    f.b.onGreetingSwipe(1)
+    expect(f.b.talkList.value[0].content).toBe('alternate one')
+    f.post.mockResolvedValue({ statusCode: 200, data: { conversationId: 'new', defaultRelay: 'alternate one' } })
+    await f.b.onCanvasSend()
+    expect(f.post).toHaveBeenCalledTimes(1)
+    expect(f.post.mock.calls[0][1].data).toEqual({ conversationId: 'current', save: true, greetingIndex: 1 })
+    expect(f.b.chatStart).not.toHaveBeenCalled()
+    expect(f.b.conversationId.value).toBe('new')
+    expect(f.b.pendingGreetingStart.value).toBe(false)
+    expect(f.b.pendingNewConversationFrom.value).toBe('')
+    expect(f.b.talkList.value[0].content).toBe('alternate one')
+    expect(f.b.onActionBtnClick).toHaveBeenCalledOnce()
+  })
+  it.each(['offline', 'full'])('preserves the selection, draft and source archive when creation fails: %s', async (failure) => {
+    const f = chooserFixture()
+    await f.run()
+    f.b.onGreetingSwipe(1)
+    if (failure === 'offline') f.post.mockRejectedValue(new Error('offline'))
+    else f.post.mockResolvedValue({ statusCode: 409, data: { error: 'conversation_limit_reached', count: 20, limit: 20 } })
+    await f.b.onCanvasSend()
+    expect(f.b.onActionBtnClick).not.toHaveBeenCalled()
+    expect(f.b.pendingGreetingStart.value).toBe(true)
+    expect(f.b.pendingNewConversationFrom.value).toBe('current')
+    expect(f.b.content.value).toBe('player draft')
+    expect(f.b.talkList.value[0].content).toBe('alternate one')
+    expect(f.b.greetingStartBusy.value).toBe(false)
+    if (failure === 'full') {
+      expect(f.b.askArchivesFull).toHaveBeenCalledOnce()
+      expect(f.b.uni.showToast).not.toHaveBeenCalled()
+    }
+  })
+  it('does not let a second send bypass an in-flight opening creation', async () => {
+    const f = chooserFixture()
+    await f.run()
+    let complete!: (res: any) => void
+    f.post.mockReturnValue(new Promise(resolve => { complete = resolve }))
+    const first = f.b.onCanvasSend()
+    await f.b.onCanvasSend()
+    expect(f.b.onActionBtnClick).not.toHaveBeenCalled()
+    expect(f.post).toHaveBeenCalledTimes(1)
+    complete({ statusCode: 200, data: { conversationId: 'new', defaultRelay: 'main' } })
+    await first
+    expect(f.b.onActionBtnClick).toHaveBeenCalledOnce()
+  })
+  it('still uses chatStart for a card with no previous conversation', async () => {
+    const f = chooserFixture()
+    f.b.conversationId.value = ''
+    f.b.pendingGreetingStart.value = true
+    f.b.greeting.index = 2
+    f.b.chatStart.mockImplementation(async () => { f.b.conversationId.value = 'first' })
+    await f.b.onCanvasSend()
+    expect(f.post).not.toHaveBeenCalled()
+    expect(f.b.chatStart).toHaveBeenCalledWith(2)
+    expect(f.b.onActionBtnClick).toHaveBeenCalledOnce()
+  })
+  it('clears the staged new-conversation intent when opening an existing archive', () => {
+    const f = chooserFixture()
+    Object.assign(f.b, {
+      syncConversationRole: vi.fn(), getHistoryMsg: vi.fn(),
+    })
+    f.b.pendingGreetingStart.value = true
+    f.b.pendingNewConversationFrom.value = 'current'
+    handler('adoptConversation', f.b)('archive-picked')
+    expect(f.b.conversationId.value).toBe('archive-picked')
+    expect(f.b.pendingGreetingStart.value).toBe(false)
+    expect(f.b.pendingNewConversationFrom.value).toBe('')
+    expect(f.b.getHistoryMsg).toHaveBeenCalledOnce()
+  })
+  it('uses openings from the source archive revision instead of the URL revision', async () => {
+    const f = chooserFixture()
+    f.get.mockImplementation(async (url: string) => ({ statusCode: 200, data: url === '/owned'
+      ? { conversationId: 'current', roleId: 'old-revision' }
+      : { characterRoleId: 'old-revision', roleWelcome: 'old main', welcomeAlternates: ['old alternate'] } }))
+    await f.run()
+    f.b.onGreetingSwipe(1)
+    expect(f.get.mock.calls[1][1].data).toEqual({ roleId: 'old-revision' })
+    expect(f.b.greeting.list).toEqual(['old main', 'old alternate'])
+    expect(f.b.talkList.value[0].content).toBe('old alternate')
+  })
+  it('does not abandon the old history or create a conversation if its opening revision cannot be read', async () => {
+    const f = chooserFixture()
+    f.get.mockRejectedValue(new Error('offline'))
+    await f.run()
+    expect(f.b.conversationId.value).toBe('current')
+    expect(f.b.talkList.value[0].content).toBe('old history')
+    expect(f.b.pendingGreetingStart.value).toBe(false)
+    expect(f.post).not.toHaveBeenCalled()
+    expect(f.error).toHaveBeenCalledWith('canvas.archive.newFailed')
+  })
+  it('does not send or create while an archive switch is in progress', async () => {
+    const f = chooserFixture()
+    await f.run()
+    f.b.archiveBusy.value = true
+    await f.b.onCanvasSend()
+    await handler('openResponseSettings', f.b)()
+    expect(f.post).not.toHaveBeenCalled()
+    expect(f.b.onActionBtnClick).not.toHaveBeenCalled()
+    expect(f.b.pendingGreetingStart.value).toBe(true)
   })
 })
 
