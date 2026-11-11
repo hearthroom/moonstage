@@ -27,6 +27,8 @@ import { MESSAGE_SCOPE, stylePolicyFor } from '@/common/author-style-policy'
 import { FENGYUE_LAYER, translateFengyueCss } from '@/common/fengyue-css'
 import { LEGACY_FENGYUE_CSS_RULE_ID } from '@/common/rule-css-dialect'
 import { OPENING_SANDBOX, OPENING_TEXT_MAX } from '@/common/opening-page'
+import { CARD_CSS_LAYER, compileCardCss } from '@/common/card-css'
+import { CARD_APPEARANCE_VARIABLES } from '@/common/card-appearance'
 import { STANDARD_HTML_TAGS } from '@/pages/canvas/canvas-platform-defaults'
 import { CANVAS_SELECTOR_CONTRACT } from '@/pages/canvas/canvas-dom-contract'
 import {
@@ -173,7 +175,7 @@ function cssDialectFacts() {
     source: 'src/common/rule-css-dialect.ts, src/common/fengyue-css.ts',
     field: 'cssDialect on each display rule',
     values: ['fengyue', 'tavern', 'mmd'],
-    whenMissing: 'the card format decides (cardFormat section)',
+    whenMissing: 'known Fengyue ID selectors are adapted individually; every other selector follows the card format (cardFormat section), without classifying the whole style',
     legacyRuleIdTreatedAsFengyue: LEGACY_FENGYUE_CSS_RULE_ID,
     appliesTo: '<style> inside the rule replacement, outside code fences; both the classic page and the sandbox shell',
     tavern: `selectors prefixed with "${MESSAGE_SCOPE} "`,
@@ -393,6 +395,19 @@ function buildContract() {
       clipboardCopyFills: true,
       textMaxChars: OPENING_TEXT_MAX,
     },
+    cardCss: {
+      source: 'author asset cardCss (raw CSS, display only, never sent to the model)',
+      maxBytes: 512 * 1024,
+      mount: 'one style per page in both the classic page and sandbox shell; independent of messages',
+      layer: CARD_CSS_LAYER,
+      order: ['platform defaults (lt-base)', `new card CSS (${CARD_CSS_LAYER}, declaration important removed)`, 'display rules'],
+      compiledSampleUsesLayer: compileCardCss({ cardCss: '.mes{color:red}' }).includes(`@layer ${CARD_CSS_LAYER}`),
+      legacyHint: 'cardCssDialect preserves the existing fengyue/tavern/mmd translation and precedence; authors do not select it',
+      legacyCarrier: `${LEGACY_FENGYUE_CSS_RULE_ID}: only one enabled, unchanged importer-generated carrier is moved; explicit cardCss empty clears it`,
+      managedAppearanceVariables: [...CARD_APPEARANCE_VARIABLES],
+      appearanceMarker: '/* lt-card-appearance:start */ ... /* lt-card-appearance:end */',
+      managedAppearancePrecedence: 'native root variables at the card CSS layer; host inline aliases yield and ordinary display-rule declarations can override them',
+    },
     rules: ruleFacts(),
     cssDialect: cssDialectFacts(),
     sanitizer: sanitizerFacts(),
@@ -410,6 +425,7 @@ function buildContract() {
       cardFormat: ['', 'mmd', 'tavern', 'fengyue'],
       ruleCssDialect: ['', 'fengyue', 'tavern', 'mmd'],
       openingPageMaxBytes: 512 * 1024,
+      cardCssMaxBytes: 512 * 1024,
       render: { endpoint: 'GET /open/v1/role/render', executesScripts: false, runsSanitizer: false, runsMarkdown: false, ruleStatuses: ['applied', 'unmatched', 'disabled', 'empty', 'rolled_back'], unsupportedScan: { classicOnly: ['sdk.save', 'sdk.cache', 'sdk.stage', 'sdk.message', 'sdk.input', 'sdk.composer', 'sdk.role', 'sdk.user', 'sdk.on(', 'sdk.debug', '[data-chat', '[data-slot', '--chat-'], everywhere: ['sdk.vars', '<abc_vars'] } },
     },
     import: { source: 'hand-maintained from hearthroom/cli internal/importer/mmd.go', mmdSixKey: { keys: ['chatVersion', 'pageDepth', 'statusbar', 'beginning', 'personality', 'regex_scripts'], chatVersion1: 'pageMode: sandbox', pageDepth: { '1|0|under|below': 'mountLayer under', '2|missing': 'mountLayer over' }, statusbar: 'mountTrigger', beginning: 'welcome.md', personality: 'not read by the CLI importer (persona comes from the separate TXT)', droppedRegexFields: ['trimStrings', 'markdownOnly', 'promptOnly', 'runOnEdit', 'substituteRegex', 'minDepth', 'maxDepth', 'id'] } },

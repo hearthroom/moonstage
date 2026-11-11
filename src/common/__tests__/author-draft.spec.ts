@@ -135,6 +135,14 @@ describe('importAuthorDraft', () => {
 })
 
 describe('draftToAuthorAsset', () => {
+  it('獨立卡片樣式與隱藏提示在資產匯入、預覽與試玩之間不丟失', () => {
+    const draft = importAuthorDraft(JSON.stringify({ rules: [], mountLayer: 'over', cardCss: '#ai-chat-input{color:red}', cardCssDialect: 'fengyue' }))
+    expect(draftToAuthorAsset(draft)).toMatchObject({ cardCss: '#ai-chat-input{color:red}', cardCssDialect: 'fengyue' })
+    const complete = mergeAuthorDraft(draft, importAuthorDraft('Synthetic role definition', 'Synthetic'))!
+    expect(draftToTrialPayload(complete)?.authorAsset).toMatchObject({ cardCss: '#ai-chat-input{color:red}', cardCssDialect: 'fengyue', rules: [] })
+    expect(draftToAuthorAsset(importAuthorDraft(JSON.stringify({ rules: [], mountLayer: 'over', cardCss: '' })))).toHaveProperty('cardCss', '')
+  })
+
   it('產出跟 authorAssetServe 一樣的形狀，簡繁對照表為空', () => {
     const d = importAuthorDraft(JSON.stringify({ roleName: 'x', statusbar: '<s>', pageDepth: 'top', rules: [{ name: 'a', find: 'b', replace: 'c' }] }))
     const asset = draftToAuthorAsset(d)

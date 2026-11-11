@@ -1,3 +1,5 @@
+import { CARD_APPEARANCE_VARIABLES, managedCardVariables } from '@/common/card-appearance'
+
 /** MMD author tokens must also reach the standard Canvas components. */
 const TOKENS: Record<string, string[]> = {
   bg: ['bg', 'header-bg'],
@@ -30,6 +32,8 @@ export function createThemeBridge(root: HTMLElement, win: Window & typeof global
   const targets = new Set(Object.values(TOKENS).flat().map(key => `--lt-canvas-${key}`))
   for (const key of targets) host.set(key, root.style.getPropertyValue(key))
   const written = new Map<string, string>()
+  const managedHost = new Map<string, string>(CARD_APPEARANCE_VARIABLES.map(name => [name, root.style.getPropertyValue(name)]))
+  let previousManaged = new Set<string>()
   let disposed = false
   let scheduled = false
 
@@ -82,6 +86,14 @@ export function createThemeBridge(root: HTMLElement, win: Window & typeof global
     // Do not observe our own aliases: theme changes are infrequent, message
     // rendering must not cause a perpetual style/observer loop.
     observer.disconnect()
+    const managed = managedCardVariables(root)
+    for (const key of managed) root.style.removeProperty(key)
+    for (const key of previousManaged) {
+      if (managed.has(key) || targets.has(key)) continue
+      const value = managedHost.get(key) || ''
+      if (value) root.style.setProperty(key, value); else root.style.removeProperty(key)
+    }
+    previousManaged = managed
     // The standard composer renders its own placeholder elements. Only opt
     // them into an author color when that token is actually supplied, so cards
     // without an MMD input skin keep their existing placeholder appearance.
@@ -90,6 +102,7 @@ export function createThemeBridge(root: HTMLElement, win: Window & typeof global
     root.toggleAttribute('data-author-shortcut-color', authored.has('shortcut-text') &&
       !!computed.getPropertyValue('--chat-shortcut-text').trim())
     for (const key of targets) {
+      if (managed.has(key)) continue
       const value = values.get(key) || ''
       const current = root.style.getPropertyValue(key)
       // An author can still use the native --lt-canvas-* inline interface.
@@ -126,8 +139,9 @@ export function createThemeBridge(root: HTMLElement, win: Window & typeof global
     update(vars?: Record<string, string>) {
       for (const [key, value] of Object.entries(vars || {})) {
         if (!/^--lt-canvas-[\w-]+$/.test(key)) continue
+        if (managedHost.has(key)) managedHost.set(key, value)
         if (targets.has(key)) host.set(key, value)
-        else root.style.setProperty(key, value)
+        else if (!managedCardVariables(root).has(key)) root.style.setProperty(key, value)
       }
       refresh()
     },
