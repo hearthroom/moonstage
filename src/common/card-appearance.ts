@@ -1,4 +1,6 @@
-/** 網頁外觀控制項管理的純變數區塊；沒有標記的作者 CSS 不作推測。 */
+import { unconditionalCardRootProperties } from './fengyue-css'
+
+/** 網頁外觀控制項管理的純變數區塊；沒有標記的舊提示 CSS 不作推測。 */
 export const CARD_APPEARANCE_VARIABLES = [
   '--lt-canvas-bubble-ai-bg', '--lt-canvas-bubble-user-bg', '--lt-canvas-bubble-fg',
   '--lt-canvas-composer-field-bg', '--lt-canvas-send-bg', '--lt-canvas-accent',
@@ -45,4 +47,9 @@ export function splitCardAppearanceCss(css: string): { css: string; appearance: 
 
 export function managedCardVariables(root: HTMLElement): Set<string> {
   return new Set((root.getAttribute('data-lt-card-vars') || '').split(/\s+/).filter(name => allowed.has(name)))
+}
+
+/** 只供無提示的新整卡欄位使用；僅讓8個已知根變數遮住host inline，不改CSS原文。 */
+export function nativeCardRootVariables(css: string): string[] {
+  return unconditionalCardRootProperties(css).filter(name => allowed.has(name))
 }
