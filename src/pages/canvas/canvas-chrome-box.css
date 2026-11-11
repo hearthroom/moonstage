@@ -36,9 +36,8 @@
 .agent-resume-card:has(.agent-resume-card__alt) .agent-resume-card__actions {
     margin-left: auto
 }
-.composer-choices__toggle {
-    margin: 8px 12px 0;
-    padding: 4px 10px 4px 12px
+.shortcut-btn.composer-choices__toggle {
+    padding-right: 8px
 }
 .canvas-sandbox-frame {
     padding-bottom: var(--lt-viewport-safe-area-bottom, env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px)))

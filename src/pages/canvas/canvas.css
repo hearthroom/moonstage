@@ -97,11 +97,6 @@
   padding-inline: calc((100% - min(100%, var(--lt-canvas-column-width, 100%))) / 2);
 }
 
-/* 第一句選項那一排（有開場網頁的卡）跟快捷列同一種：滿寬、欄距用內距收。 */
-.composer-choices {
-  padding-inline: calc((100% - min(100%, var(--lt-canvas-column-width, 100%))) / 2);
-}
-
 /*
   彈層裡「淡一階的字」是相對的，不是一個固定的顏色。
 
@@ -620,7 +615,7 @@
   }
 
   /* 開場網頁還在、它下面沒有別的訊息（開場網頁卡還沒送出第一句）：對話欄底部不留內距與列距，
-     開場網頁一路貼到輸入區（第一句選項在輸入區最上面那一排）。一般頁是 .opening-page，沙箱殼是
+     開場網頁一路貼到輸入區（第一句選項是快捷列最左邊那顆鍵）。一般頁是 .opening-page，沙箱殼是
      [data-slot="opening"] 後面接一個空的訊息列。作者把輸入區往上推的那一段（overhang）照留。 */
   #chat:has(.opening-page + .chat-scroll-anchor),
   #chat:has([data-slot="opening"]:not([hidden]) + [data-chat="list"]:empty) {
@@ -1206,36 +1201,23 @@
     outline-offset: 1px;
   }
 
-  /* 第一句選項（有開場網頁的卡）：輸入區最上面一顆下拉鈕，跟快捷列同一種底色，開場網頁貼到這一排為止。
-     清單往上展開、蓋在開場網頁上（風月也是浮層蓋著詳細介紹），每條整段顯示。 */
+  /* 第一句選項（有開場網頁的卡）：快捷列最左邊一顆強調色的鍵，不另佔一排，開場網頁貼到快捷列為止。
+     浮層從快捷列上方往上展開、蓋在開場網頁上（風月也是浮層蓋著詳細介紹）。錨點零高，住在快捷列前面。 */
   .composer-choices {
     position: relative;
-    background: var(--lt-canvas-composer-bg);
+    height: 0;
   }
 
-  .composer-choices__toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    height: 28px;
-    box-sizing: border-box;
-    margin: 8px 12px 0;
-    padding: 4px 10px 4px 12px;
-    border-radius: 9999px;
-    border: 1px solid var(--lt-canvas-line);
-    background: transparent;
-    color: var(--lt-canvas-composer-fg, var(--lt-canvas-fg));
-    font: inherit;
-    font-size: 12px;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  /* 看起來跟快捷鍵一樣高（28px），點得到的範圍往外多 6px（約 40px 高），手指不必點準那條細邊。 */
-  .composer-choices__toggle {
+  .shortcut-btn.composer-choices__toggle {
     position: relative;
+    padding-right: 8px;
+    border-color: var(--lt-canvas-accent);
+    background: var(--lt-canvas-accent-bg);
+    color: var(--lt-canvas-accent);
+    font-weight: 600;
   }
 
+  /* 看起來跟快捷鍵一樣高（28px），點得到的範圍往外多一圈（QA 量手機至少 30px）。 */
   .composer-choices__toggle::before {
     content: '';
     position: absolute;

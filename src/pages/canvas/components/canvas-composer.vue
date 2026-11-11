@@ -29,37 +29,24 @@
     </div>
 
     <div class="chat-bottom">
-      <!-- 第一句選項（有開場網頁的卡，例如風月匯入）：一顆下拉鈕緊貼在快捷列與輸入區上方，開場網頁一路貼到這一排。
-           照風月做成下拉：選項常是整段文字，點一條就當第一句送出，展開後每條整段顯示，玩家讀完才點。
-           一般卡的開場選項仍是訊息列之後的獨立區塊（canvas-prologue）。
-           清單沿用 .prologue-scope／.prologue-content，作者寫給開場選項的樣式照樣打得到。
-           data-lt="prologue" 掛在一直看得到的這一排（新手導覽指向它），不掛在收起時隱藏的清單上。 -->
-      <div v-if="choices && choices.items.length" ref="choicesEl" class="composer-choices" data-lt="prologue"
-           @keydown.esc="onChoicesEsc" @focusout="onChoicesFocusOut">
-        <div
-          class="composer-choices__toggle"
-          :class="{ 'is-open': choicesOpen }"
-          role="button"
-          tabindex="0"
-          :aria-expanded="choicesOpen ? 'true' : 'false'"
-          :aria-controls="choicesId"
-          @click="toggleChoices"
-          @keydown.enter.prevent="!$event.repeat && toggleChoices()"
-          @keydown.space.prevent="!$event.repeat && toggleChoices()"
-        >
-          <span class="composer-choices__label">{{ choices.title }}</span>
-          <svg class="composer-choices__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 15l6-6 6 6" /></svg>
-        </div>
+      <!-- 第一句選項（有開場網頁的卡，例如風月匯入）：按鈕是快捷列最左邊一顆高亮的鍵（見下面的快捷列），
+           不另佔一排，開場網頁一路貼到快捷列。點了在快捷列上方出浮層，每條整段顯示（選項常是整段文字，
+           點一條就當第一句送出，玩家讀完才點）。浮層放在快捷列外面的這個零高錨點裡：快捷列會橫向捲動、
+           上下裁切，浮層放在裡面會被裁掉。一般卡的開場選項仍是訊息列之後的獨立區塊（canvas-prologue）。
+           清單沿用 .prologue-scope／.prologue-content，作者寫給開場選項的樣式照樣打得到。 -->
+      <div v-if="hasChoices" class="composer-choices">
         <div
           v-show="choicesOpen"
           :id="choicesId"
+          ref="choicesListEl"
           class="prologue-scope prologue-scope--dock"
           role="group"
-          :aria-label="choices.title"
+          :aria-label="choices?.title"
+          @keydown.esc="onChoicesEsc"
+          @focusout="onChoicesFocusOut"
         >
           <div
-            v-for="(item, ci) in choices.items"
+            v-for="(item, ci) in choices?.items"
             :key="'choice-' + ci"
             class="prologue-content"
             role="button"
@@ -78,6 +65,27 @@
            照沙盒寫的卡只認那一套。完整對照見 canvas-dom-contract.ts 的 mmd-sandbox 條目。 -->
       <div ref="shortcutBarEl" class="shortcut-bar-wrapper shortcut-button-scope toolbar composer-shortcut-wrap" data-lt="function-bar">
         <div class="shortcut-bar" data-chat="shortcut">
+          <!-- 第一句：data-lt="prologue" 掛在這顆一直看得到的鍵上（新手導覽指向它），不掛在收起時隱藏的清單。 -->
+          <div
+            v-if="hasChoices"
+            ref="choicesToggleEl"
+            class="shortcut-btn composer-choices__toggle"
+            :class="{ 'is-open': choicesOpen }"
+            data-lt="prologue"
+            role="button"
+            tabindex="0"
+            :aria-expanded="choicesOpen ? 'true' : 'false'"
+            :aria-controls="choicesId"
+            @click="toggleChoices"
+            @keydown.enter.prevent="!$event.repeat && toggleChoices()"
+            @keydown.space.prevent="!$event.repeat && toggleChoices()"
+            @keydown.esc="onChoicesEsc"
+            @focusout="onChoicesFocusOut"
+          >
+            <span class="sb-text composer-choices__label">{{ choices?.title }}</span>
+            <svg class="composer-choices__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 15l6-6 6 6" /></svg>
+          </div>
           <div
             v-for="item in shortcuts"
             :key="item.key"
@@ -539,28 +547,34 @@ const stopEl = ref<HTMLElement | null>(null)
 
 // ── 第一句選項的下拉 ───────────────────────────────────────────────
 // 點清單外面、按 Esc、焦點移進開場網頁（iframe 拿走焦點時這一層的 window 失焦）都收起來。
-const choicesEl = ref<HTMLElement | null>(null)
+const choicesToggleEl = ref<HTMLElement | null>(null)
+const choicesListEl = ref<HTMLElement | null>(null)
 const choicesOpen = ref(false)
+const hasChoices = computed(() => !!props.choices && props.choices.items.length > 0)
+/** 按鈕與浮層分住兩處（按鈕在快捷列裡、浮層在快捷列外），「在下拉裡面」指兩者之一。 */
+function insideChoices(node: Node | null) {
+  return !!node && (!!choicesToggleEl.value?.contains(node) || !!choicesListEl.value?.contains(node))
+}
 const choicesId = `lt-first-line-${Math.random().toString(36).slice(2, 8)}`
 function onChoicesOutside(e: Event) {
-  if (choicesEl.value && !choicesEl.value.contains(e.target as Node)) closeChoices(false)
+  if (!insideChoices(e.target as Node)) closeChoices(false)
 }
 function onChoicesBlur() { closeChoices(false) }
 function closeChoices(refocus: boolean) {
   if (!choicesOpen.value) return
   choicesOpen.value = false
-  const doc = choicesEl.value?.ownerDocument
+  const doc = choicesToggleEl.value?.ownerDocument
   doc?.removeEventListener('pointerdown', onChoicesOutside, true)
   doc?.defaultView?.removeEventListener('blur', onChoicesBlur)
-  if (refocus) choicesEl.value?.querySelector<HTMLElement>('.composer-choices__toggle')?.focus()
+  if (refocus) choicesToggleEl.value?.focus()
 }
 function toggleChoices() {
   if (choicesOpen.value) { closeChoices(false); return }
   choicesOpen.value = true
-  const doc = choicesEl.value?.ownerDocument
+  const doc = choicesToggleEl.value?.ownerDocument
   doc?.addEventListener('pointerdown', onChoicesOutside, true)
   doc?.defaultView?.addEventListener('blur', onChoicesBlur)
-  nextTick(() => choicesEl.value?.querySelector<HTMLElement>('.prologue-content')?.focus())
+  nextTick(() => choicesListEl.value?.querySelector<HTMLElement>('.prologue-content')?.focus())
 }
 // 按住 Enter 展開時，後續的重複按鍵會落在剛拿到焦點的第一條上：只認第一下（見模板的 repeat 判斷）。
 function onChoicesEsc(e: KeyboardEvent) {
@@ -571,8 +585,7 @@ function onChoicesEsc(e: KeyboardEvent) {
 }
 // 焦點離開整個下拉（Tab 出去、點進開場網頁）就收起；在下拉裡面移動不算。
 function onChoicesFocusOut(e: FocusEvent) {
-  const next = e.relatedTarget as Node | null
-  if (next && choicesEl.value?.contains(next)) return
+  if (insideChoices(e.relatedTarget as Node | null)) return
   closeChoices(false)
 }
 function pickChoice(index: number) {

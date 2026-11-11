@@ -245,8 +245,8 @@ export function mountOpeningPage(
   const content = typeof ResizeObserver === 'function' ? new ResizeObserver(() => refit()) : null
   const scroller = chatScroller(container)
   if (content && scroller) for (const child of Array.from(scroller.children)) content.observe(child)
-  // 聊天區自己變矮變高、視窗沒變：輸入區多了或少了一排（第一句選項在輸入區最上面），框要跟著讓位，
-  // 不然框底會壓到輸入區後面、要捲才看得到。鍵盤開合會改視窗高度，那時不動（見上）。
+  // 聊天區自己變矮變高、視窗沒變：輸入區長高或縮回（點進輸入框展開、打了好幾行），框要跟著讓位，
+  // 不然框底會壓到輸入區後面、聊天區卡在半捲的位置。鍵盤開合會改視窗高度，那時不動（見上）。
   const viewportHeight = () => Math.round(win.visualViewport?.height ?? win.innerHeight)
   let lastViewport = viewportHeight()
   const area = typeof ResizeObserver === 'function' && scroller ? new ResizeObserver(() => {

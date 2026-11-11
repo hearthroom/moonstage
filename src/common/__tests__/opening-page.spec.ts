@@ -230,7 +230,7 @@ describe('mountOpeningPage', () => {
     vi.unstubAllGlobals()
   })
 
-  it('聊天區變矮而視窗沒變（輸入區多了一排第一句選項）：重量框；視窗高度變了（鍵盤開合）不動', () => {
+  it('聊天區變矮而視窗沒變（輸入區變高：點進輸入框展開、打了好幾行）：重量框；視窗高度變了（鍵盤開合）不動', () => {
     const observers: Array<{ cb: () => void; targets: Element[] }> = []
     const RO = class {
       targets: Element[] = []

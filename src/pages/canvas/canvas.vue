@@ -10116,8 +10116,8 @@ function cancelAssist() { assistSession.cancel(); if(!assistSession.state.visibl
 
 const prologue = ref<string[]>([])
 const composerRef = ref<any>(null)
-// 有開場網頁的卡（風月的「詳細介紹」）：選項是玩家的第一句，改放輸入區最上面一排、標題叫「第一句」，
-// 開場網頁一路貼到那一排；一般卡照 MMD 的「你可以選擇開場」放在訊息列後面。沙箱殼收到同一個標題，自己決定放哪。
+// 有開場網頁的卡（風月的「詳細介紹」）：選項是玩家的第一句，改成快捷列最左邊一顆強調色的鍵、標題叫「第一句」，
+// 開場網頁一路貼到快捷列；一般卡照 MMD 的「你可以選擇開場」放在訊息列後面。沙箱殼收到同一個標題，自己決定放哪。
 const openingDocked = computed(() => !!openingPage.value.trim())
 const prologueTitle = computed(() => t(openingDocked.value ? 'canvas.prologue.firstLine' : 'canvas.prologue.title'))
 const prologueItems = computed(() => (
