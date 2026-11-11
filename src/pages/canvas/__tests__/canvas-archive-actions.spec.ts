@@ -5,6 +5,8 @@ import { parse } from '@vue/compiler-sfc'
 import { resolve } from 'node:path'
 import { buildGreetingList, greetingIndexForStart, hasAlternates, shouldDeferStart, showsOpening, stepGreeting } from '../canvas-greetings'
 import { conversationRoleId } from '../canvas-role-settings'
+import { nextTick, ref, watch } from 'vue'
+import { createPendingStreamEntry, decideStreamResume } from '../chat-transport-ownership'
 
 // Execute the page's actual action handlers with controlled transport and UI boundaries.
 const page = parse(readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')).descriptor.scriptSetup!.content
@@ -13,6 +15,15 @@ function handler(name: string, bindings: Record<string, any>) {
   const node = ast.statements.find(n => ts.isFunctionDeclaration(n) && n.name?.text === name)!
   const js = ts.transpileModule(node.getText(ast), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
   return new Function(...Object.keys(bindings), `${js}; return ${name}`)(...Object.values(bindings))
+}
+function initialResumeWatcher(bindings: Record<string, any>) {
+  const node = ast.statements.find(n => ts.isExpressionStatement(n)
+    && ts.isCallExpression(n.expression)
+    && n.expression.expression.getText(ast) === 'watch'
+    && n.expression.arguments[0]?.getText(ast) === 'conversationId')!
+  const js = ts.transpileModule(node.getText(ast), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
+  // The page's mutable pending turn must stay live across the scheduled Vue tick.
+  return new Function('scope', `with (scope) { return ${js} }`)(bindings)
 }
 function fixture() {
   const post = vi.fn().mockResolvedValue({ statusCode: 200, data: { conversationId: 'new' } })
@@ -213,6 +224,51 @@ describe('choose an opening after New conversation', () => {
     expect(f.post).not.toHaveBeenCalled()
     expect(f.b.onActionBtnClick).not.toHaveBeenCalled()
     expect(f.b.pendingGreetingStart.value).toBe(true)
+  })
+  it('does not treat the first live send as an abandoned mount-time draft while its WS ticket is pending', async () => {
+    const f = chooserFixture()
+    let stored: any = null
+    let pendingTurn: any = null
+    Object.assign(f.b, {
+      conversationId: ref('current'), watch, nextTick,
+      socket: ref(null), resumePendingBackwardOperation: () => false,
+      resumePendingStopSettlement: () => false,
+      readPendingStreamState: () => decideStreamResume(stored),
+      recoverStoredStreamDraft: vi.fn(() => { f.b.content.value = 'player draft' }),
+      onActionBtnClick: vi.fn(() => {
+        const payload = { conversationId: 'new', message: 'player draft', supportsOperationOutcome: true, clientOperationId: 'first-intent' }
+        pendingTurn = { payload }
+        stored = { ...createPendingStreamEntry(payload), chatPayloadDispatched: false }
+        f.b.content.value = ''
+      }),
+    })
+    Object.defineProperty(f.b, 'pendingChatTurn', { get: () => pendingTurn, configurable: true, enumerable: true })
+    f.b.tryResumeOnMount = handler('tryResumeOnMount', f.b)
+    for (const name of ['adoptStartedConversation', 'startPendingGreeting', 'onCanvasSend']) f.b[name] = handler(name, f.b)
+    const stop = initialResumeWatcher(f.b)
+    try {
+      await f.run()
+      await nextTick()
+      f.post.mockResolvedValue({ statusCode: 200, data: { conversationId: 'new', defaultRelay: 'main' } })
+      await f.b.onCanvasSend()
+      await nextTick()
+      expect(f.b.onActionBtnClick).toHaveBeenCalledOnce()
+      expect(f.b.recoverStoredStreamDraft).not.toHaveBeenCalled()
+      expect(f.b.content.value).toBe('')
+      expect(stored.chatPayloadDispatched).toBe(false)
+    } finally { stop() }
+  })
+  it('still restores an abandoned draft on a real mount with no live turn', async () => {
+    const tryResumeOnMount = vi.fn()
+    const scope = { conversationId: ref(''), pendingChatTurn: null, watch, nextTick, tryResumeOnMount,
+      unref: (r: any) => r.value }
+    const stop = initialResumeWatcher(scope)
+    try {
+      scope.conversationId.value = 'restored'
+      await nextTick()
+      await nextTick()
+      expect(tryResumeOnMount).toHaveBeenCalledOnce()
+    } finally { stop() }
   })
 })
 
