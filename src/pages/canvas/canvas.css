@@ -1241,6 +1241,46 @@
     transform: rotate(180deg);
   }
 
+  /* 快捷列會裁切外暈；提示留在鍵內，::before 繼續保留原本的點擊區。 */
+  .composer-choices__toggle.is-attention::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--lt-canvas-send-fg) 60%, transparent);
+    background: radial-gradient(ellipse at center, color-mix(in srgb, var(--lt-canvas-send-fg) 22%, transparent), transparent 70%);
+    opacity: 0;
+    animation: lt-opening-breathe 2.8s ease-in-out .6s infinite;
+  }
+
+  .composer-choices__toggle.is-attention .composer-choices__chevron {
+    animation: lt-opening-lift 2.8s ease-in-out .6s infinite;
+  }
+
+  @keyframes lt-opening-breathe {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+  }
+
+  @keyframes lt-opening-lift {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-1.5px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .composer-choices__toggle.is-attention::after {
+      animation: none;
+      background: none;
+      opacity: .55;
+    }
+    .composer-choices__toggle .composer-choices__chevron,
+    .composer-choices__toggle.is-attention .composer-choices__chevron {
+      animation: none;
+      transition: none;
+    }
+  }
+
   .prologue-scope--dock {
     position: absolute;
     bottom: calc(100% + 6px);

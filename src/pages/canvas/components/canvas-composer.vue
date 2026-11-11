@@ -70,7 +70,7 @@
             v-if="hasChoices"
             ref="choicesToggleEl"
             class="shortcut-btn composer-choices__toggle"
-            :class="{ 'is-open': choicesOpen }"
+            :class="{ 'is-open': choicesOpen, 'is-attention': !choicesSeen }"
             data-lt="prologue"
             role="button"
             tabindex="0"
@@ -550,6 +550,7 @@ const stopEl = ref<HTMLElement | null>(null)
 const choicesToggleEl = ref<HTMLElement | null>(null)
 const choicesListEl = ref<HTMLElement | null>(null)
 const choicesOpen = ref(false)
+const choicesSeen = ref(false)
 const hasChoices = computed(() => !!props.choices && props.choices.items.length > 0)
 /** 按鈕與浮層分住兩處（按鈕在快捷列裡、浮層在快捷列外），「在下拉裡面」指兩者之一。 */
 function insideChoices(node: Node | null) {
@@ -570,6 +571,7 @@ function closeChoices(refocus: boolean) {
 }
 function toggleChoices() {
   if (choicesOpen.value) { closeChoices(false); return }
+  choicesSeen.value = true
   choicesOpen.value = true
   const doc = choicesToggleEl.value?.ownerDocument
   doc?.addEventListener('pointerdown', onChoicesOutside, true)
@@ -592,7 +594,11 @@ function pickChoice(index: number) {
   closeChoices(false)
   emit('choice', index)
 }
-watch(() => props.choices?.items.length || 0, (n) => { if (!n) closeChoices(false) })
+watch(hasChoices, (available) => {
+  if (available) return
+  closeChoices(false)
+  choicesSeen.value = false
+})
 onBeforeUnmount(() => closeChoices(false))
 const composerEl = ref<HTMLElement | null>(null)
 watch(() => props.balanceHint, () => {
