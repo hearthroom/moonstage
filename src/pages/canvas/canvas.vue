@@ -10116,10 +10116,10 @@ function cancelAssist() { assistSession.cancel(); if(!assistSession.state.visibl
 
 const prologue = ref<string[]>([])
 const composerRef = ref<any>(null)
-// 有開場網頁的卡（風月的「詳細介紹」）：選項是玩家的第一句，改成快捷列最左邊一顆強調色的鍵、標題叫「第一句」，
+// 有開場網頁的卡（風月的「詳細介紹」）：選項是玩家的第一句，改成快捷列最左邊一顆強調色的鍵「選擇開場」，
 // 開場網頁一路貼到快捷列；一般卡照 MMD 的「你可以選擇開場」放在訊息列後面。沙箱殼收到同一個標題，自己決定放哪。
 const openingDocked = computed(() => !!openingPage.value.trim())
-const prologueTitle = computed(() => t(openingDocked.value ? 'canvas.prologue.firstLine' : 'canvas.prologue.title'))
+const prologueTitle = computed(() => t(openingDocked.value ? 'canvas.prologue.pick' : 'canvas.prologue.title'))
 const prologueItems = computed(() => (
   shouldShowPrologue(prologue.value, talkList.value)
     ? prologue.value.map((line) => convertPlainText(line, displayScript))
@@ -10129,6 +10129,8 @@ const prologueItems = computed(() => (
 function onProloguePick(pi: number) {
   const text = prologue.value[pi]
   if (!text) return
+  // 有開場網頁的卡：選項常是整段文字，點了只填進輸入框，玩家看過（可改）再自己送出，不另彈確認（owner 2026-11-11 經 PM 裁定）。
+  if (openingDocked.value) { fillComposer(text); return }
   if (prologuePickSends(openingMode.value, cardFormat.value)) sendOpeningLine(text)
   else fillComposer(text)
 }

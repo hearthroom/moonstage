@@ -4011,7 +4011,7 @@
 	"canvas.greeting.prev": "이전 도입부",
 	"canvas.greeting.next": "다음 도입부",
 	"canvas.prologue.title": "오프닝 선택",
-	"canvas.prologue.firstLine": "첫마디",
+	"canvas.prologue.pick": "오프닝 선택",
 	"canvas.menu.title": "이 메시지",
 	"canvas.menu.rewind": "여기로 되돌리기",
 	"canvas.menu.rewindConfirm": "이야기를 이 메시지까지 되돌립니다. 이후 내용은 남지 않습니다.",

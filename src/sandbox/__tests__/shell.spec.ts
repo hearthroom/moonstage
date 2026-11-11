@@ -743,7 +743,7 @@ describe('殼：開場選項（MMD prologue）', () => {
     const header = { roleName: 'Example', avatar: '', badge: '', backLabel: 'Back' }
     const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [{ key: 'persona', label: 'Persona' }], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: 'Stop', more: 'More', send: 'Send', paste: 'Paste', clear: 'Clear', model: 'Model', assist: 'Assist', perTurn: 'Per turn' } }
     const s = boot(config({ chromeState: { header, composer }, card: { rules: [], statusbar: '', format: 'fengyue', openingPage: '<p>首屏</p>' } }))
-    s.handle({ type: 'prologue', title: '第一句', items: ['我想搭船。', '我留下來。'] })
+    s.handle({ type: 'prologue', title: '選擇開場', items: ['我想搭船。', '我留下來。'] })
     await nextTick()
     expect(s.refs.messages.querySelector('[data-lt="prologue"]')).toBeNull()
     // 不另佔一排：鍵是快捷列的第一顆，作者給快捷鍵的樣式照樣套得到
@@ -752,7 +752,7 @@ describe('殼：開場選項（MMD prologue）', () => {
     expect(toggle.parentElement?.getAttribute('data-chat')).toBe('shortcut')
     expect(toggle.parentElement?.firstElementChild).toBe(toggle)
     expect(toggle.classList.contains('shortcut-btn')).toBe(true)
-    expect(toggle.textContent!.trim()).toBe('第一句')
+    expect(toggle.textContent!.trim()).toBe('選擇開場')
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     // 浮層在快捷列外面（快捷列會橫捲裁切），收起時藏著
     const list = s.refs.composer.querySelector('.prologue-scope--dock') as HTMLElement
@@ -769,7 +769,7 @@ describe('殼：開場選項（MMD prologue）', () => {
     await nextTick()
     expect(sent).toContainEqual({ type: 'ui', event: 'prologue', key: '1' })
     expect(list.style.display).toBe('none')
-    s.handle({ type: 'prologue', title: '第一句', items: [] })
+    s.handle({ type: 'prologue', title: '選擇開場', items: [] })
     await nextTick()
     expect(s.refs.composer.querySelector('[data-lt="prologue"]')).toBeNull()
     s.dispose()
