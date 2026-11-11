@@ -649,6 +649,21 @@
 
   /* ── 訊息 ─────────────────────────────────────────────────────── */
 
+  /* 觸控長按由平台訊息選單處理；瀏覽器同時選字會再蓋一層原生工具列。
+     複製沿用選單與動作列；桌機仍可反白、右鍵。作者輸入欄位保留原生編輯。 */
+  @media (hover: none) and (pointer: coarse) {
+    .mes {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+    .mes :where(input, textarea, [contenteditable]:not([contenteditable="false"])) {
+      -webkit-user-select: text;
+      user-select: text;
+      -webkit-touch-callout: default;
+    }
+  }
+
   /* 兩排 grid：頭像＋名字一排（.mesAvatarWrapper / .ch_name 各佔一格），
      氣泡另起一排、橫跨兩欄、滿版寬度（.mes_block 的 grid-area 同時蓋住
      "avatar" 與 "name" 兩欄）。
