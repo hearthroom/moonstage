@@ -75,4 +75,13 @@ describe('未標來源的作者 CSS 逐選擇器相容', () => {
     expect(out.startsWith(raw.replace('<style>#ai-chat-input', '<style>.mes_text #ai-chat-input'))).toBe(true)
     expect(out).toContain(':where(.composer-field)')
   })
+
+  it('只有大寫native STYLE時維持酒館舊早退位元組，真正風月掛點仍能新auto', () => {
+    const native = '<STYLE data-x="1">.native{color:red}</STYLE>'
+    expect(applyStylePolicyToHtml(native, stylePolicyFor('tavern'))).toBe(native)
+    expect(applyStylePolicyToHtml(native, stylePolicyFor('mmd'))).toBe(native)
+    const mapped = applyStylePolicyToHtml('<STYLE>#ai-chat-input{color:red}</STYLE>', stylePolicyFor('tavern'))
+    expect(mapped).toContain(':where(.composer-field)')
+    expect(mapped).not.toContain('#ai-chat-input')
+  })
 })

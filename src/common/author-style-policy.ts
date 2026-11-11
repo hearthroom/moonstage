@@ -97,6 +97,8 @@ export function applyStylePolicyToHtml(html: string, policy: AuthorStylePolicy):
     if (hasCompiledDialect(attrs)) return whole
     const compiled = applyStylePolicy(css, policy)
     const native = policy.scope ? scopeCss(css, policy.scope) : css
+    // 舊酒館只在有小寫 <style 時掃描；沒有新增映射時維持那個早退與原tag位元組。
+    if (compiled === native && !nativeRawScan) return whole
     const marker = compiled === native ? '' : ` ${CSS_DIALECT_ATTR}="auto"`
     return `<style${attrs}${marker}>${compiled}</style>`
   }))
