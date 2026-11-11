@@ -4,6 +4,7 @@ import { transpileModule, ScriptTarget } from 'typescript'
 import { afterEach, expect, it } from 'vitest'
 import { compileCardCss, createCardCssMount, resolveCardCssAsset } from '@/common/card-css'
 import { compileRuleCssDialects } from '@/common/rule-css-dialect'
+import { scopeCardHtml } from '../canvas-style-scope'
 import { hasCrossLineRule } from '@/utils/display-rule-engine.js'
 
 const source = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
@@ -32,6 +33,15 @@ it('一般頁走實際 setActiveAuthorAsset：空歷史也注入，更新與清�
   state.setActiveAuthorAsset({ rules: [{ id: 'hearthroom-fengyue-inner-css', find: '/([\\s\\S])$/', replace: '$1<style>#ai-chat-input{color:red}</style>' }] })
   expect(state.activeAuthorAsset.value.rules).toEqual([])
   expect(document.head.querySelector('style[data-lt="card-css"]')).not.toBeNull()
+  for (const hint of [false, true]) {
+    const carrier = { id: 'hearthroom-fengyue-inner-css', find: '/([\\s\\S])$/', replace: '$1<style>#ai-chat-input{background:#bde8f2}</style>', ...(hint ? { cssDialect: 'fengyue' } : {}) }
+    const peer = { id: 'peer', find: carrier.find, replace: '$1<style>#ai-chat-input{background:#ff6600}</style>' }
+    state.setActiveAuthorAsset({ cardFormat: 'fengyue', rules: [carrier, peer] })
+    expect(state.activeAuthorAsset.value.rules[0].replace).toContain(':where(.composer-field)')
+    expect(state.activeAuthorAsset.value.rules[1].replace).toBe(peer.replace)
+    expect(scopeCardHtml(state.activeAuthorAsset.value.rules[1].replace, 'fengyue')).toBe(peer.replace)
+    expect(document.head.querySelector('style[data-lt="card-css"]')).toBeNull()
+  }
   sandboxCard.value = true
   state.setActiveAuthorAsset({ cardCss: '.mes{color:red}' })
   expect(document.head.querySelector('style[data-lt="card-css"]')).toBeNull()

@@ -40,3 +40,14 @@ it('明確清空欄位不會重新套用尚在 payload 裡的舊假規則', () =
   expect(document.head.querySelector('style[data-lt="card-css"]')).toBeNull()
   expect(s.refs.authorCss.textContent).toBe('')
 })
+
+it.each([false, true])('STYLE03：舊 carrier + peer 不啟用 inert CSS，carrier hint=%s', (hint) => {
+  const s = boot({ cardFormat: 'fengyue', rules: [
+    { id: 'hearthroom-fengyue-inner-css', find: '/([\\s\\S])$/', replace: '$1<style>#ai-chat-input{background:#bde8f2}</style>', ...(hint ? { cssDialect: 'fengyue' } : {}) },
+    { id: 'peer', find: '/([\\s\\S])$/', replace: '$1<style>#ai-chat-input{background:#ff6600}</style>' },
+  ], statusbar: '' })
+  expect(document.head.querySelector('style[data-lt="card-css"]')).toBeNull()
+  expect(s.refs.authorCss.textContent).toContain(':where(.composer-field)')
+  expect(s.refs.authorCss.textContent?.endsWith('#ai-chat-input{background:#ff6600}')).toBe(true)
+  expect(s.refs.authorCss.textContent).not.toContain('color:#f2f2f5')
+})

@@ -17,7 +17,6 @@
 import { type CardFormat, normalizeCardFormat } from './card-format'
 import { scopeCss } from './author-style-scope'
 import { withFencesProtected } from './markdown-fences'
-import { adaptFengyueSelectors } from './fengyue-css'
 
 export interface AuthorStylePolicy {
   /** 每條選擇器前面要接的作用域；null＝原樣生效。 */
@@ -66,42 +65,15 @@ export function stylePolicyFor(format: CardFormat | string | null | undefined): 
 /** 一段 CSS 依政策落地。 */
 export function applyStylePolicy(css: string, policy: AuthorStylePolicy): string {
   const text = String(css == null ? '' : css)
-  return adaptFengyueSelectors(text, (native) => applyNativeStylePolicy(native, policy))
+  return policy.scope ? scopeCss(text, policy.scope) : text
 }
 
-/** 既有作用域政策，不作新增的選擇器自動對應。 */
-export function applyNativeStylePolicy(css: string, policy: AuthorStylePolicy): string {
-  return policy.scope ? scopeCss(css, policy.scope) : css
-}
-
-// script／textarea 是 HTML raw text；裡面的標籤字串與註解都不是可套用的樣式。
-const STYLE_TAG = /<!--[\s\S]*?(?:-->|$)|<(script|textarea)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)|<style\b([^>]*)>([\s\S]*?)<\/style>/gi
-const NATIVE_STYLE_TAG = /<style\b([^>]*)>([\s\S]*?)<\/style>/gi
-
-/** 真 style 會整塊越過，避免把 CSS 值裡的 script 字串誤認為 HTML raw text。 */
-export function rawTextHtmlRanges(html: string): Array<{ start: number; end: number }> {
-  return [...html.matchAll(STYLE_TAG)].filter(match => match[3] === undefined).map(match => ({ start: match.index!, end: match.index! + match[0].length }))
-}
+const STYLE_TAG = /<style\b([^>]*)>([\s\S]*?)<\/style>/gi
 
 /** 一段訊息 HTML 裡的每個 <style> 依政策落地；不需改寫的政策連掃描都不做。 */
 export function applyStylePolicyToHtml(html: string, policy: AuthorStylePolicy): string {
   const text = String(html == null ? '' : html)
-  if (!/<style\b/i.test(text)) return text
-  const nativeRawScan = !!policy.scope && text.indexOf('<style') >= 0
+  if (!policy.scope || text.indexOf('<style') < 0) return text
   // 程式碼圍欄裡的 <style> 是字面文字（前端區塊協議會把整份文件放進自己的 iframe），不加前綴。
-  return withFencesProtected(text, (outside) => outside.replace(STYLE_TAG, (whole, _rawTag: string | undefined, attrs: string | undefined, css: string | undefined) => {
-    if (css === undefined || attrs === undefined) {
-      // 只禁新增 auto；酒館既有的字面前綴處理保留，避免修成另一個舊行為。
-      return nativeRawScan ? whole.replace(NATIVE_STYLE_TAG, (tag, rawAttrs: string, rawCss: string) => hasCompiledDialect(rawAttrs) ? tag : `<style${rawAttrs}>${applyNativeStylePolicy(rawCss, policy)}</style>`) : whole
-    }
-    if (hasCompiledDialect(attrs)) return whole
-    // 舊版沒有啟動 native 掃描時，混合段落裡的原生 selector 也必須保持 identity。
-    const effectivePolicy = nativeRawScan ? policy : { ...policy, scope: null }
-    const compiled = applyStylePolicy(css, effectivePolicy)
-    const native = applyNativeStylePolicy(css, effectivePolicy)
-    // 舊酒館只在有小寫 <style 時掃描；沒有新增映射時維持那個早退與原tag位元組。
-    if (compiled === native && !nativeRawScan) return whole
-    const marker = compiled === native ? '' : ` ${CSS_DIALECT_ATTR}="auto"`
-    return `<style${attrs}${marker}>${compiled}</style>`
-  }))
+  return withFencesProtected(text, (outside) => outside.replace(STYLE_TAG, (whole, attrs: string, css: string) => hasCompiledDialect(attrs) ? whole : `<style${attrs}>${scopeCss(css, policy.scope as string)}</style>`))
 }
