@@ -1208,12 +1208,14 @@
     height: 0;
   }
 
+  /* 實心強調色：跟送出鍵同一組顏色（白字在強調色上，各主題的對比由送出鍵那組保證）。
+     淡底配強調色字在淺色主題只有約 3:1，12px 的字讀不清。 */
   .shortcut-btn.composer-choices__toggle {
     position: relative;
     padding-right: 8px;
-    border-color: var(--lt-canvas-accent);
-    background: var(--lt-canvas-accent-bg);
-    color: var(--lt-canvas-accent);
+    border-color: var(--lt-canvas-send-bg);
+    background: var(--lt-canvas-send-bg);
+    color: var(--lt-canvas-send-fg);
     font-weight: 600;
   }
 
