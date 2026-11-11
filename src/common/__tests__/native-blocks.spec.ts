@@ -7,6 +7,17 @@ describe('原生區塊：狀態與選項', () => {
     expect(drawNativeBlocks('')).toBe('')
   })
 
+  it.each([
+    '<style>/* [choices] */ .lt-choice { color: red }</style>',
+    '<STYLE media="screen">/* [choices]\n- fake\n[/choices] [status] fake [/status] */</STYLE>',
+    '<style>/* [choices] */</style><style>.x::after { content: "[status]" }</style>',
+  ])('略過樣式內容，正文選項照常：%s', (style) => {
+    const prose = '正文\n[choices]\n- Go\n- Stay\n[/choices]'
+    expect(drawNativeBlocks(style)).toBe(style)
+    expect(drawNativeBlocks(style + prose)).toBe(style + drawNativeBlocks(prose))
+    expect(drawNativeBlocks(prose + style)).toBe(drawNativeBlocks(prose) + style)
+  })
+
   it('值的階梯：數字、百分比、a/b、等級、列表、屬性、實體、標籤、路徑、文字', () => {
     expect(drawValue('380')).toBe('<span class="lt-num">380</span>')
     expect(drawValue('72%')).toContain('width:72.0%')

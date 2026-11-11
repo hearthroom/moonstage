@@ -166,7 +166,11 @@ const CHOICES_RE = /\[choices\]([\s\S]*?)(?:\[\/choices\]|(?=\[status\]|<div cla
 export function drawNativeBlocks(text: string): string {
   const s = String(text == null ? '' : text)
   if (s.indexOf('[status]') < 0 && s.indexOf('[choices]') < 0) return s
-  return s.replace(STATUS_RE, (_m, body: string) => drawStatusBody(body)).replace(CHOICES_RE, (_m, body: string) => drawChoicesBody(body))
+  // 樣式是作者原始碼，註解與 content 字串裡的標記都不是正文。分段處理也讓缺閉合的正文區塊停在樣式前。
+  // 串流中的 <style> 可能還沒閉合：保留到結尾，不能把半段 CSS 當選項。
+  return s.split(/(<style\b[^>]*>[\s\S]*?(?:<\/style\s*>|$))/gi).map((part, index) => (
+    index % 2 ? part : part.replace(STATUS_RE, (_m, body: string) => drawStatusBody(body)).replace(CHOICES_RE, (_m, body: string) => drawChoicesBody(body))
+  )).join('')
 }
 
 export const NATIVE_BLOCKS = { status: 'status', choices: 'choices', classes: ['lt-status', 'lt-status__row', 'lt-status__k', 'lt-status__v', 'lt-bar', 'lt-bar__fill', 'lt-chips', 'lt-chip', 'lt-kvlist', 'lt-stats', 'lt-path', 'lt-level', 'lt-choices', 'lt-choice', 'lt-choice--own'] } as const

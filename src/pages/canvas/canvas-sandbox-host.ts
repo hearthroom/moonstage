@@ -7,7 +7,7 @@
  *
  * 差分：橋自己記「殼已經知道哪些訊息」，每次 sync() 讀一次宿主狀態，只送變化——
  * 新氣泡 message.new、內容長了 message.stream、定稿 message.done、消失 message.remove。
- * 訊息 id 給殼看的是 `h<宿主id>`（冷啟動的歷史）與 `l<n>`（之後長出來的），serverId 是宿主 id
+ * 訊息 id 給殼看的是 `h<宿主id>`（冷啟動的歷史）與 `l<n>`（之後長出來的），serverId 是正式訊息 id
  * （只有 AI 定稿後才給；玩家訊息與開場白永遠 null）——作者的契約說 id 不穩、持久化用 serverId。
  *
  * 安全：只認 `event.source === iframe.contentWindow` 且 origin 相符的訊息；送出去也只送給
@@ -183,7 +183,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
   const roleOf = (m: HudHostMessage): SandboxMessageRole => (m.role === 'user' ? 'user' : m.role === 'system' ? 'system' : 'ai')
   const finishedOf = (m: HudHostMessage) => m.role === 'user' || !!m.finished
   // 開場白不給 serverId（同 MMD）：作者腳本拿「AI 訊息有 serverId」判斷已經聊過，開場白帶了就把開場動畫當成舊存檔跳過。
-  const serverIdOf = (m: HudHostMessage): string | null => (roleOf(m) === 'ai' && finishedOf(m) && !m.opening ? m.id : null)
+  const serverIdOf = (m: HudHostMessage): string | null => (roleOf(m) === 'ai' && finishedOf(m) && !m.opening ? (m.serverId || m.id) : null)
   const hostIdOf = (shellId: string): string | null => {
     for (const [hostId, t] of tracked.entries()) if (t.shellId === shellId) return hostId
     return null
@@ -543,7 +543,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
         case 'message.edit': {
           const serverId = String(args[0] ?? '')
           const text = String(args[1] ?? '')
-          const target = visible().find((m) => m.id === serverId)
+          const target = visible().find((m) => (m.serverId || m.id) === serverId || m.id === serverId)
           if (!target) return reply(reqId, false, undefined, { code: 'INVALID_ARGS', message: 'message not found' })
           const opened = await hud.openEdit(target.id)
           if (opened === false) return reply(reqId, false, undefined, { code: 'HOST_DENIED' })

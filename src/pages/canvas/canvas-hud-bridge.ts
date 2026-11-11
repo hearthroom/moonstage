@@ -47,6 +47,8 @@ export type HudMoreKind =
 
 export interface HudHostMessage {
   id: string
+  /** 正式訊息 ID；畫面列的 id 在 live 串流時可能仍是本機暫存值。 */
+  serverId?: string
   role: 'user' | 'assistant' | 'system'
   text: string
   html: string

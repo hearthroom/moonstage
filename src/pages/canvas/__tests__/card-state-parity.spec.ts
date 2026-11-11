@@ -12,7 +12,7 @@ import { nextTick } from 'vue'
 import { createSandboxHost } from '../canvas-sandbox-host'
 import type { HudHost, HudHostMessage, HudHostState } from '../canvas-hud-bridge'
 import { cardStateRowsOf, cardStateFromServer, sandboxCardStateOf } from '../canvas-card-state'
-import { cardStateAt, cardStateUpdate, createCardStateFeed, currentCardState, currentCardStatePayload, initialCardState, type CardStatePayload } from '@/common/card-state'
+import { cardStateAt, cardStateMessageId, cardStateUpdate, createCardStateFeed, currentCardState, currentCardStatePayload, initialCardState, type CardStatePayload } from '@/common/card-state'
 import { createAuthorAssetRuntime } from '@/utils/author-asset-mount.js'
 import { createShell, type Shell } from '@/sandbox/shell'
 import type { HostToShell, SandboxHelloConfig } from '@/sandbox/protocol'
@@ -32,7 +32,7 @@ const INITIAL = { 角色: { 小雪: { 好感度: 40 } }, 金錢: 0 }
 // 伺服器的 cardState（歷史列與 operationStatus 帶的形狀）
 const server = (seq: number, data: unknown, changes: unknown[] = [], source = 'inline') => ({ data, changes, seq, source })
 
-interface Item { id: number | string; type: 0 | 1; content: string; cardState?: ReturnType<typeof cardStateFromServer>; chatId?: string }
+interface Item { id: number | string; type: 0 | 1; content: string; cardState?: ReturnType<typeof cardStateFromServer>; chatId?: string; finished?: boolean }
 const row = (id: number, type: 0 | 1, content: string, cs?: unknown): Item => {
   const item: Item = { id, type, content }
   const parsed = cs === undefined ? undefined : cardStateFromServer(cs)
@@ -54,8 +54,8 @@ function history(): Item[] {
 function hudMessages(items: Item[], withView: boolean, cardStateOn = true): HudHostMessage[] {
   return items.map((item, index) => {
     const m: HudHostMessage = {
-      id: String(item.id), role: item.type === 1 ? 'user' : 'assistant', text: item.content, html: `<p>${item.content}</p>`,
-      opening: index === 0 && item.type === 0, finished: true, canonicalLatestAI: false,
+      id: String(item.id), serverId: cardStateMessageId(item), role: item.type === 1 ? 'user' : 'assistant', text: item.content, html: `<p>${item.content}</p>`,
+      opening: index === 0 && item.type === 0, finished: item.finished !== false, canonicalLatestAI: false,
     }
     if (withView) m.view = { role: item.type === 1 ? 'user' : 'ai', html: `<p>${item.content}</p>`, finished: true }
     if (cardStateOn) m.cardState = sandboxCardStateOf(item)
@@ -202,6 +202,37 @@ describe.each([true, false])('state:change 兩種頁面同一串（宿主送呈�
     expect(sdk.state.of('h11')).toEqual(classic.of('11'))
     expect(sdk.state.of('h13')).toEqual(classic.of('13'))
     expect(sdk.state.of('greeting')).toEqual(classic.of('10'))
+  })
+})
+
+describe('即時訊息的正式 ID', () => {
+  it('串流完成當下的 done 與 mount 可用 serverId 讀數值，重載後相同', async () => {
+    const sandbox = sandboxPage({ initial: INITIAL }, true)
+    cleanup.push(() => sandbox.dispose())
+    await sandbox.boot(history())
+    const sdk = sandbox.shell()!.sdk
+    const seen: Array<{ event: string; serverId: string | null; state: unknown }> = []
+    for (const event of ['message:done', 'message:mount'] as const) {
+      sdk.on(event, (p: any) => {
+        if (p.id.startsWith('l')) seen.push({ event, serverId: p.serverId, state: sdk.state.of(p.serverId) })
+      })
+    }
+    const live = { ...row(1700000000000, 0, '回覆中'), finished: false }
+    sandbox.set([...history(), live])
+    seen.length = 0
+    const savedId = '00000000-0000-4000-8000-000000000016'
+    const saved = { ...live, content: '回覆完成', finished: true, chatId: savedId, cardState: cardStateFromServer(server(2, { 金錢: 80 }, [{ op: 'set', path: '金錢', old: 100, new: 80 }])) }
+    sandbox.set([...history(), saved])
+    const expected = { messageId: savedId, data: { 金錢: 80 }, changes: [{ op: 'set', path: '金錢', old: 100, new: 80 }] }
+    expect(seen).toEqual(['message:done', 'message:mount'].map(event => ({ event, serverId: savedId, state: expected })))
+    const reloaded = sandboxPage({ initial: INITIAL }, true)
+    sandbox.dispose()
+    cleanup.push(() => reloaded.dispose())
+    await reloaded.boot([...history(), { ...saved, id: savedId }])
+    const late: any[] = []
+    reloaded.shell()!.sdk.on('message:done', p => late.push(p))
+    expect(late.at(-1).serverId).toBe(savedId)
+    expect(reloaded.shell()!.sdk.state.of(savedId)).toEqual(expected)
   })
 })
 
