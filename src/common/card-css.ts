@@ -2,26 +2,32 @@
 import { applyStylePolicy, stylePolicyFor } from './author-style-policy'
 import { compileDialectCss, LEGACY_FENGYUE_CSS_RULE_ID, normalizeCssDialect } from './rule-css-dialect'
 import { splitCssImports } from './fengyue-css'
-import { splitCardAppearanceCss } from './card-appearance'
+import { nativeCardRootVariables, splitCardAppearanceCss } from './card-appearance'
 
 export const CARD_CSS_LAYER = 'lt-card-css'
 
 interface CssRule { id?: unknown; find?: unknown; replace?: unknown; enabled?: unknown; cssDialect?: unknown }
 export interface CardCssAsset { cardCss?: unknown; cardCssDialect?: unknown; rules?: CssRule[] }
 
-/** 只搬匯入器原封產生的單一啟用假規則；作者改過或停用的內容留在原處。 */
-export function resolveCardCssAsset<T extends CardCssAsset>(asset: T): T & { cardCss: string; cardCssDialect: string; rules: NonNullable<T['rules']> } {
+/**
+ * 只搬匯入器原封產生的單一啟用假規則；作者改過或停用的內容留在原處。
+ * 有其他啟用樣式或腳本時不猜層級：保留原位置，避免搬到 head 前方改變同層先後。
+ */
+export function resolveCardCssAsset<T extends CardCssAsset>(asset: T): T & { cardCss?: string; cardCssDialect?: string; rules: NonNullable<T['rules']> } {
   const rules = Array.isArray(asset.rules) ? asset.rules : []
   const candidates = rules.filter((rule) => String(rule?.id ?? '') === LEGACY_FENGYUE_CSS_RULE_ID)
   const legacy = candidates.length === 1 ? candidates[0] : null
   const replace = String(legacy?.replace ?? '')
   const match = /^\$1<style>([\s\S]*)<\/style>$/.exec(replace)
-  const migrates = legacy?.enabled !== false && legacy?.find === '/([\\s\\S])$/' && match && !/<\/?style\b/i.test(match[1])
+  const unchanged = legacy?.enabled !== false && legacy?.find === '/([\\s\\S])$/' && match && !/<\/?style\b/i.test(match[1])
   const explicit = Object.prototype.hasOwnProperty.call(asset, 'cardCss')
+  const hasCssOrderPeers = rules.some(rule => rule !== legacy && rule?.enabled !== false && /<(?:style|script)\b/i.test(String(rule?.replace ?? '')))
+  // 明確的空欄位是作者清除意圖，仍抑制未修改 carrier；這不是自動搬遷。
+  const migrates = unchanged && (explicit || !hasCssOrderPeers)
   return {
     ...asset,
-    cardCss: explicit ? String(asset.cardCss ?? '') : migrates ? match[1] : '',
-    cardCssDialect: explicit ? normalizeCssDialect(asset.cardCssDialect) ?? '' : migrates ? normalizeCssDialect(legacy?.cssDialect) ?? 'fengyue' : '',
+    ...(explicit ? { cardCss: String(asset.cardCss ?? ''), cardCssDialect: normalizeCssDialect(asset.cardCssDialect) ?? '' }
+      : migrates ? { cardCss: match[1], cardCssDialect: normalizeCssDialect(legacy?.cssDialect) ?? 'fengyue' } : {}),
     rules: (migrates ? rules.filter((rule) => rule !== legacy) : rules) as NonNullable<T['rules']>,
   }
 }
@@ -74,8 +80,8 @@ export function compileCardCss(asset: CardCssAsset): string {
 export function createCardCssMount(doc: Document) {
   let node: HTMLStyleElement | null = null
   const before = new Map<HTMLElement, Map<string, [string, string]>>()
-  const mark = (css: string) => {
-    const variables = splitCardAppearanceCss(css).variables
+  const mark = (css: string, native = false) => {
+    const variables = [...new Set([...splitCardAppearanceCss(css).variables, ...(native ? nativeCardRootVariables(css) : [])])]
     const names = variables.join(' ')
     const roots = new Set([...doc.querySelectorAll<HTMLElement>('.canvas-root'), ...before.keys()])
     for (const root of roots) {
@@ -95,8 +101,8 @@ export function createCardCssMount(doc: Document) {
     }
   }
   return {
-    set(css: string) {
-      mark(css)
+    set(css: string, options: { nativeRootVariables?: boolean } = {}) {
+      mark(css, options.nativeRootVariables)
       if (!css) { node?.remove(); node = null; return }
       if (!node) { node = doc.createElement('style'); node.setAttribute('data-lt', 'card-css'); doc.head.insertBefore(node, doc.head.querySelector('style[data-chat="author-css"]')) }
       node.textContent = css

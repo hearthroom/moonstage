@@ -387,3 +387,18 @@ export function splitCssImports(css: string): { imports: string[]; body: string 
   }
   return { imports, body: body + css.slice(cursor) }
 }
+
+/** 新整卡欄位明寫在無條件 `.canvas-root` 上的 custom properties；不猜條件式規則。 */
+export function unconditionalCardRootProperties(css: string): string[] {
+  const properties: string[] = []
+  for (const node of parse(css)) {
+    if (node.body === null) continue
+    if (/^@layer\b/i.test(node.prelude)) { properties.push(...unconditionalCardRootProperties(node.body)); continue }
+    if (node.prelude.startsWith('@') || !splitTop(stripComments(node.prelude), ',').some(selector => selector.trim() === '.canvas-root')) continue
+    for (const declaration of splitTop(stripComments(node.body), ';')) {
+      const name = /^\s*(--[\w-]+)\s*:/.exec(declaration)?.[1]
+      if (name) properties.push(name)
+    }
+  }
+  return [...new Set(properties)]
+}
