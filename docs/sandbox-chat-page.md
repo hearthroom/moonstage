@@ -199,7 +199,7 @@ containing block，也不覆寫 pointer-events，作者自行定位的 fixed 面
 
 z-index：平台節點一律 `auto`；舞台 content 2000、full 3000；平台彈層 8000+；作者安全帶 3500–7999。
 
-卡片樣式（作者資產 `cardCss`）是獨立的整頁 CSS，每頁只掛一份，不進訊息或模型；新手寫樣式在 `lt-card-css` 層，顯示規則可覆蓋。風月匯入與舊資料的隱藏 `cardCssDialect` 保留原轉譯與優先序，作者不必選來源。未標寫法的樣式只逐選擇器對應已知風月 ID，其他選擇器維持卡片格式政策，本站的 `.mes` 不會被猜成酒館。
+卡片樣式（作者資產 `cardCss`）是獨立的整頁 CSS，每頁只掛一份，不進訊息或模型；新手寫樣式在 `lt-card-css` 層，顯示規則可覆蓋。風月匯入與舊資料的隱藏 `cardCssDialect` 保留原轉譯與優先序，作者不必選來源。只有新 `cardCss` 欄位逐選擇器對應已知風月 ID，本站的 `.mes` 不會被猜成酒館。顯示規則維持原本的卡片格式政策與既有 `cssDialect`／標記，不自動對應。
 
 規則：重用 `display-rule-engine.js`（同一份預算／回滾邏輯）；套完後把 `<style>` 收進 `author-css`、
 `<script>` 收成一段在 DOM 前執行；正文過 Markdown（`*x*` → `<em>`，四空格不當程式碼塊）；
