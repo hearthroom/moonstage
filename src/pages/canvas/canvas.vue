@@ -71,7 +71,9 @@
     </div>
 
     <CanvasStage v-if="!sandboxCard" :background="stageBackground" @scroll="onStageScroll">
-      <CanvasIntro :text="introText" :open="introOpen" @toggle="introOpen = !introOpen" />
+      <!-- 有開場網頁的卡不放簡介：開場網頁本身就是首屏，簡介疊在上面只會把網頁往下推、吸不了頂（owner 2026-11-11，卡 100991）。
+           簡介仍在卡片頁顯示，這裡只是不畫。 -->
+      <CanvasIntro v-if="!openingDocked" :text="introText" :open="introOpen" @toggle="introOpen = !introOpen" />
       <!-- 首屏網頁（AI 風月的「詳細介紹」）：只在對話的開頭、且玩家還沒送出第一句時展開；送出後收起。 -->
       <CanvasOpeningPage v-if="shouldShowOpeningPage(openingPage, talkList) && !ajax.hasNextPage" :html="openingPage" :title="roleView?.roleName" @fill="fillComposer" @send="sendFromOpeningPage" />
 
