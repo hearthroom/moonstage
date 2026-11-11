@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { applyStylePolicy, applyStylePolicyToHtml, stylePolicyFor } from '../author-style-policy'
 import { compileRuleCssDialects } from '../rule-css-dialect'
 import { translateFengyueCss } from '../fengyue-css'
+import { installCard } from '@/sandbox/rules'
 
 describe('未標來源的作者 CSS 逐選擇器相容', () => {
   it('同一段的風月掛點會轉譯，本站 .mes 保留原本的版面與 important', () => {
@@ -37,5 +38,41 @@ describe('未標來源的作者 CSS 逐選擇器相容', () => {
       const expected = dialect === 'mmd' ? css : dialect === 'fengyue' ? translateFengyueCss(css) : '.mes_text body{background:red} .mes_text #ai-chat-input{color:blue} .mes_text .mes{width:2px !important}'
       expect(rendered).toContain(`>${expected}</style>`)
     }
+  })
+
+  it.each([
+    '<script>const css = "<style>#ai-chat-input{color:red}</style>";</script>',
+    '<textarea><style>#ai-chat-input{color:red}</style></textarea>',
+    '<!-- <style>#ai-chat-input{color:red}</style> -->',
+  ])('不改raw text／註解裡的偽style位元組，外面真style仍映射：%s', (raw) => {
+    const html = raw + '<style>#ai-chat-input{color:blue}</style>'
+    const out = applyStylePolicyToHtml(html, stylePolicyFor('mmd'))
+    expect(out.startsWith(raw)).toBe(true)
+    expect(out.slice(raw.length)).not.toContain('#ai-chat-input')
+    expect(out.slice(raw.length)).toContain(':where(.composer-field)')
+  })
+
+  it('sandbox維持既有字串抽取與script code，只阻止假CSS新增自動映射', () => {
+    const code = 'const css = "<style>#ai-chat-input{color:red}</style>";'
+    const card = installCard([{ find: 'x', replace: `<script>${code}</script><style>#ai-chat-input{color:blue}</style>` }], stylePolicyFor('mmd'))
+    expect(card.styles).toHaveLength(2)
+    expect(card.styles[0]).toBe('#ai-chat-input{color:red}')
+    expect(card.styles[1]).toContain('color:blue')
+    expect(card.scripts[0]).toMatchObject({ code: 'const css = "";' })
+  })
+
+  it.each(['<textarea><style>#ai-chat-input{color:red}</style></textarea>', '<!--<style>#ai-chat-input{color:red}</style>-->'])('sandbox維持舊抽取位元組而不映射raw text／註解偽style：%s', (raw) => {
+    const card = installCard([{ find: 'x', replace: raw + '<style>#ai-chat-input{color:blue}</style>' }], stylePolicyFor('mmd'))
+    expect(card.styles).toHaveLength(2)
+    expect(card.styles[0]).toBe('#ai-chat-input{color:red}')
+    expect(card.styles[1]).toContain('color:blue')
+    expect(card.rules[0].replace).toBe(raw.replace('<style>#ai-chat-input{color:red}</style>', ''))
+  })
+
+  it('raw text裡的酒館前綴位元組維持舊結果，不新增風月映射', () => {
+    const raw = '<script>const css="<style>#ai-chat-input{color:red}</style>";</script>'
+    const out = applyStylePolicyToHtml(raw + '<style>#ai-chat-input{color:blue}</style>', stylePolicyFor('tavern'))
+    expect(out.startsWith(raw.replace('<style>#ai-chat-input', '<style>.mes_text #ai-chat-input'))).toBe(true)
+    expect(out).toContain(':where(.composer-field)')
   })
 })
