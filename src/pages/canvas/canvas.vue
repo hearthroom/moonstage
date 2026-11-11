@@ -2557,7 +2557,7 @@ function timelineMutationState() {
 }
 
 function isTimelineMutationBlocked() {
-  return isChatSendInFlight(timelineMutationState());
+  return greetingStartBusy.value || isChatSendInFlight(timelineMutationState());
 }
 
 function notifyTimelineMutationBlocked() {
@@ -5950,6 +5950,37 @@ async function saveAndStartNew() {
       else await chatStart();
       return;
     }
+    // 另開沿用的是來源存檔的版本，不一定是網址那一版。先讀準，避免預覽和實際開場不同。
+    const sourceId = String(unref(conversationId));
+    const owned = await _this.http.get(_this.requestUrl.ownedConversation, {
+      data: { conversationId: sourceId }, showLoading: false, quietTransport: true, quietErrors: true,
+    });
+    const sourceRoleId = conversationRoleId(owned.data);
+    if (owned.statusCode !== 200 || owned.data?.conversationId !== sourceId || !sourceRoleId) throw new Error('opening_source_unavailable');
+    const detail = await _this.http.get(_this.requestUrl.getRoleDetail, {
+      data: { roleId: sourceRoleId }, showLoading: false, quietTransport: true, quietErrors: true,
+    });
+    if (detail.statusCode !== 200 || String(detail.data?.characterRoleId ?? detail.data?.roleId ?? '') !== sourceRoleId) throw new Error('opening_detail_unavailable');
+    const openings = buildGreetingList(detail.data);
+    // 已有存檔也可以另選開場；選定前不建立新對話，否則伺服器已把第一條寫進去了。
+    if (shouldDeferStart(openings)) {
+      greeting.list = openings;
+      pendingNewConversationFrom.value = sourceId;
+      teardownStreamForConversationSwitch({ invalidateHistory: true });
+      conversationId.value = '';
+      uni.$emit('updateConversationId', { conversationId: '' });
+      historyConversation.value = false;
+      ajax.value.flag = false;
+      ajax.value.hasNextPage = false;
+      greeting.index = 0;
+      pendingGreetingStart.value = true;
+      openMore.value = false;
+      renderGreetingPreview();
+      autoScrollEnabled.value = true;
+      isUserAtBottom.value = true;
+      nextTick(() => scrollToBottom(true));
+      return;
+    }
     const res = await postArchiveAction(_this.requestUrl.saveAndStartNew, { conversationId: unref(conversationId), save: true });
     if (res.statusCode === 200 && res.data?.conversationId) {
       adoptStartedConversation(res.data);
@@ -5970,6 +6001,8 @@ async function saveAndStartNew() {
 /** 另開新檔成功之後的收尾（存檔清單的「開新對話」與 sdk.archive.start 共用）：換 conversationId、推開場白、捲到底。 */
 function adoptStartedConversation(started: any) {
   teardownStreamForConversationSwitch({ invalidateHistory: true });
+  pendingGreetingStart.value = false;
+  pendingNewConversationFrom.value = '';
   conversationId.value = started.conversationId;
   if (followConversationRole(conversationRoleId(started))) void reloadSettingsForRevision();
   // 通知 right-window 更新 conversationId
@@ -10010,6 +10043,9 @@ watch(cardFormat, refreshPageTheme);
 // ── 開場白 ─────────────────────────────────────────────────────────────
 const greeting = reactive({ list: [] as string[], index: 0 })
 const pendingGreetingStart = ref(false)
+// 明確按了「新對話」時，保留要存下的舊對話；不能改走會接回舊存檔的 chatStart。
+const pendingNewConversationFrom = ref('')
+const greetingStartBusy = ref(false)
 
 /**
  * 這張卡有沒有既有的對話。
@@ -12739,6 +12775,8 @@ function postArchiveAction(url: string, data: Record<string, any>) {
 // 差別只在這裡沒有開場白可以直接推——那一段的訊息在伺服器上，要重新載。
 function adoptConversation(nextId: string) {
   teardownStreamForConversationSwitch({ invalidateHistory: true })
+  pendingGreetingStart.value = false
+  pendingNewConversationFrom.value = ''
   conversationId.value = nextId
   void syncConversationRole(nextId)
   uni.$emit('updateConversationId', { conversationId: nextId })
@@ -13320,26 +13358,52 @@ function downloadConversationFile(text: string) {
  */
 async function startPendingGreeting(): Promise<boolean> {
   if (!canGenerate.value) return false;
+  if (greetingStartBusy.value) return false
   if (!pendingGreetingStart.value) return true
   // 遊客不開對話：開對話要登入，被拒了畫面會卡在等回覆。直接往下交給 send() 的登入檢查——
   // 它會存草稿、請宿主登入（canvas-guest）。
   if (!unref(hasLogin)) return true
   const index = greetingIndexForStart(greeting)
   const draft = content.value
+  let failureReported = false
+  let started = false
+  greetingStartBusy.value = true
   pendingGreetingStart.value = false
   talkList.value = []
   try {
-    await chatStart(index)
+    if (pendingNewConversationFrom.value) {
+      const res = await postArchiveAction(_this.requestUrl.saveAndStartNew, {
+        conversationId: pendingNewConversationFrom.value, save: true, greetingIndex: index,
+      })
+      if (res.statusCode === 200 && res.data?.conversationId) {
+        adoptStartedConversation(res.data)
+        started = true
+      }
+      else if (res.statusCode === 409 && res.data?.error === 'conversation_limit_reached') {
+        archiveCount.value = Number(res.data.count || archiveCount.value)
+        if (Number(res.data.limit) > 0) archiveLimit.value = Number(res.data.limit)
+        askArchivesFull()
+        failureReported = true
+      } else {
+        message.error(t('canvas.archive.newFailed'))
+        failureReported = true
+      }
+    } else {
+      await chatStart(index)
+      started = !!unref(conversationId)
+    }
   } catch (e) {
     // 請求層自己吞錯誤，這裡多半走不到；留著是為了真的丟出來的那種。
+  } finally {
+    greetingStartBusy.value = false
   }
   // 開對話成不成功看的是有沒有拿到對話——請求層對失敗也是 resolve，
   // 用 try/catch 判定會在沒有對話的情況下把訊息送進虛空。
-  if (!unref(conversationId)) {
+  if (!started) {
     pendingGreetingStart.value = true
     content.value = draft
     renderGreetingPreview()
-    uni.showToast({ title: t('main.network_error'), icon: 'error' })
+    if (!failureReported) uni.showToast({ title: t('main.network_error'), icon: 'error' })
     return false
   }
   return true
@@ -13349,13 +13413,14 @@ async function startPendingGreeting(): Promise<boolean> {
  * 送出。有替代開場白的卡在這一刻才真的開對話——選到哪一條要跟著這一次請求走。
  */
 async function onCanvasSend() {
-  if (!canGenerate.value) return false;
+  if (!canGenerate.value || archiveBusy.value) return false;
   if (!await startPendingGreeting()) return
   onActionBtnClick()
 }
 
 // 回覆偏好存在對話上：還沒開對話就先開（選定畫面上這條開場白），第一句送出前就能設定。
 async function openResponseSettings() {
+  if (archiveBusy.value) return
   if (!await startPendingGreeting()) return
   ensureRoleSettings()
   if (responseSettingsSupported.value) panel.value = openSheet(panel.value, 'response-settings')
