@@ -279,7 +279,7 @@ function readableColor(decls: string[]): string | null {
   return lum > 0.55 ? DARK_TEXT : LIGHT_TEXT
 }
 
-function translateNodes(nodes: Node[], imports: string[], knownOnly = false): string {
+function translateNodes(nodes: Node[], imports: string[], knownOnly = false, readableFallback = true): string {
   let out = ''
   for (const node of nodes) {
     const head = node.prelude
@@ -289,7 +289,7 @@ function translateNodes(nodes: Node[], imports: string[], knownOnly = false): st
       continue
     }
     if (/^@(media|supports|container|layer|scope|document|starting-style)\b/i.test(head)) {
-      const inner = translateNodes(parse(node.body), imports, knownOnly)
+      const inner = translateNodes(parse(node.body), imports, knownOnly, readableFallback)
       if (inner.trim()) out += `${head} {\n${inner}}\n`
       continue
     }
@@ -305,7 +305,7 @@ function translateNodes(nodes: Node[], imports: string[], knownOnly = false): st
     const decls = splitDeclarations(node.body, tier)
     if (decls === null) { out += `${parts.map((p) => p.selector).join(',\n')} {${node.body.replace(/\s*!\s*important\b/gi, '')}}\n`; continue }
     if (!decls.length) continue
-    const fallback = parts.some((p) => p.text) ? readableColor(decls) : null
+    const fallback = readableFallback && parts.some((p) => p.text) ? readableColor(decls) : null
     const own = fallback ? [...decls, `color:${fallback}`] : decls
     out += `${parts.map((p) => p.selector).join(',\n')} {${block(own)}}\n`
     // 輸入框：字色、字型也寫到 textarea 本身（提示字是另一個 div，跟著外框的字色走）。
@@ -323,9 +323,9 @@ function translateNodes(nodes: Node[], imports: string[], knownOnly = false): st
 }
 
 /** 一段風月寫法的 CSS → 我們畫布用的 CSS（包在 @layer lt-author-fengyue 裡）。 */
-export function translateFengyueCss(css: string): string {
+export function translateFengyueCss(css: string, options: { readableFallback?: boolean } = {}): string {
   const imports: string[] = []
-  const body = translateNodes(parse(css), imports)
+  const body = translateNodes(parse(css), imports, false, options.readableFallback !== false)
   if (!body.trim() && !imports.length) return ''
   return (imports.length ? imports.join('\n') + '\n' : '') + (body.trim() ? `@layer ${FENGYUE_LAYER} {\n${body}}\n` : '')
 }
