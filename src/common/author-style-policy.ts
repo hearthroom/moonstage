@@ -95,8 +95,10 @@ export function applyStylePolicyToHtml(html: string, policy: AuthorStylePolicy):
       return nativeRawScan ? whole.replace(NATIVE_STYLE_TAG, (tag, rawAttrs: string, rawCss: string) => hasCompiledDialect(rawAttrs) ? tag : `<style${rawAttrs}>${applyNativeStylePolicy(rawCss, policy)}</style>`) : whole
     }
     if (hasCompiledDialect(attrs)) return whole
-    const compiled = applyStylePolicy(css, policy)
-    const native = policy.scope ? scopeCss(css, policy.scope) : css
+    // 舊版沒有啟動 native 掃描時，混合段落裡的原生 selector 也必須保持 identity。
+    const effectivePolicy = nativeRawScan ? policy : { ...policy, scope: null }
+    const compiled = applyStylePolicy(css, effectivePolicy)
+    const native = applyNativeStylePolicy(css, effectivePolicy)
     // 舊酒館只在有小寫 <style 時掃描；沒有新增映射時維持那個早退與原tag位元組。
     if (compiled === native && !nativeRawScan) return whole
     const marker = compiled === native ? '' : ` ${CSS_DIALECT_ATTR}="auto"`
