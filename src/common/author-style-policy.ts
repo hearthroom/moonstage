@@ -66,17 +66,34 @@ export function stylePolicyFor(format: CardFormat | string | null | undefined): 
 /** 一段 CSS 依政策落地。 */
 export function applyStylePolicy(css: string, policy: AuthorStylePolicy): string {
   const text = String(css == null ? '' : css)
-  return adaptFengyueSelectors(text, (native) => policy.scope ? scopeCss(native, policy.scope) : native)
+  return adaptFengyueSelectors(text, (native) => applyNativeStylePolicy(native, policy))
 }
 
-const STYLE_TAG = /<style\b([^>]*)>([\s\S]*?)<\/style>/gi
+/** 既有作用域政策，不作新增的選擇器自動對應。 */
+export function applyNativeStylePolicy(css: string, policy: AuthorStylePolicy): string {
+  return policy.scope ? scopeCss(css, policy.scope) : css
+}
+
+// script／textarea 是 HTML raw text；裡面的標籤字串與註解都不是可套用的樣式。
+const STYLE_TAG = /<!--[\s\S]*?(?:-->|$)|<(script|textarea)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)|<style\b([^>]*)>([\s\S]*?)<\/style>/gi
+const NATIVE_STYLE_TAG = /<style\b([^>]*)>([\s\S]*?)<\/style>/gi
+
+/** 真 style 會整塊越過，避免把 CSS 值裡的 script 字串誤認為 HTML raw text。 */
+export function rawTextHtmlRanges(html: string): Array<{ start: number; end: number }> {
+  return [...html.matchAll(STYLE_TAG)].filter(match => match[3] === undefined).map(match => ({ start: match.index!, end: match.index! + match[0].length }))
+}
 
 /** 一段訊息 HTML 裡的每個 <style> 依政策落地；不需改寫的政策連掃描都不做。 */
 export function applyStylePolicyToHtml(html: string, policy: AuthorStylePolicy): string {
   const text = String(html == null ? '' : html)
   if (!/<style\b/i.test(text)) return text
+  const nativeRawScan = !!policy.scope && text.indexOf('<style') >= 0
   // 程式碼圍欄裡的 <style> 是字面文字（前端區塊協議會把整份文件放進自己的 iframe），不加前綴。
-  return withFencesProtected(text, (outside) => outside.replace(STYLE_TAG, (whole, attrs: string, css: string) => {
+  return withFencesProtected(text, (outside) => outside.replace(STYLE_TAG, (whole, _rawTag: string | undefined, attrs: string | undefined, css: string | undefined) => {
+    if (css === undefined || attrs === undefined) {
+      // 只禁新增 auto；酒館既有的字面前綴處理保留，避免修成另一個舊行為。
+      return nativeRawScan ? whole.replace(NATIVE_STYLE_TAG, (tag, rawAttrs: string, rawCss: string) => hasCompiledDialect(rawAttrs) ? tag : `<style${rawAttrs}>${applyNativeStylePolicy(rawCss, policy)}</style>`) : whole
+    }
     if (hasCompiledDialect(attrs)) return whole
     const compiled = applyStylePolicy(css, policy)
     const native = policy.scope ? scopeCss(css, policy.scope) : css
