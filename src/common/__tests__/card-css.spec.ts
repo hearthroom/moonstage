@@ -47,8 +47,32 @@ describe('獨立卡片樣式', () => {
     expect(resolveCardCssAsset({ cardCss: '', rules: [legacy] }).cardCss).toBe('')
     for (const rules of [[{ ...legacy, enabled: false }], [legacy, legacy], [{ ...legacy, replace: '$1<style>x{}</style><script>x()</script>' }]]) {
       expect(resolveCardCssAsset({ rules }).rules).toEqual(rules)
-      expect(resolveCardCssAsset({ rules }).cardCss).toBe('')
+      expect(resolveCardCssAsset({ rules })).not.toHaveProperty('cardCss')
     }
+  })
+
+  it.each(['fengyue', 'mmd', 'tavern'])('有其他啟用樣式時保留 %s carrier 的原順序', (dialect) => {
+    const peer = { id: 'peer', find: 'x', replace: '<style>#ai-chat-input{color:blue}</style>', enabled: true, cssDialect: dialect }
+    const carrier = { ...legacy, cssDialect: dialect }
+    for (const rules of [[peer, carrier], [carrier, peer]]) {
+      const resolved = resolveCardCssAsset({ rules })
+      expect(resolved.rules).toEqual(rules)
+      expect(resolved).not.toHaveProperty('cardCss')
+      expect(resolveCardCssAsset(resolved).rules).toEqual(rules)
+    }
+  })
+
+  it('其他原生規則寫入 layer 或可能由腳本寫入 CSS，也不自動搬；停用 peer 不阻擋', () => {
+    for (const replace of ['<style>@layer lt-author-fengyue {p{color:blue}}</style>', '<script>installStyle()</script>']) {
+      const peer = { id: 'peer', find: 'x', replace, enabled: true }
+      expect(resolveCardCssAsset({ rules: [peer, legacy] }).rules).toEqual([peer, legacy])
+      expect(resolveCardCssAsset({ rules: [{ ...peer, enabled: false }, legacy] }).rules).toEqual([{ ...peer, enabled: false }])
+    }
+  })
+
+  it('明確清空欄位仍可抑制標準 carrier，即使有其他樣式', () => {
+    const peer = { id: 'peer', find: 'x', replace: '<style>p{color:blue}</style>', enabled: true }
+    expect(resolveCardCssAsset({ cardCss: '', rules: [peer, legacy] }).rules).toEqual([peer])
   })
 
   it('同頁更新只留一個 style，清除與離場移除，不依賴訊息數', () => {
@@ -63,5 +87,23 @@ describe('獨立卡片樣式', () => {
     mount.set('.mes{color:red}')
     mount.dispose()
     expect(document.head.querySelector('[data-lt="card-css"]')).toBeNull()
+  })
+
+  it('新欄位的無條件裸根變數也讓host inline退讓，legacy hint不自動改寫', () => {
+    const root = document.createElement('div')
+    root.className = 'canvas-root'
+    root.style.setProperty('--lt-canvas-bg', 'black')
+    document.body.appendChild(root)
+    const mount = createCardCssMount(document)
+    try {
+      const css = compileCardCss({ cardCss: '.canvas-root{--lt-canvas-bg:red}' })
+      mount.set(css, { nativeRootVariables: true })
+      expect(root.style.getPropertyValue('--lt-canvas-bg')).toBe('')
+      expect(root.getAttribute('data-lt-card-vars')).toBe('--lt-canvas-bg')
+      mount.set('')
+      expect(root.style.getPropertyValue('--lt-canvas-bg')).toBe('black')
+      mount.set(compileCardCss({ cardCss: '.canvas-root{--lt-canvas-bg:red}', cardCssDialect: 'mmd' }))
+      expect(root.style.getPropertyValue('--lt-canvas-bg')).toBe('black')
+    } finally { mount.dispose(); root.remove() }
   })
 })
