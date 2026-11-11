@@ -350,7 +350,7 @@ export function createShell(options: CreateShellOptions): Shell {
   // 規則自己標了 CSS 寫法的先照那個寫法轉好（common/rule-css-dialect），其餘照卡片格式。
   const cssAsset = resolveCardCssAsset(config.card)
   const cardCssMount = createCardCssMount(doc)
-  cardCssMount.set(compileCardCss(cssAsset))
+  cardCssMount.set(compileCardCss(cssAsset), { nativeRootVariables: !cssAsset.cardCssDialect })
   const card = installCard(compileRuleCssDialects(cssAsset.rules), stylePolicy)
   refs.authorCss.textContent = card.styles.join('\n')
   const macros = { user: config.user.nickname || '', char: config.role.name || '' }
