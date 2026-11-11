@@ -1,6 +1,6 @@
 /** 作者資產中的整卡樣式：原文保留，畫面只掛一份，不進訊息或模型。 */
 import { compileDialectCss, LEGACY_FENGYUE_CSS_RULE_ID, normalizeCssDialect } from './rule-css-dialect'
-import { adaptFengyueSelectors, splitCssImports } from './fengyue-css'
+import { adaptFengyueSelectors, layeredCssImport, splitCssImports } from './fengyue-css'
 import { nativeCardRootVariables, splitCardAppearanceCss } from './card-appearance'
 import { compileFengyueV2Css } from './fengyue-v2'
 
@@ -37,29 +37,6 @@ function withoutImportant(css: string): string {
   return css.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\/\*[\s\S]*?(?:\*\/|$)|!\s*important\b/gi, (part) => part[0] === '!' ? '' : part)
 }
 
-/** @import 的 URL 後面接 layer，外部樣式也遵守卡片樣式的優先序。 */
-function layeredImport(entry: string): string {
-  const start = /^@import\s+/i.exec(entry)?.[0].length ?? 0
-  let cursor = start
-  let quote = ''
-  let parentheses = 0
-  for (; cursor < entry.length; cursor++) {
-    const ch = entry[cursor]
-    if (ch === '\\') { cursor++; continue }
-    if (quote) { if (ch === quote) { quote = ''; if (!parentheses) { cursor++; break } } continue }
-    if (ch === '"' || ch === "'") { quote = ch; continue }
-    if (ch === '(') { parentheses++; continue }
-    if (ch === ')' && --parentheses === 0) { cursor++; break }
-    if (!parentheses && /\s/.test(ch)) break
-  }
-  const uri = entry.slice(0, cursor)
-  const rest = entry.slice(cursor).trim()
-  const layer = /^layer(?:\(\s*([^)]*)\s*\))?(?=\s|$)/i.exec(rest)
-  const qualifier = layer ? rest.slice(layer[0].length).trim() : rest
-  const name = layer?.[1]?.trim()
-  return `${uri} layer(${CARD_CSS_LAYER}${name ? '.' + name : ''})${qualifier ? ' ' + qualifier : ''};`
-}
-
 export function compileCardCss(asset: CardCssAsset): string {
   const source = String(asset.cardCss ?? '')
   if (!source.trim()) return ''
@@ -77,7 +54,7 @@ export function compileCardCss(asset: CardCssAsset): string {
   const adapted = adaptFengyueSelectors(withoutImportant(css), native => native)
   // 卡片樣式在平台之上、顯示規則之下；來源原文不動。import 必須留在 layer 外。
   const { imports, body } = splitCssImports(adapted)
-  return `@layer lt-base, ${CARD_CSS_LAYER}, lt-author-fengyue;\n${imports.map(layeredImport).join('\n')}${imports.length ? '\n' : ''}@layer ${CARD_CSS_LAYER} {\n${body}\n${withoutImportant(appearance)}\n}`
+  return `@layer lt-base, ${CARD_CSS_LAYER}, lt-author-fengyue;\n${imports.map(entry => layeredCssImport(entry, CARD_CSS_LAYER)).join('\n')}${imports.length ? '\n' : ''}@layer ${CARD_CSS_LAYER} {\n${body}\n${withoutImportant(appearance)}\n}`
 }
 
 /** 一般頁與殼都擁有自己的實例；換卡、清空與離場不留下樣式。 */
