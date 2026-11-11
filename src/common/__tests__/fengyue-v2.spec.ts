@@ -34,4 +34,10 @@ describe('new Fengyue imports retain their source platform base', () => {
     expect(compileCardCss({ cardCss: source, cardCssDialect: 'fengyue' })).toContain('color:#1f2328')
     expect(compileCardCss({ cardCss: source, cardCssDialect: 'fengyue-v2' })).not.toContain('color:#1f2328')
   })
+
+  it('keeps imported styles and high-specificity card rules below explicit display-rule styles', () => {
+    const out = compileCardCss({ cardCss: '@import url("https://styles.example/theme.css") layer(theme) screen; #installedBuiltInCss #customized-answer #customized-answer-content{background:red}', cardCssDialect: 'fengyue-v2' })
+    expect(out).toContain('@import url("https://styles.example/theme.css") layer(lt-card-css.theme) screen;')
+    expect(out).toMatch(/@layer lt-card-css \{\s*@layer lt-author-fengyue \{/)
+  })
 })
