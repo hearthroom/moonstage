@@ -289,6 +289,8 @@ export interface ChromeState {
     meterHint?: { ring: string; score: string; ok: string } | null
     /** 目前模型的友善名（頂欄那個「模型名 · 線路名」）；空字串＝還不知道。殼不畫它，給 sdk.model.get() 用。 */
     modelName?: string
+    /** 宿主不支援輸入輔助時 false；省略沿用輸入列既有預設 true。 */
+    assistEnabled?: boolean
     assistBusy: boolean
     assistCost: string | number
     labels: { stop: string; more: string; send: string; paste: string; clear: string; model: string; assist: string; perTurn: string; continue?: string }
