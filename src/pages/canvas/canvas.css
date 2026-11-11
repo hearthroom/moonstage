@@ -39,6 +39,8 @@
  * transform 會讓 #chat 自己變成這些 fixed 子孫的 containing block，跟 defect 1
  * 同一種錯，只是從掛載容器換成了訊息氣泡。margin:auto 不建立 containing block，
  * 不會有這個副作用。
+ * 新風月 v2 的原站欄寬／欄邊距由 fengyue-v2.ts 在同一未分層水位補上，
+ * 使用與這裡相同的特異性，顯示規則仍可後寫覆蓋；舊提示不輸出那段補償。
  */
 
 #mes_stop {
