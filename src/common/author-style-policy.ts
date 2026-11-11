@@ -17,6 +17,7 @@
 import { type CardFormat, normalizeCardFormat } from './card-format'
 import { scopeCss } from './author-style-scope'
 import { withFencesProtected } from './markdown-fences'
+import { adaptFengyueSelectors } from './fengyue-css'
 
 export interface AuthorStylePolicy {
   /** 每條選擇器前面要接的作用域；null＝原樣生效。 */
@@ -65,7 +66,7 @@ export function stylePolicyFor(format: CardFormat | string | null | undefined): 
 /** 一段 CSS 依政策落地。 */
 export function applyStylePolicy(css: string, policy: AuthorStylePolicy): string {
   const text = String(css == null ? '' : css)
-  return policy.scope ? scopeCss(text, policy.scope) : text
+  return adaptFengyueSelectors(text, (native) => policy.scope ? scopeCss(native, policy.scope) : native)
 }
 
 const STYLE_TAG = /<style\b([^>]*)>([\s\S]*?)<\/style>/gi
@@ -73,7 +74,13 @@ const STYLE_TAG = /<style\b([^>]*)>([\s\S]*?)<\/style>/gi
 /** 一段訊息 HTML 裡的每個 <style> 依政策落地；不需改寫的政策連掃描都不做。 */
 export function applyStylePolicyToHtml(html: string, policy: AuthorStylePolicy): string {
   const text = String(html == null ? '' : html)
-  if (!policy.scope || text.indexOf('<style') < 0) return text
+  if (!/<style\b/i.test(text)) return text
   // 程式碼圍欄裡的 <style> 是字面文字（前端區塊協議會把整份文件放進自己的 iframe），不加前綴。
-  return withFencesProtected(text, (outside) => outside.replace(STYLE_TAG, (whole, attrs: string, css: string) => hasCompiledDialect(attrs) ? whole : `<style${attrs}>${scopeCss(css, policy.scope as string)}</style>`))
+  return withFencesProtected(text, (outside) => outside.replace(STYLE_TAG, (whole, attrs: string, css: string) => {
+    if (hasCompiledDialect(attrs)) return whole
+    const compiled = applyStylePolicy(css, policy)
+    const native = policy.scope ? scopeCss(css, policy.scope) : css
+    const marker = compiled === native ? '' : ` ${CSS_DIALECT_ATTR}="auto"`
+    return `<style${attrs}${marker}>${compiled}</style>`
+  }))
 }

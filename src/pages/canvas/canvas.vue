@@ -563,6 +563,7 @@ import { withFencesProtected } from '@/common/markdown-fences'
 import { tagFrontendBlocks, mountFrontendBlocks } from '@/common/frontend-block'
 import { stylePolicyFor } from '@/common/author-style-policy'
 import { compileRuleCssDialects } from '@/common/rule-css-dialect'
+import { compileCardCss, createCardCssMount, resolveCardCssAsset } from '@/common/card-css'
 import { detectAuthorOwnedRegions } from './canvas-author-regions'
 import { BACKGROUND_COLORS, backgroundChoiceFrom, backgroundPrefsPatch, readLocalChoice, resolvePlayerBackground, writeLocalChoice, CUSTOM_BACKGROUND_LIMIT, type BackgroundChoice, type BackgroundMode } from './canvas-player-background'
 import { resolveStageBackground } from './canvas-background'
@@ -2661,9 +2662,15 @@ function previewEcho() {
 
 /** 作者資產的首屏網頁（openingPage）；空字串＝沒有。 */
 const openingPage = ref('')
+let cardCssMount: ReturnType<typeof createCardCssMount> | null = null
 /** 作者選的開局呈現（openingMode：greeting｜page）；空字串＝伺服器沒帶，照卡片格式。 */
 const openingMode = ref('')
 function setActiveAuthorAsset(asset) {
+  asset = resolveCardCssAsset(asset || {})
+  if (typeof document !== 'undefined') {
+    cardCssMount ??= createCardCssMount(document)
+    cardCssMount.set(sandboxCard.value || authorScopeClosed ? '' : compileCardCss(asset))
+  }
   // 規則自己標了 CSS 寫法的，<style> 先照那個寫法轉好（common/rule-css-dialect）；之後的卡片格式作用域會略過它們。
   const rules = compileRuleCssDialects((asset && Array.isArray(asset.rules)) ? asset.rules : []);
   activeAuthorAsset.value = {
@@ -2987,13 +2994,14 @@ const SANDBOX_STYLE_RE = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi;
 
 function sandboxCardCss(): string {
   // 規則自己標了 CSS 寫法的先照那個寫法轉好（風月寫法不會原樣漆到宿主頁）。
-  const rules = compileRuleCssDialects(Array.isArray(sandboxAsset?.rules) ? sandboxAsset.rules : []);
-  const chunks: string[] = [];
+  const cssAsset = resolveCardCssAsset(sandboxAsset || {});
+  const rules = compileRuleCssDialects(cssAsset.rules);
+  const chunks: string[] = [compileCardCss(cssAsset)];
   for (const r of rules) {
     const rep = String((r && (r.replace ?? r.replaceString)) || '');
     for (const m of rep.matchAll(SANDBOX_STYLE_RE)) chunks.push(m[1]);
   }
-  return chunks.join('\n');
+  return chunks.filter(Boolean).join('\n');
 }
 
 function applySandboxSkin() {
@@ -3300,6 +3308,8 @@ function mountSandbox(asset: any) {
             // 顯示字形跟訊息一樣在正則之後轉（只轉文字節點）：否則功能欄是原文、正文是玩家的簡繁，同一頁兩種字。
             statusbarHtml: sandboxStatusbarHtml(),
             openingPage: String(sandboxAsset?.openingPage || ''),
+            ...(Object.prototype.hasOwnProperty.call(sandboxAsset || {}, 'cardCss') ? { cardCss: String(sandboxAsset.cardCss ?? '') } : {}),
+            cardCssDialect: String(sandboxAsset?.cardCssDialect || ''),
           },
           variants: sandboxAsset?.variants || null,
           composer: true,
@@ -4383,6 +4393,8 @@ function setAuthorAssetPageVisible(visible) {
 }
 
 function disposeAuthorAsset() {
+  cardCssMount?.dispose();
+  cardCssMount = null;
   // 接管清單跟著作者的東西一起收：換一張沒美化的卡時，宿主那一層要畫回來。
   authorOwnedRegions.value = '';
   disposeCardTheme()
