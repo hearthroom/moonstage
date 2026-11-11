@@ -16,7 +16,7 @@ import { ruleAppliesToMessage, substituteMacros, type RuleMessageTarget } from '
 import { applyDisplayRules } from '@/utils/display-rule-engine.js'
 import type { SandboxRule } from './protocol'
 import { sanitizeAuthorHtml, stripUnknownTags } from './sanitize'
-import { applyNativeStylePolicy, applyStylePolicy, hasCompiledDialect, rawTextHtmlRanges, type AuthorStylePolicy } from '@/common/author-style-policy'
+import { applyStylePolicy, hasCompiledDialect, type AuthorStylePolicy } from '@/common/author-style-policy'
 import { withFencesProtected } from '@/common/markdown-fences'
 import { tagFrontendBlocks } from '@/common/frontend-block'
 import { drawNativeBlocks } from '@/common/native-blocks'
@@ -59,16 +59,9 @@ export function installCard(rules: SandboxRule[], policy: AuthorStylePolicy): In
     const scriptMarkers: string[] = []
     // 程式碼圍欄裡的 <style>／<script> 是字面文字：那是一整份要放進自己 iframe 的前端文件（前端區塊協議），
     // 抽出來當全頁樣式會把整個聊天頁弄壞、文件本身也少了樣式。
-    const replace = withFencesProtected(String(rule.replace == null ? '' : rule.replace), (outside) => {
-      const literalRanges = rawTextHtmlRanges(outside)
-      return outside
+    const replace = withFencesProtected(String(rule.replace == null ? '' : rule.replace), (outside) => outside
       // 規則自己標了寫法的（rule-css-dialect）已經轉好，不再套卡片格式。
-      .replace(STYLE_RE, (_m, attrs: string, css: string, offset: number) => {
-        // 舊版會抽取 raw text 裡的偽 style，保留其輸出與 script 碼；只禁新 auto 讓假 CSS 生效。
-        const literal = literalRanges.some(range => offset >= range.start && offset < range.end)
-        styles.push(hasCompiledDialect(attrs) ? css : literal ? applyNativeStylePolicy(css, policy) : applyStylePolicy(css, policy))
-        return ''
-      })
+      .replace(STYLE_RE, (_m, attrs: string, css: string) => { styles.push(hasCompiledDialect(attrs) ? css : applyStylePolicy(css, policy)); return '' })
       .replace(SCRIPT_RE, (_m, attrs: string, code: string) => {
         const src = SRC_RE.exec(attrs || '')
         const url = src ? (src[1] || src[2] || src[3] || '') : ''
@@ -91,8 +84,7 @@ export function installCard(rules: SandboxRule[], policy: AuthorStylePolicy): In
           }
         }
         return ''
-      })
-    })
+      }))
     if (ruleInline.length) {
       const bodyProbe = withFencesProtected(replace, (outside) => outside
         .replace(/<!--[\s\S]*?-->/g, '')
