@@ -582,7 +582,7 @@ import CanvasPrologue from './components/canvas-prologue.vue'
 import CanvasOpeningPage from './components/canvas-opening-page.vue'
 import CanvasStatePanel from './components/canvas-state-panel.vue'
 import { cardStateFromServer, cardStateRowsKey, cardStateRowsOf, sandboxCardStateOf } from './canvas-card-state'
-import { cardStateAt, cardStateUpdate, createCardStateFeed, currentCardState, currentCardStatePayload, initialCardState } from '@/common/card-state'
+import { cardStateAt, cardStateMessageId, cardStateUpdate, createCardStateFeed, currentCardState, currentCardStatePayload, initialCardState } from '@/common/card-state'
 import type { StatePanelLabels } from '@/common/panel/state-panel'
 import { hasUserActivation } from '../../common/opening-page'
 import { captureBodySnapshot, restoreBodySnapshot, sweepForeignNodes } from './canvas-body-snapshot'
@@ -3866,6 +3866,7 @@ function buildHudHost(): HudHost {
           const isAI = !isUser && !item.systemOnly;
           return [{
             id: String(item.id),
+            serverId: cardStateMessageId(item),
             role: item.systemOnly ? 'system' as const : (isUser ? 'user' as const : 'assistant' as const),
             text: String(item.content || ''),
             html: item.chatLoading ? '' : hudMessageHtml(item),

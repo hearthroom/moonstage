@@ -78,6 +78,20 @@ describe('沙箱宿主橋', () => {
   beforeEach(() => { h = harness() })
   afterEach(() => { h.iframe.remove() })
 
+  it('訊息編輯用公開 serverId 找到 live 氣泡，宿主動作仍用畫面 id', async () => {
+    const state = { current: makeState({ messages: [msg({ id: '1700000000000', serverId: 'saved-ai', text: '回覆' })] }) }
+    const { hud, calls } = fakeHud(state)
+    const host = createSandboxHost({ hud, iframe: h.iframe, win: window, origin: ORIGIN, roleId: '1', hello })
+    host.start()
+    h.fromShell({ type: 'ready-shell' })
+    await flush()
+    h.fromShell({ type: 'request', reqId: 1, op: 'message.edit', args: ['saved-ai', '改寫'] })
+    await flush()
+    expect(calls).toContainEqual(['openEdit', ['1700000000000']])
+    expect(calls).toContainEqual(['submitEdit', ['1700000000000', '改寫']])
+    host.destroy()
+  })
+
   it('玩家名只在 hello 後變更時補送；設定晚到、再次改名與銷毀都不重送舊值', async () => {
     let name = '暱稱'
     const { hud } = fakeHud({ current: makeState() })
