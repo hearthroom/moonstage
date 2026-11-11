@@ -388,6 +388,29 @@ export function splitCssImports(css: string): { imports: string[]; body: string 
   return { imports, body: body + css.slice(cursor) }
 }
 
+/** @import 的 URL 後面接 layer，保留作者的既有 layer 名稱與 media/supports 條件。 */
+export function layeredCssImport(entry: string, targetLayer: string): string {
+  const start = /^@import\s+/i.exec(entry)?.[0].length ?? 0
+  let cursor = start
+  let quote = ''
+  let parentheses = 0
+  for (; cursor < entry.length; cursor++) {
+    const ch = entry[cursor]
+    if (ch === '\\') { cursor++; continue }
+    if (quote) { if (ch === quote) { quote = ''; if (!parentheses) { cursor++; break } } continue }
+    if (ch === '"' || ch === "'") { quote = ch; continue }
+    if (ch === '(') { parentheses++; continue }
+    if (ch === ')' && --parentheses === 0) { cursor++; break }
+    if (!parentheses && /\s/.test(ch)) break
+  }
+  const uri = entry.slice(0, cursor)
+  const rest = entry.slice(cursor).trim()
+  const layer = /^layer(?:\(\s*([^)]*)\s*\))?(?=\s|$)/i.exec(rest)
+  const qualifier = layer ? rest.slice(layer[0].length).trim() : rest
+  const name = layer?.[1]?.trim()
+  return `${uri} layer(${targetLayer}${name ? '.' + name : ''})${qualifier ? ' ' + qualifier : ''};`
+}
+
 /** 新整卡欄位明寫在無條件 `.canvas-root` 上的 custom properties；不猜條件式規則。 */
 export function unconditionalCardRootProperties(css: string): string[] {
   const properties: string[] = []
