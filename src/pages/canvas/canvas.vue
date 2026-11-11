@@ -1916,7 +1916,12 @@ watch(conversationId, (newId, oldId) => {
   if (!newId) return;
   // 只在首次設定時檢查（避免切換對話時重複觸發）
   if (oldId) return;
-  nextTick(() => tryResumeOnMount());
+  nextTick(() => {
+    // 延後開局後第一句可能已在等票證，socket 尚未建立。不能把本頁的新意圖當作
+    // 上次離開留下的草稿恢復；排程期間若又換了對話，也不能接管新對話。
+    if (String(unref(conversationId)) !== newId || pendingChatTurn) return;
+    tryResumeOnMount();
+  });
 });
 
 function tryResumeOnMount() {
