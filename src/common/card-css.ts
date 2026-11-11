@@ -2,6 +2,7 @@
 import { compileDialectCss, LEGACY_FENGYUE_CSS_RULE_ID, normalizeCssDialect } from './rule-css-dialect'
 import { adaptFengyueSelectors, splitCssImports } from './fengyue-css'
 import { nativeCardRootVariables, splitCardAppearanceCss } from './card-appearance'
+import { compileFengyueV2Css } from './fengyue-v2'
 
 export const CARD_CSS_LAYER = 'lt-card-css'
 
@@ -25,7 +26,7 @@ export function resolveCardCssAsset<T extends CardCssAsset>(asset: T): T & { car
   const migrates = unchanged && (explicit || !hasCssOrderPeers)
   return {
     ...asset,
-    ...(explicit ? { cardCss: String(asset.cardCss ?? ''), cardCssDialect: normalizeCssDialect(asset.cardCssDialect) ?? '' }
+    ...(explicit ? { cardCss: String(asset.cardCss ?? ''), cardCssDialect: asset.cardCssDialect === 'fengyue-v2' ? 'fengyue-v2' : normalizeCssDialect(asset.cardCssDialect) ?? '' }
       : migrates ? { cardCss: match[1], cardCssDialect: normalizeCssDialect(legacy?.cssDialect) ?? 'fengyue' } : {}),
     rules: (migrates ? rules.filter((rule) => rule !== legacy) : rules) as NonNullable<T['rules']>,
   }
@@ -63,6 +64,10 @@ export function compileCardCss(asset: CardCssAsset): string {
   const source = String(asset.cardCss ?? '')
   if (!source.trim()) return ''
   const { css, appearance } = splitCardAppearanceCss(source)
+  if (asset.cardCssDialect === 'fengyue-v2') {
+    const current = compileFengyueV2Css(css)
+    return appearance ? `${current}\n@layer ${CARD_CSS_LAYER} {\n${withoutImportant(appearance)}\n}` : current
+  }
   const dialect = normalizeCssDialect(asset.cardCssDialect)
   // 舊資料提示優先：既有風月／酒館／MMD 轉譯與權重不得因搬欄位改變。
   if (dialect) {

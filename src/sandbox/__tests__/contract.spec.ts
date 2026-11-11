@@ -403,6 +403,7 @@ function buildContract() {
       order: ['platform defaults (lt-base)', `new card CSS (${CARD_CSS_LAYER}, declaration important removed)`, 'display rules'],
       compiledSampleUsesLayer: compileCardCss({ cardCss: '.mes{color:red}' }).includes(`@layer ${CARD_CSS_LAYER}`),
       legacyHint: 'cardCssDialect preserves the existing fengyue/tavern/mmd translation and precedence; authors do not select it',
+      currentImportHint: 'new Fengyue imports write fengyue-v2 for source-platform base styles; raw CSS bytes are preserved; legacy hints and migrated carriers are not upgraded; reimport an old Fengyue card for current compatibility',
       legacyCarrier: `${LEGACY_FENGYUE_CSS_RULE_ID}: only one enabled, unchanged importer-generated carrier with no other enabled style/script peers is moved; otherwise its rule order is preserved; explicit cardCss empty clears the unchanged carrier`,
       managedAppearanceVariables: [...CARD_APPEARANCE_VARIABLES],
       appearanceMarker: '/* lt-card-appearance:start */ ... /* lt-card-appearance:end */',
