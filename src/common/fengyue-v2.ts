@@ -1,5 +1,5 @@
 /** 新匯入專用；舊 fengyue 提示仍只轉作者 CSS，不補原站基底。 */
-import { splitCssImports, translateFengyueCss } from './fengyue-css'
+import { layeredCssImport, splitCssImports, translateFengyueCss } from './fengyue-css'
 
 // 原站 has-css=true 的 bg-secondary、text-gray-900、bg-background 與 text-sm。
 // Markdown 的 1.5 與容器／作者的 line-height 分開；深色正文白字由作者 CSS 決定。
@@ -11,6 +11,7 @@ const BASE = `@layer lt-fengyue-base {
   --lt-fy-input-bg:hsl(0 0% 99%);
   --lt-fy-input-fg:hsl(210 2% 16%);
   --lt-fy-border:rgb(242 242 242);
+  background:var(--lt-fy-input-bg);
 }
 .canvas-root[data-lt-theme="dark"] {
   --lt-fy-bubble-bg:hsl(210 2% 20%);
@@ -47,6 +48,7 @@ const BASE = `@layer lt-fengyue-base {
 .canvas-root[data-lt-card-vars~="--lt-canvas-bubble-user-bg"] .mes[data-lt-role="user"] .mes_text { background:var(--lt-canvas-bubble-user-bg); }
 .canvas-root[data-lt-card-vars~="--lt-canvas-bubble-fg"] .mes_text { color:var(--lt-canvas-bubble-fg); }
 .canvas-root[data-lt-card-vars~="--lt-canvas-composer-field-bg"] .composer-field { background:var(--lt-canvas-composer-field-bg); }
+.canvas-root[data-lt-card-vars~="--lt-canvas-bg"] { background:var(--lt-canvas-bg); }
 .canvas-root[data-lt-card-vars~="--lt-canvas-font"] .mes_text,
 .canvas-root[data-lt-card-vars~="--lt-canvas-font"] .composer-field,
 .canvas-root[data-lt-card-vars~="--lt-canvas-font"] .uni-textarea-textarea { font-family:var(--lt-canvas-font); }
@@ -67,5 +69,5 @@ export function compileFengyueV2Css(css: string): string {
 .canvas-root .chat-bottom-wapper, .canvas-root .shortcut-bar-wrapper {
   padding-inline:calc((100% - min(100%, var(--lt-fy-column-width))) / 2);
 }`
-  return `@layer lt-base, lt-fengyue-base, lt-card-css, lt-author-fengyue;\n${imports.map(entry => entry + ';').join('\n')}\n${BASE}\n${column}\n${body}`
+  return `@layer lt-base, lt-fengyue-base, lt-card-css, lt-author-fengyue;\n${imports.map(entry => layeredCssImport(entry, 'lt-card-css')).join('\n')}\n${BASE}\n${column}\n@layer lt-card-css {\n${body}\n}`
 }
