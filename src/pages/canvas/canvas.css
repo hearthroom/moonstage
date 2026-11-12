@@ -814,6 +814,17 @@
   }
 
   /* 作者固定寬面板只超出外框時保持原樣；超過視窗時讓內容自己橫捲，不裁掉也不改作者寬度。 */
+  /* 對話裝飾的括註：普通作者 CSS 自然優先於平台預設，不需 !important。 */
+  .lt-inline-aside {
+    color: var(--lt-canvas-aside-ai-color);
+    font-style: italic;
+    font-weight: 400;
+  }
+
+  .lt-inline-aside--user {
+    color: var(--lt-canvas-aside-user-color);
+  }
+
   .mes_text[data-lt-overflow-scroll] {
     overflow-x: auto;
   }

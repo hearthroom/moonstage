@@ -13,6 +13,8 @@ import { stylePolicyFor } from '../../../common/author-style-policy'
 import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
+import { spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
 import { describe, it, expect } from 'vitest'
 import {
   isHeavyHtml,
@@ -83,7 +85,7 @@ describe('MMD 來源的畫布：平台預設與對白上色', () => {
     const html = buildHighlightText('mmd')(SCREENSHOT, 0, null)
     expect(html).not.toContain('color: #C4B4A3;font-style: italic;font-weight: 400;"&gt;')
     expect(html).not.toMatch(/<font color="#DC8333">"color:/)
-    expect(html).toMatch(/<span style="color: #C4B4A3;font-style: italic;font-weight: 400;">（實際她沒見過）<\/span>/)
+    expect(html).toMatch(/<span class="lt-inline-aside lt-inline-aside--ai">（實際她沒見過）<\/span>/)
     // 半形引號經 markdown 成了 &quot;，對白仍要上色（原站的對白就是半形引號）
     expect(html).toContain('<font color="#DC8333">&quot;你見過我的&quot;</font>')
     expect(html).toContain('<font color="#DC8333">&quot;害我想找你都沒找到。&quot;</font>')
@@ -139,7 +141,69 @@ describe('底線斜體裝飾不吃掉單字裡的底線', () => {
   it('snake_case 不動；獨立的 _心聲_ 才轉成括號斜體', () => {
     const html = buildHighlightText('mmd')('<p>檔案 file_name_here 放這。她 _輕嘆_ 一聲。</p>', 0, null)
     expect(html).toContain('file_name_here')
-    expect(html).toMatch(/<span style="color: #C4B4A3;font-style: italic;font-weight: 400;">（輕嘆）<\/span>/)
+    expect(html).toMatch(/<span class="lt-inline-aside lt-inline-aside--ai">（輕嘆）<\/span>/)
     expect(html).not.toContain('_輕嘆_')
   })
 })
+
+
+describe('括註樣式的作者介面', () => {
+  for (const format of ['mmd', 'tavern'] as const) {
+    for (const [type, role] of [[0, 'ai'], [1, 'user']] as const) {
+      it(`${format} ${role} 括註提供可覆蓋的 class，不再以行內樣式鎖住外觀`, () => {
+        const html = buildHighlightText(format)('<p>她（停頓）並 _輕嘆_。</p>', type, null)
+        const root = document.createElement('div')
+        root.innerHTML = html
+        const asides = root.querySelectorAll(`.lt-inline-aside.lt-inline-aside--${role}`)
+        expect(asides.length).toBe(2)
+        for (const aside of asides) expect(aside.hasAttribute('style')).toBe(false)
+        expect(root.textContent).toBe('她（停頓）並 （輕嘆）。')
+      })
+    }
+  }
+})
+
+
+it('真實瀏覽器保留深淺／MMD 括註預設，普通作者 CSS 與變數可覆蓋', () => {
+  const chrome = process.env.CHROME_BIN || [
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser',
+  ].find(fs.existsSync)
+  expect(chrome, 'Install Chrome or set CHROME_BIN for the aside style contract').toBeTruthy()
+  const dir = fs.mkdtempSync(path.join(tmpdir(), 'stage-inline-aside-'))
+  let retainProfile = false
+  try {
+    const platformCss = ['src/common/canvas-theme-vars.css', 'src/pages/canvas/canvas.css']
+      .map(file => fs.readFileSync(path.join(process.cwd(), file), 'utf8')).join('\n')
+    const cases = ['light', 'dark', 'mmd'].map(mode => {
+      const render = buildHighlightText(mode === 'mmd' ? 'mmd' : 'tavern')
+      const pair = render('<p>她（停頓）。</p>', 0, null) + render('<p>我（點頭）。</p>', 1, null)
+      return `<section class="canvas-root ${mode === 'mmd' ? 'lt-theme-dark' : ''}" data-mode="${mode}">
+        <div class="default">${pair}</div><div class="author">${pair}</div><div class="vars">${pair}</div></section>`
+    }).join('')
+    const file = path.join(dir, 'fixture.html')
+    fs.writeFileSync(file, `<!doctype html><meta charset="utf-8"><style>
+      /* 作者樣式比平台先插入，仍應贏過平台 layer。 */
+      .author .lt-inline-aside { color: rgb(12, 34, 56); font-style: normal; font-weight: 700; }
+      .vars { --lt-canvas-aside-ai-color: rgb(23, 45, 67); --lt-canvas-aside-user-color: rgb(34, 56, 78); }
+      </style><style>${platformCss}</style>${cases}<pre id="result"></pre><script>
+      const result = [...document.querySelectorAll('.lt-inline-aside')].map(el => {
+        const s = getComputedStyle(el); return [s.color, s.fontStyle, s.fontWeight];
+      }); document.querySelector('#result').textContent = JSON.stringify(result);
+      </script>`)
+    retainProfile = true
+    const run = spawnSync(chrome!, ['--headless=new', '--no-first-run', '--no-default-browser-check',
+      `--user-data-dir=${path.join(dir, 'profile')}`, '--dump-dom', '--virtual-time-budget=1000', `file://${file}`],
+      { encoding: 'utf8', timeout: 20000, maxBuffer: 2 * 1024 * 1024 })
+    expect(run.error, run.stderr).toBeUndefined()
+    expect(run.status, `${run.stderr}\nRetained fixture: ${dir}`).toBe(0)
+    retainProfile = false
+    const result = JSON.parse(run.stdout.match(/<pre id="result">([^<]+)<\/pre>/)![1])
+    const expected = [
+      ['rgb(196, 180, 163)', 'italic', '400'], ['rgb(102, 91, 101)', 'italic', '400'],
+      ['rgb(12, 34, 56)', 'normal', '700'], ['rgb(12, 34, 56)', 'normal', '700'],
+      ['rgb(23, 45, 67)', 'italic', '400'], ['rgb(34, 56, 78)', 'italic', '400'],
+    ]
+    expect(result).toEqual([...expected, ...expected, ...expected])
+  } finally { if (!retainProfile) fs.rmSync(dir, { recursive: true, force: true }) }
+}, 30000)
