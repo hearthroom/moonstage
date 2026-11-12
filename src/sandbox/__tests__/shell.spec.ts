@@ -898,6 +898,19 @@ describe('殼：舞台背景', () => {
 })
 
 describe('原生區塊：沒有規則的卡也有面板與選項', () => {
+  it.each(['「等一下，先問：真的嗎？！」', '「待って、確認します：合計１００％です。」？！'])('選項顯示、填入及送出皆保留全形字：%s', async (text) => {
+    const s = boot(config())
+    s.handle({ type: 'messages', messages: [{ id: 'greeting', role: 'ai', content: `[choices]\n- ${text}\n[/choices]`, serverId: null }] })
+    await nextTick()
+    const button = s.refs.list.querySelector('.lt-choice') as HTMLButtonElement
+    expect(button.textContent).toBe(text)
+    button.click()
+    expect(s.sdk.input.get()).toBe(text)
+    expect(sent.some(m => m.type === 'request')).toBe(false)
+    s.refs.send.click()
+    expect(sent.find(m => m.type === 'request')).toMatchObject({ op: 'message.send', args: [text] })
+  })
+
   it('開場白裡的 [status] 與 [choices] 畫成 .lt-status／.lt-choices；點選項填進輸入框不送出；玩家訊息不畫', async () => {
     const s = boot(config({ card: { rules: [], statusbar: '' } }))
     s.handle({ type: 'messages', messages: [
