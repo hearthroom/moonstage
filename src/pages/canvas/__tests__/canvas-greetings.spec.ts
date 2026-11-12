@@ -25,7 +25,6 @@ import {
   prologuePickSends,
   keepsPlayerDraft,
   showsOpening,
-  MAX_GREETINGS,
   MAX_PROLOGUE,
   archivesShowStartedCard,
   offersResponseSettings,
@@ -48,9 +47,14 @@ describe('開場白清單', () => {
     expect(buildGreetingList({ roleWelcome: '主', welcomeAlternates: ['', '  ', '乙'] })).toEqual(['主', '乙'])
   })
 
-  it('超過上限的截掉', () => {
-    const many = Array.from({ length: 40 }, (_, i) => 'g' + i)
-    expect(buildGreetingList({ roleWelcome: '主', welcomeAlternates: many })).toHaveLength(MAX_GREETINGS)
+  it.each([25, 26])('keeps the main opening and all %i alternates in their original order', count => {
+    const alternates = Array.from({ length: count }, (_, i) => `alternate-${i + 1}`)
+    expect(buildGreetingList({ roleWelcome: 'main', roleWelcomeAlternates: alternates })).toEqual(['main', ...alternates])
+  })
+
+  it('keeps every alternate when the main opening is empty', () => {
+    const alternates = Array.from({ length: 26 }, (_, i) => `alternate-${i + 1}`)
+    expect(buildGreetingList({ roleWelcome: '', welcomeAlternates: alternates })).toEqual(alternates)
   })
 
   it('只有一條就沒得選', () => {
@@ -184,6 +188,24 @@ describe('開場選項（MMD prologue）', () => {
 })
 
 describe('切換的畫面', () => {
+  for (const mode of ['ordinary', 'sandbox'] as const) {
+    it.each([25, 26])(`${mode}: can select beyond the twentieth displayed opening with %i alternates`, async count => {
+      const list = buildGreetingList({ roleWelcome: 'main', roleWelcomeAlternates: Array.from({ length: count }, (_, i) => `alternate-${i + 1}`) })
+      const state = { list, index: 19 }
+      const message = () => ({ ...BASE, html: `<p>${state.list[state.index]}</p>`, swipes: { index: state.index, total: state.list.length } })
+      const wrapper = mount(CanvasMessage, { props: { message: message(), ...(mode === 'sandbox' ? { chat: { from: 'ai' as const, state: 'done', msgId: null, generating: false } } : {}) } })
+      expect(wrapper.find('.swipes-counter').text().replace(/\s/g, '')).toBe(`20/${count + 1}`)
+      await wrapper.find('.swipe_right').trigger('click')
+      expect(wrapper.emitted('swipe')).toEqual([[1]])
+      state.index = stepGreeting(state, 1)
+      expect(greetingIndexForStart(state)).toBe(20)
+      expect(state.list[state.index]).toBe('alternate-20')
+      await wrapper.setProps({ message: message() })
+      expect(wrapper.find('.swipes-counter').text().replace(/\s/g, '')).toBe(`21/${count + 1}`)
+      wrapper.unmount()
+    })
+  }
+
   it('有替代開場白時畫出箭頭與「第 k／n」', () => {
     const wrapper = mount(CanvasMessage, {
       props: { message: { ...BASE, swipes: { index: 1, total: 3 } } },
