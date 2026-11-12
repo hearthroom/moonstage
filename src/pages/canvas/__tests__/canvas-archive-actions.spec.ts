@@ -35,6 +35,7 @@ function fixture() {
     _this: { http: { post, get }, requestUrl: { saveAndStartNew: '/new', ownedConversation: '/owned', getRoleDetail: '/detail' } },
     conversationId: { value: 'current' }, pendingGreetingStart: { value: false },
     pendingNewConversationFrom: { value: '' }, greetingStartBusy: { value: false },
+    pendingExistingOpening: { value: null }, openingSelectionAttempt: { value: null }, openingPreviewDirty: { value: false },
     greeting: { list: ['main'], index: 0 }, shouldDeferStart, buildGreetingList, conversationRoleId,
     archiveBusy: { value: false }, canGenerate: { value: true },
     unref: (r: any) => r.value, t: (key: string) => key,
@@ -110,7 +111,13 @@ describe('choose an opening after New conversation', () => {
       cardStateFromServer: () => null, nextBubbleId: () => 123,
       showsOpening, stepGreeting, greetingIndexForStart, hasAlternates,
       onActionBtnClick: vi.fn(),
+      pendingChatTurn: null, isStreamActive: { value: false },
+      backwardHistorySnapshot: { value: { conversationId: 'current', historyEpoch: 4, nextSeq: 1 } },
+      getHistoryMsg: vi.fn(), applyBackwardHistorySnapshot: vi.fn(),
     })
+    b._this.requestUrl.selectOpening = '/select-opening'
+    b.selectStoredOpening = handler('selectStoredOpening', b)
+    b.applyStoredOpeningState = handler('applyStoredOpeningState', b)
     f.get.mockImplementation(async (url: string) => ({ statusCode: 200, data: url === '/owned'
       ? { conversationId: 'current', roleId: 'source-role' }
       : { characterRoleId: 'source-role', roleWelcome: 'main', welcomeAlternates: ['alternate one', 'alternate two'] } }))
@@ -138,6 +145,90 @@ describe('choose an opening after New conversation', () => {
     expect(f.b.pendingNewConversationFrom.value).toBe('')
     expect(f.b.talkList.value[0].content).toBe('alternate one')
     expect(f.b.onActionBtnClick).toHaveBeenCalledOnce()
+  })
+  it('sends in the same reset save instead of starting or retiring another conversation', async () => {
+    const f = chooserFixture()
+    f.b.pendingGreetingStart.value = true
+    f.b.pendingExistingOpening.value = { conversationId: 'current', revision: 'revision' }
+    f.b.talkList.value = [{ id: 'saved-opening', type: 0, content: 'main' }]
+    await f.b.onCanvasSend()
+    expect(f.b.chatStart).not.toHaveBeenCalled()
+    expect(f.post).toHaveBeenCalledOnce()
+    expect(f.post.mock.calls[0][0]).toBe('/select-opening')
+    expect(f.b.conversationId.value).toBe('current')
+    expect(f.b.talkList.value[0].id).toBe('saved-opening')
+    // Attempting Send can fail admission; history, not the click, closes the chooser.
+    expect(f.b.pendingGreetingStart.value).toBe(true)
+    expect(f.b.onActionBtnClick).toHaveBeenCalledOnce()
+  })
+  it('restores the chooser from authoritative opening-only history without replacing its saved row', () => {
+    const f = chooserFixture()
+    f.b.talkList.value = [{ id: 'saved-opening', type: 0, content: 'main' }]
+    f.b.applyStoredOpeningState({ total: 1, openingSelection: { choices: ['main', 'alternate'], index: 0, revision: 'revision' } }, 'current')
+    expect(f.b.pendingGreetingStart.value).toBe(true)
+    expect(f.b.pendingExistingOpening.value).toEqual({ conversationId: 'current', revision: 'revision' })
+    expect(f.b.talkList.value[0].id).toBe('saved-opening')
+    f.b.applyStoredOpeningState({ total: 3 }, 'current')
+    expect(f.b.pendingGreetingStart.value).toBe(false)
+    expect(f.b.pendingExistingOpening.value).toBeNull()
+  })
+  it('previews reset opening choices locally without writing before the first send', async () => {
+    const f = chooserFixture()
+    f.b.pendingGreetingStart.value = true
+    f.b.pendingExistingOpening.value = { conversationId: 'current', revision: 'revision' }
+    await f.b.onGreetingSwipe(1)
+    expect(f.post).not.toHaveBeenCalled()
+    expect(f.b.greeting.index).toBe(1)
+    expect(f.b.talkList.value[0].content).toBe('alternate one')
+  })
+  it('serializes persisted opening choices and refreshes the same save from the committed first page', async () => {
+    const f = chooserFixture()
+    f.b.pendingGreetingStart.value = true
+    f.b.pendingExistingOpening.value = { conversationId: 'current', revision: 'revision' }
+    let finish!: (value: unknown) => void
+    f.post.mockReturnValue(new Promise(resolve => { finish = resolve }))
+    f.b.onGreetingSwipe(1)
+    expect(f.post).not.toHaveBeenCalled()
+    const first = f.b.onCanvasSend()
+    await f.b.onCanvasSend()
+    expect(f.post).toHaveBeenCalledOnce()
+    expect(f.b.onActionBtnClick).not.toHaveBeenCalled()
+    expect(f.post.mock.calls[0][0]).toBe('/select-opening')
+    expect(f.post.mock.calls[0][1].data).toMatchObject({ conversationId: 'current', greetingIndex: 1, openingRevision: 'revision', historyEpoch: 4, nextSeq: 1 })
+    const page = { total: 1, chats: [{ chatId: 'opening' }], openingSelection: { choices: ['main', 'alternate'], index: 1, revision: 'revision' } }
+    finish({ statusCode: 200, data: { historyEpoch: 5, nextSeq: 1, firstPage: page } })
+    await first
+    expect(f.b.getHistoryMsg).toHaveBeenCalledWith(page)
+    expect(f.b.conversationId.value).toBe('current')
+    expect(f.b.chatStart).not.toHaveBeenCalled()
+  })
+  it('reconciles a rejected stale selection instead of retaining a permanently failing intent', async () => {
+    const f = chooserFixture()
+    f.b.pendingGreetingStart.value = true
+    f.b.pendingExistingOpening.value = { conversationId: 'current', revision: 'revision' }
+    f.b.onGreetingSwipe(1)
+    f.post.mockRejectedValueOnce({ statusCode: 409, data: { error: 'conflict' } })
+    await f.b.onCanvasSend()
+    expect(f.b.openingSelectionAttempt.value).toBeNull()
+    expect(f.b.openingPreviewDirty.value).toBe(false)
+    expect(f.b.getHistoryMsg).toHaveBeenCalledOnce()
+    expect(f.b.onActionBtnClick).not.toHaveBeenCalled()
+    expect(f.b.content.value).toBe('player draft')
+  })
+  it('retains an unknown selection request for idempotent retry and does not send a first turn meanwhile', async () => {
+    const f = chooserFixture()
+    f.b.pendingGreetingStart.value = true
+    f.b.pendingExistingOpening.value = { conversationId: 'current', revision: 'revision' }
+    f.post.mockRejectedValueOnce(new Error('response lost'))
+    f.b.onGreetingSwipe(1)
+    await f.b.onCanvasSend()
+    const original = f.post.mock.calls[0][1].data
+    expect(f.b.onActionBtnClick).not.toHaveBeenCalled()
+    expect(f.b.content.value).toBe('player draft')
+    f.post.mockResolvedValueOnce({ statusCode: 200, data: { historyEpoch: 5, nextSeq: 1 } })
+    await f.b.onCanvasSend()
+    expect(f.post.mock.calls[1][1].data).toEqual(original)
+    expect(f.b.openingSelectionAttempt.value).toBeNull()
   })
   it.each(['offline', 'full'])('preserves the selection, draft and source archive when creation fails: %s', async (failure) => {
     const f = chooserFixture()
