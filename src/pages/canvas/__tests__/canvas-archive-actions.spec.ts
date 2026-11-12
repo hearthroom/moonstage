@@ -172,6 +172,22 @@ describe('choose an opening after New conversation', () => {
     expect(f.b.pendingGreetingStart.value).toBe(false)
     expect(f.b.pendingExistingOpening.value).toBeNull()
   })
+  it.each([25, 26])('adopts and sends every reset opening with %i alternates', async (count) => {
+    const f = chooserFixture()
+    const choices = ['main', ...Array.from({ length: count }, (_, i) => `alternate ${i + 1}`)]
+    f.b.talkList.value = [{ id: 'saved-opening', type: 0, content: 'main' }]
+    f.b.applyStoredOpeningState({ total: 1, openingSelection: { choices, index: count, revision: 'full-revision' } }, 'current')
+    expect(f.b.pendingGreetingStart.value).toBe(true)
+    expect(f.b.greeting.list).toEqual(choices)
+    expect(f.b.greeting.index).toBe(count)
+    expect(f.b.pendingExistingOpening.value).toEqual({ conversationId: 'current', revision: 'full-revision' })
+    await f.b.onCanvasSend()
+    expect(f.post).toHaveBeenCalledOnce()
+    expect(f.post.mock.calls[0][0]).toBe('/select-opening')
+    expect(f.post.mock.calls[0][1].data).toMatchObject({ conversationId: 'current', greetingIndex: count, openingRevision: 'full-revision' })
+    expect(f.b.chatStart).not.toHaveBeenCalled()
+    expect(f.b.onActionBtnClick).toHaveBeenCalledOnce()
+  })
   it('previews reset opening choices locally without writing before the first send', async () => {
     const f = chooserFixture()
     f.b.pendingGreetingStart.value = true
