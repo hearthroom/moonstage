@@ -791,11 +791,15 @@ export function createShell(options: CreateShellOptions): Shell {
     chromeColorSent = color
     transport.send({ type: 'chrome-color', color })
   }
-  let docStateQueued = false
+  let docStateTimer: ReturnType<typeof win.setTimeout> | null = null
   const queueDocState = () => {
-    if (docStateQueued) return
-    docStateQueued = true
-    win.setTimeout(() => { docStateQueued = false; postDocState(); postChromeColor() }, 50)
+    if (disposed || docStateTimer !== null) return
+    docStateTimer = win.setTimeout(() => {
+      docStateTimer = null
+      if (disposed) return
+      postDocState()
+      postChromeColor()
+    }, 50)
   }
   const docObserver = typeof MutationObserver === 'function' ? new MutationObserver(queueDocState) : null
   if (docObserver) {
@@ -1047,6 +1051,7 @@ export function createShell(options: CreateShellOptions): Shell {
       disposeCardBlockTheme()
       historyRemote.dispose()
       disposed = true
+      if (docStateTimer !== null) { win.clearTimeout(docStateTimer); docStateTimer = null }
       offRuleSettled()
       bus.emit('dispose')
       for (const waiter of pending.values()) waiter.reject(new SdkError('HOST_DENIED', 'shell disposed'))

@@ -403,6 +403,26 @@ describe('殼：冷啟動與事件順序', () => {
     style.remove()
   })
 
+  it('dispose 取消已排程的文件狀態與頁首底色回報', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const s = boot(config())
+      document.documentElement.setAttribute('data-dispose-queue', 'queued')
+      await nextTick()
+      s.dispose()
+      sent = []
+      document.documentElement.setAttribute('data-dispose-queue', 'after-dispose')
+      await vi.advanceTimersByTimeAsync(60)
+      expect(sent.filter((m) => m.type === 'docstate' || m.type === 'chrome-color')).toEqual([])
+    } finally {
+      shell?.dispose()
+      shell = null
+      vi.clearAllTimers()
+      vi.useRealTimers()
+      document.documentElement.removeAttribute('data-dispose-queue')
+    }
+  })
+
   it('宿主說沒有上一頁（獨立的卡片 App）：標準頁首不畫返回鍵；陽春頁首的返回鍵也藏起來', () => {
     const header = { roleName: '露娜', avatar: '', badge: '', backLabel: '返回' }
     const composer = { placeholder: '', sendState: 'send', generating: false, enterSends: true, shortcuts: [], moreOpen: false, moreItems: [], modelScore: '', assistBusy: false, assistCost: '', labels: { stop: '停止', more: '更多', send: '送出', paste: '貼上', clear: '清除', model: '模型', assist: '幫答', perTurn: '每輪' } }
