@@ -2,6 +2,17 @@ import { describe, it, expect } from 'vitest'
 import { drawNativeBlocks, drawValue } from '../native-blocks'
 
 describe('原生區塊：狀態與選項', () => {
+  it.each([
+    ['- ', '「等一下，先問：真的嗎？！」'],
+    ['1. ', '「待って、確認します：合計１００％です。」？！'],
+    ['２. ', 'Ａ／Ｂ＝５０％｜下一步＞返回－原地'],
+    ['－ ', '保留全形，與全形：標點'],
+  ])('選項只剝列表符號 %s，保留原始文字', (prefix, text) => {
+    const box = document.createElement('div')
+    box.innerHTML = drawNativeBlocks(`[choices]\n${prefix}${text}\n[/choices]`)
+    expect(box.querySelector('.lt-choice')!.textContent).toBe(text)
+  })
+
   it('沒有區塊就原樣回傳', () => {
     expect(drawNativeBlocks('plain prose, no block')).toBe('plain prose, no block')
     expect(drawNativeBlocks('')).toBe('')

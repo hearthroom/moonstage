@@ -5,7 +5,7 @@
  *
  * 位置：顯示規則之後、Markdown 之前，兩條渲染路徑（殼自畫、宿主畫布）同一個函式。只對 AI 訊息。
  *
- * 容錯：閉合標記可缺（吃到正文結尾或下一個區塊為止）；全形標點折半形；`;;` 也當換行；沒冒號的行當文字；
+ * 容錯：閉合標記可缺（吃到正文結尾或下一個區塊為止）；狀態值全形標點折半形；`;;` 也當換行；沒冒號的行當文字；
  * 值的形狀決定畫法（數字／百分比與 a/b 進度條／`名|a/b` 等級／`k:v|k:v` 列表／`k:v k:v` 屬性／`名=數` 實體／
  * 逗號標籤／`a > b` 路徑／其餘文字），形狀不完整一律退回文字——畫錯一行字比畫壞一個控件好。
  * 產物只有標準標籤與 class：作者 CSS（不分層）可以整個蓋掉；按鈕沒有 inline handler，點擊由宿主委派處理，
@@ -146,11 +146,11 @@ export function drawStatusBody(body: string): string {
   return rows.length ? `<div class="lt-status">${rows.join('')}</div>` : ''
 }
 
-/** 選項體 → 按鈕；條列符號與編號剝掉，最多八個，末尾一顆「✎ 自己寫」。 */
+/** 選項體 → 按鈕；只剝條列符號與編號、保留原字，最多八個，末尾一顆「✎ 自己寫」。 */
 export function drawChoicesBody(body: string): string {
   const out: string[] = []
   for (const line of String(body).split(/\r?\n/)) {
-    const t = norm(line).trim().replace(/^(?:[-*+•]|\d+[.)]|[①-⑳])\s*/, '').trim()
+    const t = line.trim().replace(/^(?:[-*+•－]|[\d０-９]+[.)]|[①-⑳])\s*/, '').trim()
     if (t) out.push(cut(t))
     if (out.length >= MAX_CHOICES) break
   }
