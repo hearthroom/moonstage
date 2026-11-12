@@ -58,6 +58,33 @@ describe('長按', () => {
 
   const touch = (x: number, y: number) => ({ touches: [{ clientX: x, clientY: y }] } as any)
 
+  it.each([
+    ['input', '<input>'], ['textarea', '<textarea></textarea>'],
+    ['editable', '<div contenteditable="true"><span>Editable</span></div>'],
+    ['empty editable', '<div contenteditable><span>Editable</span></div>'],
+    ['plaintext editable', '<div contenteditable="plaintext-only"><span>Editable</span></div>'],
+  ])('%s 與內嵌文字長按交原生編輯，不計時或消耗手勢', (_name, html) => {
+    const parent = document.createElement('div')
+    parent.innerHTML = html
+    const target = parent.querySelector('span')?.firstChild || parent.firstElementChild!
+    const h = harness()
+    h.handle.start({ ...touch(10, 10), target })
+    h.fire()
+    expect(h.triggered).toEqual([])
+    expect(h.handle.consumed()).toBe(false)
+    expect(h.scheduledMs()).toBe(-1)
+  })
+
+  it('contenteditable=false 的普通內容仍可長按平台選單', () => {
+    const el = document.createElement('div')
+    el.contentEditable = 'false'
+    el.setAttribute('contenteditable', 'false')
+    const h = harness()
+    h.handle.start({ ...touch(10, 10), target: el })
+    h.fire()
+    expect(h.triggered).toHaveLength(1)
+  })
+
   it('按住 450ms 才算長按', () => {
     const h = harness()
     h.handle.start(touch(10, 10))

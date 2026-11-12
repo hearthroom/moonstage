@@ -1015,6 +1015,8 @@ export function createShell(options: CreateShellOptions): Shell {
         bus.resetReplay()
         syncOpeningSlot()
         syncCardState()
+        // 新對話沒有訊息快照時，事件型面板也要回到初始值；晚訂閱由bus重播這份現值。
+        if (cardInitial) bus.emit('state:change', cardStatePayloadOf(null, cardInitial))
         // 載荷 { conversationId }（宿主有給才帶）：卡片用它對上 sdk.archive.list() 裡的那一段
         bus.emit('conversation:switch', message.conversationId ? { conversationId: String(message.conversationId) } : undefined)
         return

@@ -18,7 +18,7 @@ it('reserves touch message long-press for platform actions while retaining deskt
     import Message from './src/pages/canvas/components/canvas-message.vue'
     const sandbox=ref(false);window.menuCount=0;window.actions=[]
     createApp({render:()=>h('main',{class:'canvas-root chat'},[h(Message,{
-      message:{id:'fixture',mesid:1,role:'ai',name:'Synthetic speaker',avatar:'',finished:true,html:'<p id="prose">Synthetic message for a sustained touch.</p><input id="author-input" value="Editable author text"><div id="author-editable" contenteditable="true">Editable region</div>'},
+      message:{id:'fixture',mesid:1,role:'ai',name:'Synthetic speaker',avatar:'',finished:true,html:'<p id="prose">Synthetic message for a sustained touch.</p><input id="author-input" value="Editable author text"><textarea id="author-textarea">Editable textarea</textarea><div id="author-editable" contenteditable="true"><span id="author-child">Editable region</span></div>'},
       chat:sandbox.value?{from:'ai',state:'done',msgId:'saved-fixture',generating:false}:null,
       onMenu:()=>window.menuCount++,onAction:key=>window.actions.push(key)
     })])}).mount('#app')
@@ -79,6 +79,14 @@ it('reserves touch message long-press for platform actions while retaining deskt
           await send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},sessionId)
           const after=await evaluate('window.inspect()')
           expect(after.menuCount).toBe(1);expect(after.selection).toBe('')
+          for (const selector of ['#author-input', '#author-textarea', '#author-child']) {
+            const point = await evaluate(`(()=>{const el=document.querySelector('${selector}');el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect();return{x:r.left+Math.min(15,r.width/2),y:r.top+r.height/2}})()`)
+            await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point]},sessionId)
+            await pause(600)
+            await send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},sessionId)
+            expect((await evaluate('window.inspect()')).menuCount).toBe(1)
+          }
+          await evaluate('window.scrollTo(0,0)')
         }else{
           expect(before.prose).not.toBe('none')
           await send('Input.dispatchMouseEvent',{type:'mousePressed',x:before.x,y:before.y,button:'right',clickCount:1},sessionId)

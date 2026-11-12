@@ -339,6 +339,7 @@ function buildContract() {
       replayedToLateSubscribers: ['message:mount', 'message:done'],
       // state:change 只補發最後一份（現值），不補整串
       latestReplayedToLateSubscribers: ['state:change'],
+      stateReset: { on: 'conversation.switch', requiresInitialValues: true, messageId: null, changes: [], data: 'initial values', replayedToLateSubscribers: true },
       readyReplayed: false,
       coldStartOrder: ['message:new', 'message:mount', 'message:done', '…', 'ready'],
       payload: { 'message:new': ['content', 'id', 'role', 'serverId'], 'message:mount': ['content', 'id', 'role', 'serverId'], 'message:done': ['content', 'id', 'role', 'serverId'], 'message:stream': ['content', 'id', 'role'], 'message:unmount': ['content', 'id', 'role', 'serverId'], 'input:change': 'string', 'theme:change': 'none', 'model:change': ['cost', 'name'], 'generation:phase': ['phase', 'since'], 'generation:outcome': ['actions', 'kind', 'label', 'sub'], 'share:change': 'none', 'state:change': ['changes', 'data', 'messageId'], 'conversation:switch': ['conversationId'], others: 'none' },

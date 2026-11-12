@@ -66,6 +66,26 @@ describe('殼：卡片數值', () => {
     expect(seen.map((p) => (p as { messageId: string }).messageId)).toEqual(['1', '3', '1'])
   })
 
+  it('新對話重置為初始值時只發一次null messageId，晚訂閱不重播上一局', () => {
+    const s = boot(config({ cardState: { initial: { a: 0 } } }))
+    s.handle({ type: 'messages', messages: [{ id: 'old', role: 'ai', content: 'Previous', serverId: 'saved-old', view: { html: '<p>Previous</p>', state: st('saved-old', 1, { a: 9 }) } }] })
+    const seen: unknown[] = []
+    s.sdk.on('state:change', p => seen.push(p))
+    seen.length = 0
+    s.handle({ type: 'conversation.switch', conversationId: 'new' })
+    const initial = { messageId: null, data: { a: 0 }, changes: [] }
+    expect(seen).toEqual([initial])
+    expect(s.sdk.state.get()).toEqual(initial)
+    const late: unknown[] = []
+    s.sdk.on('state:change', p => late.push(p))
+    expect(late).toEqual([initial])
+    s.handle({ type: 'messages', messages: [] })
+    s.handle({ type: 'messages', messages: [{ id: 'opening', role: 'ai', content: 'Opening', serverId: null }] })
+    expect(seen).toEqual([initial])
+    s.handle({ type: 'state', id: 'opening', state: st('saved-new', 0, { a: 2 }) })
+    expect(seen).toEqual([initial, { messageId: 'saved-new', data: { a: 2 }, changes: [] }])
+  })
+
   it('切會話：數值清掉、補發記錄清掉，新會話從頭發', () => {
     const s = boot(config({ cardState: {} }))
     s.handle({ type: 'messages', messages: [{ id: 'greeting', role: 'ai', content: '開場', serverId: null, view: { html: '<p>開場</p>', state: st('1', 0, { a: 1 }) } }] })
