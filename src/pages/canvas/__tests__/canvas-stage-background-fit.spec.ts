@@ -168,7 +168,7 @@ describe('canvas.vue 把背景交出去', () => {
 
 it('深色色票上的平台控制項同樣自帶底與不透明淺字，不依賴卡片主題', () => {
   const player = readFileSync(resolve(__dirname, '../canvas-player-background.css'), 'utf8')
-  for (const control of ['.name_text', '.extraMesButtonsHint', '.swipes-counter', '.lt-msg-regen']) {
+  for (const control of ['.name_text', '.extraMesButtonsHint', '.swipeRightBlock', '.lt-msg-regen']) {
     expect(player).toContain('[data-lt-player-bg=color]:not([data-lt-player-tone=light]) ' + control)
   }
 })

@@ -365,6 +365,16 @@ describe('⋯ 看得見、點得到（站方 2026-11-05：插圖背景上找不�
     expect(hint).toMatch(/--lt-msg-hint-bg:\s*var\(--lt-canvas-bg, var\(--chat-bg/)
   })
 
+  it('開場切換自帶成對底色，玩家背景只給整顆膠囊墊底', () => {
+    const swipe = block(read('../canvas.css'), '.swipeRightBlock')
+    expect(swipe).toContain('var(--lt-msg-hint-bg) 72%')
+    expect(swipe).toContain('color: var(--lt-msg-hint-fg)')
+    expect(swipe).toContain('calc(var(--lt-canvas-actions-size, 22px) + 10px)')
+    const player = read('../canvas-player-background.css')
+    expect(player).not.toContain('.swipes-counter')
+    expect(player).toContain('[data-lt-player-tone=light] .swipeRightBlock,')
+  })
+
   it('點擊區上下擴到 34px（不小於 30），左右不擴', () => {
     const hit = block(read('../canvas.css'), '.extraMesButtonsHint::after')
     expect(hit).toMatch(/inset:\s*-6px 0;/)
