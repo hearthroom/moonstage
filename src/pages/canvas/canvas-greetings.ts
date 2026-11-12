@@ -21,9 +21,6 @@ export interface GreetingState {
   index: number
 }
 
-/** 我方自訂的上限。酒館原始碼沒有上限，但無上限的清單在 UI 上沒有意義。 */
-export const MAX_GREETINGS = 20
-
 /**
  * 從角色詳情組出開場白清單。
  *
@@ -37,7 +34,7 @@ export function buildGreetingList(detail: any): string[] {
     ? rawAlternates.filter((s: any) => typeof s === 'string' && s.trim() !== '')
     : []
   const list = main ? [main, ...alternates] : alternates.slice()
-  return list.slice(0, MAX_GREETINGS)
+  return list
 }
 
 /** 有沒有得選。只有一條就不畫箭頭與計數器。 */
