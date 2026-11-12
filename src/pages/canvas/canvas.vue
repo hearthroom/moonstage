@@ -2580,6 +2580,7 @@ function notifyTimelineMutationBlocked() {
 // 操作本身送出；伺服器那頭改歷史前也會自己把還在跑的回合停掉、等它收尾，所以
 // 這裡不等停止 ACK。只有另一個回溯還在送的時候才真的要等。
 function stopRunningTurnForTimelineMutation(): boolean {
+  if (greetingStartBusy.value) { notifyTimelineMutationBlocked(); return false; }
   const gate = resolveTimelineMutationGate(timelineMutationState());
   if (gate === 'wait') {
     message.warning(t('chat.rollbackInProgressNotice') || t('chat.rollbackPending') || 'Please wait for the current operation.');

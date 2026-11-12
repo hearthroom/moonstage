@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { buildGreetingList, greetingIndexForStart, hasAlternates, shouldDeferStart, showsOpening, stepGreeting } from '../canvas-greetings'
 import { conversationRoleId } from '../canvas-role-settings'
 import { nextTick, ref, watch } from 'vue'
-import { createPendingStreamEntry, decideStreamResume } from '../chat-transport-ownership'
+import { createPendingStreamEntry, decideStreamResume, resolveTimelineMutationGate } from '../chat-transport-ownership'
 
 // Execute the page's actual action handlers with controlled transport and UI boundaries.
 const page = parse(readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')).descriptor.scriptSetup!.content
@@ -201,6 +201,38 @@ describe('choose an opening after New conversation', () => {
     expect(f.b.getHistoryMsg).toHaveBeenCalledWith(page)
     expect(f.b.conversationId.value).toBe('current')
     expect(f.b.chatStart).not.toHaveBeenCalled()
+  })
+  it('refuses reset confirmation while the selected opening response is pending, then sends once', async () => {
+    const f = chooserFixture()
+    f.b.pendingGreetingStart.value = true
+    f.b.pendingExistingOpening.value = { conversationId: 'current', revision: 'revision' }
+    const postReset = vi.fn()
+    Object.assign(f.b, {
+      resetChoices: { value: { clearNotepad: false, clearDirectives: false, clearResponseSettings: false } },
+      timelineMutationState: () => ({}), resolveTimelineMutationGate, sendStop: vi.fn(),
+      readPendingBackwardOperation: () => null, rollbackPending: { value: false },
+      createBackwardOperationEntry: (input: any) => input,
+      writePendingBackwardOperation: () => true, postPendingBackwardOperation: postReset,
+    })
+    f.b.message.warning = vi.fn()
+    f.b.stopRunningTurnForTimelineMutation = handler('stopRunningTurnForTimelineMutation', f.b)
+    const reset = handler('resetConversation', f.b)
+    let finish!: (value: unknown) => void
+    f.post.mockReturnValue(new Promise(resolve => { finish = resolve }))
+    f.b.onGreetingSwipe(1)
+    const send = f.b.onCanvasSend()
+    expect(f.b.greetingStartBusy.value).toBe(true)
+    await f.b.onCanvasSend()
+    await reset()
+    expect(postReset).not.toHaveBeenCalled()
+    expect(f.b.sendStop).not.toHaveBeenCalled()
+    expect(f.b.rollbackPending.value).toBe(false)
+    finish({ statusCode: 200, data: { historyEpoch: 5, nextSeq: 1, firstPage: { total: 1 } } })
+    await send
+    expect(f.b.onActionBtnClick).toHaveBeenCalledOnce()
+    expect(f.post).toHaveBeenCalledOnce()
+    expect(f.b.greetingStartBusy.value).toBe(false)
+    expect(f.b.content.value).toBe('player draft')
   })
   it('reconciles a rejected stale selection instead of retaining a permanently failing intent', async () => {
     const f = chooserFixture()
