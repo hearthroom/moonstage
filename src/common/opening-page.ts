@@ -21,6 +21,8 @@
  * 玩家不必再貼一次。
  */
 
+import { substituteMacros, type MacroContext } from '../pages/canvas/canvas-rule-engine-core'
+
 export const OPENING_MESSAGE_TYPE = 'hearthroom:opening'
 /** 一次填入／送出的字數上限，避免頁面把整份文件塞進輸入框。 */
 export const OPENING_TEXT_MAX = 8000
@@ -56,11 +58,46 @@ if(window.ResizeObserver){new ResizeObserver(size).observe(document.documentElem
 window.addEventListener('load',size);setTimeout(size,0);
 })();`
 
-/** 作者的 HTML 包成 iframe 的 srcdoc：淺色紙、不留外距，再接上面那段腳本。作者自己的樣式寫在後面，照樣蓋得過預設。 */
-export function openingSrcdoc(html: string): string {
+/** 在頁內更新顯示巨集，不重載作者表單或重跑初始化腳本。 */
+const OPENING_MACROS = String.raw`(function(current, substitute){
+var tracked=new Map(), attrs=['title','alt','placeholder','aria-label'];
+var pattern=/\{\{\s*(user|char)\s*\}\}/i;
+function apply(node,key,raw){
+  var records=tracked.get(node);if(!records){records=new Map();tracked.set(node,records)}
+  var record=records.get(key),value=key===null?node.nodeValue:node.getAttribute(key);
+  if(record&&value!==record.shown){records.delete(key);raw=value||'';record=null}
+  if(!record){if(!pattern.test(raw))return;record={raw:raw,shown:value};records.set(key,record)}
+  var next=substitute(record.raw,current);record.shown=next;
+  if(value!==next){if(key===null)node.nodeValue=next;else node.setAttribute(key,next)}
+}
+function walk(node){
+  if(node.nodeType===3){if(node.parentElement&&/^(script|style)$/i.test(node.parentElement.localName))return;apply(node,null,node.nodeValue||'');return}
+  if(node.nodeType===1){
+    if(/^(script|style)$/i.test(node.localName))return;
+    attrs.forEach(function(key){if(node.hasAttribute(key))apply(node,key,node.getAttribute(key))});
+    if(node.tagName==='INPUT'&&node.hasAttribute('value'))apply(node,'value',node.getAttribute('value'));
+  }
+  Array.from(node.childNodes).forEach(walk);
+}
+walk(document.documentElement);
+new MutationObserver(function(changes){changes.forEach(function(change){
+  if(change.type==='childList')Array.from(change.addedNodes).forEach(walk);else walk(change.target);
+});tracked.forEach(function(_,node){if(!node.isConnected)tracked.delete(node)})}).observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:attrs.concat('value')});
+window.addEventListener('message',function(event){
+  var m=event.data;if(event.source!==parent||!m||m.type!=='hearthroom:opening-macros'||!m.macros)return;
+  if(typeof m.macros.user!=='string'||typeof m.macros.char!=='string')return;
+  current=m.macros;tracked.forEach(function(records,node){records.forEach(function(record,key){apply(node,key,record.raw)})});
+});
+})`
+
+/** 作者 HTML 原樣保留；巨集只在頁內以文字／顯示屬性寫入，不改 script、style、事件或機讀掛點。 */
+export function openingSrcdoc(html: string, macros?: MacroContext): string {
   const base = '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
     + '<style>html{background:#fff;color:#1f1f1f;color-scheme:light}body{margin:0;padding:12px;overflow-wrap:anywhere}</style>'
-  return `<!doctype html>${base}<script>${OPENING_BOOTSTRAP}</script>${String(html ?? '')}`
+  // 名稱不能關閉 script；JSON 與函式本身都不含作者 HTML。
+  const names = JSON.stringify({ user: macros?.user || '', char: macros?.char || '' }).replace(/</g, '\\u003c')
+  const expand = macros ? `<script>${OPENING_MACROS}(${names},${substituteMacros.toString()})</script>` : ''
+  return `<!doctype html>${base}<script>${OPENING_BOOTSTRAP}</script>${String(html ?? '')}${expand}`
 }
 
 /** 認外層收到的訊息；不是首屏網頁送的、或形狀不對都回 null。 */
@@ -180,6 +217,7 @@ export function fitOpeningFrame(container: HTMLElement, frame: HTMLIFrameElement
 
 export interface OpeningPageMount {
   frame: HTMLIFrameElement
+  updateMacros(macros: MacroContext): void
   destroy(): void
 }
 
@@ -207,7 +245,7 @@ export function mountOpeningPage(
   container: HTMLElement,
   html: string,
   handlers: OpeningHandlers,
-  options: { title?: string; activated?: () => boolean; maxHeight?: () => number } = {},
+  options: { title?: string; activated?: () => boolean; maxHeight?: () => number; macros?: MacroContext } = {},
 ): OpeningPageMount {
   const doc = container.ownerDocument
   const win = doc.defaultView as Window
@@ -217,7 +255,13 @@ export function mountOpeningPage(
   frame.setAttribute('data-lt', 'opening-page')
   if (options.title) frame.title = options.title
   frame.style.cssText = 'display:block;width:100%;border:0;background:#fff'
-  frame.srcdoc = openingSrcdoc(html)
+  let macros = options.macros
+  frame.srcdoc = openingSrcdoc(html, macros)
+  const postMacros = () => {
+    if (macros) frame.contentWindow?.postMessage({ type: 'hearthroom:opening-macros', macros: { user: macros.user || '', char: macros.char || '' } }, '*')
+  }
+  frame.addEventListener('load', postMacros)
+  const setMacros = (next: MacroContext) => { macros = next; postMacros() }
   const activated = options.activated ?? (() => clickedFrame(win, frame))
   container.appendChild(frame)
   // 位置與上限在掛上之後量（要知道聊天區多寬多高）。之後只在視窗變寬變窄、或聊天區內容變高變矮時重量：
@@ -267,7 +311,11 @@ export function mountOpeningPage(
   win.addEventListener('resize', onResize)
   return {
     frame,
+    updateMacros(macros) {
+      setMacros(macros)
+    },
     destroy() {
+      frame.removeEventListener('load', postMacros)
       win.removeEventListener('message', onMessage)
       win.removeEventListener('resize', onResize)
       content?.disconnect()

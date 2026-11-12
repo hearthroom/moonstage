@@ -75,7 +75,7 @@
            簡介仍在卡片頁顯示，這裡只是不畫。 -->
       <CanvasIntro v-if="!openingDocked" :text="introText" :open="introOpen" @toggle="introOpen = !introOpen" />
       <!-- 首屏網頁（AI 風月的「詳細介紹」）：只在對話的開頭、且玩家還沒送出第一句時展開；送出後收起。 -->
-      <CanvasOpeningPage v-if="shouldShowOpeningPage(openingPage, talkList) && !ajax.hasNextPage" :html="openingPage" :title="roleView?.roleName" @fill="fillComposer" @send="sendFromOpeningPage" />
+      <CanvasOpeningPage v-if="shouldShowOpeningPage(openingPage, talkList) && !ajax.hasNextPage" :html="openingPage" :title="roleView?.roleName" :macros="authorRuleOptions().macros" @fill="fillComposer" @send="sendFromOpeningPage" />
 
       <!-- 前置被擋卡上的重送進行中，被擋那一列整列收起來（filterCardReplaced）：只收卡會留下一列空的「⋯」。 -->
       <template v-for="(item, index) in talkList" :key="item.id != null ? item.id : index">

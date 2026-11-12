@@ -1263,6 +1263,20 @@ describe('殼：訊息規則腳本與功能欄／SDK 去重（卡 100737／10074
 
 // AI 風月卡的首屏網頁：訊息列最上方的作者網頁，在自己的無同源 iframe 裡；填入與送出交給宿主決定。
 describe('殼：首屏網頁', () => {
+  it.each(['fengyue', 'native'])('展開 %s 開場巨集，晚到的人設稱呼更新，原始資產不變', (format) => {
+    const html = '<p>{{ USER }} / {{char}}</p>'
+    const cfg = config({ card: { rules: [], statusbar: '', format, openingPage: html } })
+    const s = boot(cfg)
+    const frame = s.refs.messages.querySelector('[data-slot="opening"] iframe') as HTMLIFrameElement
+    expect(frame.srcdoc).toContain('"user":"小明","char":"露娜"')
+    const before = frame.srcdoc
+    const post = vi.spyOn(frame.contentWindow!, 'postMessage')
+    s.handle({ type: 'user', nickname: '人設暱稱' })
+    expect(post).toHaveBeenCalledWith({ type: 'hearthroom:opening-macros', macros: { user: '人設暱稱', char: '露娜' } }, '*')
+    expect(frame.srcdoc).toBe(before)
+    expect(cfg.card.openingPage).toBe(html)
+  })
+
   it('有首屏網頁就畫在訊息列之前，頁面送來的填入／送出原樣轉給宿主', () => {
     const s = boot(config({ card: { rules: [], statusbar: '', format: 'fengyue', openingPage: '<p>TEST-INTRO</p>' } }))
     const slot = s.refs.messages.querySelector('[data-slot="opening"]') as HTMLElement
