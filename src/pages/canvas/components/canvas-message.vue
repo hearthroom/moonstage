@@ -176,14 +176,22 @@
 
       <!-- 開場白的左右切換。酒館的玩家習慣：第一則訊息可以換一條開場白再開始。
            只有真的有替代開場白時才畫箭頭，沒有就整組不出現。 -->
-      <div v-if="message.swipes && message.swipes.total > 1" class="swipeRightBlock">
+      <div v-if="message.swipes && message.swipes.total > 1" class="swipeRightBlock hover-pill">
         <div class="swipe_left" role="button" tabindex="0" :aria-label="labels.prev"
-             @click.stop="$emit('swipe', -1)"
-             @keydown.enter.prevent.stop="$emit('swipe', -1)">‹</div>
+             :aria-disabled="!(message.swipes.index > 0)"
+             @click.stop="message.swipes.index > 0 && $emit('swipe', -1)"
+             @keydown.enter.prevent.stop="message.swipes.index > 0 && $emit('swipe', -1)"
+             @keydown.space.prevent.stop="message.swipes.index > 0 && $emit('swipe', -1)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6l-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
         <div class="swipes-counter">{{ message.swipes.index + 1 }} / {{ message.swipes.total }}</div>
         <div class="swipe_right" role="button" tabindex="0" :aria-label="labels.next"
-             @click.stop="$emit('swipe', 1)"
-             @keydown.enter.prevent.stop="$emit('swipe', 1)">›</div>
+             :aria-disabled="!(message.swipes.index < message.swipes.total - 1)"
+             @click.stop="message.swipes.index < message.swipes.total - 1 && $emit('swipe', 1)"
+             @keydown.enter.prevent.stop="message.swipes.index < message.swipes.total - 1 && $emit('swipe', 1)"
+             @keydown.space.prevent.stop="message.swipes.index < message.swipes.total - 1 && $emit('swipe', 1)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
       </div>
       <!-- 沒有替代開場白時仍留一組空節點：酒館主題會抓 .swipe_left / .swipes-counter，
            節點不在的話規則靜默失效。畫面上由樣式收起。 -->

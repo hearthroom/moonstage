@@ -17,6 +17,9 @@ playground uses HarperHarbor for authorization, agent configurations and convers
 - `docs/open-api-v1.md` — the frozen API contract this client depends on.
 - `docs/trust-model.md` — why author-provided HTML, CSS and scripts run as-is.
 
+Card authors: see [styling message controls](docs/card-styles.md) for the opening
+switcher CSS hooks and colors.
+
 ## Develop
 
 ```sh

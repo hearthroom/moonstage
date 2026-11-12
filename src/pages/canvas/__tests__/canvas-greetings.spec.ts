@@ -204,6 +204,26 @@ describe('切換的畫面', () => {
     expect(wrapper.emitted('swipe')).toEqual([[1], [-1]])
   })
 
+  it('鍵盤空白鍵可以切換，頭尾停用的箭頭不發出事件', async () => {
+    const wrapper = mount(CanvasMessage, {
+      props: { message: { ...BASE, swipes: { index: 0, total: 3 } } },
+    })
+    expect(wrapper.find('.swipe_left').attributes('aria-disabled')).toBe('true')
+    await wrapper.find('.swipe_left').trigger('click')
+    await wrapper.find('.swipe_left').trigger('keydown', { key: 'Enter' })
+    await wrapper.find('.swipe_left').trigger('keydown', { key: ' ' })
+    expect(wrapper.emitted('swipe')).toBeUndefined()
+    await wrapper.find('.swipe_right').trigger('keydown', { key: ' ' })
+    expect(wrapper.emitted('swipe')).toEqual([[1]])
+    await wrapper.setProps({ message: { ...BASE, swipes: { index: 2, total: 3 } } })
+    expect(wrapper.find('.swipe_right').attributes('aria-disabled')).toBe('true')
+    await wrapper.find('.swipe_right').trigger('click')
+    await wrapper.find('.swipe_right').trigger('keydown', { key: ' ' })
+    expect(wrapper.emitted('swipe')).toEqual([[1]])
+    await wrapper.find('.swipe_left').trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('swipe')).toEqual([[1], [-1]])
+  })
+
   it('沒有替代開場白時整組收起——但節點仍然在，酒館主題抓得到', () => {
     const wrapper = mount(CanvasMessage, { props: { message: { ...BASE, swipes: null } } })
     const el = wrapper.element as HTMLElement
