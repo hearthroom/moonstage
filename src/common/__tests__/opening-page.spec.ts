@@ -3,11 +3,79 @@
  * 只有玩家剛點過時才會替他送出。
  */
 import { describe, it, expect, vi } from 'vitest'
+import { JSDOM } from 'jsdom'
 import { clickedFrame, createFrameSizer, mountOpeningPage, openingSrcdoc, parseOpeningMessage, OPENING_BOOTSTRAP, OPENING_MESSAGE_TYPE, OPENING_SANDBOX } from '../opening-page'
 import { stylePolicyFor } from '../author-style-policy'
 import { normalizeCardFormat } from '../card-format'
 
 describe('srcdoc', () => {
+  it('網頁開局展開顯示文字的 user／char，名字是純文字且只展開一次', () => {
+    const html = '<html lang="en"><head><title>{{char}}</title></head><body><p>{{ USER }} / {{char}} / {{unknown}}</p><input placeholder="{{user}}"></body></html>'
+    const name = '<旅人> & $1 {{char}}'
+    const doc = new JSDOM(openingSrcdoc(html, { user: name, char: '星' }), { runScripts: 'dangerously' }).window.document
+    expect(doc.querySelector('p')!.textContent).toBe(`${name} / 星 / {{unknown}}`)
+    expect(doc.querySelector('p')!.children.length).toBe(0)
+    expect(doc.querySelector('input')!.placeholder).toBe(name)
+    expect(doc.title).toBe('星')
+    expect(doc.documentElement.lang).toBe('en')
+  })
+
+  it('保留作者的 script、style、事件與機讀屬性', () => {
+    const html = '<style>.{{user}}{color:red}</style><p id="{{user}}" onclick="window.hit=1">{{user}}</p><script>window.template="{{user}}"</script>'
+    const doc = new JSDOM(openingSrcdoc(html, { user: '小明', char: '星' }), { runScripts: 'dangerously' }).window.document
+    expect(doc.querySelector('p')!.textContent).toBe('小明')
+    expect(doc.querySelector('p')!.id).toBe('{{user}}')
+    expect(doc.querySelector('p')!.getAttribute('onclick')).toBe('window.hit=1')
+    expect(doc.querySelector('style:last-of-type')!.textContent).toBe('.{{user}}{color:red}')
+    expect(Array.from(doc.querySelectorAll('script')).some(s => s.textContent === 'window.template="{{user}}"')).toBe(true)
+  })
+
+  it('頁內更新只接受父頁，保留玩家表單、腳本狀態；後加入的顯示文字也展開', async () => {
+    const dom = new JSDOM(openingSrcdoc('<p>{{user}} / {{char}}</p><input value="draft"><script>window.boots=(window.boots||0)+1</script>', { user: '帳號名', char: '星' }), { runScripts: 'dangerously' })
+    const win = dom.window
+    const input = win.document.querySelector('input')!
+    input.value = '玩家已填內容'
+    const post = (source: any, name: string) => win.dispatchEvent(new win.MessageEvent('message', { source, data: { type: 'hearthroom:opening-macros', macros: { user: name, char: '星' } } }))
+    post(null, '外來訊息')
+    expect(win.document.querySelector('p')!.textContent).toBe('帳號名 / 星')
+    post(win.parent, '</script><b>$1 {{char}}</b>')
+    expect(win.document.querySelector('p')!.textContent).toBe('</script><b>$1 {{char}}</b> / 星')
+    expect(input.value).toBe('玩家已填內容')
+    expect((win as any).boots).toBe(1)
+    const extra = win.document.createElement('div')
+    extra.textContent = '{{user}}'
+    win.document.body.append(extra)
+    await Promise.resolve()
+    expect(extra.textContent).toBe('</script><b>$1 {{char}}</b>')
+    dom.window.close()
+  })
+
+  it('不改 SVG 的 script/style；作者改寫文字或刪除顯示屬性後不還原舊模板', () => {
+    const dom = new JSDOM(openingSrcdoc('<svg><style>.{{user}}{fill:red}</style><script>window.svgName="{{user}}"</script></svg><p>{{user}}</p><input placeholder="{{user}}">', { user: '帳號名', char: '星' }), { runScripts: 'dangerously' })
+    const win = dom.window
+    expect(win.document.querySelector('svg style')!.textContent).toBe('.{{user}}{fill:red}')
+    expect(win.document.querySelector('svg script')!.textContent).toBe('window.svgName="{{user}}"')
+    win.document.querySelector('p')!.firstChild!.nodeValue = '作者另寫的文字'
+    win.document.querySelector('input')!.removeAttribute('placeholder')
+    win.dispatchEvent(new win.MessageEvent('message', { source: win.parent, data: { type: 'hearthroom:opening-macros', macros: { user: '新名', char: '星' } } }))
+    expect(win.document.querySelector('p')!.textContent).toBe('作者另寫的文字')
+    expect(win.document.querySelector('input')!.hasAttribute('placeholder')).toBe(false)
+    dom.window.close()
+  })
+
+  it('更新稱呼不重載 iframe，保留玩家表單與作者腳本狀態', () => {
+    const box = document.createElement('div')
+    document.body.appendChild(box)
+    const page = mountOpeningPage(box, '<p>{{user}}</p>', { fill() {}, send() {} }, { macros: { user: '帳號名', char: '星' } })
+    const before = page.frame.srcdoc
+    const post = vi.spyOn(page.frame.contentWindow!, 'postMessage')
+    page.updateMacros({ user: '人設名', char: '星' })
+    expect(page.frame.srcdoc).toBe(before)
+    expect(post).toHaveBeenCalledWith({ type: 'hearthroom:opening-macros', macros: { user: '人設名', char: '星' } }, '*')
+    page.destroy()
+    box.remove()
+  })
+
   it('腳本在作者內容之前，淺色紙的預設樣式也在作者樣式之前', () => {
     const doc = openingSrcdoc('<style>html{background:#000}</style><p>TEST</p>')
     expect(doc.indexOf(OPENING_BOOTSTRAP)).toBeGreaterThan(0)

@@ -6,7 +6,7 @@
  *   createShell(config) → 建骨架、裝訊息作用域、建 sdk（掛到 window.sdk）、裝卡（樣式進
  *   author-css、腳本跑一次）→ 等宿主的 `messages` → 冷啟動每則 new→mount→done → `ready`。
  */
-import { mountOpeningPage } from '../common/opening-page'
+import { mountOpeningPage, type OpeningPageMount } from '../common/opening-page'
 import { shouldShowOpeningPage } from '@/pages/canvas/canvas-greetings'
 import type { ChromeState, ChromeUiEvent, GenerationOutcome, HostToShell, MessageView, RequestOp, SandboxBackground, SandboxCardState, SandboxHelloConfig, SandboxMessage, SandboxMessageRole, ShellToHost, StageState } from './protocol'
 import { createThemeBridge } from './theme-bridge'
@@ -812,15 +812,16 @@ export function createShell(options: CreateShellOptions): Shell {
   // 宿主跟一般頁同一段邏輯（送出只在玩家剛點過頁面時照做）。
   const openingHtml = String(config.card.openingPage || '')
   let openingSlot: HTMLElement | null = null
+  let openingMount: OpeningPageMount | null = null
   if (openingHtml.trim()) {
     const slot = doc.createElement('div')
     slot.setAttribute('data-slot', 'opening')
     refs.list.before(slot)
     openingSlot = slot
-    mountOpeningPage(slot, openingHtml, {
+    openingMount = mountOpeningPage(slot, openingHtml, {
       fill: (text) => transport.send({ type: 'ui', event: 'opening-fill', key: text }),
       send: (text) => transport.send({ type: 'ui', event: 'opening-send', key: text }),
-    }, { title: config.role?.name ? String(config.role.name) : undefined })
+    }, { title: config.role?.name ? String(config.role.name) : undefined, macros })
   }
   const syncOpeningSlot = () => {
     if (openingSlot) openingSlot.hidden = !shouldShowOpeningPage(openingHtml, cardOrder())
@@ -974,6 +975,7 @@ export function createShell(options: CreateShellOptions): Shell {
         if (message.nickname === config.user.nickname) return
         config.user.nickname = message.nickname
         macros.user = message.nickname
+        openingMount?.updateMacros(macros)
         if (message.statusbarHtml != null) config.card.statusbarHtml = message.statusbarHtml
         if (refs.statusbar) {
           if (config.card.statusbarHtml) {
@@ -1040,6 +1042,7 @@ export function createShell(options: CreateShellOptions): Shell {
     refs,
     sdk: controller.sdk,
     dispose() {
+      openingMount?.destroy()
       themeBridge.dispose()
       disposeCardBlockTheme()
       historyRemote.dispose()

@@ -6,8 +6,9 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { mountOpeningPage, type OpeningPageMount } from '../../../common/opening-page'
+import type { MacroContext } from '../canvas-rule-engine-core'
 
-const props = defineProps<{ html: string; title?: string }>()
+const props = defineProps<{ html: string; title?: string; macros?: MacroContext }>()
 const emit = defineEmits<{ fill: [text: string]; send: [text: string] }>()
 
 const box = ref<HTMLElement | null>(null)
@@ -20,11 +21,12 @@ function mount() {
   mounted = mountOpeningPage(box.value, props.html, {
     fill: (text) => emit('fill', text),
     send: (text) => emit('send', text),
-  }, { title: props.title })
+  }, { title: props.title, macros: props.macros })
 }
 
 onMounted(mount)
 watch(() => props.html, mount)
+watch(() => [props.macros?.user, props.macros?.char], () => mounted?.updateMacros(props.macros || {}))
 onBeforeUnmount(() => { mounted?.destroy(); mounted = null })
 </script>
 
