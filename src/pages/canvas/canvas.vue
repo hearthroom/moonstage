@@ -10068,7 +10068,7 @@ function applyStoredOpeningState(payload:any, expectedConversationId:string, com
     || pendingChatTurn || isStreamActive.value || (greetingStartBusy.value && !committedPage) || pendingNewConversationFrom.value) return;
   const state = payload?.openingSelection;
   const valid = canGenerate.value && Number(payload?.total) <= 1 && state
-    && Array.isArray(state.choices) && state.choices.length > 1 && state.choices.length <= 20
+    && Array.isArray(state.choices) && state.choices.length > 1
     && state.choices.every((text:any) => typeof text === 'string')
     && Number.isInteger(state.index) && state.index >= 0 && state.index < state.choices.length
     && typeof state.revision === 'string' && !!state.revision;
