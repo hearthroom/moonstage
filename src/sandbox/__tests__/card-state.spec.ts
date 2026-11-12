@@ -80,10 +80,22 @@ describe('殼：卡片數值', () => {
     s.sdk.on('state:change', p => late.push(p))
     expect(late).toEqual([initial])
     s.handle({ type: 'messages', messages: [] })
+    const afterEmpty: unknown[] = []
+    s.sdk.on('state:change', p => afterEmpty.push(p))
+    expect(afterEmpty).toEqual([initial])
     s.handle({ type: 'messages', messages: [{ id: 'opening', role: 'ai', content: 'Opening', serverId: null }] })
+    const afterOpening: unknown[] = []
+    s.sdk.on('state:change', p => afterOpening.push(p))
+    expect(afterOpening).toEqual([initial])
     expect(seen).toEqual([initial])
+    expect(late).toEqual([initial])
+    expect(afterEmpty).toEqual([initial])
     s.handle({ type: 'state', id: 'opening', state: st('saved-new', 0, { a: 2 }) })
-    expect(seen).toEqual([initial, { messageId: 'saved-new', data: { a: 2 }, changes: [] }])
+    const expected = [initial, { messageId: 'saved-new', data: { a: 2 }, changes: [] }]
+    expect(seen).toEqual(expected)
+    expect(late).toEqual(expected)
+    expect(afterEmpty).toEqual(expected)
+    expect(afterOpening).toEqual(expected)
   })
 
   it('切會話：數值清掉、補發記錄清掉，新會話從頭發', () => {
