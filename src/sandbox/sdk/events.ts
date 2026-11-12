@@ -50,8 +50,8 @@ export interface EventBus {
   emit(event: SdkEventName, payload?: unknown, options?: EmitOptions): void
   /** 某則訊息的氣泡沒了：它的 mount/done 補發記錄一起拿掉。 */
   forget(key: string): void
-  /** 切會話：補發記錄清空（訂閱不清）。 */
-  resetReplay(): void
+  /** 切會話清全部補發；只重建訊息列表時保留最新數值（訂閱不清）。 */
+  resetReplay(options?: { messagesOnly?: boolean }): void
   /** 腳本來源被換掉（預覽重跑）：訂閱清空。 */
   clear(): void
   listenerCount(event: string): number
@@ -115,9 +115,9 @@ export function createEventBus(deps: EventBusDeps = {}): EventBus {
         for (let i = history.length - 1; i >= 0; i--) if (history[i].key === key) history.splice(i, 1)
       }
     },
-    resetReplay() {
+    resetReplay(options = {}) {
       for (const history of replay.values()) history.length = 0
-      latest.clear()
+      if (!options.messagesOnly) latest.clear()
     },
     clear() {
       listeners.clear()

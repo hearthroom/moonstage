@@ -21,6 +21,26 @@ describe('事件匯流排：補發規則', () => {
     expect(after).toEqual([])
   })
 
+  it('重建訊息列表只清mount／done回放，保留最新state；完整重置仍清全部', () => {
+    const bus = createEventBus()
+    const initial = { messageId: null, data: { a: 0 }, changes: [] }
+    bus.emit('message:mount', { id: 'old' }, { key: 'old' })
+    bus.emit('message:done', { id: 'old' }, { key: 'old:done' })
+    bus.emit('state:change', initial)
+    bus.resetReplay({ messagesOnly: true })
+    const messages: unknown[] = []
+    const states: unknown[] = []
+    bus.on('message:mount', p => messages.push(p))
+    bus.on('message:done', p => messages.push(p))
+    bus.on('state:change', p => states.push(p))
+    expect(messages).toEqual([])
+    expect(states).toEqual([initial])
+    bus.resetReplay()
+    const afterReset: unknown[] = []
+    bus.on('state:change', p => afterReset.push(p))
+    expect(afterReset).toEqual([])
+  })
+
   it('mount／done 對晚訂閱者補發；ready 不補發；不認得的事件名不報錯', () => {
     const bus = createEventBus()
     bus.emit('message:mount', { id: 'l1' }, { key: 'l1' })

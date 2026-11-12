@@ -151,7 +151,7 @@ export function createMessageList(deps: MessageListDeps): MessageList {
   const bus = {
     emit: (m: SandboxMessage, ...args: Parameters<MessageListDeps['bus']['emit']>) => { if (authorFacing(m)) deps.bus.emit(...args) },
     forget: (key: string) => deps.bus.forget(key),
-    resetReplay: () => deps.bus.resetReplay(),
+    resetReplay: () => deps.bus.resetReplay({ messagesOnly: true }),
   }
   let seq = 0
   // 估高：拆過的外框量到的平均值。
