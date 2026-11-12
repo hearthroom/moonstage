@@ -1827,6 +1827,9 @@ async function bootFromDraft(draftId: string, targetRoleId: any) {
 }
 
 function bootRole(targetRoleId: any, draft: AuthorDraft | null) {
+  pendingExistingOpening.value = null;
+  openingPreviewDirty.value = false;
+  openingSelectionAttempt.value = null;
   const options = { roleId: targetRoleId };
   roleId.value = options.roleId;
   conversationRole.value = '';
@@ -5719,6 +5722,7 @@ function finishPendingBackwardOperation(entry: any) {
   cancelPendingBackwardRetryTimer();
   backwardOperationRequestKey = '';
   clearPendingBackwardOperation(entry);
+  if (entry.resetOptions?.reselectOpening) { pendingExistingOpening.value=null;openingPreviewDirty.value=false;openingSelectionAttempt.value=null;pendingGreetingStart.value=false; }
   rollbackPending.value = false;
   unref(ajax).flag = true;
   unref(ajax).page = 1;
@@ -6008,6 +6012,9 @@ function adoptStartedConversation(started: any) {
   teardownStreamForConversationSwitch({ invalidateHistory: true });
   pendingGreetingStart.value = false;
   pendingNewConversationFrom.value = '';
+  pendingExistingOpening.value = null;
+  openingPreviewDirty.value = false;
+  openingSelectionAttempt.value = null;
   conversationId.value = started.conversationId;
   if (followConversationRole(conversationRoleId(started))) void reloadSettingsForRevision();
   // 通知 right-window 更新 conversationId
@@ -7427,7 +7434,7 @@ function getHistoryMsg(preloadedFirstPage?: any) {
       showLoading: false,
       data: historyRequestData,
     });
-  historyRequest.then(res => {
+  return historyRequest.then(res => {
     if (!isConversationGenerationCurrent(generationAtHistoryRequest)) {
       const recoveryScheduled = recoverEmptyHistory('stale_generation', {
         conversationId: conversationIdAtHistoryRequest,
@@ -7603,6 +7610,9 @@ function getHistoryMsg(preloadedFirstPage?: any) {
           : null;
         if (liveOperation) reattachRunningOperation(liveOperation, 'history');
       }
+
+      if (pageAtHistoryRequest === 1) applyStoredOpeningState(res.data, conversationIdAtHistoryRequest,
+        usableFirstPage(preloadedFirstPage, pageAtHistoryRequest, conversationIdAtHistoryRequest));
 
       if (pageAtHistoryRequest == 1) {
         if (talkList.value.length > 0) {
@@ -10050,7 +10060,80 @@ const greeting = reactive({ list: [] as string[], index: 0 })
 const pendingGreetingStart = ref(false)
 // 明確按了「新對話」時，保留要存下的舊對話；不能改走會接回舊存檔的 chatStart。
 const pendingNewConversationFrom = ref('')
+const pendingExistingOpening = ref<{conversationId:string;revision:string}|null>(null)
+const openingPreviewDirty = ref(false)
+// Retain the exact idempotent request after an unknown transport outcome.
+const openingSelectionAttempt = ref<{conversationId:string;index:number;payload:Record<string,any>}|null>(null)
 const greetingStartBusy = ref(false)
+
+function applyStoredOpeningState(payload:any, expectedConversationId:string, committedPage=false) {
+  if (String(unref(conversationId)) !== expectedConversationId || !expectedConversationId
+    || pendingChatTurn || isStreamActive.value || (greetingStartBusy.value && !committedPage) || pendingNewConversationFrom.value) return;
+  const state = payload?.openingSelection;
+  const valid = canGenerate.value && Number(payload?.total) <= 1 && state
+    && Array.isArray(state.choices) && state.choices.length > 1 && state.choices.length <= 20
+    && state.choices.every((text:any) => typeof text === 'string')
+    && Number.isInteger(state.index) && state.index >= 0 && state.index < state.choices.length
+    && typeof state.revision === 'string' && !!state.revision;
+  if (valid && openingPreviewDirty.value && !committedPage) return;
+  openingSelectionAttempt.value = null;
+  openingPreviewDirty.value=false;
+  if (!valid) {
+    pendingExistingOpening.value = null;
+    pendingGreetingStart.value = false;
+    return;
+  }
+  greeting.list = state.choices.slice();
+  greeting.index = state.index;
+  pendingExistingOpening.value = { conversationId: expectedConversationId, revision: state.revision };
+  pendingGreetingStart.value = true;
+}
+
+async function selectStoredOpening(index:number):Promise<boolean> {
+  const stored = pendingExistingOpening.value;
+  const id = String(unref(conversationId));
+  if (!stored || stored.conversationId !== id || !canGenerate.value || greetingStartBusy.value || isTimelineMutationBlocked()) return false;
+  const snapshot = backwardHistorySnapshot.value;
+  const previous = openingSelectionAttempt.value;
+  if (!snapshot || snapshot.conversationId !== id || (previous && (previous.conversationId !== id || previous.index !== index))) {
+    openingPreviewDirty.value=false;
+    ajax.value.page=1;ajax.value.flag=true;getHistoryMsg();
+    return false;
+  }
+  const attempt = previous ?? { conversationId:id,index,payload:{conversationId:id,greetingIndex:index,
+    openingRevision:stored.revision,historyEpoch:snapshot.historyEpoch,nextSeq:snapshot.nextSeq,
+    clientOperationID:`opening-${Date.now()}-${Math.random().toString(36).slice(2,10)}`} };
+  openingSelectionAttempt.value=attempt;
+  greetingStartBusy.value=true;
+  try {
+    const res=await _this.http.post(_this.requestUrl.selectOpening,{data:attempt.payload,showLoading:false,quietTransport:true,quietErrors:true});
+    if (String(unref(conversationId))!==id || pendingExistingOpening.value!==stored) return false;
+    if (res.statusCode===200) {
+      openingSelectionAttempt.value=null;
+      applyBackwardHistorySnapshot(res.data,id);
+      ajax.value.page=1;ajax.value.flag=true;await getHistoryMsg(res.data.firstPage);
+      return String(unref(conversationId))===id;
+    } else {
+      if (res.statusCode===409 || res.statusCode===400) openingSelectionAttempt.value=null;
+      openingPreviewDirty.value=false;
+      message.error(t('message.operation_failed'));
+      greetingStartBusy.value=false;
+      ajax.value.page=1;ajax.value.flag=true;getHistoryMsg();
+    }
+  } catch (error: any) {
+    const status = Number(error?.statusCode);
+    if (status >= 400 && status < 500) {
+      openingSelectionAttempt.value = null;
+      openingPreviewDirty.value = false;
+      greetingStartBusy.value = false;
+      ajax.value.page = 1; ajax.value.flag = true; getHistoryMsg();
+    }
+    message.error(t('message.operation_failed'));
+  } finally {
+    greetingStartBusy.value=false;
+  }
+  return false;
+}
 
 /**
  * 這張卡有沒有既有的對話。
@@ -10112,14 +10195,16 @@ function renderGreetingPreview() {
 }
 
 function onGreetingSwipe(delta: number) {
-  if (!pendingGreetingStart.value) return
+  if (!pendingGreetingStart.value || greetingStartBusy.value) return
   const next = stepGreeting(greeting, delta)
   if (next === greeting.index) return
+  if (pendingExistingOpening.value) openingPreviewDirty.value=true;
   greeting.index = next
   renderGreetingPreview()
 }
 
-const showGreetingSwipes = computed(() => pendingGreetingStart.value && hasAlternates(greeting.list))
+const showGreetingSwipes = computed(() => pendingGreetingStart.value && hasAlternates(greeting.list)
+  && !talkList.value.some((row:any) => row.type === 1))
 
 // ── 開場選項（MMD prologue）────────────────────────────────────────────
 //
@@ -12782,6 +12867,9 @@ function adoptConversation(nextId: string) {
   teardownStreamForConversationSwitch({ invalidateHistory: true })
   pendingGreetingStart.value = false
   pendingNewConversationFrom.value = ''
+  pendingExistingOpening.value = null
+  openingPreviewDirty.value = false
+  openingSelectionAttempt.value = null
   conversationId.value = nextId
   void syncConversationRole(nextId)
   uni.$emit('updateConversationId', { conversationId: nextId })
@@ -13285,7 +13373,7 @@ async function resetConversation() {
       operationId: `reset-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       historyEpoch: snapshot.historyEpoch, nextSeq: snapshot.nextSeq, now: Date.now(),
     }),
-    resetOptions: confirmedChoices,
+    resetOptions: { ...confirmedChoices, reselectOpening: true },
   }
   if (!writePendingBackwardOperation(entry)) {
     uni.showToast({ title: t('chat.rollbackFailed'), icon: 'error' }); return
@@ -13368,6 +13456,11 @@ async function startPendingGreeting(): Promise<boolean> {
   // 遊客不開對話：開對話要登入，被拒了畫面會卡在等回覆。直接往下交給 send() 的登入檢查——
   // 它會存草稿、請宿主登入（canvas-guest）。
   if (!unref(hasLogin)) return true
+  if (pendingExistingOpening.value?.conversationId === String(unref(conversationId))) {
+    // Preview stays local until Send, as it does on the first play. The fenced
+    // mutation updates only this save's opening and never resets the story again.
+    return await selectStoredOpening(greeting.index);
+  }
   const index = greetingIndexForStart(greeting)
   const draft = content.value
   let failureReported = false
@@ -13426,7 +13519,7 @@ async function onCanvasSend() {
 // 回覆偏好存在對話上：還沒開對話就先開（選定畫面上這條開場白），第一句送出前就能設定。
 async function openResponseSettings() {
   if (archiveBusy.value) return
-  if (!await startPendingGreeting()) return
+  if (!pendingExistingOpening.value && !await startPendingGreeting()) return
   ensureRoleSettings()
   if (responseSettingsSupported.value) panel.value = openSheet(panel.value, 'response-settings')
 }

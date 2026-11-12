@@ -94,6 +94,7 @@ export interface ResetOptions {
   clearNotepad: boolean
   clearDirectives: boolean
   clearResponseSettings: boolean
+  reselectOpening?: boolean
 }
 
 export interface BackwardOperationEntry {
@@ -142,6 +143,10 @@ export function normalizeBackwardOperationEntry(
     const keys = ['clearNotepad', 'clearDirectives', 'clearResponseSettings'] as const
     if (!input.resetOptions || keys.some(key => typeof input.resetOptions[key] !== 'boolean')) return null
     resetOptions = Object.fromEntries(keys.map(key => [key, input.resetOptions[key]])) as unknown as ResetOptions
+    if (input.resetOptions.reselectOpening !== undefined) {
+      if (typeof input.resetOptions.reselectOpening !== 'boolean') return null
+      resetOptions.reselectOpening = input.resetOptions.reselectOpening
+    }
   }
   const operationId = String(input.operationId || '').trim()
   const conversationId = String(input.conversationId || '').trim()

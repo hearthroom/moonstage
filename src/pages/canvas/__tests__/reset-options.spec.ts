@@ -21,7 +21,7 @@ describe('reset choices', () => {
   })
   it('keeps all choices across persisted retries and reloads', () => {
     const base = createBackwardOperationEntry({ conversationId: 'c', operationId: 'reset-1', targetChatId: 'reset', now: 100 })
-    const entry = { ...base, resetOptions: { clearNotepad: true, clearDirectives: false, clearResponseSettings: true } }
+    const entry = { ...base, resetOptions: { clearNotepad: true, clearDirectives: false, clearResponseSettings: true, reselectOpening: true } }
     expect(normalizeBackwardOperationEntry(JSON.parse(JSON.stringify(entry)), 'c', 110)).toMatchObject(entry)
     expect(normalizeBackwardOperationEntry({ ...entry, resetOptions: { clearNotepad: 'false' } }, 'c', 110)).toBeNull()
   })
@@ -47,5 +47,5 @@ it('resets on the first confirmation even when a fresh conversation has no histo
   deps.resetChoices.value = { clearNotepad: false, clearDirectives: false, clearResponseSettings: true }
   await pending
   expect(post).toHaveBeenCalledOnce()
-  expect(post.mock.calls[0][0].resetOptions).toEqual(choices)
+  expect(post.mock.calls[0][0].resetOptions).toEqual({ ...choices, reselectOpening: true })
 })
