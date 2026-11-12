@@ -76,6 +76,31 @@ function buildHighlightText(macros = { user: '小明', char: '星' }): (content:
 const CSS = '\n.jh{--p:#ed3e81;position:relative}\n\n/* 角色卡 */\n.jh .stage{position:relative;height:668px}\n.jh .userbar:before{content:"";position:absolute}\n'
 const JS = '\n(function(){var a="x";\n\nvar b=\'y\';if(a<b){}\n})()\n'
 
+describe('一般頁原生選項保留原字', () => {
+  it.each(['「等一下，先問：真的嗎？！」', '「待って、確認します：合計１００％です。」？！'])('渲染與點擊填入保留全形字：%s', (text) => {
+    const box = document.createElement('div')
+    box.innerHTML = buildHighlightText()(`[choices]\n- ${text}\n[/choices]`, 0)
+    const input = document.createElement('textarea')
+    input.id = 'send_textarea'
+    document.body.append(box, input)
+    const source = fs.readFileSync(CHAT_VUE_PATH, 'utf8')
+    const start = source.indexOf('const onNativeChoiceClick = (event) => {')
+    const end = source.indexOf('onUnmounted(', start)
+    const click = vm.runInNewContext(`(() => { ${source.slice(start, end)} return onNativeChoiceClick })()`, { document, Event })
+    document.addEventListener('click', click)
+    try {
+      const button = box.querySelector('.lt-choice') as HTMLButtonElement
+      expect(button.textContent).toBe(text)
+      button.click()
+      expect(input.value).toBe(text)
+    } finally {
+      document.removeEventListener('click', click)
+      box.remove()
+      input.remove()
+    }
+  })
+})
+
 describe('畫布渲染管線：<style>／<script> 內容不被 markdown 動到', () => {
   it('敘事文字在前（非 heavy 路徑）：含空行與雙引號的 CSS 原樣保留，規則全部解析得出來', () => {
     const highlightText = buildHighlightText()
