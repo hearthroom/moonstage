@@ -163,6 +163,7 @@ export interface Sdk {
    * 卡片數值：get() 是現值、of(messageId) 是那則訊息當下的值（它自己記的，或之前最近的一份）；
    * 都回 { messageId, data, changes } 或 null。messageId 是伺服器的訊息 id（訊息載荷的 serverId），
    * of() 也收殼的訊息 id。變了發 state:change，晚訂閱補發現值。
+   * 換對話回到初始值時也發一次（messageId:null、changes:[]）；沒有初始值不發。
    */
   state: { get(): CardStatePayload | null; of(messageId: string): CardStatePayload | null }
   on(event: string, cb: (payload?: unknown) => void): void

@@ -114,6 +114,14 @@ export function createLongPress(options: LongPressOptions): LongPressHandle {
     start(event) {
       cancel()
       fired = false
+      // 作者可編輯區的長按留給原生游標／選字，不啟動父層訊息選單。
+      const target = event && event.target
+      const element = target && ((target as Node).nodeType === 1 ? target as Element : (target as Node).parentElement)
+      if (element && typeof element.closest === 'function') {
+        if (element.closest('input, textarea')) return
+        const editable = element.closest('[contenteditable]')
+        if (editable && editable.getAttribute('contenteditable')?.toLowerCase() !== 'false') return
+      }
       origin = pointOf(event)
       const pressedAt = origin
       timer = setTimer(() => {
