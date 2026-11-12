@@ -4811,12 +4811,8 @@ const highlightText = (content, type, cacheKey, streaming) => {
             (replacementText.startsWith('(') && replacementText.endsWith(')')) ||
             (replacementText.startsWith('（') && replacementText.endsWith('）'));
 
-        let spanOpen = '';
-        if (type == 0) {
-          spanOpen = '<span style="color: #C4B4A3;font-style: italic;font-weight: 400;">';
-        } else {
-          spanOpen = '<span style="color: #665b65;font-style: italic;font-weight: 400;">';
-        }
+        // 作者可用普通 CSS 或括註色彩變數覆蓋；預設外觀留在 lt-base。
+        const spanOpen = `<span class="lt-inline-aside lt-inline-aside--${type == 0 ? 'ai' : 'user'}">`;
         const spanClose = '</span>';
 
         return lead + (hasBrackets

@@ -76,6 +76,10 @@
   --lt-canvas-avatar-radius: 9999px;
 
   /* ── 訊息 ── */
+  /* 括註保留既有固定配色；不接站台 muted，避免深淺切換改變既有卡片外觀。
+     作者可在訊息容器或括註本身覆寫變數，或直接覆寫 .lt-inline-aside。 */
+  --lt-canvas-aside-ai-color: #C4B4A3;
+  --lt-canvas-aside-user-color: #665b65;
   --lt-canvas-row-gap: 14px;
   --lt-canvas-name-size: 12px;
   --lt-canvas-name-color: var(--lt-canvas-muted);
