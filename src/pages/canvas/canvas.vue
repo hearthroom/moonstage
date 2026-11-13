@@ -2700,11 +2700,30 @@ let workshopOpeningPick = '';
 let pendingCapacityTrigger = false;
 /** 那一次寫入還在路上：第一句要等它寫好再送，否則伺服器還不知道玩家已經選過，又回一次放不下。 */
 let capacityTriggerTask: Promise<boolean> | null = null;
+function holdFirstSend<T>(task: Promise<T>): Promise<T> {
+  capacityTriggerTask = task as unknown as Promise<boolean>;
+  return task.finally(() => { if (capacityTriggerTask === (task as unknown)) capacityTriggerTask = null; });
+}
 function applyPendingCapacityTrigger(revision: number): Promise<boolean> {
   pendingCapacityTrigger = false;
-  const task = saveWorkshopCapacityTrigger(revision);
-  capacityTriggerTask = task;
-  return task.finally(() => { if (capacityTriggerTask === task) capacityTriggerTask = null; });
+  return holdFirstSend(writeCapacityTriggerOnce(revision));
+}
+/** 卡片頁帶來的選擇：revision 舊了（伺服器開局時已經有容量記錄）就讀一次現在的 revision 再寫，不讓選擇無聲掉了。 */
+async function writeCapacityTriggerOnce(revision: number): Promise<boolean> {
+  const target = String(unref(conversationId) || '');
+  let outcome = await postCapacityTrigger(revision);
+  if (outcome === 'stale' && target === String(unref(conversationId) || '')) {
+    try {
+      const res: any = await _this.http.get(_this.requestUrl.workshopConversation, {
+        data: { conversationId: target }, showLoading: false, quietTransport: true, quietErrors: true, timeout: 8000,
+      });
+      const fresh = res.statusCode === 200 ? normalizeWorkshopView(res.data) : null;
+      if (fresh) outcome = await postCapacityTrigger(fresh.capacityRevision);
+    } catch (e) { /* 讀不到就算了：第一句送出時伺服器會再給選擇 */ }
+  }
+  if (outcome === 'fail') return false;
+  void refreshWorkshopView();
+  return true;
 }
 /** 試玩時每個請求多帶的參數。 */
 function workshopTrialQuery(): Record<string, string> {
@@ -3040,38 +3059,45 @@ async function refreshWorkshopView() {
   const targetConversationId = String(unref(conversationId) || '');
   // 卡片頁選了「照樣開始」：只套在這次進頁拿到的第一段對話，讀不讀得到都不留到下一段。
   const applyTrigger = pendingCapacityTrigger && !!targetConversationId;
-  let view: WorkshopConversationView | null = null;
-  if (targetRoleId && targetConversationId && unref(hasLogin) && !previewOnly.value && !previewDraft.value && !trialCard.value) {
-    try {
-      const res: any = await _this.http.get(_this.requestUrl.workshopConversation, {
-        data: { conversationId: targetConversationId }, showLoading: false, quietTransport: true, quietErrors: true, timeout: 8000,
-      });
-      if (res.statusCode === 200) view = normalizeWorkshopView(res.data);
-    } catch (e) { /* 讀不到當作沒有擴充，不影響遊玩 */ }
-  }
-  if (seq !== workshopViewSeq) return;
-  workshopView.value = view;
-  workshopViewConversation = targetConversationId;
-  if (targetRoleId) stageHost.card?.setWorkshop?.(targetRoleId, view);
-  // 讀不到（沒有擴充的供應商、換到別段存檔）：開場網頁與開場選項回到原卡的，不留上一段擴充開場的。
-  if (!view) {
-    // 讀不到就不留到下一段存檔
-    if (applyTrigger) pendingCapacityTrigger = false;
-    syncOpeningExtras();
-    return;
-  }
-  if (applyTrigger && pendingCapacityTrigger) {
-    // 續玩既有存檔、卡片頁選了「照樣開始」：對這段對話寫一次容量選擇，寫完重讀（面板標示、入口圓點跟著變）。
-    if (await applyPendingCapacityTrigger(view.capacityRevision)) return;
+  // 續玩存檔帶著卡片頁的「照樣開始」：讀檢視到寫好之間，第一句先等著（不然伺服器還不知道玩家選過）。
+  let releaseHold: (() => void) | null = null;
+  if (applyTrigger) void holdFirstSend(new Promise<boolean>((done) => { releaseHold = () => done(true); }));
+  try {
+    let view: WorkshopConversationView | null = null;
+    if (targetRoleId && targetConversationId && unref(hasLogin) && !previewOnly.value && !previewDraft.value && !trialCard.value) {
+      try {
+        const res: any = await _this.http.get(_this.requestUrl.workshopConversation, {
+          data: { conversationId: targetConversationId }, showLoading: false, quietTransport: true, quietErrors: true, timeout: 8000,
+        });
+        if (res.statusCode === 200) view = normalizeWorkshopView(res.data);
+      } catch (e) { /* 讀不到當作沒有擴充，不影響遊玩 */ }
+    }
     if (seq !== workshopViewSeq) return;
+    workshopView.value = view;
+    workshopViewConversation = targetConversationId;
+    if (targetRoleId) stageHost.card?.setWorkshop?.(targetRoleId, view);
+    // 讀不到（沒有擴充的供應商、換到別段存檔）：開場網頁與開場選項回到原卡的，不留上一段擴充開場的。
+    if (!view) {
+      // 讀不到就不留到下一段存檔
+      if (applyTrigger) pendingCapacityTrigger = false;
+      syncOpeningExtras();
+      return;
+    }
+    if (applyTrigger && pendingCapacityTrigger) {
+      // 續玩既有存檔、卡片頁選了「照樣開始」：對這段對話寫一次容量選擇，寫完重讀（面板標示、入口圓點跟著變）。
+      if (await applyPendingCapacityTrigger(view.capacityRevision)) return;
+      if (seq !== workshopViewSeq) return;
+    }
+    // 讀失敗也不留到下一段存檔
+    if (applyTrigger) pendingCapacityTrigger = false;
+    // 開場來源以伺服器記下的為準（重新整理、換存檔都一樣），不靠前端記得剛才選了哪條。
+    activeOpening.value = { conversationId: targetConversationId, source: viewOpeningSource(view) };
+    syncOpeningExtras();
+    // 已裝的版面跟這段對話的擴充對不上（換到清單不同的存檔、擴充有新核准版）：重讀並重建。
+    if (installedWorkshopHash !== null && view.manifestHash !== installedWorkshopHash) void reloadAuthorAssetForConversation(targetConversationId);
+  } finally {
+    releaseHold?.();
   }
-  // 讀失敗也不留到下一段存檔
-  if (applyTrigger) pendingCapacityTrigger = false;
-  // 開場來源以伺服器記下的為準（重新整理、換存檔都一樣），不靠前端記得剛才選了哪條。
-  activeOpening.value = { conversationId: targetConversationId, source: viewOpeningSource(view) };
-  syncOpeningExtras();
-  // 已裝的版面跟這段對話的擴充對不上（換到清單不同的存檔、擴充有新核准版）：重讀並重建。
-  if (installedWorkshopHash !== null && view.manifestHash !== installedWorkshopHash) void reloadAuthorAssetForConversation(targetConversationId);
 }
 watch(() => [String(unref(conversationId) || ''), !!unref(hasLogin)], () => { void refreshWorkshopView(); });
 // 離場：還在路上的讀取作廢（不然晚到的會把這張卡的擴充推給宿主），面板分頁收掉。
@@ -3415,8 +3441,12 @@ watch(() => sandboxHostRef.value ? userDisplayName() : null, (name) => {
   if (name !== null) sandboxHostRef.value?.postUserName(name, sandboxStatusbarHtml());
 });
 
+// 每次掛殼一個代號：資產還在等角色詳情時又換了一份（擴充重建），先排的那次 nextTick 不能再接上同一個 iframe，
+// 否則兩個宿主橋接在一個殼上，舊的那個永遠不會被收掉。
+let sandboxMountSeq = 0;
 function mountSandbox(asset: any) {
   destroySandboxHost();
+  const mountSeq = ++sandboxMountSeq;
   sandboxAsset = asset;
   sandboxFailed.value = false;
   const targetRoleId = String(unref(roleId) || '');
@@ -3425,7 +3455,7 @@ function mountSandbox(asset: any) {
   sandboxAttr.value = resolved.sandboxAttr;
   nextTick(() => {
     const frame = sandboxFrame.value;
-    if (!frame || !sandboxCard.value) return;
+    if (!frame || !sandboxCard.value || mountSeq !== sandboxMountSeq) return;
     const host = createSandboxHost({
       hud: buildHudHost(),
       archive: allowsStagePanel(stageHost.capabilities, 'conversations') ? sandboxArchive : null,
@@ -11295,18 +11325,22 @@ async function saveCapacityPatch(patch: CapacityPatch): Promise<boolean> {
 
 // 「照樣開始」：這段對話的擴充常駐從清單最上方起改成關鍵詞觸發。寫進伺服器的容量選擇（帶 revision，
 // 別的分頁先改過就失敗、不重送），寫好才重送；面板的標示與入口圓點跟著重讀。
-async function saveWorkshopCapacityTrigger(revision: number): Promise<boolean> {
+async function postCapacityTrigger(revision: number): Promise<'ok' | 'stale' | 'fail'> {
   const targetConversation = String(unref(conversationId) || '')
-  if (!targetConversation) return false
+  if (!targetConversation) return 'fail'
   try {
     const res: any = await postArchiveAction(_this.requestUrl.workshopCapacity, { conversationId: targetConversation, expectedRevision: revision, choice: 'trigger' })
-    if (String(unref(conversationId) || '') !== targetConversation) return false
-    // 別處先改過容量選擇（revision 舊了）：不重試同一份建議，照樣重送一次，讓伺服器回現在的建議。
-    const stale = res.statusCode === 409 && res.data?.error === 'capacity_revision_stale'
-    if (res.statusCode !== 200 && !stale) return false
+    if (String(unref(conversationId) || '') !== targetConversation) return 'fail'
+    if (res.statusCode === 200) return 'ok'
+    return res.statusCode === 409 && res.data?.error === 'capacity_revision_stale' ? 'stale' : 'fail'
   } catch (e) {
-    return false
+    return 'fail'
   }
+}
+
+// 彈層裡按「照樣開始」：寫好就重送。revision 舊了（別處先改過）不重試同一份建議，照樣重送一次，讓伺服器回現在的建議。
+async function saveWorkshopCapacityTrigger(revision: number): Promise<boolean> {
+  if ((await postCapacityTrigger(revision)) === 'fail') return false
   void refreshWorkshopView()
   return true
 }

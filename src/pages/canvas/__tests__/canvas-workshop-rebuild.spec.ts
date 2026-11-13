@@ -122,6 +122,7 @@ describe('saveWorkshopCapacityTrigger（照樣開始）', () => {
       conversationId: { value: 'c1' }, unref: (r: any) => r.value,
       postArchiveAction: post, refreshWorkshopView: vi.fn(),
     }
+    scope.postCapacityTrigger = handler('postCapacityTrigger', scope)
     return { scope, post, save: handler('saveWorkshopCapacityTrigger', scope) }
   }
 
@@ -159,6 +160,7 @@ describe('refreshWorkshopView', () => {
       activeOpening: { value: null }, syncOpeningExtras: vi.fn(),
       installedWorkshopHash: 'h1', reloadAuthorAssetForConversation: vi.fn(),
       pendingCapacityTrigger: false, applyPendingCapacityTrigger: vi.fn().mockResolvedValue(true),
+      holdFirstSend: vi.fn((task: Promise<unknown>) => task),
     }
     return { scope, get, refresh: handler('refreshWorkshopView', scope) }
   }
@@ -206,6 +208,45 @@ describe('refreshWorkshopView', () => {
     await fail.refresh()
     expect(fail.scope.applyPendingCapacityTrigger).not.toHaveBeenCalled()
     expect(fail.scope.pendingCapacityTrigger).toBe(false)
+  })
+})
+
+describe('卡片頁帶來的「照樣開始」（writeCapacityTriggerOnce）', () => {
+  it('開局時伺服器已經有容量記錄（revision 舊了）：讀一次現在的 revision 再寫，不讓選擇無聲掉了', async () => {
+    const posts: number[] = []
+    const scope: Record<string, any> = {
+      conversationId: { value: 'c1' }, unref: (r: any) => r.value,
+      postCapacityTrigger: vi.fn(async (rev: number) => { posts.push(rev); return rev === 0 ? 'stale' : 'ok' }),
+      _this: { http: { get: vi.fn(async () => ({ statusCode: 200, data: { manifestHash: '', capacityRevision: 5, items: [] } })) }, requestUrl: { workshopConversation: '/view' } },
+      normalizeWorkshopView, refreshWorkshopView: vi.fn(),
+    }
+    expect(await handler('writeCapacityTriggerOnce', scope)(0)).toBe(true)
+    expect(posts).toEqual([0, 5])
+    expect(scope.refreshWorkshopView).toHaveBeenCalledOnce()
+  })
+})
+
+describe('mountSandbox：還沒接上就又換了一份資產', () => {
+  it('只有最後一次接上 iframe，先排的那次不會再建第二個宿主橋', () => {
+    const ticks: Array<() => void> = []
+    const createSandboxHost = vi.fn(() => ({ destroy: vi.fn() }))
+    const base: Record<string, any> = {
+      sandboxMountSeq: 0, sandboxAsset: null,
+      sandboxFailed: { value: false }, sandboxUrl: { value: '' }, sandboxAttr: { value: '' },
+      sandboxFrame: { value: {} }, sandboxCard: { value: true }, sandboxHostRef: { value: null },
+      roleId: { value: 'role' }, unref: (r: any) => r.value,
+      destroySandboxHost: vi.fn(), resolveSandbox: () => ({ shellUrl: 'https://c1.example/sandbox/', sandboxAttr: 'allow-scripts', origin: 'https://c1.example', saves: null }),
+      nextTick: (fn: () => void) => { ticks.push(fn) }, createSandboxHost,
+    }
+    // 宿主橋的其他參數這裡不驗：沒列到的名字一律給一個空函式
+    const anything: any = new Proxy(function () {}, { get: (_t, k) => (k === Symbol.toPrimitive ? () => '' : anything), apply: () => anything })
+    const scope = new Proxy(base, { has: () => true, get: (t, k) => (k in t ? t[k as string] : k === Symbol.unscopables ? undefined : anything) })
+    const mount = handler('mountSandbox', scope)
+    mount({ pageMode: 'sandbox', workshopHash: 'a' })
+    mount({ pageMode: 'sandbox', workshopHash: 'b' })
+    for (const tick of ticks) { try { tick() } catch { /* 宿主橋之後的設定不在這裡驗 */ } }
+    expect(createSandboxHost).toHaveBeenCalledTimes(1)
+    expect(base.sandboxAsset).toEqual({ pageMode: 'sandbox', workshopHash: 'b' })
   })
 })
 
