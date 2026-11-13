@@ -269,33 +269,37 @@
 										<div class="ms-dot" :class="'ms-dot-fill-' + laneDetailTone"></div>
 										<span class="ms-chip-status-text">{{ laneDetailStatusText }}</span>
 									</div>
-									<span v-if="laneHistory && laneHistory.percentText" class="ms-lane-pct">{{ laneHistory.percentText }}</span>
+									<span v-if="laneTouch || (laneHistory && laneHistory.percentText)" class="ms-lane-pct"
+										:style="{ visibility: laneHistory && laneHistory.percentText ? undefined : 'hidden' }">{{ laneHistory && laneHistory.percentText || '100%' }}</span>
 									<span class="ms-lane-pct-cap">{{ t('modelSelect.laneDetailUptime') }}</span>
 								</div>
 
-								<div v-if="laneHistoryLoading" class="ms-lane-empty" :class="{ 'ms-lane-touch-loading': laneTouch }">
-									<div v-if="laneTouch" class="ms-bucket-loading"><div class="ms-bucket-readout"><span class="ms-bucket-reading" role="status">{{ t('modelSelect.speedObserving') }}</span></div><div class="ms-buckets" aria-hidden="true"><div v-for="i in 72" :key="i" class="ms-bucket" :style="{ flex: 1 }"></div></div></div>
-									<span v-if="!laneTouch" class="ms-hint" role="status">{{ t('modelSelect.speedObserving') }}</span>
+								<div v-if="laneHistoryLoading && !laneTouch" class="ms-lane-empty">
+									<span class="ms-hint" role="status">{{ t('modelSelect.speedObserving') }}</span>
 								</div>
-								<div v-else-if="!laneBuckets.length" class="ms-lane-empty">
+								<div v-else-if="!laneHistoryLoading && !laneBuckets.length" class="ms-lane-empty">
 									<span class="ms-hint">{{ t('modelSelect.laneDetailEmpty') }}</span>
 								</div>
+								<!-- 觸控載入與完成共用同一組文流：時間軸、圖例與父層 gap 都保留。 -->
 								<template v-else>
 									<div v-if="laneTouch" class="ms-bucket-readout">
-										<button type="button" class="ms-bucket-step ms-bucket-prev" :aria-label="t('modelSelect.bucketPrev')" :disabled="laneSelectedIndex <= 0" @pointerdown="startLaneStep($event, -1)" @pointerup="stopLaneStep" @pointerleave="stopLaneStep" @pointercancel="stopLaneStep" @blur="stopLaneStep" @click.stop="onLaneStepClick($event, -1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button>
-										<div v-if="laneSelected" class="ms-bucket-reading" aria-live="polite" aria-atomic="true">
+										<span v-if="laneHistoryLoading" class="ms-bucket-reading" role="status">{{ t('modelSelect.speedObserving') }}</span>
+										<button v-if="!laneHistoryLoading" type="button" class="ms-bucket-step ms-bucket-prev" :aria-label="t('modelSelect.bucketPrev')" :disabled="laneSelectedIndex <= 0" @pointerdown="startLaneStep($event, -1)" @pointerup="stopLaneStep" @pointerleave="stopLaneStep" @pointercancel="stopLaneStep" @blur="stopLaneStep" @click.stop="onLaneStepClick($event, -1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button>
+										<div v-if="!laneHistoryLoading && laneSelected" class="ms-bucket-reading" aria-live="polite" aria-atomic="true">
 											<span class="ms-bucket-tip-t">{{ laneSelected.rangeText }}</span>
 											<span class="ms-bucket-tip-row"><span v-if="laneSelected.tone !== 'none'" class="ms-dot" :class="'ms-dot-fill-' + laneSelected.tone"></span>{{ laneSelected.valueText }}</span>
 										</div>
-										<button type="button" class="ms-bucket-step ms-bucket-next" :aria-label="t('modelSelect.bucketNext')" :disabled="laneSelectedIndex >= laneBuckets.length - 1" @pointerdown="startLaneStep($event, 1)" @pointerup="stopLaneStep" @pointerleave="stopLaneStep" @pointercancel="stopLaneStep" @blur="stopLaneStep" @click.stop="onLaneStepClick($event, 1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
+										<button v-if="!laneHistoryLoading" type="button" class="ms-bucket-step ms-bucket-next" :aria-label="t('modelSelect.bucketNext')" :disabled="laneSelectedIndex >= laneBuckets.length - 1" @pointerdown="startLaneStep($event, 1)" @pointerup="stopLaneStep" @pointerleave="stopLaneStep" @pointercancel="stopLaneStep" @blur="stopLaneStep" @click.stop="onLaneStepClick($event, 1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
 									</div>
-									<div class="ms-buckets" :role="laneTouch ? 'slider' : undefined" :tabindex="laneTouch ? 0 : undefined"
+									<div class="ms-buckets" :class="{ 'ms-bucket-loading': laneHistoryLoading }" :aria-hidden="laneHistoryLoading ? 'true' : undefined" :role="laneTouch && !laneHistoryLoading ? 'slider' : undefined" :tabindex="laneTouch && !laneHistoryLoading ? 0 : undefined"
 										:aria-label="laneTouch ? t('modelSelect.bucketBar') : undefined"
 										:aria-valuemin="laneTouch ? 0 : undefined" :aria-valuemax="laneTouch ? laneBuckets.length - 1 : undefined"
 										:aria-valuenow="laneTouch ? laneSelectedIndex : undefined"
 										:aria-valuetext="laneTouch && laneSelected ? laneSelected.rangeText + ' ' + laneSelected.valueText : undefined"
 										@pointerdown="startLaneScrub" @pointermove="moveLaneScrub" @pointerup="endLaneScrub" @pointercancel="endLaneScrub" @lostpointercapture="endLaneScrub"
 										@keydown="onLaneKey">
+										<template v-if="laneHistoryLoading"><div v-for="i in 72" :key="i" class="ms-bucket" :style="{ flex: 1 }"></div></template>
+										<template v-else>
 										<div
 											v-for="(b, i) in laneBuckets"
 											:key="b.hourStartMs"
@@ -305,7 +309,8 @@
 											@mouseenter="!laneTouch && (laneSelectedIndex = i)"
 											@mouseleave="!laneTouch && (laneSelectedIndex = -1)"
 											@click.stop="!laneTouch && (laneSelectedIndex = laneSelectedIndex === i ? -1 : i)"></div>
-										<div v-if="laneTouch && laneSelected" class="ms-bucket-marker" :class="'ms-bucket-' + laneSelected.tone" :style="laneDotStyle" aria-hidden="true"></div>
+										</template>
+										<div v-if="!laneHistoryLoading && laneTouch && laneSelected" class="ms-bucket-marker" :class="'ms-bucket-' + laneSelected.tone" :style="laneDotStyle" aria-hidden="true"></div>
 									</div>
 									<!-- tooltip 放方塊條**下方**：放上方會蓋掉可用率那個數字。 -->
 									<div v-if="!laneTouch" class="ms-bucket-tipwrap">
@@ -1012,7 +1017,7 @@ const truncationText = (completionRate: number) => {
 		laneSelectedIndex.value = Math.max(0, Math.min(n - 1, Math.round((pct - width / 2) / (width + 0.35))));
 	};
 	const startLaneScrub = (e: PointerEvent) => {
-		if (!laneTouch.value || e.button > 0 || lanePointer !== null) return;
+		if (!laneTouch.value || laneHistoryLoading.value || e.button > 0 || lanePointer !== null) return;
 		lanePointer = e.pointerId;
 		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
 		selectLaneAt(e);

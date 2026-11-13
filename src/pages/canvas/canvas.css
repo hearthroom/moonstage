@@ -3666,7 +3666,6 @@
     color: var(--lt-canvas-muted);
   }
 
-  .ms-lane-touch-loading { padding: 0; }
   .ms-bucket-readout { display: flex; align-items: center; height: 48px; margin-bottom: 8px; border: 1px solid var(--lt-canvas-sheet-line); border-radius: 12px; background: var(--lt-canvas-sheet-pop-bg); box-sizing: border-box; overflow: hidden; }
   .ms-bucket-step { appearance: none; flex: 0 0 44px; width: 44px; height: 48px; border: 0; background: transparent; color: var(--lt-canvas-sheet-fg); display: grid; place-items: center; padding: 0; cursor: pointer; touch-action: manipulation; }
   .ms-bucket-step svg { width: 18px; height: 18px; }

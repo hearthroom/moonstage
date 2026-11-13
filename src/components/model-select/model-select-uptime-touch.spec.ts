@@ -80,10 +80,16 @@ it('prefers the last meaningful bucket over more recent sparse samples and stops
     expect(vm.laneSelectedIndex).toBe(0)
     await bar.trigger('keydown', { key: 'End' })
     expect(vm.laneSelectedIndex).toBe(1)
+    const axis = w.find('.ms-bucket-axis').text()
+    const legend = w.find('.ms-bucket-legend').text()
     vm.laneHistoryLoading = true
     await flushPromises()
-    expect(w.find('.ms-lane-touch-loading .ms-bucket-readout').text()).toContain('modelSelect.speedObserving')
-    expect(w.find('.ms-lane-touch-loading > .ms-hint').exists()).toBe(false)
+    expect(w.find('.ms-bucket-readout').text()).toContain('modelSelect.speedObserving')
+    expect(w.find('.ms-lane-empty').exists()).toBe(false)
+    expect(w.find('.ms-bucket-axis').text()).toBe(axis)
+    expect(w.find('.ms-bucket-legend').text()).toBe(legend)
+    expect(w.find('.ms-lane-head .ms-lane-pct').exists()).toBe(true)
+    expect(w.find('.ms-buckets').attributes('tabindex')).toBeUndefined()
   } finally { w.unmount() }
 })
 it('steps immediately and repeats only while the arrow is held', async () => {
