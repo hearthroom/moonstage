@@ -2038,6 +2038,11 @@
     cursor: pointer;
   }
 
+  /* 明確設定整卡送出鍵底色才啟用；未設定的舊卡保留原底色。 */
+  :where(.canvas-root[data-lt-card-vars~="--lt-canvas-send-bg"]) .lt-send.is-send {
+    background: var(--lt-canvas-send-bg);
+  }
+
   .lt-send svg {
     width: 16px;
     height: 16px;
