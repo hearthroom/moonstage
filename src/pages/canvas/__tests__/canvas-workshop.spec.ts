@@ -84,6 +84,10 @@ describe('開對話帶的開場', () => {
     expect(preselectOpening(sources, 'base')).toBe(0)
     expect(preselectOpening(sources, 'nope')).toBe(0)
     expect(preselectOpening(sources, '')).toBe(0)
+    // 試玩草稿的開場用位置當 id（welcome／alt-<n>）
+    const draft = composeOpenings(['原卡主'], normalizeWorkshopOpenings({ items: [{ ...snow, openingId: 'welcome' }, { ...snow, openingId: 'alt-1', greeting: '備選' }] })).sources
+    expect(preselectOpening(draft, 'alt-1')).toBe(2)
+    expect(preselectOpening(draft, 'welcome')).toBe(1)
   })
 })
 
