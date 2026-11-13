@@ -8,6 +8,20 @@ import ko from '../locale/ko.json'
 
 const key = (k: string) => k
 
+describe('suspected input truncation', () => {
+  it('includes the three messages in every supported locale', () => {
+    for (const locale of [zhHant,zhHans,en,ja,ko]) {
+      for (const name of ['systemMsg.inputTruncated','systemMsg.inputTruncatedSub','systemMsg.inputTruncatedSubNoLane']) expect(locale[name]).toBeTruthy()
+    }
+  })
+  it('names uncertainty and only offers a lane when the card has that action', () => {
+    expect(operationFailureTitle('input_truncated', key)).toBe('systemMsg.inputTruncated')
+    expect(operationFailureSub('input_truncated', key, {actions:['retry','switch_lane']})).toBe('systemMsg.inputTruncatedSub')
+    expect(operationFailureSub('input_truncated', key, {actions:['retry','switch_model']})).toBe('systemMsg.inputTruncatedSubNoLane')
+    expect(operationFailureSub('input_truncated', key, {actions:[]})).toBe('')
+  })
+})
+
 describe('summary length limits use the confirmed failure stage and settlement', () => {
   it('keeps ordinary reply limits and legacy unknown stages unchanged', () => {
     expect(operationFailureTitle('output_limit', key)).toBe('')

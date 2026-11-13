@@ -31,6 +31,7 @@ export function operationFailureTitle(cause: unknown, t: (key: string) => string
     no_final_answer: 'error.emptyResponse',
     empty_response: 'error.emptyResponse',
     usage_invalid: 'multiPass.failureUsage',
+    input_truncated: 'systemMsg.inputTruncated',
     context_capacity_exceeded: 'error.contextCapacityTitle',
     insufficient_credits: 'chat.point_no_tips',
     internal_error: 'systemMsg.ourError',
@@ -61,6 +62,9 @@ export function operationFailureSub(cause: unknown, t: (key: string) => string, 
   if (restricted) return t(restricted + (opts.canSwitch === false && ['systemMsg.filterSafety','systemMsg.filterRefusal'].includes(restricted) ? 'SubNoSwitch' : 'Sub'))
   if (typeof cause !== 'string') return ''
   switch (cause) {
+    case 'input_truncated':
+      if (!opts.actions?.length) return ''
+      return t(opts.actions.includes('switch_lane') ? 'systemMsg.inputTruncatedSub' : 'systemMsg.inputTruncatedSubNoLane')
     case 'no_final_answer':
     case 'empty_response':
     case 'no_answer':

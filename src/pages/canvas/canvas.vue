@@ -452,6 +452,7 @@
 import { syncStartedModelSettings } from './canvas-model-preference'
 import { cardPortrait } from './canvas-portrait'
 import { operationFailureSub, operationFailureTitle } from '@/utils/operation-failure-copy'
+import { inputTruncationActions } from './canvas-input-truncation'
 import { cfImageDesktop } from "@/utils/image-transform.js"
 
 import { createFullscreenController } from './canvas-fullscreen';
@@ -5384,13 +5385,16 @@ function getSystemMsgCtas(item, index) {
   if (!allowsStageAction(stageHost.capabilities, 'continue')) return []
   if (item?.operationProjectionCapable !== true) return [];
   if (item?.finishReason === 'outcome_unconfirmed') return [];
-  return terminalUIActionsFromAllowedActions(item)
+  const base = terminalUIActionsFromAllowedActions(item)
     .filter(action => isTerminalActionAllowed(talkList.value, index, action))
     .map(action => ({
       action,
       label: getSystemMsgCtaLabel(action),
     }))
     .filter(entry => !!entry.label);
+  return item?.failureCause === 'input_truncated'
+    ? inputTruncationActions(item.failureCause, base, currentModelHasOtherLanes(), t('chat.switchLane'))
+    : base;
 }
 function getSystemMsgCtaAction(finishReason, item, index) {
   if (!canGenerate.value) return ['history_load_error','conversation_stale'].includes(finishReason) ? 'refresh_history' : '';
@@ -5506,6 +5510,10 @@ function onSystemMsgCta(action, item, index) {
     return;
   }
   if (action === 'switch_lane') {
+    if (item?.failureCause === 'input_truncated' && !getSystemMsgCtas(item, index).some(entry => entry.action === 'switch_lane')) {
+      notifyTimelineMutationBlocked();
+      return;
+    }
     rememberFilterCardSwitch(item);
     openModelSelect('lanes');
     return;
