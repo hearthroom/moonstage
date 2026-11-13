@@ -100,23 +100,26 @@ it('lets a legacy opening wizard fill the collapsed composer on the Classic page
   const chrome = process.env.CHROME_BIN || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].find(existsSync)
   expect(chrome, 'Native Chrome is required for getBoundingClientRect and onerror wizard boot').toBeTruthy()
   const styles = ['src/common/canvas-theme-vars.css', 'src/pages/canvas/canvas.css', 'src/pages/canvas/canvas-chrome-box.css', 'src/sandbox/shell.css'].map(file => readFileSync(resolve(file), 'utf8'))
-  // A synthetic author widget boots via an image event and writes to the visible-size input.
+  // Keep boot later than the former 80ms click to cover asynchronous author initialization.
+  // The real image error must still run before the widget can install its handler.
   const wizardHtml = `<div id="wizard">
     <textarea aria-label="Character notes"></textarea>
     <button type="button">Apply</button><span role="status"></span>
     <img src="invalid-image" hidden alt="" onerror="
       const panel = this.closest('#wizard');
-      panel.querySelector('button').onclick = () => {
-        for (const input of document.querySelectorAll('textarea,[contenteditable],input')) {
-          if (panel.contains(input)) continue;
-          const rect = input.getBoundingClientRect();
-          if (rect.width <= 40 || rect.height <= 8) continue;
-          if (typeof input.value === 'string') input.value = (input.value || '') + 'Synthetic opening';
-          panel.querySelector('[role=status]').textContent = 'Draft filled';
-          return;
-        }
-        panel.querySelector('[role=status]').textContent = 'Input missing';
-      };
+      setTimeout(() => {
+        panel.querySelector('button').onclick = () => {
+          for (const input of document.querySelectorAll('textarea,[contenteditable],input')) {
+            if (panel.contains(input)) continue;
+            const rect = input.getBoundingClientRect();
+            if (rect.width <= 40 || rect.height <= 8) continue;
+            if (typeof input.value === 'string') input.value = (input.value || '') + 'Synthetic opening';
+            panel.querySelector('[role=status]').textContent = 'Draft filled';
+            return;
+          }
+          panel.querySelector('[role=status]').textContent = 'Input missing';
+        };
+      }, 160);
     ">
   </div>`
   const code = (await build({
@@ -127,6 +130,19 @@ it('lets a legacy opening wizard fill the collapsed composer on the Classic page
         import {createShell} from './src/sandbox/shell.ts'
 
         const wizardHtml = ${JSON.stringify(wizardHtml)}
+
+        async function applyWizard(surface: string) {
+          const btn = document.querySelector('#wizard button') as HTMLButtonElement | null
+          if (!btn) throw new Error(surface + ': wizard button missing')
+          // Vue flush and elapsed virtual time do not imply that image onerror has booted.
+          const deadline = performance.now() + 1000
+          while (typeof btn.onclick !== 'function') {
+            if (performance.now() >= deadline) throw new Error(surface + ': wizard onclick was not installed')
+            await new Promise(r => setTimeout(r, 10))
+          }
+          btn.click()
+          await nextTick()
+        }
 
         async function runClassic() {
           const root = document.getElementById('app')!
@@ -144,11 +160,7 @@ it('lets a legacy opening wizard fill the collapsed composer on the Classic page
           app.mount('#classic-composer')
           document.getElementById('classic-msg')!.innerHTML = wizardHtml
           await nextTick()
-          await new Promise(r => setTimeout(r, 80))
-          const btn = document.querySelector('#wizard button') as HTMLButtonElement | null
-          btn?.click()
-          await nextTick()
-          await new Promise(r => setTimeout(r, 40))
+          await applyWizard('Classic')
           const out = {
             msg: document.querySelector('#wizard [role="status"]')?.textContent || '',
             draft: value.value,
@@ -210,11 +222,7 @@ it('lets a legacy opening wizard fill the collapsed composer on the Classic page
             }],
           })
           await nextTick()
-          await new Promise(r => setTimeout(r, 80))
-          const btn = document.querySelector('#wizard button') as HTMLButtonElement | null
-          btn?.click()
-          await nextTick()
-          await new Promise(r => setTimeout(r, 40))
+          await applyWizard('Sandbox')
           const out = {
             msg: document.querySelector('#wizard [role="status"]')?.textContent || '',
             sdkInput: shell.sdk.input.get(),
@@ -263,7 +271,7 @@ it('lets a legacy opening wizard fill the collapsed composer on the Classic page
   try {
     const css = styles.join('\n').replace(/(-?\d*\.?\d+)rpx/g, 'calc($1 * var(--ms-rpx))')
     const file = join(dir, 'fixture.html')
-    const receiver = '<pre id="result"></pre><script>addEventListener("message",e=>document.querySelector("#result").textContent=JSON.stringify(e.data))</script>'
+    const receiver = '<pre id="result"></pre><script>let failed=false;addEventListener("message",e=>{if(failed)return;failed=!!e.data.error;document.querySelector("#result").textContent=JSON.stringify(e.data)})</script>'
     const fixture = `<!doctype html><script>addEventListener('error',e=>parent.postMessage({error:e.message},'*'));addEventListener('unhandledrejection',e=>parent.postMessage({error:String(e.reason)},'*'))</script><style>:root{--ms-rpx:.5px}body{margin:0}${css}</style><div id="app"></div><script>${code.replace(/<\/script/gi, '<\\/script')}</script>`
     writeFileSync(file, fixture + receiver)
     const run = spawnSync(chrome!, ['--headless=new', '--no-first-run', '--no-default-browser-check', `--user-data-dir=${join(dir, 'profile')}`, '--dump-dom', '--virtual-time-budget=2000', `file://${file}`], { encoding: 'utf8', timeout: 25000, maxBuffer: 4 * 1024 * 1024 })
@@ -273,7 +281,7 @@ it('lets a legacy opening wizard fill the collapsed composer on the Classic page
     expect(json, run.stdout.slice(-1500)).toBeTruthy()
     const result = JSON.parse(json!)
     expect(result.error).toBeUndefined()
-    expect(result.classic.msg).toBe('Draft filled')
+    expect(result.classic.msg, JSON.stringify(result.classic)).toBe('Draft filled')
     expect(result.classic.draft).toContain('Synthetic opening')
     expect(result.classic.collapsedText).toContain('Synthetic opening')
     expect(result.classic.sendEnabled).toBe(true)
