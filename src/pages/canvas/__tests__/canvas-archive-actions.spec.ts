@@ -218,6 +218,19 @@ describe('choose an opening after New conversation', () => {
     expect(f.post.mock.calls[0][1].data).toEqual({ roleId: 'role', opening: { kind: 'workshop', workshopId: 'w1', openingId: 'o1' }, saveConversationId: 'current', firstPageSize: undefined })
     expect(f.b.conversationId.value).toBe('new')
   })
+  it('first start with an extension opening the server rejects: only the opening-unavailable toast, not a network error on top', async () => {
+    const f = chooserFixture()
+    const snow = { kind: 'workshop', workshopId: 'w1', workshopName: '雪夜篇', openingId: 'o1', mode: 'greeting', greeting: 'snow', openingPage: '', prologue: [] }
+    f.b.conversationId.value = ''
+    f.b.pendingGreetingStart.value = true
+    f.b.greeting.list = ['main', 'snow']
+    f.b.greeting.sources = [{ kind: 'base' }, snow]
+    f.b.greeting.index = 1
+    f.b.chatStart.mockResolvedValue('reported')
+    await f.b.onCanvasSend()
+    expect(f.b.uni.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'main.network_error' }))
+    expect(f.b.pendingGreetingStart.value).toBe(true)
+  })
   it('drops an extension opening the server no longer accepts and returns to the chooser', async () => {
     const f = chooserFixture()
     f.b._this.requestUrl.workshopConversationStart = '/workshop-start'

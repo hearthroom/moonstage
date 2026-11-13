@@ -83,7 +83,8 @@ export function resolveContextCapacityAdvice(source) {
     triggerFits: ws.trigger_fits === true,
     revision: Number.isInteger(Number(ws.revision)) ? Number(ws.revision) : 0,
   } : null
-  if (!requiredTier && !trimFits && !workshop?.triggerFits) return null
+  // 有擴充時畫布只給換檔位與照樣開始（精簡原卡的選項不給），兩個都不行就沒有建議
+  if (workshop ? (!requiredTier && !workshop.triggerFits) : (!requiredTier && !trimFits)) return null
   return workshop ? { requiredTier, requiredTokens, trimFits, workshop } : { requiredTier, requiredTokens, trimFits }
 }
 

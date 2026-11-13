@@ -19,4 +19,15 @@ describe('classic history author lifecycle',()=>{
    scope.dispose();expect(document.getElementById('synthetic-history-hud')).toBeNull();expect(scope.timerCount()).toBe(0)
   }finally{scope.dispose();vi.clearAllTimers();vi.useRealTimers();document.body.innerHTML=''}
  })
+ it('收掉作者範圍（離場或擴充重建）時，卡片訂閱的歷史監聽一併退訂，不留在宿主那邊輪詢',()=>{
+  const scope=createAuthorScope({doc:document,win:window})
+  const off=vi.fn()
+  const history={capabilities:()=>({version:1,available:true,reason:'ready'}),list:async()=>({items:[]}),onChange:vi.fn(()=>off)}
+  const bound=(historyModule as any).bindHistoryAuthorScope(history,scope)
+  bound.onChange(()=>{});bound.onChange(()=>{})
+  expect(off).not.toHaveBeenCalled()
+  scope.dispose()
+  expect(off).toHaveBeenCalledTimes(2)
+  document.body.innerHTML=''
+ })
 })

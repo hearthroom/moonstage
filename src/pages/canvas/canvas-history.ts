@@ -141,6 +141,8 @@ interface AuthorScope {
  suspend(fn:Function, thisArg?:unknown, args?:unknown[]):any
  wrap(fn:Function):Function
  isDisposed():boolean
+ /** 範圍收掉時要跑的收尾（離場、擴充重建都會收範圍）。 */
+ onDispose?(fn:()=>void):void
 }
 
 /** Keep host transport outside the author scope, but attribute async card work. */
@@ -153,7 +155,10 @@ export function bindHistoryAuthorScope(history:HistoryApi, scope:AuthorScope):Hi
    active()
    if(typeof callback!=='function')throw historyError('HISTORY_CURSOR_INVALID')
    const wrapped=scope.wrap(callback)
-   return scope.suspend(history.onChange,history,[(event:HistoryChange)=>{if(!scope.isDisposed())wrapped(event)}])
+   const off=scope.suspend(history.onChange,history,[(event:HistoryChange)=>{if(!scope.isDisposed())wrapped(event)}])
+   // 範圍收掉就退訂：不然監聽留在宿主那邊，輪詢不停，也佔著監聽上限（擴充重建會一再收範圍）。
+   if(typeof off==='function')scope.onDispose?.(off)
+   return off
   },
  }
 }
