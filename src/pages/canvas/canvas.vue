@@ -3032,7 +3032,8 @@ async function refreshWorkshopView() {
   if (seq !== workshopViewSeq) return;
   workshopView.value = view;
   if (targetRoleId) stageHost.card?.setWorkshop?.(targetRoleId, view);
-  if (!view) return;
+  // 讀不到（沒有擴充的供應商、換到別段存檔）：開場網頁與開場選項回到原卡的，不留上一段擴充開場的。
+  if (!view) { syncOpeningExtras(); return; }
   if (pendingCapacityTrigger) {
     // 卡片頁選了「照樣開始」：對這段對話寫一次容量選擇，寫完重讀（面板標示、入口圓點跟著變）。只做一次。
     pendingCapacityTrigger = false;
