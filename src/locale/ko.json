@@ -4469,5 +4469,14 @@
 	"modelSelect.agentCostReload": "다시 불러오기",
 	"systemMsg.summaryLengthCap": "스토리 정리 길이 제한 도달",
 	"systemMsg.summaryLengthCapSub": "스토리를 정리하는 중 길이 제한에 도달했습니다. 다시 시도해 주세요.",
-	"systemMsg.summaryLengthCapSubUncharged": "스토리를 정리하는 중 길이 제한에 도달했습니다. 포인트는 차감되지 않았습니다. 다시 시도해 주세요."
+	"systemMsg.summaryLengthCapSubUncharged": "스토리를 정리하는 중 길이 제한에 도달했습니다. 포인트는 차감되지 않았습니다. 다시 시도해 주세요.",
+	"workshop.stage.openingChip": "‘{name}’에서",
+	"workshop.stage.dot": "확장팩 {n}개가 키워드로 적용돼요",
+	"workshop.stage.openingUnavailable": "이 도입부는 더 이상 쓸 수 없어요. 다시 골라 주세요",
+	"workshop.capacity.title": "컨텍스트 길이가 부족해요",
+	"workshop.capacity.body": "카드와 사용 중인 확장팩의 상시 내용이 약 {total}자라서 현재 {tier}에는 다 들어가지 않아요.",
+	"workshop.capacity.opt.switch": "{tier} 사용 (권장)",
+	"workshop.capacity.opt.switch.desc": "{tier}에서 플레이하길 권해요. 상시 내용이 모두 대화에 들어가요.",
+	"workshop.capacity.opt.go": "그대로 시작",
+	"workshop.capacity.opt.go.desc": "목록 맨 위의 확장팩은 키워드가 맞을 때만 내용이 대화에 들어가요. 대화 중 패널에 표시돼요."
 }

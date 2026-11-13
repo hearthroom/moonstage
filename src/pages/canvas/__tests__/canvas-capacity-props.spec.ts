@@ -4,7 +4,7 @@ import ts from 'typescript'
 import { computed, ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import { capacityChoiceOptions } from '../canvas-capacity-choice'
+import { capacityChoiceOptions, capacityContent } from '../canvas-capacity-choice'
 import CanvasCapacityChoice from '../components/canvas-capacity-choice.vue'
 
 // Execute the actual canvas computed, including its dependency wiring. Testing
@@ -18,7 +18,7 @@ const js = ts.transpileModule(statement.getText(tree), { compilerOptions: { targ
 
 function props(advice: any, contextBudgetOptions: any = [{ value: 3, tokens: 128000 }]) {
   const ctx: any = {
-    computed, capacityChoiceOptions,
+    computed, capacityChoiceOptions, capacityContent,
     capacitySpec: ref({ advice, saving: false, error: '' }),
     selectedVariant: ref({ contextBudgetOptions }),
     t: (key: string, params?: any) => params?.size ? `${key}:${params.size}` : key,

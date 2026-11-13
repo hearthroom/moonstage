@@ -4469,5 +4469,14 @@
 	"modelSelect.agentCostReload": "重新加载",
 	"systemMsg.summaryLengthCap": "整理剧情超出长度上限",
 	"systemMsg.summaryLengthCapSub": "整理剧情时超出长度上限，可重试。",
-	"systemMsg.summaryLengthCapSubUncharged": "整理剧情时超出长度上限，未扣点。可重试。"
+	"systemMsg.summaryLengthCapSubUncharged": "整理剧情时超出长度上限，未扣点。可重试。",
+	"workshop.stage.openingChip": "来自“{name}”",
+	"workshop.stage.dot": "有 {n} 个扩展包的常驻内容改为关键词触发",
+	"workshop.stage.openingUnavailable": "这个开场已无法使用，请重新选择",
+	"workshop.capacity.title": "上下文长度不够",
+	"workshop.capacity.body": "原卡加上已启用的扩展包，常驻内容约 {total} 字，当前的 {tier} 容纳不下。",
+	"workshop.capacity.opt.switch": "换成 {tier}（推荐）",
+	"workshop.capacity.opt.switch.desc": "建议使用 {tier}，常驻内容可以全部带进对话。",
+	"workshop.capacity.opt.go": "照样开始",
+	"workshop.capacity.opt.go.desc": "排在最上面的扩展包，常驻内容改成关键词命中才带进对话；对话中的面板会标示。"
 }

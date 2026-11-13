@@ -151,7 +151,9 @@ describe('開場選項（MMD prologue）', () => {
     const start = page.slice(page.indexOf('function chatStart('), page.indexOf('function appendChatErrorBubble('))
     expect(start).toContain('if (showsOpening(welcomeContent))')
     const preview = page.slice(page.indexOf('function renderGreetingPreview('), page.indexOf('function onGreetingSwipe('))
-    expect(preview).toContain('if (!showsOpening(text))')
+    // 例外只有一個：擴充的開場只有開場網頁、而且還有別條可切時，留一列只有來源 chip 與左右切換的開場
+    // （氣泡本身收起，見 canvas.css 的 .is-origin-only），否則玩家切到那條就回不去。
+    expect(preview).toContain('if (!showsOpening(text) && !(fromWorkshop && hasAlternates(greeting.list)))')
     // 開新對話（存檔後開新的一段）也走同一條規則：QA 在傳統頁開新對話時看到過空氣泡
     const adopt = page.slice(page.indexOf('function adoptStartedConversation('), page.indexOf('function chatStart('))
     expect(adopt).toContain('if (showsOpening(welcomeContent))')

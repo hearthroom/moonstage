@@ -28,9 +28,15 @@ export interface CapacityAdvice {
   requiredTokens: number | null
   /** 用目前檔位、只帶最重要的常駐設定時裝得下。 */
   trimFits: boolean
+  /**
+   * 對話有啟用擴充（卡片工坊）時才有：原卡加擴充的常駐總字數、目前檔位的字樣、「照樣開始」可不可行，
+   * 以及這段對話容量選擇的 revision（寫入時帶回）。有這一塊時只給「換檔位／照樣開始」：
+   * 關掉部分擴充只在開始對話前的網頁上做，畫布裡不給（PM 2026-11-14）。
+   */
+  workshop?: { totalChars: number; tierLabel: string; triggerFits: boolean; revision: number }
 }
 
-export type CapacityChoiceKey = 'raise' | 'trim'
+export type CapacityChoiceKey = 'raise' | 'trim' | 'trigger'
 
 export interface CapacityChoiceOption {
   key: CapacityChoiceKey
@@ -38,7 +44,11 @@ export interface CapacityChoiceOption {
   desc: string
 }
 
-export type CapacityPatch = { context: number; trimConstantLore: false } | { trimConstantLore: true }
+export type CapacityPatch =
+  | { context: number; trimConstantLore: false }
+  | { trimConstantLore: true }
+  /** 照樣開始：這段對話的擴充常駐從清單最上方起改成關鍵詞觸發（伺服器決定降哪幾件）。 */
+  | { workshopTrigger: true; revision: number }
 
 type Translate = (key: string, params?: Record<string, unknown>) => string
 
@@ -78,8 +88,16 @@ export function raisesContext(previous: unknown, next: unknown): boolean {
   return Number.isFinite(from) && Number.isFinite(to) && from > 0 && to > from
 }
 
-export function capacityTitleKey(situation?: CapacitySituation | null): string {
+export function capacityTitleKey(situation?: CapacitySituation | null, advice?: CapacityAdvice | null): string {
+  if (advice?.workshop) return 'workshop.capacity.title'
   return situation === 'later' ? 'canvas.capacity.titleLater' : 'canvas.capacity.titleStart'
+}
+
+/** 彈層的說明句：有擴充時講原卡加擴充的常駐總字數與目前檔位。 */
+export function capacityContent(advice: CapacityAdvice | null | undefined, t: Translate): string {
+  const ws = advice?.workshop
+  if (!ws) return t('canvas.capacity.content')
+  return t('workshop.capacity.body', { total: ws.totalChars.toLocaleString('en-US'), tier: ws.tierLabel })
 }
 
 /** 128000 → '128K'：跟模型選單上那一檔的寫法一樣。 */
@@ -100,6 +118,16 @@ export function capacityChoiceOptions(
 ): CapacityChoiceOption[] {
   if (!advice) return []
   const options: CapacityChoiceOption[] = []
+  if (advice.workshop) {
+    if (advice.requiredTier) {
+      const tier = capacitySizeLabel(advice.requiredTokens ?? fallbackTokens)
+      options.push({ key: 'raise', label: t('workshop.capacity.opt.switch', { tier }), desc: t('workshop.capacity.opt.switch.desc', { tier }) })
+    }
+    if (advice.workshop.triggerFits) {
+      options.push({ key: 'trigger', label: t('workshop.capacity.opt.go'), desc: t('workshop.capacity.opt.go.desc') })
+    }
+    return options
+  }
   if (advice.requiredTier) {
     const size = capacitySizeLabel(advice.requiredTokens ?? fallbackTokens)
     options.push({
@@ -119,7 +147,8 @@ export function capacityChoicePatch(key: CapacityChoiceKey, advice: CapacityAdvi
   if (!advice) return null
   // 調高就是要完整的設定：之前選過精簡的話一起關掉，不然調高了設定還是被截掉。
   if (key === 'raise' && advice.requiredTier) return { context: advice.requiredTier, trimConstantLore: false }
-  if (key === 'trim' && advice.trimFits) return { trimConstantLore: true }
+  if (key === 'trim' && advice.trimFits && !advice.workshop) return { trimConstantLore: true }
+  if (key === 'trigger' && advice.workshop?.triggerFits) return { workshopTrigger: true, revision: advice.workshop.revision }
   return null
 }
 

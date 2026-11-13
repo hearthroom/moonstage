@@ -254,6 +254,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     post({ type: 'messages', messages })
     list.forEach((m) => { const t = tracked.get(m.id); if (t) postStateIfViewless(m, t.shellId) })
     // 開場選項畫在訊息列之後，跟著全量訊息一起到；之後變了才由 sync 再送。
+    syncOpening(snapshot)
     syncPrologue(snapshot)
   }
 
@@ -407,6 +408,14 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     post({ type: 'prologue', ...state })
   }
 
+  let lastOpening: string | null = null
+  const syncOpening = (snapshot: HudHostState) => {
+    if (typeof snapshot.openingPage !== 'string' || lastOpening === null) return
+    if (snapshot.openingPage === lastOpening) return
+    lastOpening = snapshot.openingPage
+    post({ type: 'opening', html: snapshot.openingPage })
+  }
+
   const syncInput = (snapshot: HudHostState) => {
     const value = snapshot.inputText
     if (value === lastInputPosted) return
@@ -481,6 +490,8 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
     if (destroyed) return
     const base = deps.hello()
     lastUserName = base.user.nickname
+    // hello 已經帶了這份首屏網頁；之後選到別的開場才送 opening。
+    lastOpening = String(base.card?.openingPage || '')
     const share = deps.share ? deps.share.read() : null
     lastShareKey = JSON.stringify(share)
     // 殼一開始的草稿是空的；宿主此刻的草稿若非空，第一次 sync 會送過去，空的就不必。
@@ -751,6 +762,7 @@ export function createSandboxHost(deps: SandboxHostDeps): SandboxHost {
       syncChrome(snapshot)
       syncPanels(snapshot)
       syncHistory(snapshot)
+      syncOpening(snapshot)
       syncPrologue(snapshot)
     },
     conversationSwitched(conversationId?: string) {

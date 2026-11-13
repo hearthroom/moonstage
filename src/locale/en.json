@@ -4469,5 +4469,14 @@
 	"modelSelect.agentCostReload": "Reload",
 	"systemMsg.summaryLengthCap": "Story recap length limit reached",
 	"systemMsg.summaryLengthCapSub": "The story recap reached the length limit. Retry.",
-	"systemMsg.summaryLengthCapSubUncharged": "The story recap reached the length limit. No credits were charged. Retry."
+	"systemMsg.summaryLengthCapSubUncharged": "The story recap reached the length limit. No credits were charged. Retry.",
+	"workshop.stage.openingChip": "From “{name}”",
+	"workshop.stage.dot": "{n} extensions are keyword-triggered",
+	"workshop.stage.openingUnavailable": "That opening is no longer available. Choose another.",
+	"workshop.capacity.title": "Context length is not enough",
+	"workshop.capacity.body": "The card and the extensions you turned on add up to about {total} characters of always-on content, which does not fit in the current {tier}.",
+	"workshop.capacity.opt.switch": "Switch to {tier} (recommended)",
+	"workshop.capacity.opt.switch.desc": "{tier} is recommended. All always-on content fits in the chat.",
+	"workshop.capacity.opt.go": "Start anyway",
+	"workshop.capacity.opt.go.desc": "The extension at the top of the list will only add its content when a keyword matches. The panel in the chat shows which ones."
 }

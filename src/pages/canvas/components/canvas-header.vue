@@ -68,6 +68,7 @@
             :title="commentsLabel"
             aria-haspopup="dialog"
             :aria-expanded="commentsExpanded ? 'true' : 'false'"
+            :aria-description="commentsAlert || null"
             @click="$emit('comments')"
             @keydown.enter.prevent="$emit('comments')"
             @keydown.space.prevent="$emit('comments')"
@@ -77,6 +78,8 @@
               <circle cx="12" cy="12" r="9" />
               <path d="M12 11v5.5M12 7.5v.01" />
             </svg>
+            <!-- 擴充的常駐有降為觸發載入：小圓點提示去面板看（讀屏從鍵的 aria-description 讀到同一句） -->
+            <i v-if="commentsAlert" class="comments-alert" data-lt="comments-alert" :title="commentsAlert" aria-hidden="true"></i>
           </div>
           <div
             v-if="fullscreenSupported"
@@ -129,6 +132,8 @@ withDefaults(defineProps<{
   commentsLabel?: string
   /** 宿主的卡片資訊面板開著 */
   commentsExpanded?: boolean
+  /** 面板裡有要玩家知道的提示（擴充常駐降為觸發載入）：入口右上角加小圓點，字樣給讀屏與滑鼠提示；空字串不畫 */
+  commentsAlert?: string
 }>(), { badge: '', showBack: true })
 
 defineEmits<{

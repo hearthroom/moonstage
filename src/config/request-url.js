@@ -42,6 +42,11 @@ export const requestUrl = {
 	// 試玩卡：把本機的酒館卡建成一張會自動到期的私有卡（PUT/GET/DELETE …/{clientKey}）。
 	trialCards: `${V1}/trial-cards`,
 	authorAssetServe: `${V1}/role/author-asset/serve`,
+	// 卡片工坊（擴充）：開場候選、帶開場新開、這場對話的擴充（docs studio/tasks/2026-11-13-card-workshop/interface-stage.md）
+	workshopOpenings: `${V1}/workshop/openings`,
+	workshopConversationStart: `${V1}/workshop/conversation/start`,
+	workshopConversation: `${V1}/workshop/conversation`,
+	workshopCapacity: `${V1}/workshop/conversation/capacity`,
 	// 外觀偏好（桌布、字體）。送出那一輪不讀它——讀的是下面那一份。
 	playerPreference: `${V1}/player/preference`,
 	playerPreferenceSave: `${V1}/player/preference/save`,

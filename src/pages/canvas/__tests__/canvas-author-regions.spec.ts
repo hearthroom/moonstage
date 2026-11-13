@@ -89,7 +89,10 @@ describe('離場要把接管清單收回來', () => {
   const vue = readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')
 
   it('disposeAuthorAsset 把清單清空', () => {
-    const start = vue.indexOf('function disposeAuthorAsset()')
+    // 收作者執行期抽成 teardownAuthorRuntime（離場與擴充重建共用），離場一定先叫它
+    const dispose = vue.slice(vue.indexOf('function disposeAuthorAsset()'), vue.indexOf('\n}', vue.indexOf('function disposeAuthorAsset()')))
+    expect(dispose).toMatch(/teardownAuthorRuntime\(\)/)
+    const start = vue.indexOf('function teardownAuthorRuntime()')
     expect(start).toBeGreaterThan(-1)
     const body = vue.slice(start, vue.indexOf('\n}', start))
     expect(body).toMatch(/authorOwnedRegions\.value = ''/)

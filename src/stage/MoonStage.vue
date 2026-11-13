@@ -19,12 +19,17 @@ import '@/static/icon/fui-custom-icon.css'
 import '@/common/html-card.css'
 import '@/static/styles/stage-tokens.css'
 
-const props = defineProps<{ roleId?: string; draft?: string; trial?: string; conversationId?: string; readOnly?: boolean; accessReason?: string; historyTitle?: string }>()
+// wsCapacity／wsTrial／wsOpening：卡片工坊（擴充）。卡片頁選了「照樣開始」、或作者從編輯頁按「試玩」時由網頁帶進來
+// （docs studio/tasks/2026-11-13-card-workshop/interface-stage.md §6）。
+const props = defineProps<{ roleId?: string; draft?: string; trial?: string; conversationId?: string; readOnly?: boolean; accessReason?: string; historyTitle?: string; wsCapacity?: string; wsTrial?: string; wsOpening?: string }>()
 provide(STAGE_ROUTE_OPTIONS, {
   ...(props.conversationId ? {conversationId:props.conversationId} : {}),
   ...(props.roleId ? { roleId: props.roleId } : {}),
   ...(props.draft ? { draft: props.draft } : {}),
   ...(props.trial ? { trial: props.trial } : {}),
+  ...(props.wsCapacity ? { wsCapacity: props.wsCapacity } : {}),
+  ...(props.wsTrial ? { wsTrial: props.wsTrial } : {}),
+  ...(props.wsOpening ? { wsOpening: props.wsOpening } : {}),
 })
 
 // 跟 App.vue 一樣拿 state 本體：useLoading() 的 visible／text 是取值函式，直接綁到模板會把函式印出來

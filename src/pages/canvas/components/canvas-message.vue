@@ -69,11 +69,16 @@
         玩家找不到（用戶 2026-09-12 回報：「三個點離玩家的消息太遠了」）。
         寬度上限（玩家 92%）搬到這一層，氣泡在裡面撐滿。
       -->
+      <!-- 開場來自擴充：氣泡上方一枚來源 chip（平台的標示，不進作者的氣泡內容）。原卡開場沒有。 -->
+      <div v-if="message.origin" class="mes_origin" data-lt="opening-origin">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 13l9 5 9-5" /></svg>
+        <span>{{ message.origin }}</span>
+      </div>
       <div class="mes_turn" data-lt="turn">
       <div
         ref="bubbleEl"
         class="mes_text content"
-        :class="bubbleClass"
+        :class="[bubbleClass, { 'is-origin-only': !!message.origin && !message.html }]"
         :id="'q-' + message.mesid"
         data-lt="bubble"
         :data-lt-role="message.role"
@@ -267,6 +272,8 @@ const props = withDefaults(defineProps<{
     /** 最新的那一則 AI 回覆——只有它能重新生成、改寫、繼續 */
     latestAI?: boolean
     swipes?: { index: number; total: number } | null
+    /** 開場來自擴充時的來源字樣；空字串或沒有就不畫 */
+    origin?: string
   }
   labels?: { copy: string; edit: string; regenerate: string; reasoning: string; prepTrail: string; prev: string; next: string; interruptedNotice?: string; interruptedNoticeSub?: string; continueAction?: string; failedAgainSub?: string; switchModel?: string; waitSeconds?: string; waitMinutes?: string }
   menuLabel?: string

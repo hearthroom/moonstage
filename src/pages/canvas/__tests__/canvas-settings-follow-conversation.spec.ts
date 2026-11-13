@@ -48,7 +48,8 @@ describe('card settings follow the conversation revision', () => {
 
   it('follows the conversation revision on start, new save, switch and fork', () => {
     const canvas = read('src/pages/canvas/canvas.vue')
-    expect(fn(canvas, 'function chatStart(')).toContain('followConversationRole(conversationRoleId(res.data))')
+    // conversation/start 與帶擴充開場新開共用同一段回應處理
+    expect(fn(canvas, 'async function handleChatStartResponse(')).toContain('followConversationRole(conversationRoleId(res.data))')
     expect(fn(canvas, 'function adoptStartedConversation(')).toContain('followConversationRole(conversationRoleId(started))')
     expect(fn(canvas, 'function adoptConversation(')).toContain('syncConversationRole(nextId)')
   })
