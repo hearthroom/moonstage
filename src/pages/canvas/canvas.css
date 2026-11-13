@@ -3666,6 +3666,23 @@
     color: var(--lt-canvas-muted);
   }
 
+  .ms-lane-touch-loading { padding: 0; }
+  .ms-bucket-readout { display: flex; align-items: center; height: 48px; margin-bottom: 8px; border: 1px solid var(--lt-canvas-sheet-line); border-radius: 12px; background: var(--lt-canvas-sheet-pop-bg); box-sizing: border-box; overflow: hidden; }
+  .ms-bucket-step { appearance: none; flex: 0 0 44px; width: 44px; height: 48px; border: 0; background: transparent; color: var(--lt-canvas-sheet-fg); display: grid; place-items: center; padding: 0; cursor: pointer; touch-action: manipulation; }
+  .ms-bucket-step svg { width: 18px; height: 18px; }
+  .ms-bucket-step:active { background: var(--lt-canvas-accent-bg); }
+  .ms-bucket-reading .ms-bucket-tip-row { font-size: 14px; font-weight: 600; }
+  .ms-bucket-reading .ms-bucket-tip-t { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ms-bucket-step:disabled { opacity: .32; cursor: default; }
+  .ms-bucket-step:focus-visible, .ms-buckets:focus-visible { outline: 2px solid var(--lt-canvas-accent); outline-offset: 2px; }
+  .ms-bucket-reading { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; color: var(--lt-canvas-sheet-fg); overflow-wrap: anywhere; }
+  .ms-bucket-marker { position: absolute; top: 2px; width: 8px; height: 40px; box-sizing: border-box; transform: translateX(-50%); border-radius: 3px; border: 2px solid var(--lt-canvas-sheet-fg); box-shadow: 0 0 0 2px var(--lt-canvas-sheet-pop-bg); pointer-events: none; }
+  @media (hover: none) and (pointer: coarse) {
+    .ms-buckets { position: relative; height: 44px; padding-block: 8px; box-sizing: border-box; touch-action: pan-y; user-select: none; }
+    .ms-bucket { height: 28px; }
+    .ms-bucket-sel { outline: 0; }
+  }
+
   .ms-bucket-axis {
     display: flex;
     justify-content: space-between;

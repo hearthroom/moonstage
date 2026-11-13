@@ -240,6 +240,16 @@
 .ms-bucket-tip {
     padding: 4px 8px
 }
+.ms-lane-touch-loading { padding: 0
+}
+.ms-bucket-readout { margin-bottom: 8px
+}
+.ms-bucket-step { padding: 0
+}
+@media (hover: none) and (pointer: coarse) {
+    .ms-buckets { padding-block: 8px
+    }
+}
 .ms-empty {
     padding: 32px 0
 }

@@ -273,26 +273,42 @@
 									<span class="ms-lane-pct-cap">{{ t('modelSelect.laneDetailUptime') }}</span>
 								</div>
 
-								<div v-if="laneHistoryLoading" class="ms-lane-empty">
-									<span class="ms-hint">{{ t('modelSelect.speedObserving') }}</span>
+								<div v-if="laneHistoryLoading" class="ms-lane-empty" :class="{ 'ms-lane-touch-loading': laneTouch }">
+									<div v-if="laneTouch" class="ms-bucket-loading"><div class="ms-bucket-readout"><span class="ms-bucket-reading" role="status">{{ t('modelSelect.speedObserving') }}</span></div><div class="ms-buckets" aria-hidden="true"><div v-for="i in 72" :key="i" class="ms-bucket" :style="{ flex: 1 }"></div></div></div>
+									<span v-if="!laneTouch" class="ms-hint" role="status">{{ t('modelSelect.speedObserving') }}</span>
 								</div>
 								<div v-else-if="!laneBuckets.length" class="ms-lane-empty">
 									<span class="ms-hint">{{ t('modelSelect.laneDetailEmpty') }}</span>
 								</div>
 								<template v-else>
-									<div class="ms-buckets">
+									<div v-if="laneTouch" class="ms-bucket-readout">
+										<button type="button" class="ms-bucket-step ms-bucket-prev" :aria-label="t('modelSelect.bucketPrev')" :disabled="laneSelectedIndex <= 0" @pointerdown="startLaneStep($event, -1)" @pointerup="stopLaneStep" @pointerleave="stopLaneStep" @pointercancel="stopLaneStep" @blur="stopLaneStep" @click.stop="onLaneStepClick($event, -1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button>
+										<div v-if="laneSelected" class="ms-bucket-reading" aria-live="polite" aria-atomic="true">
+											<span class="ms-bucket-tip-t">{{ laneSelected.rangeText }}</span>
+											<span class="ms-bucket-tip-row"><span v-if="laneSelected.tone !== 'none'" class="ms-dot" :class="'ms-dot-fill-' + laneSelected.tone"></span>{{ laneSelected.valueText }}</span>
+										</div>
+										<button type="button" class="ms-bucket-step ms-bucket-next" :aria-label="t('modelSelect.bucketNext')" :disabled="laneSelectedIndex >= laneBuckets.length - 1" @pointerdown="startLaneStep($event, 1)" @pointerup="stopLaneStep" @pointerleave="stopLaneStep" @pointercancel="stopLaneStep" @blur="stopLaneStep" @click.stop="onLaneStepClick($event, 1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
+									</div>
+									<div class="ms-buckets" :role="laneTouch ? 'slider' : undefined" :tabindex="laneTouch ? 0 : undefined"
+										:aria-label="laneTouch ? t('modelSelect.bucketBar') : undefined"
+										:aria-valuemin="laneTouch ? 0 : undefined" :aria-valuemax="laneTouch ? laneBuckets.length - 1 : undefined"
+										:aria-valuenow="laneTouch ? laneSelectedIndex : undefined"
+										:aria-valuetext="laneTouch && laneSelected ? laneSelected.rangeText + ' ' + laneSelected.valueText : undefined"
+										@pointerdown="startLaneScrub" @pointermove="moveLaneScrub" @pointerup="endLaneScrub" @pointercancel="endLaneScrub" @lostpointercapture="endLaneScrub"
+										@keydown="onLaneKey">
 										<div
 											v-for="(b, i) in laneBuckets"
 											:key="b.hourStartMs"
 											class="ms-bucket"
 											:class="['ms-bucket-' + b.tone, { 'ms-bucket-sel': laneSelectedIndex === i }]"
 											:style="{ width: laneBucketWidthPct + '%' }"
-											@mouseenter="laneSelectedIndex = i"
-											@mouseleave="laneSelectedIndex = -1"
-											@click.stop="laneSelectedIndex = laneSelectedIndex === i ? -1 : i"></div>
+											@mouseenter="!laneTouch && (laneSelectedIndex = i)"
+											@mouseleave="!laneTouch && (laneSelectedIndex = -1)"
+											@click.stop="!laneTouch && (laneSelectedIndex = laneSelectedIndex === i ? -1 : i)"></div>
+										<div v-if="laneTouch && laneSelected" class="ms-bucket-marker" :class="'ms-bucket-' + laneSelected.tone" :style="laneDotStyle" aria-hidden="true"></div>
 									</div>
 									<!-- tooltip 放方塊條**下方**：放上方會蓋掉可用率那個數字。 -->
-									<div class="ms-bucket-tipwrap">
+									<div v-if="!laneTouch" class="ms-bucket-tipwrap">
 										<div v-if="laneSelected" class="ms-bucket-dot" :style="laneDotStyle"></div>
 										<div v-if="laneSelected" class="ms-bucket-tip" :style="laneTipStyle">
 											<span class="ms-bucket-tip-t">{{ laneSelected.rangeText }}</span>
@@ -967,6 +983,74 @@ const truncationText = (completionRate: number) => {
 		if (!h || !Array.isArray(h.buckets)) return [];
 		return h.buckets.map((b: any) => Object.assign({}, b, { tone: uptimeBucketTone(b) }));
 	});
+
+	const touchMedia = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(hover: none) and (pointer: coarse)') : null;
+	const laneTouch = ref(!!touchMedia?.matches);
+	const onLaneTouchChange = (e: MediaQueryListEvent) => { laneTouch.value = e.matches; };
+	touchMedia?.addEventListener?.('change', onLaneTouchChange);
+	onBeforeUnmount(() => touchMedia?.removeEventListener?.('change', onLaneTouchChange));
+	watch([laneBuckets, laneTouch], ([buckets, touch]) => {
+		lanePointer = null;
+		if (!touch) { laneSelectedIndex.value = -1; return; }
+		let last = -1;
+		for (let i = buckets.length - 1; i >= 0; i--) {
+			if (buckets[i].tone !== 'none') { last = i; break; }
+		}
+		if (last < 0) for (let i = buckets.length - 1; i >= 0; i--) {
+			if (buckets[i].total > 0) { last = i; break; }
+		}
+		laneSelectedIndex.value = last >= 0 ? last : buckets.length - 1;
+	});
+	let lanePointer: number | null = null;
+	const selectLaneAt = (e: PointerEvent) => {
+		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		const n = laneBuckets.value.length;
+		if (!n || rect.width <= 0) return;
+		// 格間隙也能命中；用格中心的 pitch 選最近的小時。
+		const pct = (e.clientX - rect.left) / rect.width * 100;
+		const width = laneBucketWidthPct.value;
+		laneSelectedIndex.value = Math.max(0, Math.min(n - 1, Math.round((pct - width / 2) / (width + 0.35))));
+	};
+	const startLaneScrub = (e: PointerEvent) => {
+		if (!laneTouch.value || e.button > 0 || lanePointer !== null) return;
+		lanePointer = e.pointerId;
+		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+		selectLaneAt(e);
+	};
+	const moveLaneScrub = (e: PointerEvent) => {
+		if (laneTouch.value && lanePointer !== null && lanePointer === e.pointerId) selectLaneAt(e);
+	};
+	const endLaneScrub = (e: PointerEvent) => {
+		if (lanePointer === e.pointerId) lanePointer = null;
+	};
+	const stepLaneHour = (delta: number) => {
+		laneSelectedIndex.value = Math.max(0, Math.min(laneBuckets.value.length - 1, laneSelectedIndex.value + delta));
+	};
+	let laneStepTimer: ReturnType<typeof setTimeout> | null = null;
+	const stopLaneStep = () => { if (laneStepTimer !== null) clearTimeout(laneStepTimer); laneStepTimer = null; };
+	onBeforeUnmount(stopLaneStep);
+	const startLaneStep = (e: PointerEvent, delta: number) => {
+		if (e.button > 0) return;
+		e.preventDefault(); stopLaneStep(); stepLaneHour(delta);
+		const repeat = () => {
+			const before = laneSelectedIndex.value; stepLaneHour(delta);
+			if (before !== laneSelectedIndex.value) laneStepTimer = setTimeout(repeat, 90);
+			else stopLaneStep();
+		};
+		laneStepTimer = setTimeout(repeat, 400);
+	};
+	const onLaneStepClick = (e: MouseEvent, delta: number) => {
+		// 鍵盤／輔助科技的 click 沒有 pointerdown；觸控 click 已在按下時處理。
+		if (e.detail === 0) stepLaneHour(delta);
+	};
+	const onLaneKey = (e: KeyboardEvent) => {
+		if (!laneTouch.value) return;
+		if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'].includes(e.key)) {
+			e.preventDefault(); stepLaneHour(({ ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1, PageUp: 24, PageDown: -24 })[e.key]);
+		} else if (e.key === 'Home' || e.key === 'End') {
+			e.preventDefault(); laneSelectedIndex.value = e.key === 'Home' ? 0 : laneBuckets.value.length - 1;
+		}
+	};
 
 	// 寬度用百分比：72 格各自捨入的話誤差會累積把整條推爆。
 	const laneBucketWidthPct = computed(() => {
