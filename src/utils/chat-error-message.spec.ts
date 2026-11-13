@@ -157,6 +157,19 @@ describe('resolveContextCapacityAdvice', () => {
     constant_lore_trim_fits: true,
   }
 
+  it('對話有擴充時多帶 workshop：總字數、目前檔位字樣、照樣開始可不可行、revision', () => {
+    const advice = resolveContextCapacityAdvice({ ...envelope, constant_lore_trim_fits: false,
+      workshop_capacity: { total_chars: 182000, current_tier_label: '32K', trigger_fits: true, revision: 2 } })
+    expect(advice).toEqual({ requiredTier: 3, requiredTokens: 128000, trimFits: false,
+      workshop: { totalChars: 182000, tierLabel: '32K', triggerFits: true, revision: 2 } })
+  })
+
+  it('只有照樣開始可行（沒有檔位裝得下）也算有建議', () => {
+    const { required_context_tier: _t, required_context_tokens: _k, ...rest } = envelope
+    expect(resolveContextCapacityAdvice({ ...rest, constant_lore_trim_fits: false, workshop_capacity: { total_chars: 9, trigger_fits: true, revision: 0 } }))
+      .toEqual({ requiredTier: null, requiredTokens: null, trimFits: false, workshop: { totalChars: 9, tierLabel: '', triggerFits: true, revision: 0 } })
+  })
+
   it('keeps the recommended tier, its size and whether trimming fits', () => {
     expect(resolveContextCapacityAdvice(envelope)).toEqual({ requiredTier: 3, requiredTokens: 128000, trimFits: true })
   })

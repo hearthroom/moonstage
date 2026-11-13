@@ -67,8 +67,9 @@ describe('capacity rejection card with advice', () => {
       for (const word of ['体验', '更佳']) expect((zhHans as Record<string, string>)[key]).toContain([...word].join(WJ))
     }
     // 彈窗標題與泡泡標題用同一個判斷，兩種頁面（一般卡、沙箱卡）都一樣。
-    expect(source).toMatch(/:title="t\(capacityTitleKey\(capacitySpec\.situation\)\)"/)
-    expect(source).toMatch(/case 'capacity':[\s\S]{0,80}t\(capacityTitleKey\(capacitySpec\.value\.situation\)\)/)
+    // 標題另看有沒有擴充（工坊）的建議：有就換成工坊那一組
+    expect(source).toMatch(/:title="t\(capacityTitleKey\(capacitySpec\.situation, capacitySpec\.advice\)\)"/)
+    expect(source).toMatch(/case 'capacity':[\s\S]{0,80}t\(capacityTitleKey\(capacitySpec\.value\.situation, capacitySpec\.value\.advice\)\)/)
   })
 
   it('talks about the card size instead of shortening the message, and offers the choice', () => {

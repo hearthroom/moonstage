@@ -84,7 +84,8 @@ describe('desktop 捲底跟隨', () => {
   // 沒歷史則自己推一則開場白。後者原本推完就結束，一行捲動都沒有——第一次打開一張
   // 角色卡就停在頂端，開場白只露出一角（2026-08-12 使用者回報）。開場白越長越明顯。
   it('chatStart 沒有歷史時推完開場白會捲到底並重置跟隨狀態', () => {
-    const body = fnBody('chatStart')
+    // 回應處理抽成 handleChatStartResponse（與帶擴充開場新開共用）
+    const body = fnBody('handleChatStartResponse')
     const afterPush = body.slice(body.indexOf('talkList).push'))
     expect(afterPush).toMatch(/scrollToBottom/)
     expect(afterPush).toMatch(/autoScrollEnabled\.value\s*=\s*true/)

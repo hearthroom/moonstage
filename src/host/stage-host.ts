@@ -110,6 +110,12 @@ export interface StageHost {
     toggleInfo(roleId: string): void
     /** 面板開關變了叫 fn（頁首入口的 aria-expanded）；回傳取消訂閱。 */
     onInfoChange?(fn: (open: boolean) => void): () => void
+    /**
+     * 這段對話的擴充（卡片工坊）：換了對話、讀到新的就叫一次，離開對話頁叫一次 null。
+     * 宿主照它畫卡片資訊面板的「擴充」分頁（唯讀）；null＝沒有或讀不到，分頁不出現。
+     * 形狀見 pages/canvas/canvas-workshop.ts 的 WorkshopConversationView。
+     */
+    setWorkshop?(roleId: string, view: import('../pages/canvas/canvas-workshop').WorkshopConversationView | null): void
   }
 }
 

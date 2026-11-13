@@ -74,6 +74,8 @@ export interface HudHostState {
   history?: { more: boolean; loading: boolean }
   /** 沙箱殼用：開場選項（標題＋要畫的條目；玩家說過第一句之後是空的）。 */
   prologue?: { title: string; items: string[] }
+  /** 沙箱殼用：首屏網頁（選到擴充的開場時是它的）；沒有就是空字串。 */
+  openingPage?: string
   messages: HudHostMessage[]
   sendBlocked?: boolean
   readOnly?: boolean

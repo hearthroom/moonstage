@@ -4,6 +4,7 @@ import ts from 'typescript'
 import { parse } from '@vue/compiler-sfc'
 import { resolve } from 'node:path'
 import { buildGreetingList, greetingIndexForStart, hasAlternates, shouldDeferStart, showsOpening, stepGreeting } from '../canvas-greetings'
+import { composeOpenings, openingStartTarget } from '../canvas-workshop'
 import { conversationRoleId } from '../canvas-role-settings'
 import { nextTick, ref, watch } from 'vue'
 import { createPendingStreamEntry, decideStreamResume } from '../chat-transport-ownership'
@@ -35,7 +36,11 @@ function fixture() {
     _this: { http: { post, get }, requestUrl: { saveAndStartNew: '/new', ownedConversation: '/owned', getRoleDetail: '/detail' } },
     conversationId: { value: 'current' }, pendingGreetingStart: { value: false },
     pendingNewConversationFrom: { value: '' }, greetingStartBusy: { value: false },
-    greeting: { list: ['main'], index: 0 }, shouldDeferStart, buildGreetingList, conversationRoleId,
+    greeting: { list: ['main'], sources: [{ kind: 'base' }], index: 0 }, shouldDeferStart, buildGreetingList, conversationRoleId,
+    // 擴充開場（卡片工坊）：這些測試的卡沒有擴充，清單只有原卡開場。
+    composeOpenings, openingStartTarget, workshopOpenings: { value: [] }, baseGreetings: [],
+    syncOpeningExtras: vi.fn(), activeOpening: { value: null }, dropWorkshopOpening: vi.fn(), roleId: { value: 'role' },
+    workshopTrialId: { value: '' },
     archiveBusy: { value: false }, canGenerate: { value: true },
     unref: (r: any) => r.value, t: (key: string) => key,
     message: { error }, adoptStartedConversation: vi.fn(), askArchivesFull: vi.fn(),
@@ -45,6 +50,7 @@ function fixture() {
     resolveChatErrorMessage: () => 'generic', resolveChatErrorTypeFromFailure: () => 'generic',
   }
   Object.assign(bindings, { postArchiveAction: handler('postArchiveAction', bindings) })
+  Object.assign(bindings, { setOpenings: handler('setOpenings', bindings) })
   return { bindings, post, get, error, run: () => handler('saveAndStartNew', bindings)() }
 }
 describe('new conversation action', () => {
@@ -97,7 +103,7 @@ describe('choose an opening after New conversation', () => {
     const f = fixture()
     const b = f.bindings as Record<string, any>
     Object.assign(b, {
-      greeting: { list: ['main', 'alternate one', 'alternate two'], index: 0 },
+      greeting: { list: ['main', 'alternate one', 'alternate two'], sources: [{ kind: 'base' }, { kind: 'base' }, { kind: 'base' }], index: 0 },
       talkList: { value: [{ id: 'old', type: 1, content: 'old history' }] },
       pic: { value: '' }, content: { value: 'player draft' }, hasLogin: { value: true },
       historyConversation: { value: true }, openMore: { value: true },
@@ -114,7 +120,7 @@ describe('choose an opening after New conversation', () => {
     f.get.mockImplementation(async (url: string) => ({ statusCode: 200, data: url === '/owned'
       ? { conversationId: 'current', roleId: 'source-role' }
       : { characterRoleId: 'source-role', roleWelcome: 'main', welcomeAlternates: ['alternate one', 'alternate two'] } }))
-    for (const name of ['renderGreetingPreview', 'onGreetingSwipe', 'adoptStartedConversation', 'startPendingGreeting', 'onCanvasSend']) {
+    for (const name of ['setOpenings', 'renderGreetingPreview', 'onGreetingSwipe', 'adoptStartedConversation', 'startPendingGreeting', 'onCanvasSend']) {
       b[name] = handler(name, b)
     }
     return { ...f, b }
@@ -178,8 +184,52 @@ describe('choose an opening after New conversation', () => {
     f.b.chatStart.mockImplementation(async () => { f.b.conversationId.value = 'first' })
     await f.b.onCanvasSend()
     expect(f.post).not.toHaveBeenCalled()
-    expect(f.b.chatStart).toHaveBeenCalledWith(2)
+    // 第二個參數是擴充開場的目標；原卡開場是 null（照舊帶開場序號）。
+    expect(f.b.chatStart).toHaveBeenCalledWith(2, null)
     expect(f.b.onActionBtnClick).toHaveBeenCalledOnce()
+  })
+  it('starts a fresh conversation with the chosen extension opening (no previous conversation)', async () => {
+    const f = chooserFixture()
+    const snow = { kind: 'workshop', workshopId: 'w1', workshopName: '雪夜篇', openingId: 'o1', mode: 'greeting', greeting: 'snow', openingPage: '', prologue: [] }
+    f.b.conversationId.value = ''
+    f.b.pendingGreetingStart.value = true
+    f.b.greeting.list = ['main', 'snow']
+    f.b.greeting.sources = [{ kind: 'base' }, snow]
+    f.b.greeting.index = 1
+    f.b.chatStart.mockImplementation(async () => { f.b.conversationId.value = 'first' })
+    await f.b.onCanvasSend()
+    expect(f.post).not.toHaveBeenCalled()
+    expect(f.b.chatStart).toHaveBeenCalledWith(1, { kind: 'workshop', workshopId: 'w1', openingId: 'o1' })
+    // 開成之後這段對話的開場記下來，來源 chip 與開場網頁跟著它
+    expect(f.b.activeOpening.value).toEqual({ conversationId: 'first', source: snow })
+  })
+  it('saves the current archive and starts with the extension opening through the workshop entry', async () => {
+    const f = chooserFixture()
+    f.b._this.requestUrl.workshopConversationStart = '/workshop-start'
+    f.b.workshopOpenings.value = [{ workshopId: 'w1', workshopName: '雪夜篇', openingId: 'o1', mode: 'greeting', greeting: 'snow', openingPage: '', prologue: [] }]
+    await f.run()
+    expect(f.b.greeting.list).toEqual(['main', 'alternate one', 'alternate two', 'snow'])
+    f.b.onGreetingSwipe(3)
+    expect(f.b.greeting.index).toBe(3)
+    f.post.mockResolvedValue({ statusCode: 200, data: { conversationId: 'new', defaultRelay: 'snow' } })
+    await f.b.onCanvasSend()
+    expect(f.post).toHaveBeenCalledTimes(1)
+    expect(f.post.mock.calls[0][0]).toBe('/workshop-start')
+    expect(f.post.mock.calls[0][1].data).toEqual({ roleId: 'role', opening: { kind: 'workshop', workshopId: 'w1', openingId: 'o1' }, saveConversationId: 'current', firstPageSize: undefined })
+    expect(f.b.conversationId.value).toBe('new')
+  })
+  it('drops an extension opening the server no longer accepts and returns to the chooser', async () => {
+    const f = chooserFixture()
+    f.b._this.requestUrl.workshopConversationStart = '/workshop-start'
+    f.b.workshopOpenings.value = [{ workshopId: 'w1', workshopName: '雪夜篇', openingId: 'o1', mode: 'greeting', greeting: 'snow', openingPage: '', prologue: [] }]
+    await f.run()
+    f.b.onGreetingSwipe(3)
+    f.post.mockRejectedValue({ statusCode: 409, data: { error: 'workshop_opening_unavailable' } })
+    await f.b.onCanvasSend()
+    expect(f.b.dropWorkshopOpening).toHaveBeenCalledWith({ kind: 'workshop', workshopId: 'w1', openingId: 'o1' })
+    expect(f.b.uni.showToast).toHaveBeenCalledWith({ title: 'workshop.stage.openingUnavailable', icon: 'none' })
+    expect(f.b.pendingGreetingStart.value).toBe(true)
+    expect(f.b.conversationId.value).toBe('')
   })
   it('clears the staged new-conversation intent when opening an existing archive', () => {
     const f = chooserFixture()

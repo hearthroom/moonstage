@@ -4469,5 +4469,14 @@
 	"modelSelect.agentCostReload": "重新載入",
 	"systemMsg.summaryLengthCap": "整理劇情超過長度上限",
 	"systemMsg.summaryLengthCapSub": "整理劇情時超過長度上限，可重試。",
-	"systemMsg.summaryLengthCapSubUncharged": "整理劇情時超過長度上限，未扣點。可重試。"
+	"systemMsg.summaryLengthCapSubUncharged": "整理劇情時超過長度上限，未扣點。可重試。",
+	"workshop.stage.openingChip": "來自「{name}」",
+	"workshop.stage.dot": "有 {n} 個擴充的常駐內容改為關鍵詞觸發",
+	"workshop.stage.openingUnavailable": "這個開場已無法使用，請重新選擇",
+	"workshop.capacity.title": "上下文長度不夠",
+	"workshop.capacity.body": "原卡加上啟用中的擴充，常駐內容約 {total} 字，目前的 {tier} 容納不下。",
+	"workshop.capacity.opt.switch": "換成 {tier}（推薦）",
+	"workshop.capacity.opt.switch.desc": "建議以 {tier} 遊玩，常駐內容可以全部帶進對話。",
+	"workshop.capacity.opt.go": "照樣開始",
+	"workshop.capacity.opt.go.desc": "排在最上面的擴充，常駐內容改成關鍵詞命中才帶進對話；對話中的面板會標示。"
 }

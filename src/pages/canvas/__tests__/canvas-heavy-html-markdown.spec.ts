@@ -197,7 +197,7 @@ describe('opening display script regression', () => {
     const start = page.indexOf('function renderGreetingPreview() {')
     const end = page.indexOf('function onGreetingSwipe(', start)
     if (start < 0 || end < 0) throw new Error('renderGreetingPreview source anchors missing')
-    const context = vm.createContext({ greeting: { list: [source], index: 0 }, talkList: { value: [] }, pic: { value: '' }, unref: (value: any) => value.value, showsOpening })
+    const context = vm.createContext({ greeting: { list: [source], sources: [{ kind: 'base' }], index: 0 }, talkList: { value: [] }, pic: { value: '' }, unref: (value: any) => value.value, showsOpening, hasAlternates: (list: string[]) => list.length > 1, syncOpeningExtras: () => {} })
     vm.runInContext(page.slice(start, end) + '\nrenderGreetingPreview();', context)
     return (context as any).talkList.value[0]
   }

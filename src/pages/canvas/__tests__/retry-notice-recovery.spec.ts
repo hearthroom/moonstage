@@ -59,7 +59,7 @@ function fixture() {
     isCompacting: ref(false), waitPhrase: ref(''), waitClock: { startedAt: () => 0 },
     pendingReplyLabel, renderMessage: (item: any) => item.content,
     roleView: ref({ roleName: '角色' }), convertPlainText: (s: string) => s, displayScript: 'original',
-    allowsStageAction: () => false, canGenerate: ref(true), previewOnly: ref(false), showGreetingSwipes: ref(false),
+    allowsStageAction: () => false, canGenerate: ref(true), previewOnly: ref(false), showGreetingSwipes: ref(false), openingOriginLabel: () => '',
     operationFailureTitle: () => '', operationFailureSub: () => '', canSwitchModelFor: () => false,
     getSystemMsgCtas: () => [], filterCardFor: () => ({}),
   })

@@ -552,6 +552,19 @@
     cursor: pointer;
   }
   .header-action svg { width: 20px; height: 20px; }
+  /* 卡片資訊入口的小圓點（擴充的常駐降為觸發載入）：疊在圖示右上角，外圈用頂欄底色隔開圖示線條。 */
+  .comments-toggle { position: relative; }
+  .comments-alert {
+    position: absolute;
+    top: calc(50% - 12px);
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--lt-canvas-danger);
+    box-shadow: 0 0 0 2px var(--lt-canvas-header-bg);
+    pointer-events: none;
+  }
   .header-action:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
 
   .preview-badge {
@@ -1198,6 +1211,32 @@
   .swipeRightBlock.is-empty {
     display: none;
   }
+
+  /* 開場來自擴充的來源 chip：跟開場切換同一種膠囊配色（沙箱殼退回 --chat-*），在亮暗背景上都讀得到。
+     放在氣泡上方、不在氣泡裡：這是平台的標示，不混進作者美化的內容。 */
+  .mes_origin {
+    --lt-msg-hint-fg: var(--lt-canvas-fg, var(--chat-text, #e8eaed));
+    --lt-msg-hint-bg: var(--lt-canvas-bg, var(--chat-bg, #0f1217));
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    width: fit-content;
+    box-sizing: border-box;
+    height: 24px;
+    margin-bottom: 6px;
+    padding: 0 10px;
+    border: 1px solid color-mix(in srgb, var(--lt-msg-hint-fg) 22%, transparent);
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--lt-msg-hint-bg) 72%, transparent);
+    color: var(--lt-msg-hint-fg);
+    font-size: 12px;
+    line-height: 1;
+  }
+  .mes_origin svg { width: 13px; height: 13px; flex: none; }
+  /* 擴充的開場只有開場網頁、沒有開場白：這一列只留來源 chip 與左右切換，不畫空氣泡。 */
+  .mes_text.is-origin-only { display: none; }
+  .mes_origin span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .swipe_left,
   .swipe_right {

@@ -4469,5 +4469,14 @@
 	"modelSelect.agentCostReload": "再読み込み",
 	"systemMsg.summaryLengthCap": "ストーリーの整理が長さの上限に到達",
 	"systemMsg.summaryLengthCapSub": "ストーリーの整理中に長さの上限に達しました。再試行してください。",
-	"systemMsg.summaryLengthCapSubUncharged": "ストーリーの整理中に長さの上限に達しました。ポイントは消費されていません。再試行してください。"
+	"systemMsg.summaryLengthCapSubUncharged": "ストーリーの整理中に長さの上限に達しました。ポイントは消費されていません。再試行してください。",
+	"workshop.stage.openingChip": "「{name}」より",
+	"workshop.stage.dot": "{n}個の拡張パックがキーワードで入る設定です",
+	"workshop.stage.openingUnavailable": "この書き出しは使えなくなりました。選び直してください",
+	"workshop.capacity.title": "コンテキストの長さが足りません",
+	"workshop.capacity.body": "カード本体と使用中の拡張パックを合わせた常時オンの内容は約{total}文字で、現在の{tier}には収まりません。",
+	"workshop.capacity.opt.switch": "{tier}に切り替える（おすすめ）",
+	"workshop.capacity.opt.switch.desc": "{tier}でのプレイがおすすめです。常時オンの内容がすべて会話に入ります。",
+	"workshop.capacity.opt.go": "このまま始める",
+	"workshop.capacity.opt.go.desc": "リストの一番上の拡張パックは、キーワードに一致したときだけ内容が会話に入ります。会話中のパネルに表示されます。"
 }

@@ -75,8 +75,16 @@ export function resolveContextCapacityAdvice(source) {
   const tokens = Number(data.required_context_tokens)
   const requiredTokens = requiredTier && Number.isFinite(tokens) && tokens > 0 ? tokens : null
   const trimFits = data.constant_lore_trim_fits === true
-  if (!requiredTier && !trimFits) return null
-  return { requiredTier, requiredTokens, trimFits }
+  // 對話有啟用擴充（卡片工坊）時伺服器多帶這一塊：畫布改給「換檔位／照樣開始」。
+  const ws = data.workshop_capacity && typeof data.workshop_capacity === 'object' ? data.workshop_capacity : null
+  const workshop = ws ? {
+    totalChars: Number.isFinite(Number(ws.total_chars)) ? Math.max(0, Number(ws.total_chars)) : 0,
+    tierLabel: typeof ws.current_tier_label === 'string' ? ws.current_tier_label : '',
+    triggerFits: ws.trigger_fits === true,
+    revision: Number.isInteger(Number(ws.revision)) ? Number(ws.revision) : 0,
+  } : null
+  if (!requiredTier && !trimFits && !workshop?.triggerFits) return null
+  return workshop ? { requiredTier, requiredTokens, trimFits, workshop } : { requiredTier, requiredTokens, trimFits }
 }
 
 const CHAT_ERROR_FINISH_REASONS = Object.freeze({

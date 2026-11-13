@@ -31,6 +31,7 @@
       :comments-supported="!!social"
       :comments-label="t('canvas.info.open')"
       :comments-expanded="infoOpen"
+      :comments-alert="workshopInfoAlert"
       @fullscreen="toggleFullscreen"
       @favorite="toggleFavorite"
       @comments="toggleInfo"
@@ -428,7 +429,7 @@
     </CanvasPopup>
 
     <!-- 送出前就放不下的一輪：沙箱卡由殼畫同一個元件（buildPanelsState 的 'capacity'）。 -->
-    <CanvasPopup :open="panel.sheet === 'capacity'" v-if="!sandboxCard" :title="t(capacityTitleKey(capacitySpec.situation))" heading
+    <CanvasPopup :open="panel.sheet === 'capacity'" v-if="!sandboxCard" :title="t(capacityTitleKey(capacitySpec.situation, capacitySpec.advice))" heading
                  :close-label="t('main.cancel')" @close="closeCapacityChoice">
       <CanvasCapacityChoice v-bind="capacityProps" @pick="onCapacityPick" @cancel="closeCapacityChoice" />
     </CanvasPopup>
@@ -572,6 +573,7 @@ import { prepStepText as formatPrepStep } from '@/utils/prep-step-text'
 import { stripUnknownTags, wrapDialogue } from './canvas-platform-defaults'
 import { drawNativeBlocks } from '@/common/native-blocks'
 import { buildGreetingList, hasAlternates, shouldDeferStart, stepGreeting, greetingIndexForStart, buildPrologueList, shouldShowPrologue, shouldShowOpeningPage, prologuePickSends, keepsPlayerDraft, showsOpening, archivesShowStartedCard, offersResponseSettings } from './canvas-greetings'
+import { normalizeWorkshopOpenings, composeOpenings, openingStartTarget, preselectOpening, selectedOpeningExtras, normalizeWorkshopView, viewOpeningSource, workshopAlert, assetWorkshopHash, needsAssetRebuild, type WorkshopOpening, type OpeningSource, type OpeningStartTarget, type OpeningExtras, type WorkshopConversationView } from './canvas-workshop'
 import { archiveRequestQuery, buildArchiveRows, isArchiveFull, nextArchiveAfterDelete } from './canvas-archives'
 import { allowsStageAction, allowsStagePanel } from '@/host/capabilities'
 import type { ArchiveRow } from './canvas-archives'
@@ -595,7 +597,7 @@ import { chromeTopColor, syncChromeTone } from './canvas-chrome-tone'
 import CanvasConfirm from './components/canvas-confirm.vue'
 import CanvasCapacityChoice from './components/canvas-capacity-choice.vue'
 import {
-  applyCapacityChoice, capacityChoiceOptions, capacitySituation, capacityTitleKey,
+  applyCapacityChoice, capacityChoiceOptions, capacitySituation, capacityTitleKey, capacityContent,
   type CapacityAdvice, type CapacityChoiceKey, type CapacityPatch, type CapacitySituation,
 } from './canvas-capacity-choice'
 import CanvasModify from './components/canvas-modify.vue'
@@ -1728,6 +1730,9 @@ onLoad((options) => {
   // 不碰伺服器；兩個都有＝照常遊玩，但作者資產換成本機草稿。
   // 試玩卡：入口頁剛把本機檔案建成一張會到期的私有卡，玩法跟一般卡完全一樣，只多個徽章。
   trialCard.value = options.trial === '1';
+  workshopTrialId.value = options.wsTrial ? String(options.wsTrial) : '';
+  workshopOpeningPick = options.wsOpening ? String(options.wsOpening) : '';
+  pendingCapacityTrigger = options.wsCapacity === 'trigger';
   const draftId = options.draft ? String(options.draft) : '';
   if (draftId) {
     bootFromDraft(draftId, options.roleId);
@@ -1859,20 +1864,30 @@ function bootRole(targetRoleId: any, draft: AuthorDraft | null) {
   startBackgroundChoice(String(options.roleId || ''), !!unref(hasLogin) && stageHost.capabilities?.preferences !== false);
 
   setCurrentRoleId(options.roleId);
+  // 擴充開場跟角色詳情一起讀，決定押不押後開對話之前要到手（清單多了擴充開場也算「有得選」）。
+  const workshopOpeningsPending = fetchWorkshopOpenings(String(options.roleId || ''));
   getRole(async (error, data) => {
     if (error) {
       if (roleLoadFailureIsOurs(error)) message.error(t('canvas.roleLoadFailed'));
       contentReady.mark();
       return;
     }
-    greeting.list = buildGreetingList(data);
-    prologue.value = buildPrologueList(data);
+    workshopOpenings.value = await workshopOpeningsPending;
+    setOpenings(buildGreetingList(data));
+    baseOpening.prologue = buildPrologueList(data);
     if (data) pic.value = cardPortrait(data);
     // 遊客送出前存下的草稿（canvas-guest）：登入回來，開場白選到哪、輸入框的字都還在。
     const guestDraft = takeGuestDraft(guestDraftStorage(), String(options.roleId));
     if (guestDraft) {
       greeting.index = Math.min(Math.max(guestDraft.greetingIndex, 0), Math.max(greeting.list.length - 1, 0));
       content.value = guestDraft.content;
+    }
+    // 作者試玩擴充：每次都是新的一段試玩對話，一律先停在開場選擇（網址指定的那條），按送出才開。
+    if (workshopTrialId.value && unref(hasLogin)) {
+      greeting.index = preselectOpening(greeting.sources, workshopOpeningPick);
+      pendingGreetingStart.value = true;
+      renderGreetingPreview();
+      return;
     }
     // 遊客：只畫開場白（有替代開場白照樣能左右挑），不開對話——開對話要登入。送出時才請他登入。
     if (!unref(hasLogin)) {
@@ -1889,6 +1904,7 @@ function bootRole(targetRoleId: any, draft: AuthorDraft | null) {
       renderGreetingPreview();
       return;
     }
+    syncOpeningExtras();
     chatStart();
   });
 }
@@ -2608,7 +2624,7 @@ const ajax = ref({
 // 拉出去單獨 eval），每多一個自由變數就得在那兩個測試的 vm context 裡多宣告一個。
 // 一個物件比三個 ref 好維護，也讓「這兩支熱函式依賴什麼」一眼看得完。
 // crossLine 只在資產變動時算一次，不必每次渲染都判。
-const activeAuthorAsset = ref({ rules: [], version: 0, crossLine: false, random: false, variants: null });
+const activeAuthorAsset = ref({ rules: [], version: 0, workshopHash: '', crossLine: false, random: false, variants: null });
 
 // ── 作者預覽 ─────────────────────────────────────────────────────────
 //
@@ -2665,6 +2681,69 @@ const openingPage = ref('')
 let cardCssMount: ReturnType<typeof createCardCssMount> | null = null
 /** 作者選的開局呈現（openingMode：greeting｜page）；空字串＝伺服器沒帶，照卡片格式。 */
 const openingMode = ref('')
+
+// ── 擴充（卡片工坊）的開場（canvas-workshop.ts）──────────────────────────
+// 擴充帶的開場併在原卡開場後面左右切換；選到擴充的開場時，開場網頁與開場選項也換成它自己的。
+// 原卡的那一組記在這裡，換回原卡開場、或作者資產重套時照它還原。
+const baseOpening: OpeningExtras = { openingPage: '', openingMode: '', prologue: [] };
+/** 玩家目前卡片層啟用清單裡的擴充開場（登入才有）。 */
+const workshopOpenings = ref<WorkshopOpening[]>([]);
+/** 原卡開場（主＋備選）；擴充開場被拿掉時用它重組清單。 */
+let baseGreetings: string[] = [];
+/** 這段對話實際用的開場（開了對話之後）：開局當下選的，或重新整理時伺服器記下的那個。 */
+const activeOpening = ref<{ conversationId: string; source: OpeningSource } | null>(null);
+/** 作者從編輯頁按「試玩」：只套這一個擴充的草稿（網址 wsTrial，網頁傳進來）；空字串＝不是試玩。 */
+const workshopTrialId = ref('');
+/** 試玩網址指定先停在哪個開場（base 或 openingId）。 */
+let workshopOpeningPick = '';
+/** 卡片頁選了「照樣開始」進來（網址 wsCapacity=trigger）：拿到對話後寫一次容量選擇。 */
+let pendingCapacityTrigger = false;
+/** 試玩時每個請求多帶的參數。 */
+function workshopTrialQuery(): Record<string, string> {
+  return workshopTrialId.value ? { workshopTrial: workshopTrialId.value } : {};
+}
+
+/** 這段對話的開場（換了對話、還沒讀到伺服器的記錄時不算）。 */
+function conversationOpening(): OpeningSource | undefined {
+  const held = activeOpening.value;
+  return held && held.conversationId === String(unref(conversationId) || '') ? held.source : undefined;
+}
+
+function fetchWorkshopOpenings(targetRoleId: string): Promise<WorkshopOpening[]> {
+  if (!targetRoleId || !unref(hasLogin) || previewOnly.value || previewDraft.value || trialCard.value) return Promise.resolve([]);
+  return _this.http.get(_this.requestUrl.workshopOpenings, {
+    data: { roleId: targetRoleId, ...workshopTrialQuery() }, showLoading: false, quietTransport: true, quietErrors: true, timeout: 8000,
+  }).then((res: any) => (res.statusCode === 200 ? normalizeWorkshopOpenings(res.data) : []))
+    .catch(() => []);
+}
+
+/** 原卡開場換了（讀到角色詳情、另開對話）：跟擴充開場重組成一份清單。 */
+function setOpenings(base: string[]) {
+  baseGreetings = base.slice();
+  const composed = composeOpenings(baseGreetings, workshopOpenings.value);
+  greeting.list = composed.list;
+  greeting.sources = composed.sources;
+  if (greeting.index > greeting.list.length - 1) greeting.index = Math.max(greeting.list.length - 1, 0);
+}
+
+/** 伺服器說這個擴充開場用不了（下架、不在清單）：從選擇裡拿掉，停在原卡主開場。 */
+function dropWorkshopOpening(target: OpeningStartTarget) {
+  if (target.kind !== 'workshop') return;
+  workshopOpenings.value = workshopOpenings.value.filter((o) => !(o.workshopId === target.workshopId && o.openingId === target.openingId));
+  greeting.index = 0;
+  setOpenings(baseGreetings);
+  syncOpeningExtras();
+}
+
+/** 現在畫面上該用哪個開場的開場網頁與開場選項：還在選就看選到的那條，開了對話就看這段對話的。 */
+function syncOpeningExtras() {
+  const source = pendingGreetingStart.value ? greeting.sources[greeting.index] : conversationOpening();
+  const extras = selectedOpeningExtras(source, baseOpening);
+  openingPage.value = extras.openingPage;
+  openingMode.value = extras.openingMode;
+  prologue.value = extras.prologue;
+}
+
 function setActiveAuthorAsset(asset) {
   asset = resolveCardCssAsset(asset || {})
   if (typeof document !== 'undefined') {
@@ -2676,14 +2755,17 @@ function setActiveAuthorAsset(asset) {
   activeAuthorAsset.value = {
     rules: rules,
     version: (asset && asset.version) || 0,
+    // 擴充合成進來的規則換了，原卡的 version 不一定動：算進記住的渲染結果，換了就重算。
+    workshopHash: assetWorkshopHash(asset),
     crossLine: hasCrossLineRule(rules),
     random: rules.some((rule) => String(rule.replace || '').includes('{{random:')),
     // 伺服器算好的簡繁對照表：規則寫簡體、玩家看到繁體時仍要命中。
     variants: (asset && asset.variants) || null,
   };
   // 首屏網頁與開局呈現跟規則一起換：換卡、重載、作者資產清掉時都跟著走。
-  openingPage.value = String((asset && asset.openingPage) || '');
-  openingMode.value = String((asset && asset.openingMode) || '');
+  baseOpening.openingPage = String((asset && asset.openingPage) || '');
+  baseOpening.openingMode = String((asset && asset.openingMode) || '');
+  syncOpeningExtras();
   // 規則換了，之前用舊規則算出來的串流快取必須作廢。
   clearStreamCache();
 }
@@ -2936,6 +3018,46 @@ function toggleInfo() {
   if (social.value) stageHost.card?.toggleInfo(String(roleId.value));
 }
 
+// ── 這段對話的擴充（卡片工坊）─────────────────────────────────────────
+// 伺服器記下的定格清單、開場來源與常駐分配。畫布用它畫開場來源 chip 與資訊入口的小圓點，
+// 整份交給宿主畫資訊面板的「擴充」分頁（宿主介面 card.setWorkshop）。對話中唯讀，調整只影響新對話。
+const workshopView = ref<WorkshopConversationView | null>(null);
+let workshopViewSeq = 0;
+async function refreshWorkshopView() {
+  const seq = ++workshopViewSeq;
+  const targetRoleId = String(unref(roleId) || '');
+  const targetConversationId = String(unref(conversationId) || '');
+  let view: WorkshopConversationView | null = null;
+  if (targetRoleId && targetConversationId && unref(hasLogin) && !previewOnly.value && !previewDraft.value && !trialCard.value) {
+    try {
+      const res: any = await _this.http.get(_this.requestUrl.workshopConversation, {
+        data: { conversationId: targetConversationId }, showLoading: false, quietTransport: true, quietErrors: true, timeout: 8000,
+      });
+      if (res.statusCode === 200) view = normalizeWorkshopView(res.data);
+    } catch (e) { /* 讀不到當作沒有擴充，不影響遊玩 */ }
+  }
+  if (seq !== workshopViewSeq) return;
+  workshopView.value = view;
+  if (targetRoleId) stageHost.card?.setWorkshop?.(targetRoleId, view);
+  if (!view) return;
+  if (pendingCapacityTrigger) {
+    // 卡片頁選了「照樣開始」：對這段對話寫一次容量選擇，寫完重讀（面板標示、入口圓點跟著變）。只做一次。
+    pendingCapacityTrigger = false;
+    if (await saveWorkshopCapacityTrigger(view.capacityRevision)) return;
+  }
+  // 開場來源以伺服器記下的為準（重新整理、換存檔都一樣），不靠前端記得剛才選了哪條。
+  activeOpening.value = { conversationId: targetConversationId, source: viewOpeningSource(view) };
+  syncOpeningExtras();
+  // 已裝的版面跟這段對話的擴充對不上（換到清單不同的存檔、擴充有新核准版）：重讀並重建。
+  if (installedWorkshopHash !== null && view.manifestHash !== installedWorkshopHash) void reloadAuthorAssetForConversation(targetConversationId);
+}
+watch(() => [String(unref(conversationId) || ''), !!unref(hasLogin)], () => { void refreshWorkshopView(); });
+onUnmounted(() => { const id = String(unref(roleId) || ''); if (id) stageHost.card?.setWorkshop?.(id, null); });
+/** 資訊入口的小圓點：有擴充的常駐降為觸發載入才亮（宿主有面板才畫）。 */
+/** 小圓點的讀屏與提示字樣；空字串＝不畫圓點。 */
+const workshopInfoAlert = computed(() => (!!social.value && workshopAlert(workshopView.value)
+  ? t('workshop.stage.dot', { n: workshopView.value!.triggeredCount }) : ''));
+
 // 頁首與輸入區的呈現資料：跟模板上綁給 CanvasHeader／CanvasComposer 的是同一批值，殼那邊用同一套元件畫。
 function onPasteFeedback(reason: string) {
   if (reason !== 'failed' && reason !== 'empty') return;
@@ -2959,6 +3081,7 @@ function buildChromeState() {
       commentsSupported: !!social.value,
       commentsLabel: t('canvas.info.open'),
       commentsExpanded: infoOpen.value,
+      commentsAlert: workshopInfoAlert.value,
     },
     composer: {
       placeholder: t('canvas.placeholder'),
@@ -3092,7 +3215,7 @@ function buildPanelsState() {
     case 'assist':
       title = t('canvas.assist.title'); heading = true; props = assistProps.value; break;
     case 'capacity':
-      title = t(capacityTitleKey(capacitySpec.value.situation)); heading = true; props = capacityProps.value; break;
+      title = t(capacityTitleKey(capacitySpec.value.situation, capacitySpec.value.advice)); heading = true; props = capacityProps.value; break;
     case 'confirm':
       title = confirmSpec.value.title;
       heading = true;
@@ -3307,7 +3430,8 @@ function mountSandbox(asset: any) {
             // 狀態欄也用一般卡的管線算（跟訊息同一套規則引擎與範圍處理），殼直接掛。
             // 顯示字形跟訊息一樣在正則之後轉（只轉文字節點）：否則功能欄是原文、正文是玩家的簡繁，同一頁兩種字。
             statusbarHtml: sandboxStatusbarHtml(),
-            openingPage: String(sandboxAsset?.openingPage || ''),
+            // 選到擴充的開場時是它自己的開場網頁（syncOpeningExtras 換好的），不一定是原卡的。
+            openingPage: String(openingPage.value || ''),
             ...(Object.prototype.hasOwnProperty.call(sandboxAsset || {}, 'cardCss') ? { cardCss: String(sandboxAsset.cardCss ?? '') } : {}),
             cardCssDialect: String(sandboxAsset?.cardCssDialect || ''),
           },
@@ -3868,6 +3992,7 @@ function buildHudHost(): HudHost {
         history: sandboxCard.value ? { more: !!ajax.value.hasNextPage, loading: !ajax.value.flag } : undefined,
         // 沙箱殼用：開場選項（跟普通頁同一份清單與顯示時機）。
         prologue: sandboxCard.value ? { title: prologueTitle.value, items: prologueItems.value } : undefined,
+        openingPage: sandboxCard.value ? openingPage.value : undefined,
         character: {
           id: String(unref(roleId) || '') || null,
           name: convertPlainText(view.roleName || '', displayScript),
@@ -4028,7 +4153,7 @@ async function loadAuthorAsset(targetRoleId) {
   if (!targetRoleId) { authorAssetSettled.value = true; return; }
   try {
     const res = await _this.http.get(_this.requestUrl.authorAssetServe, {
-      data: { roleId: targetRoleId },
+      data: { roleId: targetRoleId, ...workshopTrialQuery() },
       showLoading: false,
       quietTransport: true,
       timeout: 60000,
@@ -4066,6 +4191,7 @@ function ensureAuthorScope() {
 }
 
 function applyAuthorAsset(asset) {
+  installedWorkshopHash = assetWorkshopHash(asset);
   try {
     const res = { data: asset };
     // 新版沙箱卡（pageMode=sandbox）：規則與腳本是寫給沙箱殼的固定節點與 sdk 的，
@@ -4392,9 +4518,9 @@ function setAuthorAssetPageVisible(visible) {
   try { if (authorAssetRuntime) authorAssetRuntime.setPageVisible(visible); } catch (e) { /* 不得影響頁面切換 */ }
 }
 
-function disposeAuthorAsset() {
-  cardCssMount?.dispose();
-  cardCssMount = null;
+// 作者執行期（容器、橋、觀察器、全域 stage／sdk）收乾淨；頁面離場與擴充重建共用。
+// 卡片 CSS（cardCssMount）不在這裡：重建時 setActiveAuthorAsset 會換成新的內容，只有離場才拆。
+function teardownAuthorRuntime() {
   // 接管清單跟著作者的東西一起收：換一張沒美化的卡時，宿主那一層要畫回來。
   authorOwnedRegions.value = '';
   disposeCardTheme()
@@ -4429,6 +4555,12 @@ function disposeAuthorAsset() {
     const hud = (window as any).__MMD_HUD_IFRAME__;
     if (hud && typeof hud.destroy === 'function') { try { hud.destroy(); } catch (e) { /* 收尾不得拋錯 */ } }
   }
+}
+
+function disposeAuthorAsset() {
+  cardCssMount?.dispose();
+  cardCssMount = null;
+  teardownAuthorRuntime();
   // 範圍最後收：執行期 dispose 時作者的 dispose 回呼還可能開計時器、動節點，要一起算進去
   stopHistoryScopeWatch();
   canvasHistory.dispose();
@@ -4438,6 +4570,49 @@ function disposeAuthorAsset() {
     authorScope = null;
   }
   setActiveAuthorAsset(null);
+}
+
+// ── 擴充換了：整個規則安裝重建 ─────────────────────────────────────────
+// 擴充的規則與介面由伺服器合成進作者資產（多一個 workshopHash）。換了一段擴充清單不同的對話、
+// 或擴充有新核准版時，不能只換規則陣列：作者的樣式、腳本、事件與掛載容器都要先收乾淨再重掛，
+// 否則舊擴充的樣式與計時器會留在頁面上。沙箱卡重建整個 iframe（mountSandbox 會先拆舊的）。
+/** 目前裝上去的那份資產的 workshopHash；null＝還沒裝過。 */
+let installedWorkshopHash: string | null = null;
+let workshopAssetSeq = 0;
+
+function rebuildAuthorAsset(asset: any) {
+  if (authorScopeClosed) return;
+  if (!sandboxCard.value) {
+    teardownAuthorRuntime();
+    // 範圍收掉、下一次 applyAuthorAsset 重建一個新的；頁面還活著，所以不關閉範圍、不動存檔歷史。
+    if (authorScope) {
+      try { authorScope.dispose(); } catch (e) { /* 收尾不得拋錯 */ }
+      authorScope = null;
+    }
+    // 訊息裡的作者腳本跟著舊範圍一起收掉了：重繪時要重新掛上。
+    activatedMessageScripts = new WeakMap<object, string>();
+  }
+  applyAuthorAsset(asset);
+}
+
+/** 這段對話的擴充跟已裝的資產對不上：帶 conversationId 重讀，hash 真的不同才重建。 */
+async function reloadAuthorAssetForConversation(targetConversationId: string) {
+  const targetRoleId = String(unref(roleId) || '');
+  if (!targetRoleId || !targetConversationId || previewDraft.value) return;
+  const seq = ++workshopAssetSeq;
+  try {
+    const res = await _this.http.get(_this.requestUrl.authorAssetServe, {
+      data: { roleId: targetRoleId, conversationId: targetConversationId, ...workshopTrialQuery() },
+      showLoading: false, quietTransport: true, quietErrors: true, timeout: 60000,
+    });
+    if (seq !== workshopAssetSeq || String(unref(conversationId) || '') !== targetConversationId) return;
+    if (res.statusCode !== 200 || !res.data) return;
+    if (!needsAssetRebuild(installedWorkshopHash, assetWorkshopHash(res.data))) return;
+    rebuildAuthorAsset(res.data);
+  } catch (e) {
+    // 讀不到就留著現在的版面，不影響對話。
+    console.warn('[Workshop] 擴充版面重讀失敗，沿用目前的版面');
+  }
 }
 
 const highlightText = (content, type, cacheKey, streaming) => {
@@ -4948,6 +5123,7 @@ function renderMemoKey(item) {
     summary: !!item.isSummary,
     messageRole: item.systemOnly ? 'system' : item.type == 1 ? 'user' : item.type == 0 ? 'ai' : 'system',
     version: activeAuthorAsset.value.version,
+    workshop: activeAuthorAsset.value.workshopHash,
     script: displayScriptDirection.value,
     playerName: sandboxCard.value ? userDisplayName() : null,
   }
@@ -4963,6 +5139,7 @@ function renderMemoHit(entry, key) {
     && entry.key.summary === key.summary
     && entry.key.messageRole === key.messageRole
     && entry.key.version === key.version
+    && entry.key.workshop === key.workshop
     && entry.key.script === key.script
     && entry.key.playerName === key.playerName
     && (entry.ruleEpoch == null || entry.ruleEpoch === authorRuleEpoch.value)
@@ -5089,7 +5266,7 @@ function activateFrontendBlocks(item: any, html: string) {
   });
 }
 
-const activatedMessageScripts = new WeakMap<object, string>();
+let activatedMessageScripts = new WeakMap<object, string>();
 function activateMessageScripts(item: any, html: string) {
   if (!item || !item.chatFinish) return;
   // 沙箱卡：作者的腳本與樣式只在殼（別的源）裡跑，這一頁一行都不掛。
@@ -5264,7 +5441,7 @@ function getSystemMsgKind(finishReason) {
 }
 function getSystemMsgLabel(finishReason, item = null) {
   // 放不下的是這張卡還是這段對話，在出錯那一刻就判斷好存在泡泡上（capacitySituation）。
-  if (finishReason === 'context_capacity_choice') return t(capacityTitleKey(item?.capacitySituation));
+  if (finishReason === 'context_capacity_choice') return t(capacityTitleKey(item?.capacitySituation, item?.capacityAdvice));
   if (['content_filter', 'content_filter_input', 'refusal'].includes(finishReason)) return operationFailureTitle(finishReason, t);
   const map = {
     'content_filter':   t('systemMsg.filtered')     || 'AI 已終止本次回覆',
@@ -5984,8 +6161,9 @@ async function saveAndStartNew() {
     if (detail.statusCode !== 200 || String(detail.data?.characterRoleId ?? detail.data?.roleId ?? '') !== sourceRoleId) throw new Error('opening_detail_unavailable');
     const openings = buildGreetingList(detail.data);
     // 已有存檔也可以另選開場；選定前不建立新對話，否則伺服器已把第一條寫進去了。
-    if (shouldDeferStart(openings)) {
-      greeting.list = openings;
+    if (shouldDeferStart(composeOpenings(openings, workshopOpenings.value).list)) {
+      greeting.index = 0;
+      setOpenings(openings);
       pendingNewConversationFrom.value = sourceId;
       teardownStreamForConversationSwitch({ invalidateHistory: true });
       conversationId.value = '';
@@ -6060,8 +6238,22 @@ function adoptStartedConversation(started: any) {
 }
 
 
-function chatStart(greetingIndex?: number) {
+function chatStart(greetingIndex?: number, opening?: OpeningStartTarget | null) {
   if (!canGenerate.value) return false;
+  // 選了擴充帶的開場：走「帶開場新開」（一律新建，不接回舊對話）；回應形狀與 conversation/start 相同，下面同一段處理。
+  if (opening) {
+    return _this.http.post(_this.requestUrl.workshopConversationStart, {
+      header: { 'content-type': 'application/json' },
+      showLoading: false,
+      timeout: 60000,
+      quietErrors: true,
+      data: { roleId: unref(roleId), opening, firstPageSize: ajax.value.rows, ...(workshopTrialId.value ? { trialWorkshopId: workshopTrialId.value } : {}) },
+    }).then(res => handleChatStartResponse(res, opening)).catch((failure: any) => {
+      // 業務拒絕（開場已下架等）交回同一段處理；傳輸失敗才是「開不成」。
+      if (failure?.statusCode >= 400) return handleChatStartResponse(failure, opening);
+      message.error(t('canvas.archive.newFailed'));
+    })
+  }
   return _this.http.post(_this.requestUrl.chatStart, {
     header: {
       'content-type': 'application/json'
@@ -6077,7 +6269,13 @@ function chatStart(greetingIndex?: number) {
       // 伺服器是在這一刻建立對話並落下開場白的，所以選到哪一條要在這裡講。
       // 舊版伺服器沒有這個欄位，只有真的有替代開場白時才帶。
       : { roleId: unref(roleId), greetingIndex, firstPageSize: ajax.value.rows },
-  }).then(async res => {
+  }).then(res => handleChatStartResponse(res, null)).catch(e => {
+    message.error(t('canvas.archive.newFailed'));
+  });
+}
+
+// conversation/start 與帶擴充開場的新開共用：回應形狀相同。
+async function handleChatStartResponse(res: any, opening: OpeningStartTarget | null) {
     if (res.statusCode == 200) {
       // 頁面停在舊版卡時，伺服器會接回玩家在較新版本上的對話；設定改讀寫那一版。
       const settingsMoved = followConversationRole(conversationRoleId(res.data));
@@ -6126,12 +6324,13 @@ function chatStart(greetingIndex?: number) {
         isUserAtBottom.value = true;
         nextTick(() => scrollToBottom(true));
       }
+    } else if (opening && res.data?.error === 'workshop_opening_unavailable') {
+      // 擴充開場在這段時間被下架或不在清單裡：說清楚，回到開場選擇（呼叫端看沒拿到對話會重畫）。
+      dropWorkshopOpening(opening);
+      uni.showToast({ title: t('workshop.stage.openingUnavailable'), icon: 'none' });
     } else {
       message.error(resolveChatErrorMessage(resolveChatErrorTypeFromFailure(res), t));
     }
-  }).catch(e => {
-    message.error(t('canvas.archive.newFailed'));
-  });
 }
 
 
@@ -10062,7 +10261,7 @@ onUnmounted(() => { if (pageThemeObserver) { pageThemeObserver.disconnect(); pag
 watch(cardFormat, refreshPageTheme);
 
 // ── 開場白 ─────────────────────────────────────────────────────────────
-const greeting = reactive({ list: [] as string[], index: 0 })
+const greeting = reactive({ list: [] as string[], sources: [] as OpeningSource[], index: 0 })
 const pendingGreetingStart = ref(false)
 // 明確按了「新對話」時，保留要存下的舊對話；不能改走會接回舊存檔的 chatStart。
 const pendingNewConversationFrom = ref('')
@@ -10115,8 +10314,11 @@ async function hasExistingConversation(): Promise<boolean> {
 }
 
 function renderGreetingPreview() {
+  syncOpeningExtras()
   const text = greeting.list[greeting.index] || ''
-  if (!showsOpening(text)) { talkList.value = []; return }
+  // 擴充的開場網頁可以沒有開場白；仍畫一個只有來源 chip 的開場，左右切換才找得到回去的路。
+  const fromWorkshop = greeting.sources[greeting.index]?.kind === 'workshop'
+  if (!showsOpening(text) && !(fromWorkshop && hasAlternates(greeting.list))) { talkList.value = []; return }
   talkList.value = [{
     id: 0,
     content: text,
@@ -10136,6 +10338,14 @@ function onGreetingSwipe(delta: number) {
 }
 
 const showGreetingSwipes = computed(() => pendingGreetingStart.value && hasAlternates(greeting.list))
+
+/** 開場那一則的來源 chip 字樣；不是開場、開場是原卡的、或上面還有沒載入的歷史，都是空字串。 */
+function openingOriginLabel(index: number): string {
+  if (ajax.value.hasNextPage || !isOpeningIndex(talkList.value, index)) return ''
+  const source = pendingGreetingStart.value ? greeting.sources[greeting.index] : conversationOpening()
+  const name = source && source.kind === 'workshop' ? source.workshopName : ''
+  return name ? t('workshop.stage.openingChip', { name }) : ''
+}
 
 // ── 開場選項（MMD prologue）────────────────────────────────────────────
 //
@@ -10331,6 +10541,8 @@ function messageProps(item: any, index: number, htmlOverride?: string) {
     swipes: (index === 0 && showGreetingSwipes.value)
       ? { index: greeting.index, total: greeting.list.length }
       : null,
+    // 開場來自擴充：開場那一則上方標「來自「名稱」」（原卡開場不標）。
+    origin: openingOriginLabel(index),
   }
 }
 
@@ -11015,7 +11227,7 @@ const capacityProps = computed(() => {
     ? options.find(option => Number(option?.value) === Number(requiredTier))?.tokens
     : null
   return {
-    content: t('canvas.capacity.content'),
+    content: capacityContent(spec.advice, t),
     options: capacityChoiceOptions(spec.advice, t, fallbackTokens),
     saving: spec.saving,
     error: spec.error,
@@ -11030,6 +11242,7 @@ function closeCapacityChoice(restoreMore = false) {
 
 // 只寫動到的那一個欄位；存失敗就還原，畫面上的檔位不能停在沒存進去的值。
 async function saveCapacityPatch(patch: CapacityPatch): Promise<boolean> {
+  if ('workshopTrigger' in patch) return saveWorkshopCapacityTrigger(patch.revision)
   const targetRole = String(unref(settingsRoleId) || '')
   const targetConversation = String(unref(conversationId) || '')
   const before = { context: formData.context, trimConstantLore: formData.trimConstantLore === true }
@@ -11044,6 +11257,21 @@ async function saveCapacityPatch(patch: CapacityPatch): Promise<boolean> {
   }
   // 目錄的標價是按上下文檔位算的，換了檔位就重抓一次（跟模型選單同一個理由）。
   if ('context' in patch) loadModelCatalog()
+  return true
+}
+
+// 「照樣開始」：這段對話的擴充常駐從清單最上方起改成關鍵詞觸發。寫進伺服器的容量選擇（帶 revision，
+// 別的分頁先改過就失敗、不重送），寫好才重送；面板的標示與入口圓點跟著重讀。
+async function saveWorkshopCapacityTrigger(revision: number): Promise<boolean> {
+  const targetConversation = String(unref(conversationId) || '')
+  if (!targetConversation) return false
+  try {
+    const res: any = await postArchiveAction(_this.requestUrl.workshopCapacity, { conversationId: targetConversation, expectedRevision: revision, choice: 'trigger' })
+    if (String(unref(conversationId) || '') !== targetConversation || res.statusCode !== 200) return false
+  } catch (e) {
+    return false
+  }
+  void refreshWorkshopView()
   return true
 }
 
@@ -13385,6 +13613,8 @@ async function startPendingGreeting(): Promise<boolean> {
   // 它會存草稿、請宿主登入（canvas-guest）。
   if (!unref(hasLogin)) return true
   const index = greetingIndexForStart(greeting)
+  const workshopTarget = openingStartTarget(greeting.sources, greeting.index, !!workshopTrialId.value)
+  const chosenOpening = greeting.sources[greeting.index] || null
   const draft = content.value
   let failureReported = false
   let started = false
@@ -13393,12 +13623,22 @@ async function startPendingGreeting(): Promise<boolean> {
   talkList.value = []
   try {
     if (pendingNewConversationFrom.value) {
-      const res = await postArchiveAction(_this.requestUrl.saveAndStartNew, {
-        conversationId: pendingNewConversationFrom.value, save: true, greetingIndex: index,
-      })
+      const res = workshopTarget
+        ? await postArchiveAction(_this.requestUrl.workshopConversationStart, {
+          roleId: unref(roleId), opening: workshopTarget, saveConversationId: pendingNewConversationFrom.value, firstPageSize: ajax.value.rows,
+          ...(workshopTrialId.value ? { trialWorkshopId: workshopTrialId.value } : {}),
+        })
+        : await postArchiveAction(_this.requestUrl.saveAndStartNew, {
+          conversationId: pendingNewConversationFrom.value, save: true, greetingIndex: index,
+        })
       if (res.statusCode === 200 && res.data?.conversationId) {
         adoptStartedConversation(res.data)
         started = true
+      }
+      else if (workshopTarget && res.data?.error === 'workshop_opening_unavailable') {
+        dropWorkshopOpening(workshopTarget)
+        uni.showToast({ title: t('workshop.stage.openingUnavailable'), icon: 'none' })
+        failureReported = true
       }
       else if (res.statusCode === 409 && res.data?.error === 'conversation_limit_reached') {
         archiveCount.value = Number(res.data.count || archiveCount.value)
@@ -13410,7 +13650,7 @@ async function startPendingGreeting(): Promise<boolean> {
         failureReported = true
       }
     } else {
-      await chatStart(index)
+      await chatStart(index, workshopTarget)
       started = !!unref(conversationId)
     }
   } catch (e) {
@@ -13420,6 +13660,11 @@ async function startPendingGreeting(): Promise<boolean> {
   }
   // 開對話成不成功看的是有沒有拿到對話——請求層對失敗也是 resolve，
   // 用 try/catch 判定會在沒有對話的情況下把訊息送進虛空。
+  if (started) {
+    // 這段對話的開場定下來了：開場網頁、開場選項與來源 chip 跟著它，不再跟著左右切換。
+    activeOpening.value = chosenOpening ? { conversationId: String(unref(conversationId) || ''), source: chosenOpening } : null
+    syncOpeningExtras()
+  }
   if (!started) {
     pendingGreetingStart.value = true
     content.value = draft

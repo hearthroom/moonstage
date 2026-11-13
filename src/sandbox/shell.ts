@@ -818,10 +818,18 @@ export function createShell(options: CreateShellOptions): Shell {
   // 一旦送出第一句（自己打的或點開場選項送出的），開場網頁就收起（跟一般頁的 CanvasOpeningPage 同一條規則）。
   // 頁面在自己的無同源 iframe 裡跑（common/opening-page）；填入與送出都交給宿主決定，
   // 宿主跟一般頁同一段邏輯（送出只在玩家剛點過頁面時照做）。
-  const openingHtml = String(config.card.openingPage || '')
+  // 選開場時玩家可以切到擴充帶的開場，那個開場有自己的開場網頁：宿主送 opening 來換（同一份就不動）。
+  let openingHtml = ''
   let openingSlot: HTMLElement | null = null
   let openingMount: OpeningPageMount | null = null
-  if (openingHtml.trim()) {
+  const setOpening = (html: string) => {
+    if (html === openingHtml && (openingSlot || !html.trim())) return
+    openingMount?.destroy()
+    openingSlot?.remove()
+    openingMount = null
+    openingSlot = null
+    openingHtml = html
+    if (!openingHtml.trim()) return
     const slot = doc.createElement('div')
     slot.setAttribute('data-slot', 'opening')
     refs.list.before(slot)
@@ -831,6 +839,7 @@ export function createShell(options: CreateShellOptions): Shell {
       send: (text) => transport.send({ type: 'ui', event: 'opening-send', key: text }),
     }, { title: config.role?.name ? String(config.role.name) : undefined, macros })
   }
+  setOpening(String(config.card.openingPage || ''))
   const syncOpeningSlot = () => {
     if (openingSlot) openingSlot.hidden = !shouldShowOpeningPage(openingHtml, cardOrder())
   }
@@ -954,6 +963,10 @@ export function createShell(options: CreateShellOptions): Shell {
         if (outcomeKey !== genOutcomeKey) { genOutcome = outcome; genOutcomeKey = outcomeKey; bus.emit('generation:outcome', JSON.parse(outcomeKey)) }
         return
       }
+      case 'opening':
+        setOpening(String(message.html ?? ''))
+        syncOpeningSlot()
+        return
       case 'prologue':
         renderPrologue(String(message.title ?? ''), Array.isArray(message.items) ? message.items.map(String) : [])
         return

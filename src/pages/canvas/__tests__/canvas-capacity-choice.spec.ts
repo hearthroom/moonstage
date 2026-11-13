@@ -11,10 +11,40 @@ import {
   capacitySituation,
   capacitySizeLabel,
   capacityTitleKey,
+  capacityContent,
 } from '../canvas-capacity-choice'
 
 const t = (key: string, params?: Record<string, unknown>) => (params ? `${key}(${JSON.stringify(params)})` : key)
 const both = { requiredTier: 3, requiredTokens: 128000, trimFits: true }
+
+describe('容量選項：對話有擴充（工坊）', () => {
+  const ws = { requiredTier: 4, requiredTokens: 128000, trimFits: true, workshop: { totalChars: 182000, tierLabel: '32K', triggerFits: true, revision: 2 } }
+
+  it('只給換檔位（推薦，在前）與照樣開始；原卡的精簡選項不出現', () => {
+    const options = capacityChoiceOptions(ws, t)
+    expect(options.map((o) => o.key)).toEqual(['raise', 'trigger'])
+    expect(options[0].label).toBe('workshop.capacity.opt.switch({"tier":"128K"})')
+    expect(options[0].desc).toBe('workshop.capacity.opt.switch.desc({"tier":"128K"})')
+    expect(options[1].label).toBe('workshop.capacity.opt.go')
+    expect(options[1].desc).toBe('workshop.capacity.opt.go.desc')
+  })
+
+  it('照樣開始不可行就不給', () => {
+    expect(capacityChoiceOptions({ ...ws, workshop: { ...ws.workshop, triggerFits: false } }, t).map((o) => o.key)).toEqual(['raise'])
+  })
+
+  it('標題與說明換成工坊的那一組', () => {
+    expect(capacityTitleKey('start', ws)).toBe('workshop.capacity.title')
+    expect(capacityContent(ws, t)).toBe('workshop.capacity.body({"total":"182,000","tier":"32K"})')
+    expect(capacityContent(both, t)).toBe('canvas.capacity.content')
+  })
+
+  it('照樣開始存的是這段對話的容量選擇（帶 revision），換檔位照舊存上下文', () => {
+    expect(capacityChoicePatch('trigger', ws)).toEqual({ workshopTrigger: true, revision: 2 })
+    expect(capacityChoicePatch('raise', ws)).toEqual({ context: 4, trimConstantLore: false })
+    expect(capacityChoicePatch('trigger', both)).toBe(null)
+  })
+})
 
 describe('容量選項', () => {
   it('兩種都裝得下：先給調高容量，再給用目前容量玩', () => {

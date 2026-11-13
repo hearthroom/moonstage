@@ -1329,6 +1329,27 @@ describe('殼：首屏網頁', () => {
     expect(s.refs.messages.querySelector('[data-slot="opening"]')).toBeNull()
   })
 
+  it('宿主送 opening（玩家切到擴充帶的開場）：換成新的首屏網頁；空字串拿掉；相同不重建', () => {
+    const s = boot(config({ card: { rules: [], statusbar: '', format: 'mmd', openingPage: '<p>原卡</p>' } }))
+    const first = s.refs.messages.querySelector('[data-slot="opening"] iframe') as HTMLIFrameElement
+    expect(first.srcdoc).toContain('<p>原卡</p>')
+    s.handle({ type: 'opening', html: '<p>原卡</p>' })
+    expect(s.refs.messages.querySelector('[data-slot="opening"] iframe')).toBe(first)
+    s.handle({ type: 'opening', html: '<p>擴充</p>' })
+    const slots = s.refs.messages.querySelectorAll('[data-slot="opening"]')
+    expect(slots.length).toBe(1)
+    expect((slots[0].querySelector('iframe') as HTMLIFrameElement).srcdoc).toContain('<p>擴充</p>')
+    expect(slots[0].nextElementSibling).toBe(s.refs.list)
+    s.handle({ type: 'opening', html: '' })
+    expect(s.refs.messages.querySelector('[data-slot="opening"]')).toBeNull()
+  })
+
+  it('原本沒有首屏網頁，切到有開場網頁的擴充開場時畫出來', () => {
+    const s = boot(config())
+    s.handle({ type: 'opening', html: '<p>擴充</p>' })
+    expect(s.refs.messages.querySelector('[data-slot="opening"] iframe')).not.toBeNull()
+  })
+
   it('玩家還沒送出第一句時展開；送出第一句後收起，開新對話再展開', () => {
     const s = boot(config({ card: { rules: [], statusbar: '', format: 'fengyue', openingPage: '<p>TEST-INTRO</p>' } }))
     const slot = s.refs.messages.querySelector('[data-slot="opening"]') as HTMLElement

@@ -204,6 +204,8 @@ export interface MessageView {
   latestAI?: boolean
   contextUsage?: { label: string; tip: string; level: string } | null
   swipes?: { index: number; total: number } | null
+  /** 開場那一則來自擴充時的來源字樣（「來自「名稱」」）；空字串或沒有就不畫。 */
+  origin?: string
   /** 這一列底下的系統訊息卡（一般卡的 <chat-system-message>）；沒有就不畫。 */
   systemNotice?: SystemNotice | null
   /** 這一則記下的卡片數值（沒記就沒有）。之後變了由 state 訊息更新。 */
@@ -270,6 +272,8 @@ export interface ChromeState {
     commentsSupported?: boolean
     commentsLabel?: string
     commentsExpanded?: boolean
+    /** 入口右上角小圓點的字樣（擴充的常駐降為觸發載入）；空字串不畫，舊殼不認得就略過。 */
+    commentsAlert?: string
   }
   composer: {
     placeholder: string
@@ -376,6 +380,8 @@ export type HostToShell =
   | { type: 'history'; more: boolean; loading: boolean }
   // 開場選項（MMD「你可以选择开场」）：空清單＝拿掉。玩家點一條回 ui prologue，key 是第幾條。
   | { type: 'prologue'; title: string; items: string[] }
+  /** 首屏網頁換了（玩家左右切到擴充帶的開場）：空字串＝拿掉。跟 hello 那份相同就不動。 */
+  | { type: 'opening'; html: string }
   | { type: 'conversation.switch'; conversationId?: string }
   /**
    * 某則訊息的卡片數值變了（一輪跑完才記下、或重載後不同）：殼更新那則的數值，現值變了就發 state:change。
