@@ -1,0 +1,69 @@
+name: B192 immutable source comparison
+on:
+  push:
+    branches: [ci/input-truncation-b192-compare-20261113]
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 2b07423c5db04b7f67b64a1ec59592256c88e873
+          path: baseline
+      - uses: actions/checkout@v4
+        with:
+          ref: 21bd1bd375a832e87ce87a050aba480239e022b3
+          path: candidate
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+          cache: npm
+          cache-dependency-path: baseline/package-lock.json
+      - name: Record exact environment and immutable inputs
+        run: |
+          mkdir evidence
+          python3 - <<'PY'
+          import os, subprocess, json, hashlib
+          def run(args): return subprocess.check_output(args, text=True).strip()
+          test='src/pages/canvas/__tests__/canvas-composer-author-input-native.spec.ts'
+          result={'image':os.environ.get('ImageVersion'), 'image_os':os.environ.get('ImageOS'), 'os':run(['lsb_release','-ds']), 'node':run(['node','--version']), 'npm':run(['npm','--version']), 'chrome':run(['/usr/bin/google-chrome','--version']), 'chrome_path':os.path.realpath('/usr/bin/google-chrome'), 'inputs':{}}
+          for name in ['baseline','candidate']:
+            result['inputs'][name]={'sha':run(['git','-C',name,'rev-parse','HEAD']), 'test_sha256':hashlib.sha256(open(name+'/'+test,'rb').read()).hexdigest(), 'lock_sha256':hashlib.sha256(open(name+'/package-lock.json','rb').read()).hexdigest()}
+          result['matches_failed_image']=result['image']=='20261111.196.1'
+          print(json.dumps(result,indent=2))
+          open('evidence/environment.json','w').write(json.dumps(result,indent=2))
+          PY
+      - run: npm ci
+        working-directory: baseline
+      - run: npm ci
+        working-directory: candidate
+      - name: Three fixed alternating pairs without source changes
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: |
+          python3 - <<'PY'
+          import subprocess, json, time, pathlib, sys
+          results=[]
+          cmd=['npm','test','--','src/pages/canvas/__tests__/canvas-composer-author-input-native.spec.ts','-t','lets a legacy opening wizard fill','--maxWorkers=1','--minWorkers=1','--reporter=verbose']
+          for round_no, names in enumerate([['baseline','candidate'],['candidate','baseline'],['baseline','candidate']],1):
+            for name in names:
+              started=time.time()
+              logfile=pathlib.Path('evidence')/f'{round_no}-{name}.log'
+              with logfile.open('w') as output:
+                try: code=subprocess.run(cmd,cwd=name,stdout=output,stderr=subprocess.STDOUT,timeout=100).returncode
+                except subprocess.TimeoutExpired: code=124
+              result={'round':round_no,'source':name,'exit':code,'started_unix':started,'seconds':time.time()-started,'command':cmd}
+              results.append(result)
+              print(json.dumps(result),flush=True)
+              print(logfile.read_text(),flush=True)
+              pathlib.Path('evidence/results.json').write_text(json.dumps(results,indent=2))
+          sys.exit(1 if any(row['exit'] for row in results) else 0)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b192-immutable-comparison
+          path: evidence/
