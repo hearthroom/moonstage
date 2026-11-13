@@ -105,7 +105,7 @@ function mapId(id: string): [string, Tier] | null | undefined {
 }
 
 /** 一條選擇器 → 我們的選擇器；null＝在風月不生效或我們沒有對應，丟掉。 */
-export function translateSelector(raw: string, knownOnly = false): { selector: string; tier: Tier; text?: TextNode } | null {
+export function translateSelector(raw: string, knownOnly = false, preserveCanvasRoot = false): { selector: string; tier: Tier; text?: TextNode } | null {
   let sel = raw.trim()
   if (!sel) return null
   let dark = false
@@ -119,13 +119,14 @@ export function translateSelector(raw: string, knownOnly = false): { selector: s
     attachToRoot = sel !== '' && !/^\s/.test(sel)
     sel = sel.trim()
   }
+  const nativeRoot = preserveCanvasRoot && /^\.canvas-root(?=$|[ \t\r\n\f.#:\[>+~|])/.test(sel)
   let tier: Tier = 'full'
   let text: TextNode | undefined
   let dropped = false
   // 引號裡的 # 是屬性值（a[href="#ai-x"]），不是 id。
   let mapped = sel.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|#([A-Za-z_][\w-]*)/g, (whole, id: string | undefined) => {
     if (!id) return whole
-    const hit = knownOnly ? knownHook(id) : mapId(id)
+    const hit = knownOnly || nativeRoot ? knownHook(id) : mapId(id)
     if (hit === undefined) return whole
     if (hit === null) { dropped = true; return whole }
     if (hit[1] === 'paint') tier = 'paint'
@@ -139,6 +140,10 @@ export function translateSelector(raw: string, knownOnly = false): { selector: s
     .replace(/(:where\(\.composer-field\):not\(#lt-fy\)):focus(?![\w-])/g, '$1:focus-within')
   const root = like(ROOT) + (dark ? DARK : '')
   const extra = text ? { text } : {}
+  // 新 v2 的明確本站根已限定作用範圍；不可再接祖先根。舊提示維持原政策。
+  if (nativeRoot) {
+    return { selector: dark ? mapped.replace(/^\.canvas-root/, ROOT + DARK) : mapped, tier, ...extra }
+  }
   if (attachToRoot) return { selector: root + mapped, tier, ...extra }
   // 作者自己寫了容器 id：已經換成根，不再接一次。
   if (mapped.startsWith(like(ROOT))) return { selector: dark ? mapped.replace(like(ROOT), root) : mapped, tier, ...extra }
@@ -279,7 +284,7 @@ function readableColor(decls: string[]): string | null {
   return lum > 0.55 ? DARK_TEXT : LIGHT_TEXT
 }
 
-function translateNodes(nodes: Node[], imports: string[], knownOnly = false, readableFallback = true): string {
+function translateNodes(nodes: Node[], imports: string[], knownOnly = false, readableFallback = true, preserveCanvasRoot = false): string {
   let out = ''
   for (const node of nodes) {
     const head = node.prelude
@@ -289,7 +294,7 @@ function translateNodes(nodes: Node[], imports: string[], knownOnly = false, rea
       continue
     }
     if (/^@(media|supports|container|layer|scope|document|starting-style)\b/i.test(head)) {
-      const inner = translateNodes(parse(node.body), imports, knownOnly, readableFallback)
+      const inner = translateNodes(parse(node.body), imports, knownOnly, readableFallback, preserveCanvasRoot)
       if (inner.trim()) out += `${head} {\n${inner}}\n`
       continue
     }
@@ -298,7 +303,7 @@ function translateNodes(nodes: Node[], imports: string[], knownOnly = false, rea
       out += `${head} {${node.body}}\n`
       continue
     }
-    const parts = splitTop(stripComments(head), ',').map((selector) => translateSelector(selector, knownOnly)).filter((p): p is NonNullable<ReturnType<typeof translateSelector>> => !!p)
+    const parts = splitTop(stripComments(head), ',').map((selector) => translateSelector(selector, knownOnly, preserveCanvasRoot)).filter((p): p is NonNullable<ReturnType<typeof translateSelector>> => !!p)
     if (!parts.length) continue
     // 同一條規則的選擇器裡只要有一個是按鈕類，整條就只上色（寧可少套，不讓版面錯位）。
     const tier: Tier = parts.some((p) => p.tier === 'paint') ? 'paint' : 'full'
@@ -323,9 +328,9 @@ function translateNodes(nodes: Node[], imports: string[], knownOnly = false, rea
 }
 
 /** 一段風月寫法的 CSS → 我們畫布用的 CSS（包在 @layer lt-author-fengyue 裡）。 */
-export function translateFengyueCss(css: string, options: { readableFallback?: boolean } = {}): string {
+export function translateFengyueCss(css: string, options: { readableFallback?: boolean; preserveCanvasRoot?: boolean } = {}): string {
   const imports: string[] = []
-  const body = translateNodes(parse(css), imports, false, options.readableFallback !== false)
+  const body = translateNodes(parse(css), imports, false, options.readableFallback !== false, options.preserveCanvasRoot === true)
   if (!body.trim() && !imports.length) return ''
   return (imports.length ? imports.join('\n') + '\n' : '') + (body.trim() ? `@layer ${FENGYUE_LAYER} {\n${body}}\n` : '')
 }

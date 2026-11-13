@@ -42,6 +42,21 @@ it('一般頁走實際 setActiveAuthorAsset：空歷史也注入，更新與清�
     expect(scopeCardHtml(state.activeAuthorAsset.value.rules[1].replace, 'fengyue')).toBe(peer.replace)
     expect(document.head.querySelector('style[data-lt="card-css"]')).toBeNull()
   }
+  const root = document.createElement('div')
+  root.className = 'canvas-root'
+  document.body.appendChild(root)
+  try {
+    const cardCss = '.canvas-root { --lt-canvas-send-bg:#923455 }'
+    state.setActiveAuthorAsset({ cardCss, cardCssDialect: 'fengyue-v2', rules: [] })
+    expect(root.getAttribute('data-lt-card-vars') || '').toContain('--lt-canvas-send-bg')
+    for (const cardCssDialect of ['fengyue', 'mmd', 'tavern']) {
+      state.setActiveAuthorAsset({ cardCss, cardCssDialect, rules: [] })
+      expect(root.getAttribute('data-lt-card-vars')).toBeNull()
+    }
+  } finally {
+    state.setActiveAuthorAsset({ cardCss: '', rules: [] })
+    root.remove()
+  }
   sandboxCard.value = true
   state.setActiveAuthorAsset({ cardCss: '.mes{color:red}' })
   expect(document.head.querySelector('style[data-lt="card-css"]')).toBeNull()

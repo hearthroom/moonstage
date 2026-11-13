@@ -2668,7 +2668,7 @@ function setActiveAuthorAsset(asset) {
   asset = resolveCardCssAsset(asset || {})
   if (typeof document !== 'undefined') {
     cardCssMount ??= createCardCssMount(document)
-    cardCssMount.set(sandboxCard.value || authorScopeClosed ? '' : compileCardCss(asset), { nativeRootVariables: !asset.cardCssDialect })
+    cardCssMount.set(sandboxCard.value || authorScopeClosed ? '' : compileCardCss(asset), { nativeRootVariables: !asset.cardCssDialect || asset.cardCssDialect === 'fengyue-v2' })
   }
   // 規則自己標了 CSS 寫法的，<style> 先照那個寫法轉好（common/rule-css-dialect）；之後的卡片格式作用域會略過它們。
   const rules = compileRuleCssDialects((asset && Array.isArray(asset.rules)) ? asset.rules : []);
