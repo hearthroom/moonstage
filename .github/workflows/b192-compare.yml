@@ -1,4 +1,4 @@
-name: B192 immutable source comparison
+name: B192 immutable full-suite comparison
 on:
   push:
     branches: [ci/input-truncation-b192-compare-20261113]
@@ -7,7 +7,7 @@ permissions:
 jobs:
   compare:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,20 +40,20 @@ jobs:
         working-directory: baseline
       - run: npm ci
         working-directory: candidate
-      - name: Three fixed alternating pairs without source changes
+      - name: One full suite on each unchanged source
         env:
           CHROME_BIN: /usr/bin/google-chrome
         run: |
           python3 - <<'PY'
           import subprocess, json, time, pathlib, sys
           results=[]
-          cmd=['npm','test','--','src/pages/canvas/__tests__/canvas-composer-author-input-native.spec.ts','-t','lets a legacy opening wizard fill','--maxWorkers=1','--minWorkers=1','--reporter=verbose']
-          for round_no, names in enumerate([['baseline','candidate'],['candidate','baseline'],['baseline','candidate']],1):
+          cmd=['npm','test']
+          for round_no, names in enumerate([['baseline','candidate']],1):
             for name in names:
               started=time.time()
               logfile=pathlib.Path('evidence')/f'{round_no}-{name}.log'
               with logfile.open('w') as output:
-                try: code=subprocess.run(cmd,cwd=name,stdout=output,stderr=subprocess.STDOUT,timeout=100).returncode
+                try: code=subprocess.run(cmd,cwd=name,stdout=output,stderr=subprocess.STDOUT,timeout=600).returncode
                 except subprocess.TimeoutExpired: code=124
               result={'round':round_no,'source':name,'exit':code,'started_unix':started,'seconds':time.time()-started,'command':cmd}
               results.append(result)
@@ -65,5 +65,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: b192-immutable-comparison
+          name: b192-immutable-full-comparison
           path: evidence/
