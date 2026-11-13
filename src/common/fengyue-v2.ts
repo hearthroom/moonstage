@@ -55,7 +55,7 @@ const BASE = `@layer lt-fengyue-base {
 }`
 
 export function compileFengyueV2Css(css: string): string {
-  const translated = translateFengyueCss(css, { readableFallback: false })
+  const translated = translateFengyueCss(css, { readableFallback: false, preserveCanvasRoot: true })
   const { imports, body } = splitCssImports(translated)
   // import 必須在 layer block 前，否則原文中的字型／樣式匯入會失效。
   // 只有新 profile 輸出欄寬補償。與平台原本未分層的 selector 等權重，

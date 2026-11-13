@@ -51,3 +51,15 @@ it.each([false, true])('STYLE03：舊 carrier + peer 不啟用 inert CSS，carri
   expect(s.refs.authorCss.textContent?.endsWith('#ai-chat-input{background:#ff6600}')).toBe(true)
   expect(s.refs.authorCss.textContent).not.toContain('color:#f2f2f5')
 })
+
+it('recognizes handwritten native root variables on new v2 cards, leaving legacy hints untouched', () => {
+  const cardCss = '.canvas-root { --lt-canvas-send-bg:#923455 }'
+  const s = boot({ cardCss, cardCssDialect: 'fengyue-v2', rules: [], statusbar: '' })
+  expect(s.refs.root.getAttribute('data-lt-card-vars') || '').toContain('--lt-canvas-send-bg')
+  s.dispose(); shell = null
+  for (const cardCssDialect of ['fengyue', 'mmd', 'tavern'] as const) {
+    const legacy = boot({ cardCss, cardCssDialect, rules: [], statusbar: '' })
+    expect(legacy.refs.root.getAttribute('data-lt-card-vars')).toBeNull()
+    legacy.dispose(); shell = null
+  }
+})
