@@ -2698,6 +2698,14 @@ const workshopTrialId = ref('');
 let workshopOpeningPick = '';
 /** 卡片頁選了「照樣開始」進來（網址 wsCapacity=trigger）：拿到對話後寫一次容量選擇。 */
 let pendingCapacityTrigger = false;
+/** 那一次寫入還在路上：第一句要等它寫好再送，否則伺服器還不知道玩家已經選過，又回一次放不下。 */
+let capacityTriggerTask: Promise<boolean> | null = null;
+function applyPendingCapacityTrigger(revision: number): Promise<boolean> {
+  pendingCapacityTrigger = false;
+  const task = saveWorkshopCapacityTrigger(revision);
+  capacityTriggerTask = task;
+  return task.finally(() => { if (capacityTriggerTask === task) capacityTriggerTask = null; });
+}
 /** 試玩時每個請求多帶的參數。 */
 function workshopTrialQuery(): Record<string, string> {
   return workshopTrialId.value ? { workshopTrial: workshopTrialId.value } : {};
@@ -3032,7 +3040,6 @@ async function refreshWorkshopView() {
   const targetConversationId = String(unref(conversationId) || '');
   // 卡片頁選了「照樣開始」：只套在這次進頁拿到的第一段對話，讀不讀得到都不留到下一段。
   const applyTrigger = pendingCapacityTrigger && !!targetConversationId;
-  if (applyTrigger) pendingCapacityTrigger = false;
   let view: WorkshopConversationView | null = null;
   if (targetRoleId && targetConversationId && unref(hasLogin) && !previewOnly.value && !previewDraft.value && !trialCard.value) {
     try {
@@ -3047,12 +3054,19 @@ async function refreshWorkshopView() {
   workshopViewConversation = targetConversationId;
   if (targetRoleId) stageHost.card?.setWorkshop?.(targetRoleId, view);
   // 讀不到（沒有擴充的供應商、換到別段存檔）：開場網頁與開場選項回到原卡的，不留上一段擴充開場的。
-  if (!view) { syncOpeningExtras(); return; }
-  if (applyTrigger) {
-    // 卡片頁選了「照樣開始」：對這段對話寫一次容量選擇，寫完重讀（面板標示、入口圓點跟著變）。
-    if (await saveWorkshopCapacityTrigger(view.capacityRevision)) return;
+  if (!view) {
+    // 讀不到就不留到下一段存檔
+    if (applyTrigger) pendingCapacityTrigger = false;
+    syncOpeningExtras();
+    return;
+  }
+  if (applyTrigger && pendingCapacityTrigger) {
+    // 續玩既有存檔、卡片頁選了「照樣開始」：對這段對話寫一次容量選擇，寫完重讀（面板標示、入口圓點跟著變）。
+    if (await applyPendingCapacityTrigger(view.capacityRevision)) return;
     if (seq !== workshopViewSeq) return;
   }
+  // 讀失敗也不留到下一段存檔
+  if (applyTrigger) pendingCapacityTrigger = false;
   // 開場來源以伺服器記下的為準（重新整理、換存檔都一樣），不靠前端記得剛才選了哪條。
   activeOpening.value = { conversationId: targetConversationId, source: viewOpeningSource(view) };
   syncOpeningExtras();
@@ -13692,6 +13706,8 @@ async function startPendingGreeting(): Promise<boolean> {
     // 這段對話的開場定下來了：開場網頁、開場選項與來源 chip 跟著它，不再跟著左右切換。
     activeOpening.value = chosenOpening ? { conversationId: String(unref(conversationId) || ''), source: chosenOpening } : null
     syncOpeningExtras()
+    // 卡片頁選了「照樣開始」：新對話還沒有容量記錄（revision 0），在第一句送出前寫好。
+    if (pendingCapacityTrigger) await applyPendingCapacityTrigger(0)
   }
   if (!started) {
     pendingGreetingStart.value = true
@@ -13709,6 +13725,7 @@ async function startPendingGreeting(): Promise<boolean> {
 async function onCanvasSend() {
   if (!canGenerate.value || archiveBusy.value) return false;
   if (!await startPendingGreeting()) return
+  if (capacityTriggerTask) await capacityTriggerTask
   onActionBtnClick()
 }
 
