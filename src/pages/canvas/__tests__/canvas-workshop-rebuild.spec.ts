@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs'
 import ts from 'typescript'
 import { parse } from '@vue/compiler-sfc'
 import { resolve } from 'node:path'
-import { assetWorkshopHash, needsAssetRebuild } from '../canvas-workshop'
+import { assetWorkshopHash, needsAssetRebuild, normalizeWorkshopView, viewOpeningSource } from '../canvas-workshop'
 
 const page = parse(readFileSync(resolve(__dirname, '../canvas.vue'), 'utf8')).descriptor.scriptSetup!.content
 const ast = ts.createSourceFile('canvas.ts', page, ts.ScriptTarget.Latest, true)
@@ -143,3 +143,69 @@ describe('saveWorkshopCapacityTrigger（照樣開始）', () => {
     expect(f.scope.refreshWorkshopView).not.toHaveBeenCalled()
   })
 })
+
+describe('refreshWorkshopView', () => {
+  const VIEW = { manifestHash: 'h1', capacityRevision: 2, openingSource: { kind: 'workshop', workshopId: 'w1', workshopName: '雪夜篇', openingId: 'o1' }, items: [] }
+  function viewScope(respond: (seq: number) => any) {
+    let call = 0
+    const get = vi.fn(async () => respond(++call))
+    const scope: Record<string, any> = {
+      _this: { http: { get }, requestUrl: { workshopConversation: '/view' } },
+      roleId: { value: 'role' }, conversationId: { value: 'c1' }, hasLogin: { value: true },
+      previewOnly: { value: false }, previewDraft: { value: null }, trialCard: { value: false },
+      unref: (r: any) => r.value, normalizeWorkshopView, viewOpeningSource,
+      stageHost: { card: { setWorkshop: vi.fn() } },
+      workshopView: { value: null }, workshopViewConversation: '', workshopViewSeq: 0,
+      activeOpening: { value: null }, syncOpeningExtras: vi.fn(),
+      installedWorkshopHash: 'h1', reloadAuthorAssetForConversation: vi.fn(),
+      pendingCapacityTrigger: false, applyPendingCapacityTrigger: vi.fn().mockResolvedValue(true),
+    }
+    return { scope, get, refresh: handler('refreshWorkshopView', scope) }
+  }
+
+  it('讀到：推給宿主、開場來源以伺服器為準、hash 一樣不重讀資產', async () => {
+    const f = viewScope(() => ({ statusCode: 200, data: VIEW }))
+    await f.refresh()
+    expect(f.scope.stageHost.card.setWorkshop).toHaveBeenCalledWith('role', expect.objectContaining({ manifestHash: 'h1' }))
+    expect(f.scope.activeOpening.value).toMatchObject({ conversationId: 'c1', source: { kind: 'workshop', workshopName: '雪夜篇' } })
+    expect(f.scope.syncOpeningExtras).toHaveBeenCalled()
+    expect(f.scope.reloadAuthorAssetForConversation).not.toHaveBeenCalled()
+  })
+
+  it('hash 跟已裝的不同：帶這段對話重讀資產', async () => {
+    const f = viewScope(() => ({ statusCode: 200, data: { ...VIEW, manifestHash: 'h2' } }))
+    await f.refresh()
+    expect(f.scope.reloadAuthorAssetForConversation).toHaveBeenCalledWith('c1')
+  })
+
+  it('讀不到：推 null 給宿主，開場網頁與選項回到原卡的', async () => {
+    const f = viewScope(() => ({ statusCode: 404, data: null }))
+    await f.refresh()
+    expect(f.scope.stageHost.card.setWorkshop).toHaveBeenCalledWith('role', null)
+    expect(f.scope.syncOpeningExtras).toHaveBeenCalled()
+    expect(f.scope.activeOpening.value).toBeNull()
+  })
+
+  it('晚到的舊回應不蓋掉新的', async () => {
+    let release: (v: any) => void = () => {}
+    const f = viewScope((n) => (n === 1 ? new Promise((r) => { release = r }) : { statusCode: 200, data: { ...VIEW, manifestHash: 'new' } }))
+    const first = f.refresh()
+    await f.refresh()
+    release({ statusCode: 200, data: { ...VIEW, manifestHash: 'old' } })
+    await first
+    expect(f.scope.workshopView.value.manifestHash).toBe('new')
+  })
+
+  it('wsCapacity=trigger 續玩存檔：帶這段對話的 revision 寫一次；讀失敗也不留到下一段', async () => {
+    const ok = viewScope(() => ({ statusCode: 200, data: VIEW }))
+    ok.scope.pendingCapacityTrigger = true
+    await ok.refresh()
+    expect(ok.scope.applyPendingCapacityTrigger).toHaveBeenCalledWith(2)
+    const fail = viewScope(() => ({ statusCode: 500, data: null }))
+    fail.scope.pendingCapacityTrigger = true
+    await fail.refresh()
+    expect(fail.scope.applyPendingCapacityTrigger).not.toHaveBeenCalled()
+    expect(fail.scope.pendingCapacityTrigger).toBe(false)
+  })
+})
+

@@ -40,7 +40,7 @@ function fixture() {
     // 擴充開場（卡片工坊）：這些測試的卡沒有擴充，清單只有原卡開場。
     composeOpenings, openingStartTarget, workshopOpenings: { value: [] }, baseGreetings: [],
     syncOpeningExtras: vi.fn(), activeOpening: { value: null }, dropWorkshopOpening: vi.fn(), roleId: { value: 'role' },
-    workshopTrialId: { value: '' },
+    workshopTrialId: { value: '' }, pendingCapacityTrigger: false, applyPendingCapacityTrigger: vi.fn().mockResolvedValue(true), capacityTriggerTask: null,
     archiveBusy: { value: false }, canGenerate: { value: true },
     unref: (r: any) => r.value, t: (key: string) => key,
     message: { error }, adoptStartedConversation: vi.fn(), askArchivesFull: vi.fn(),
@@ -230,6 +230,21 @@ describe('choose an opening after New conversation', () => {
     await f.b.onCanvasSend()
     expect(f.b.uni.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'main.network_error' }))
     expect(f.b.pendingGreetingStart.value).toBe(true)
+  })
+  it('card page chose "start anyway": the capacity choice is written on the new conversation before the first message goes out', async () => {
+    const f = chooserFixture()
+    const order: string[] = []
+    f.b.conversationId.value = ''
+    f.b.pendingGreetingStart.value = true
+    f.b.pendingCapacityTrigger = true
+    f.b.chatStart.mockImplementation(async () => { f.b.conversationId.value = 'first' })
+    f.b.applyPendingCapacityTrigger.mockImplementation(async (revision: number) => { order.push(`trigger:${revision}`); return true })
+    f.b.onActionBtnClick.mockImplementation(() => order.push('send'))
+    // 重建 startPendingGreeting：它在建立時抓住 pendingCapacityTrigger 的值
+    f.b.startPendingGreeting = handler('startPendingGreeting', f.b)
+    f.b.onCanvasSend = handler('onCanvasSend', f.b)
+    await f.b.onCanvasSend()
+    expect(order).toEqual(['trigger:0', 'send'])
   })
   it('drops an extension opening the server no longer accepts and returns to the chooser', async () => {
     const f = chooserFixture()
