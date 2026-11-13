@@ -164,6 +164,11 @@ describe('resolveContextCapacityAdvice', () => {
       workshop: { totalChars: 182000, tierLabel: '32K', triggerFits: true, revision: 2 } })
   })
 
+  it('有擴充、照樣開始不可行、也沒有檔位：沒有建議（原卡精簡的選項在擴充時不給，不能開一個空彈層）', () => {
+    const { required_context_tier: _t, required_context_tokens: _k, ...rest } = envelope
+    expect(resolveContextCapacityAdvice({ ...rest, constant_lore_trim_fits: true, workshop_capacity: { total_chars: 9, trigger_fits: false, revision: 0 } })).toBeNull()
+  })
+
   it('只有照樣開始可行（沒有檔位裝得下）也算有建議', () => {
     const { required_context_tier: _t, required_context_tokens: _k, ...rest } = envelope
     expect(resolveContextCapacityAdvice({ ...rest, constant_lore_trim_fits: false, workshop_capacity: { total_chars: 9, trigger_fits: true, revision: 0 } }))

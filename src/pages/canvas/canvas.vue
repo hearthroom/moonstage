@@ -2710,7 +2710,8 @@ function conversationOpening(): OpeningSource | undefined {
 function fetchWorkshopOpenings(targetRoleId: string): Promise<WorkshopOpening[]> {
   if (!targetRoleId || !unref(hasLogin) || previewOnly.value || previewDraft.value || trialCard.value) return Promise.resolve([]);
   return _this.http.get(_this.requestUrl.workshopOpenings, {
-    data: { roleId: targetRoleId, ...workshopTrialQuery() }, showLoading: false, quietTransport: true, quietErrors: true, timeout: 8000,
+    // 開對話前要等它：伺服器沒回應時最多多等 4 秒，之後就當沒有擴充開場。
+    data: { roleId: targetRoleId, ...workshopTrialQuery() }, showLoading: false, quietTransport: true, quietErrors: true, timeout: 4000,
   }).then((res: any) => (res.statusCode === 200 ? normalizeWorkshopOpenings(res.data) : []))
     .catch(() => []);
 }
@@ -3015,11 +3016,16 @@ function toggleInfo() {
 // 伺服器記下的定格清單、開場來源與常駐分配。畫布用它畫開場來源 chip 與資訊入口的小圓點，
 // 整份交給宿主畫資訊面板的「擴充」分頁（宿主介面 card.setWorkshop）。對話中唯讀，調整只影響新對話。
 const workshopView = ref<WorkshopConversationView | null>(null);
+/** workshopView 是哪一段對話的。 */
+let workshopViewConversation = '';
 let workshopViewSeq = 0;
 async function refreshWorkshopView() {
   const seq = ++workshopViewSeq;
   const targetRoleId = String(unref(roleId) || '');
   const targetConversationId = String(unref(conversationId) || '');
+  // 卡片頁選了「照樣開始」：只套在這次進頁拿到的第一段對話，讀不讀得到都不留到下一段。
+  const applyTrigger = pendingCapacityTrigger && !!targetConversationId;
+  if (applyTrigger) pendingCapacityTrigger = false;
   let view: WorkshopConversationView | null = null;
   if (targetRoleId && targetConversationId && unref(hasLogin) && !previewOnly.value && !previewDraft.value && !trialCard.value) {
     try {
@@ -3031,13 +3037,14 @@ async function refreshWorkshopView() {
   }
   if (seq !== workshopViewSeq) return;
   workshopView.value = view;
+  workshopViewConversation = targetConversationId;
   if (targetRoleId) stageHost.card?.setWorkshop?.(targetRoleId, view);
   // 讀不到（沒有擴充的供應商、換到別段存檔）：開場網頁與開場選項回到原卡的，不留上一段擴充開場的。
   if (!view) { syncOpeningExtras(); return; }
-  if (pendingCapacityTrigger) {
-    // 卡片頁選了「照樣開始」：對這段對話寫一次容量選擇，寫完重讀（面板標示、入口圓點跟著變）。只做一次。
-    pendingCapacityTrigger = false;
+  if (applyTrigger) {
+    // 卡片頁選了「照樣開始」：對這段對話寫一次容量選擇，寫完重讀（面板標示、入口圓點跟著變）。
     if (await saveWorkshopCapacityTrigger(view.capacityRevision)) return;
+    if (seq !== workshopViewSeq) return;
   }
   // 開場來源以伺服器記下的為準（重新整理、換存檔都一樣），不靠前端記得剛才選了哪條。
   activeOpening.value = { conversationId: targetConversationId, source: viewOpeningSource(view) };
@@ -3046,7 +3053,8 @@ async function refreshWorkshopView() {
   if (installedWorkshopHash !== null && view.manifestHash !== installedWorkshopHash) void reloadAuthorAssetForConversation(targetConversationId);
 }
 watch(() => [String(unref(conversationId) || ''), !!unref(hasLogin)], () => { void refreshWorkshopView(); });
-onUnmounted(() => { const id = String(unref(roleId) || ''); if (id) stageHost.card?.setWorkshop?.(id, null); });
+// 離場：還在路上的讀取作廢（不然晚到的會把這張卡的擴充推給宿主），面板分頁收掉。
+onUnmounted(() => { workshopViewSeq++; const id = String(unref(roleId) || ''); if (id) stageHost.card?.setWorkshop?.(id, null); });
 /** 資訊入口的小圓點：有擴充的常駐降為觸發載入才亮（宿主有面板才畫）。 */
 /** 小圓點的讀屏與提示字樣；空字串＝不畫圓點。 */
 const workshopInfoAlert = computed(() => (!!social.value && workshopAlert(workshopView.value)
@@ -4151,6 +4159,10 @@ async function loadAuthorAsset(targetRoleId) {
     });
     if (res.statusCode !== 200 || !res.data) return;
     applyAuthorAsset(res.data);
+    // 這段對話的擴充清單比資產先讀到、而且跟卡片層的不同（續玩的存檔定格的是當時的清單）：補讀一次。
+    const view = workshopView.value;
+    const current = String(unref(conversationId) || '');
+    if (view && current && workshopViewConversation === current && view.manifestHash !== installedWorkshopHash) void reloadAuthorAssetForConversation(current);
   } catch (e) {
     // 資產載入失敗不能影響對話本身——沒有資產就是正常狀態。
     console.warn('[AuthorAsset] 載入失敗，本次對話不套用版面規則');
@@ -4579,6 +4591,9 @@ function rebuildAuthorAsset(asset: any) {
     }
     // 訊息裡的作者腳本跟著舊範圍一起收掉了：重繪時要重新掛上。
     activatedMessageScripts = new WeakMap<object, string>();
+  } else {
+    // 同一個網址也要換一個新的 iframe：舊殼收過 hello 就不再喊 ready-shell，新的宿主會等到逾時。
+    sandboxReloads.value++;
   }
   applyAuthorAsset(asset);
 }
@@ -6149,7 +6164,8 @@ async function saveAndStartNew() {
     if (detail.statusCode !== 200 || String(detail.data?.characterRoleId ?? detail.data?.roleId ?? '') !== sourceRoleId) throw new Error('opening_detail_unavailable');
     const openings = buildGreetingList(detail.data);
     // 已有存檔也可以另選開場；選定前不建立新對話，否則伺服器已把第一條寫進去了。
-    if (shouldDeferStart(composeOpenings(openings, workshopOpenings.value).list)) {
+    // 作者試玩：一律先選開場、再用試玩的入口新開（不然會開出一段計入加入人數的一般對話）。
+    if (workshopTrialId.value || shouldDeferStart(composeOpenings(openings, workshopOpenings.value).list)) {
       greeting.index = 0;
       setOpenings(openings);
       pendingNewConversationFrom.value = sourceId;
@@ -6316,6 +6332,8 @@ async function handleChatStartResponse(res: any, opening: OpeningStartTarget | n
       // 擴充開場在這段時間被下架或不在清單裡：說清楚，回到開場選擇（呼叫端看沒拿到對話會重畫）。
       dropWorkshopOpening(opening);
       uni.showToast({ title: t('workshop.stage.openingUnavailable'), icon: 'none' });
+      // 已經說過原因了：呼叫端不要再蓋一個「網路錯誤」上去
+      return 'reported';
     } else {
       message.error(resolveChatErrorMessage(resolveChatErrorTypeFromFailure(res), t));
     }
@@ -11255,7 +11273,10 @@ async function saveWorkshopCapacityTrigger(revision: number): Promise<boolean> {
   if (!targetConversation) return false
   try {
     const res: any = await postArchiveAction(_this.requestUrl.workshopCapacity, { conversationId: targetConversation, expectedRevision: revision, choice: 'trigger' })
-    if (String(unref(conversationId) || '') !== targetConversation || res.statusCode !== 200) return false
+    if (String(unref(conversationId) || '') !== targetConversation) return false
+    // 別處先改過容量選擇（revision 舊了）：不重試同一份建議，照樣重送一次，讓伺服器回現在的建議。
+    const stale = res.statusCode === 409 && res.data?.error === 'capacity_revision_stale'
+    if (res.statusCode !== 200 && !stale) return false
   } catch (e) {
     return false
   }
@@ -13247,7 +13268,13 @@ const sandboxArchive: SandboxArchiveHost = {
       const id = String(unref(conversationId) || '')
       return id ? { ok: true, value: { id } } : { ok: false, code: 'NETWORK', message: t('canvas.archive.newFailed') }
     }
-    const res = await postArchiveAction(_this.requestUrl.saveAndStartNew, { conversationId: unref(conversationId), save: true, greetingIndex: opening })
+    const res = workshopTrialId.value
+      // 作者試玩：作者卡腳本開新存檔也要是試玩的那一種
+      ? await postArchiveAction(_this.requestUrl.workshopConversationStart, {
+        roleId: unref(roleId), opening: { kind: 'base', index: opening ?? 0 }, saveConversationId: unref(conversationId),
+        firstPageSize: ajax.value.rows, trialWorkshopId: workshopTrialId.value,
+      })
+      : await postArchiveAction(_this.requestUrl.saveAndStartNew, { conversationId: unref(conversationId), save: true, greetingIndex: opening })
     if (isArchiveFull(res)) return archiveLimitError(res)
     if (res.statusCode !== 200 || !res.data || !res.data.conversationId) return archiveFailure(res)
     adoptStartedConversation(res.data)
@@ -13638,7 +13665,7 @@ async function startPendingGreeting(): Promise<boolean> {
         failureReported = true
       }
     } else {
-      await chatStart(index, workshopTarget)
+      if ((await chatStart(index, workshopTarget)) === 'reported') failureReported = true
       started = !!unref(conversationId)
     }
   } catch (e) {

@@ -25,7 +25,7 @@ function rebuildScope(sandbox: boolean) {
   const oldScripts = new WeakMap()
   const scope: Record<string, any> = {
     authorScopeClosed: false,
-    sandboxCard: { value: sandbox },
+    sandboxCard: { value: sandbox }, sandboxReloads: { value: 0 },
     authorScope: oldScope,
     activatedMessageScripts: oldScripts,
     teardownAuthorRuntime: vi.fn(() => order.push('teardown')),
@@ -46,10 +46,11 @@ describe('rebuildAuthorAsset', () => {
     expect(f.scope.authorScopeClosed).toBe(false)
   })
 
-  it('沙箱卡：頁面這邊沒有作者執行期，直接交給 applyAuthorAsset（mountSandbox 會拆掉舊 iframe）', () => {
+  it('沙箱卡：換一個新的 iframe 再交給 applyAuthorAsset（舊殼收過 hello 就不再喊 ready-shell）', () => {
     const f = rebuildScope(true)
     f.rebuild({ workshopHash: 'b' })
     expect(f.order).toEqual(['apply'])
+    expect(f.scope.sandboxReloads.value).toBe(1)
     expect(f.scope.authorScope).toBe(f.oldScope)
   })
 
@@ -110,5 +111,35 @@ describe('reloadAuthorAssetForConversation', () => {
     f.respond({ statusCode: 500, data: null })
     await done
     expect(f.scope.rebuildAuthorAsset).not.toHaveBeenCalled()
+  })
+})
+
+describe('saveWorkshopCapacityTrigger（照樣開始）', () => {
+  function triggerScope(response: any) {
+    const post = vi.fn().mockResolvedValue(response)
+    const scope: Record<string, any> = {
+      _this: { requestUrl: { workshopCapacity: '/capacity' } },
+      conversationId: { value: 'c1' }, unref: (r: any) => r.value,
+      postArchiveAction: post, refreshWorkshopView: vi.fn(),
+    }
+    return { scope, post, save: handler('saveWorkshopCapacityTrigger', scope) }
+  }
+
+  it('寫這段對話的容量選擇，帶 revision；成功就重讀擴充檢視並讓呼叫端重送', async () => {
+    const f = triggerScope({ statusCode: 200, data: { revision: 3 } })
+    expect(await f.save(2)).toBe(true)
+    expect(f.post).toHaveBeenCalledWith('/capacity', { conversationId: 'c1', expectedRevision: 2, choice: 'trigger' })
+    expect(f.scope.refreshWorkshopView).toHaveBeenCalledOnce()
+  })
+
+  it('revision 舊了：不卡在「存失敗」一直重按，照樣重送讓伺服器回現在的建議', async () => {
+    const f = triggerScope({ statusCode: 409, data: { error: 'capacity_revision_stale' } })
+    expect(await f.save(2)).toBe(true)
+  })
+
+  it('其他失敗：不重送', async () => {
+    const f = triggerScope({ statusCode: 500, data: {} })
+    expect(await f.save(2)).toBe(false)
+    expect(f.scope.refreshWorkshopView).not.toHaveBeenCalled()
   })
 })

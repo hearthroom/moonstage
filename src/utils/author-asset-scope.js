@@ -396,10 +396,22 @@ function createAuthorScope(options) {
   }
 
   // ── 收尾 ─────────────────────────────────────────────────────────────
+  // 收範圍時要一起退掉的宿主訂閱（例如卡片的歷史監聽）：它們登記在宿主那邊，範圍自己看不到。
+  const disposers = []
+  function onDispose(fn) {
+    if (typeof fn !== 'function') return
+    if (disposed) { try { fn() } catch (e) { /* 收尾不得拋錯 */ } return }
+    disposers.push(fn)
+  }
+
   function dispose() {
     if (disposed) return
     disposed = true
     depth = 0
+
+    disposers.splice(0).forEach(function (fn) {
+      try { fn() } catch (e) { /* 收尾不得拋錯 */ }
+    })
 
     // 佇列裡剩下的紀錄都是窗口外發生的（窗口一關就收過了），不看
     if (observer) {
@@ -457,6 +469,7 @@ function createAuthorScope(options) {
     adopt: adopt,
     owns: owns,
     dispose: dispose,
+    onDispose: onDispose,
     isDisposed: function () { return disposed },
     isActive: function () { return depth > 0 },
     // 驗證用
