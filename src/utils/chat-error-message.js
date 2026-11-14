@@ -29,6 +29,8 @@ const CHAT_ERROR_I18N_KEYS = Object.freeze({
   // 玩家選用的預設在送出時才被擋：講成預設的事（換模型或停用預設），不是伺服器壞了
   preset_model_setting_unsupported: 'responseSettings.preset.modelSettingUnsupported',
   preset_revision_unavailable: 'responseSettings.preset.loadFailed',
+  // 世界模式卡選了按次計費線路：講原因（換一條線路就能聊），不是伺服器壞了
+  per_turn_world_unsupported: 'modelSelect.flatLaneWorldReason',
 })
 
 export function resolveChatErrorMessage(errorType, translate) {

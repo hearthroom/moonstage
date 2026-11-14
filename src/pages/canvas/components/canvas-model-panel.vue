@@ -45,6 +45,7 @@
         :role-id="roleId"
         :conversation-id="conversationId"
         :agent-cost-changed="agentCostChanged"
+        :world-mode="worldMode"
         :select-model="selectedValue"
         :select-model-name="modelName"
         :context="contextValue"
@@ -120,6 +121,8 @@ const props = withDefaults(defineProps<{
   roleId?: string
   conversationId?: string
   agentCostChanged?: boolean
+  /** 世界模式卡：按次計費線路在選單上停用 */
+  worldMode?: boolean
   selectedValue?: string
   modelName?: string
   scoreText?: string
@@ -145,6 +148,7 @@ const props = withDefaults(defineProps<{
   roleId: '',
   conversationId: '',
   agentCostChanged: false,
+  worldMode: false,
   selectedValue: '',
   modelName: '',
   scoreText: '',

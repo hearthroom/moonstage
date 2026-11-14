@@ -29,7 +29,7 @@ const mounted: any[] = []
 beforeEach(() => { vi.stubGlobal('uni', { showToast: vi.fn(), $emit: vi.fn() }) })
 afterEach(() => { mounted.splice(0).forEach(w => w.unmount()); updateStorageScope(null); setStageHost(null); vi.unstubAllGlobals() })
 
-async function setup(options: { startOnFlat?: boolean; agentOn?: boolean; context?: number } = {}) {
+async function setup(options: { startOnFlat?: boolean; agentOn?: boolean; context?: number; worldMode?: boolean; saveStatus?: number; saveError?: string } = {}) {
   const catalog = JSON.parse(JSON.stringify((await import('../../pages/canvas/__tests__/fixtures/model-catalog-live.json')).default))
   const family = catalog[0].families[0]
   family.variants.push(JSON.parse(JSON.stringify(flatLane)))
@@ -40,11 +40,12 @@ async function setup(options: { startOnFlat?: boolean; agentOn?: boolean; contex
     : { statusCode: 200, data: { multiPassEnabled: stored.multiPassEnabled, runtimeEnabled: true, modelSupported: true, costWarning: false, costEstimate: quote() } })
   const post = vi.fn(async (url: string, request: any) => {
     if (url !== '/settings') return { statusCode: 200, data: {} }
+    if (options.saveStatus) throw { statusCode: options.saveStatus, data: { error: options.saveError } }
     if (request.data?.multiPassEnabled === true && request.data?.selectModel === FLAT) return { statusCode: 400, data: { error: 'invalid_request' } }
     return { statusCode: 200, data: {} }
   })
   const w = shallowMount(ModelSelectPanel, {
-    props: { open: true, roleId: 'fixture-role', selectModel: options.startOnFlat ? FLAT : ordinary, context: options.context ?? 3 },
+    props: { open: true, roleId: 'fixture-role', selectModel: options.startOnFlat ? FLAT : ordinary, context: options.context ?? 3, worldMode: options.worldMode === true },
     global: { stubs: { Teleport: false }, config: { globalProperties: { http: { get, post }, requestUrl: { playerAgentMode: '/agent', playerRoleSettingsSave: '/settings', playerAgentCostAction: '/action', getModelListV2: '/models' } } } },
   })
   mounted.push(w)
@@ -189,6 +190,38 @@ describe('按次線：畫面', () => {
     expect(w.find('.ms-dchip-context').classes()).not.toContain('is-flat')
     expect(w.find('.ms-pill-price').exists()).toBe(false)
     expect(w.find('.ms-dchip-agent').classes()).not.toContain('is-disabled')
+  })
+})
+
+describe('按次線：世界模式卡', () => {
+  it('世界模式卡上按次線停用、寫出原因，點了也不會選到', async () => {
+    const { w, vm, familyView, variantOf, ordinary } = await setup({ worldMode: true })
+    vm.toggleAllLanes(familyView)
+    await flushPromises()
+    vm.selectVariant(familyView, variantOf(FLAT))
+    await flushPromises()
+    expect(vm.formData.selectModel).toBe(ordinary)
+    expect(vm.laneLockedByWorld(variantOf(FLAT))).toBe(true)
+    expect(vm.laneLockedByWorld(variantOf(ordinary))).toBe(false)
+    const row = w.findAll('.ms-opt').find(r => r.text().includes('Dawn · Per turn'))
+    expect(row).toBeTruthy()
+    expect(row!.classes()).toContain('is-locked')
+    expect(row!.text()).toContain('modelSelect.flatLaneWorldReason')
+  })
+
+  it('一般卡不受影響', async () => {
+    const { vm, familyView, variantOf } = await setup()
+    expect(vm.laneLockedByWorld(variantOf(FLAT))).toBe(false)
+    vm.selectVariant(familyView, variantOf(FLAT))
+    expect(vm.formData.selectModel).toBe(FLAT)
+  })
+
+  it('存檔被伺服器以世界模式拒絕時，講原因而不是「儲存失敗」，選單不關', async () => {
+    const { w, vm } = await setup({ startOnFlat: true, saveStatus: 422, saveError: 'per_turn_world_unsupported' })
+    await vm.sure()
+    await flushPromises()
+    expect(uni.showToast).toHaveBeenCalledWith({ title: 'modelSelect.flatLaneWorldReason', icon: 'none' })
+    expect(w.emitted('close')).toBeUndefined()
   })
 })
 

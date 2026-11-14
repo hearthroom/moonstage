@@ -10,6 +10,12 @@ import {
 const translate = (key: string) => key
 
 describe('resolveChatErrorMessage', () => {
+  it('maps the per-turn world-mode refusal to its reason, not a server error', () => {
+    const type = resolveChatErrorTypeFromFailure({ statusCode: 422, data: { error: 'per_turn_world_unsupported' } })
+    expect(type).toBe('per_turn_world_unsupported')
+    expect(resolveChatErrorMessage(type, translate)).toBe('modelSelect.flatLaneWorldReason')
+  })
+
   it('preserves typed business failures rejected by the shared HTTP interceptor', () => {
     expect(resolveChatErrorTypeFromFailure({
       statusCode: 409,

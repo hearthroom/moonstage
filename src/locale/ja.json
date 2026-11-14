@@ -457,6 +457,7 @@
 	"modelSelect.contextHelpBody": "コンテキスト容量は、AI が返信のたびに読み返す範囲で、最近の会話、キャラクターカード、ワールドブックが入ります。容量が大きいほど前の展開を多く覚えていられ、1ターンあたりの料金も上がります。",
 	"modelSelect.agentFlatLaneReason": "この回線は1ターン定額のため、Agent モードは使えません。Agent は1ターンにモデルを何度も呼び出します。",
 	"modelSelect.agentClosedByLane": "この回線では Agent モードをオフにしました。他の回線に戻したときは、もう一度オンにしてください。",
+	"modelSelect.flatLaneWorldReason": "このカードは複数キャラクターのワールドモードで、1ターンに複数のキャラクターが返信するため、1ターン定額の回線は使えません。",
 	"modelSelect.tierStatNext": "次のターン",
 	"modelSelect.tierStatFirst": "最初のターン（全体の推定）",
 	"modelSelect.tierStatFull": "{tier}いっぱいの1ターン",

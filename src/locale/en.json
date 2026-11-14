@@ -306,6 +306,7 @@
 	"modelSelect.contextHelpBody": "Context capacity is what the AI reads back before each reply: the recent chat, the role card and the lorebook. A larger capacity remembers more of the story and costs more per turn.",
 	"modelSelect.agentFlatLaneReason": "Agent mode is not available on this flat-price lane, because Agent calls the model several times per turn.",
 	"modelSelect.agentClosedByLane": "Agent mode is off for this lane. After switching to another lane, turn it back on yourself.",
+	"modelSelect.flatLaneWorldReason": "This card uses world mode, where several characters reply in one turn, so it cannot use a flat per-turn lane.",
 	"modelSelect.tierStatNext": "Next turn",
 	"modelSelect.tierStatFirst": "First turn (site estimate)",
 	"modelSelect.tierStatFull": "Per turn at full {tier}",

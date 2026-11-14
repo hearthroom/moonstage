@@ -402,7 +402,8 @@
 										v-for="variant in getVisibleVariants(detailFamily)"
 										:key="variant.value"
 										class="ms-opt"
-										:class="{ 'is-on': formData.selectModel === variant.value }"
+										:class="{ 'is-on': formData.selectModel === variant.value, 'is-locked': laneLockedByWorld(variant) }"
+										:aria-disabled="laneLockedByWorld(variant) ? 'true' : undefined"
 										@click="selectVariant(detailFamily, variant)">
 										<div class="ms-opt-line1">
 											<div class="ms-radio" :class="{ 'is-on': formData.selectModel === variant.value }"></div>
@@ -435,7 +436,8 @@
 											 而且帶文字——裸箭頭在列尾的語意是「整列會導航」，跟這裡「整列是選取」
 											 正好相反。它跟指標擠同一行，不另開一列。 -->
 										<div class="ms-opt-line2">
-											<span class="ms-opt-meta">{{ laneMetaFor(variant) }}</span>
+											<span v-if="laneLockedByWorld(variant)" class="ms-opt-meta">{{ t('modelSelect.flatLaneWorldReason') }}</span>
+											<span v-else class="ms-opt-meta">{{ laneMetaFor(variant) }}</span>
 											<div
 												v-if="formData.selectModel === variant.value"
 												class="ms-opt-entry"
@@ -646,6 +648,8 @@
 		dockChips?: HTMLElement | null
 		dockPanel?: HTMLElement | null
 		dockNote?: HTMLElement | null
+		/** 世界模式卡（一張卡多角色）：按次線不開放，選單上停用並說明。 */
+		worldMode?: boolean
 		/** 高消費確認的落點：在模型殼內，但不受清單的 overflow／mask 裁切。 */
 		costDialogHost?: HTMLElement | null
 		/**
@@ -656,7 +660,7 @@
 	}>(), {
 		roleId: '', conversationId: '', agentCostChanged: false, open: true, selectModel: '', selectModelName: '', context: 1,
 		thinkingDepth: '', thinkingDepthManual: false, showThinkingProcess: true, autoCompactEnabled: false,
-		compactExtraInstruction: '', searchQuery: '', dockChips: null, dockPanel: null, dockNote: null, costDialogHost: null, focus: '',
+		compactExtraInstruction: '', searchQuery: '', dockChips: null, dockPanel: null, dockNote: null, worldMode: false, costDialogHost: null, focus: '',
 	});
 
 	const emit = defineEmits<{
@@ -2066,7 +2070,11 @@ const truncationText = (completionRate: number) => {
 		return family.variants.some(v => v.value === formData.selectModel);
 	};
 
+	// 世界模式卡不開放按次線（owner 2026-11-14）：停用並說明，伺服器也會拒絕。
+	const laneLockedByWorld = (variant) => props.worldMode === true && isFlatPerTurn(variant);
+
 	const selectVariant = (family, variant) => {
+		if (laneLockedByWorld(variant)) return;
 		const sameFamily = Boolean(selectItem.value) && selectItem.value.family === family.family;
         const selectionChanged = formData.selectModel !== variant.value;
 		formData.selectModel = variant.value;
@@ -2467,13 +2475,17 @@ function composeModelDisplayName(variant, familyName) {
 			const restoreFullLore = raisesContext(props.context, formData.context) ? { trimConstantLore: false } : {};
 			const data = { roleId: formData.roleId, ...(formData.selectModel !== props.selectModel ? { selectModel: formData.selectModel } : {}), context: formData.context, thinkingDepth: formData.thinkingDepth, thinkingDepthManual: formData.thinkingDepthManual, ...restoreFullLore, ...agentPreference };
 			const res = await _this.http.post(_this.requestUrl.playerRoleSettingsSave, { data, showLoading: false, quietErrors: true }).catch(error => {
-				if (error?.statusCode === 409) return error;
+				if (error?.statusCode === 409 || error?.statusCode === 422) return error;
 				throw error;
 			});
 			if (!res || res.statusCode !== 200) {
 				if (res?.statusCode === 409 && (res.data?.error === 'quote_changed' || res.data?.errorCode === 'quote_changed')) {
 					deepPrepQuoteChanged.value = true; dockOpen.value = 'agent';
 					await loadDeepPrepPreference();
+					return;
+				}
+				if (res?.statusCode === 422 && (res.data?.error === 'per_turn_world_unsupported' || res.data?.errorCode === 'per_turn_world_unsupported')) {
+					message.error(t('modelSelect.flatLaneWorldReason'));
 					return;
 				}
 				message.error(t('main.save_failed'));

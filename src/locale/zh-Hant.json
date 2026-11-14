@@ -457,6 +457,7 @@
 	"modelSelect.contextHelpBody": "上下文容量是 AI 每次回覆前回頭翻看的內容，包括最近的對話、角色卡和世界書。容量越大，記得的前情越多，每輪也越貴。",
 	"modelSelect.agentFlatLaneReason": "這條線路每輪固定收費，不提供 Agent 模式，因為 Agent 一輪會多次呼叫模型。",
 	"modelSelect.agentClosedByLane": "Agent 模式已在這條線路關閉；換回其他線路後需要重新打開。",
+	"modelSelect.flatLaneWorldReason": "這張卡是多角色的世界模式，一輪會由幾個角色各自回覆，所以不能用每輪固定收費的線路。",
 	"modelSelect.tierStatNext": "下一輪",
 	"modelSelect.tierStatFirst": "第一輪（全站估算）",
 	"modelSelect.tierStatFull": "吃滿 {tier} 時每輪",

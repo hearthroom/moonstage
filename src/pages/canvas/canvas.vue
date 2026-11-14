@@ -204,6 +204,7 @@
         :role-id="settingsRoleId"
         :conversation-id="String(unref(conversationId) || '')"
         :agent-cost-changed="modelCostQuoteChanged"
+        :world-mode="modelPanelWorldMode"
         :selected-value="selectedVariantValue"
         :model-name="formData.selectModelName"
         :score-text="modelScoreText"
@@ -11518,6 +11519,8 @@ const modelBalanceHint = computed(() => {
   try { available = stageHost.ui.availableCredits?.() ?? null; } catch { return ''; }
   return balanceWarning(selectedVariant.value, modelScoreOpts.value, available, t);
 })
+// 世界模式卡（一張卡多角色）不開放按次計費線路：模型選單上停用並說明。
+const modelPanelWorldMode = computed(() => Boolean((roleView.value as any)?.world))
 const modelScoreDynamic = computed(() => scoreParts(selectedVariant.value, modelScoreOpts.value).dynamic)
 // 動態計價的價格要說清楚是什麼：這段對話的下一輪，還是還沒聊過的卡依全站估的第一輪。
 // 跟模型選單用同一組字（priceMeaning），頂欄與選單才不會各說各話。

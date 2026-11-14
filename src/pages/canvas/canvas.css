@@ -3506,6 +3506,12 @@
     color: var(--lt-canvas-official);
   }
 
+  /* 世界模式卡上的按次線：停用但仍列出，第二行寫原因。 */
+  .ms-opt.is-locked {
+    cursor: default;
+    opacity: 0.55;
+  }
+
   .ms-badge.is-long-context {
     gap: 3px;
     border-color: color-mix(in srgb, var(--lt-canvas-fg) 38%, transparent);
