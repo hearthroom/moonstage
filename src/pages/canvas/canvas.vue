@@ -11527,6 +11527,7 @@ const modelScoreLabel = computed(() => {
   const meaning = priceMeaning(selectedVariant.value)
   if (meaning === 'next') return t('modelSelect.priceNext', { n: text })
   if (meaning === 'fresh') return t('modelSelect.priceFresh', { n: text })
+  if (meaning === 'flat') return t('modelSelect.priceFlat', { n: text })
   return ''
 })
 const modelPanelLabels = computed(() => ({

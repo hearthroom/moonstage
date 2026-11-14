@@ -146,6 +146,25 @@
 .ms-dchip-agent {
     padding-right: 6px
 }
+.ms-tier-bar {
+    margin-right: 4px
+}
+.ms-help-btn {
+    padding: 0
+}
+.ms-help-seg {
+    padding: 6px 4px
+}
+.ms-flat-note .ms-layers-icon {
+    margin-top: 3px
+}
+.ms-pills.is-priced > .ms-pill {
+    padding-top: 4px;
+    padding-bottom: 4px
+}
+.ms-flat-notice {
+    padding: 8px 10px
+}
 .ms-dock-panel {
     padding: 12px
 }

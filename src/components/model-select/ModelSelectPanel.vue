@@ -24,14 +24,24 @@
 		-->
 		<Teleport v-if="!isLoading" :to="dockChips" :disabled="!dockChips">
 			<div class="ms-dock-chips">
-				<div class="ms-chip ms-dchip" :class="{ 'is-open': dockOpen === 'context' }" role="button" tabindex="0"
+				<!-- 按次線：晶片換成強調態，容量數字前一條中性長度條（只有這一條、沒有底軌，
+					 大檔只是更長）；選到時呼吸幾輪提示這裡能調。攤開或看說明時回到一般的攤開態。 -->
+				<div class="ms-chip ms-dchip ms-dchip-context"
+					:class="{ 'is-open': dockOpen === 'context', 'is-flat': laneIsFlat && dockOpen !== 'context', 'is-breathing': flatChipBreathing }"
+					role="button" tabindex="0"
 					:aria-label="t('modelSelect.contextBudgetShort')"
 					:aria-expanded="dockOpen === 'context' ? 'true' : 'false'"
 					@click="toggleDock('context')"
 					@keydown.enter.prevent="toggleDock('context')">
+					<span v-if="laneIsFlat" class="ms-tier-bar" :style="{ width: flatTierBarWidth }" aria-hidden="true"></span>
 					<span class="ms-chip-text">{{ contextChipText }}</span>
 					<svg class="ms-caret" :class="{ 'is-open': dockOpen === 'context' }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 10l6 5 6-5" /></svg>
 				</div>
+				<!-- 上下文容量是什麼：每個模型都有，取代原本檔位面板標題旁的 ⓘ（同一件事不留兩個入口）。 -->
+				<button type="button" class="ms-help-btn" :class="{ 'is-on': dockOpen === 'help' }"
+					:aria-label="t('modelSelect.contextHelpLabel')"
+					:aria-expanded="dockOpen === 'help' ? 'true' : 'false'"
+					@click="toggleDock('help')">?</button>
 				<div v-if="hasThinkingDepthOptions" class="ms-chip ms-dchip" :class="{ 'is-open': dockOpen === 'thinking' }" role="button" tabindex="0"
 					:aria-label="t('modelSelect.thinkingDepth')"
 					:aria-expanded="dockOpen === 'thinking' ? 'true' : 'false'"
@@ -43,47 +53,63 @@
 				<!-- Agent 模式是一顆真的開關，不必先攤開再按。名字可以點，點了攤開它的說明。
 					 模型不支援時開關停用但仍然顯示，原因在說明裡：整個消失的話，
 					 開著的對話換到不支援的模型之後，使用者看不到也關不掉。 -->
-				<div v-if="deepPrepVisible" class="ms-chip ms-dchip ms-dchip-agent" :class="{ 'is-open': dockOpen === 'agent', 'is-disabled': !deepPrepModelSupported }">
+				<div v-if="deepPrepVisible" class="ms-chip ms-dchip ms-dchip-agent" :class="{ 'is-open': dockOpen === 'agent', 'is-disabled': !deepPrepModelSupported || laneBlocksAgent }">
 					<span class="ms-chip-text" role="button" tabindex="0"
 						:aria-expanded="dockOpen === 'agent' ? 'true' : 'false'"
 						@click="toggleDock('agent')"
 						@keydown.enter.prevent="toggleDock('agent')">✦ {{ t('modelSelect.deepPrepLabel') }}</span>
 					<ASwitch
 						:checked="deepPrepEnabled"
-						:disabled="(!deepPrepModelSupported && !deepPrepEnabled) || deepPrepSaving"
+						:disabled="laneBlocksAgent || (!deepPrepModelSupported && !deepPrepEnabled) || deepPrepSaving"
 						size="small"
 						@change="onDeepPrepChange" />
 				</div>
 			</div>
 		</Teleport>
 
+		<!-- 選中按次線時常駐的一行：這條線支援超大上下文、每輪固定收費（不必打開檔位才知道）。 -->
+		<Teleport v-if="!isLoading && laneIsFlat" :to="dockNote" :disabled="!dockNote">
+			<div class="ms-flat-note">
+				<svg class="ms-layers-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+				<span>{{ t('modelSelect.flatLaneNote', { max: flatTierMaxText }) }}</span>
+			</div>
+		</Teleport>
+
 		<Teleport v-if="!isLoading" :to="dockPanel" :disabled="!dockPanel">
-			<div v-show="dockOpen === 'context'" class="ms-dock-panel">
-				<div class="ms-set-head">
-					<span class="ms-card-title">{{ t('modelSelect.contextBudgetShort') }}</span>
-					<span class="ms-info" :class="{ 'is-on': openHint === 'context' }" role="button" tabindex="0"
-						:aria-label="t('modelSelect.contextBudgetShort')"
-						:aria-expanded="openHint === 'context' ? 'true' : 'false'"
-						@click="toggleHint('context')"
-						@keydown.enter.prevent="toggleHint('context')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></span>
-				</div>
-				<span v-if="openHint === 'context'" class="ms-hint">{{ t('modelSelect.contextTierExplain') }}</span>
-				<div class="ms-pills is-fill">
+			<div v-show="dockOpen === 'context'" class="ms-dock-panel" :class="{ 'is-flat': laneIsFlat }">
+				<span class="ms-card-title">{{ t('modelSelect.contextBudgetShort') }}</span>
+				<div class="ms-pills is-fill" :class="{ 'is-priced': laneIsFlat }">
 					<div
 						v-for="item in contextBudgetLevelOptions"
 						:key="item.value"
 						class="ms-pill token"
 						:class="{ 'is-on': item.value === formData.context, 'selected': item.value === formData.context }"
 						@click="contextBudgetLevelChange(item.value)">
-						<span class="ms-pill-text">
+						<!-- 按次線每一檔是確定價、檔與檔差很多，價格寫在鍵上才選得準；不放「建議」，
+							 收費方式由下面的提示句說明。估算線照舊不把「約」數字擺上鍵。 -->
+						<span v-if="laneIsFlat" class="ms-pill-text ms-pill-priced">
+							<span>{{ item.text }}</span>
+							<span class="ms-pill-price">{{ formatCredits(item.fixedCredits) }}</span>
+						</span>
+						<span v-else class="ms-pill-text">
 							{{ item.text }}<span v-if="item.isFloor" class="ms-pill-tag">{{ t('modelSelect.contextTierRecommended') }}</span>
 						</span>
 					</div>
 				</div>
+				<template v-if="laneIsFlat">
+					<div class="ms-tier-stats">
+						<div class="ms-tier-stat">
+							<span class="ms-tier-stat-k">{{ t('modelSelect.flatTierStat') }}</span>
+							<span class="ms-tier-stat-v">{{ t('modelSelect.priceCredits', { n: formatCredits(selectedFlatCredits) }) }}</span>
+						</div>
+					</div>
+					<span class="ms-hint">{{ t('modelSelect.flatTierHint') }}</span>
+					<span v-if="flatCompactCredits" class="ms-hint">{{ t('modelSelect.flatCompactNote', { n: formatCredits(flatCompactCredits) }) }}</span>
+				</template>
 				<!-- 選中的檔位要花多少：左邊是這段對話的下一輪，右邊是對話長到吃滿這一檔以後。
 					 都是估算。數字不擺在檔位鍵上（那裡沒人看得懂它在算什麼），而是並排成兩格，
 					 每格一個小標說明它是哪一種。Agent 模式一輪會呼叫多次模型，估不出來，改說明這件事。 -->
-				<span v-if="deepPrepOn" class="ms-tier-note">{{ t('modelSelect.contextTierAgentNote') }}</span>
+				<span v-else-if="deepPrepOn" class="ms-tier-note">{{ t('modelSelect.contextTierAgentNote') }}</span>
 				<div v-else-if="tierStats.length" class="ms-tier-stats">
 					<div v-for="cell in tierStats" :key="cell.key" class="ms-tier-stat">
 						<span class="ms-tier-stat-k">{{ cell.label }}</span>
@@ -118,7 +144,23 @@
 				</div>
 			</div>
 
-			<div v-if="deepPrepVisible" v-show="dockOpen === 'agent'" class="ms-dock-panel">
+			<!-- 上下文容量的白話說明：示意 AI 每次回頭看的範圍。只是解釋，沒有調整控件。 -->
+			<div v-show="dockOpen === 'help'" class="ms-dock-panel ms-help-panel">
+				<span class="ms-card-title">{{ t('modelSelect.contextBudgetShort') }}</span>
+				<div class="ms-help-bar" aria-hidden="true">
+					<span class="ms-help-seg is-lore">{{ t('promptBreakdown.worldbook') }}</span>
+					<span class="ms-help-seg is-role">{{ t('promptBreakdown.roleCard') }}</span>
+					<span class="ms-help-seg is-chat">{{ t('promptBreakdown.history') }}</span>
+				</div>
+				<span class="ms-hint">{{ t('modelSelect.contextHelpBody') }}</span>
+			</div>
+
+			<div v-if="deepPrepVisible && laneBlocksAgent" v-show="dockOpen === 'agent'" class="ms-dock-panel">
+				<span class="ms-card-title">✦ {{ t('modelSelect.deepPrepLabel') }}</span>
+				<span v-if="agentClosedByLane" class="ms-flat-notice" role="status">{{ t('modelSelect.agentClosedByLane') }}</span>
+				<span class="ms-hint">{{ t('modelSelect.agentFlatLaneReason') }}</span>
+			</div>
+			<div v-else-if="deepPrepVisible" v-show="dockOpen === 'agent'" class="ms-dock-panel">
 				<span class="ms-card-title">✦ {{ t('modelSelect.deepPrepLabel') }}</span>
 				<span class="ms-hint">{{ deepPrepModelSupported ? t('modelSelect.deepPrepHintBilling') : t('modelSelect.deepPrepUnsupported') }}</span>
 				<span v-if="deepPrepModelSupported" class="ms-hint" role="status" aria-live="polite">{{ agentCostText }}</span>
@@ -373,6 +415,11 @@
 												:class="{ 'is-accent': laneTagOf(variant) === 'value', 'is-official': laneTagOf(variant) === 'official' }">
 												<span class="ms-badge-text">{{ t(laneTagOf(variant) === 'official' ? 'modelSelect.laneOfficial' : 'modelSelect.laneValue') }}</span>
 											</div>
+											<!-- 按次線支援超大上下文：中性徽章（不用金色與藍色，那兩色已是實惠與官方）。 -->
+											<div v-if="isFlatPerTurn(variant)" class="ms-badge is-long-context">
+												<svg class="ms-layers-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+												<span class="ms-badge-text">{{ t('modelSelect.laneLongContext') }}</span>
+											</div>
 											<!-- 對話調價或上游折扣均已包含在售價，徽章只顯示、不再折價。 -->
 											<div v-if="variantDiscountPercent(variant) > 0" class="ms-badge is-discount">
 												<span class="ms-badge-text">-{{ variantDiscountPercent(variant) }}%</span>
@@ -480,7 +527,7 @@
 	// @ts-nocheck
 	import { useStageHost } from '@/host/stage-host'
 	const stageHost = useStageHost()
-	import { variantPrice, priceMeaning } from '@/pages/canvas/canvas-model-catalog'
+	import { variantPrice, priceMeaning, isFlatPerTurn, flatPriceFrom } from '@/pages/canvas/canvas-model-catalog'
 	import { visibleLanes, hiddenLaneCount, laneCount, laneTagOf, isDeadLane, composeModelDisplayName } from '@/pages/canvas/canvas-model-lanes'
 	import { raisesContext } from '@/pages/canvas/canvas-capacity-choice'
 	import icon_deepseek from '@/static/icon/models/deepseek.png';
@@ -598,6 +645,7 @@
 		/** 殼底部放設定鍵與攤開面板的位置；沒給（還沒掛上、或單獨掛這個元件）時就地渲染 */
 		dockChips?: HTMLElement | null
 		dockPanel?: HTMLElement | null
+		dockNote?: HTMLElement | null
 		/** 高消費確認的落點：在模型殼內，但不受清單的 overflow／mask 裁切。 */
 		costDialogHost?: HTMLElement | null
 		/**
@@ -608,7 +656,7 @@
 	}>(), {
 		roleId: '', conversationId: '', agentCostChanged: false, open: true, selectModel: '', selectModelName: '', context: 1,
 		thinkingDepth: '', thinkingDepthManual: false, showThinkingProcess: true, autoCompactEnabled: false,
-		compactExtraInstruction: '', searchQuery: '', dockChips: null, dockPanel: null, costDialogHost: null, focus: '',
+		compactExtraInstruction: '', searchQuery: '', dockChips: null, dockPanel: null, dockNote: null, costDialogHost: null, focus: '',
 	});
 
 	const emit = defineEmits<{
@@ -681,6 +729,29 @@
 	const contextBudgetOptions = computed(() => getContextBudgetOptions(selectedContextModel.value));
 	const contextBudgetLevelOptions = computed(() => getContextBudgetLevelOptions(selectedContextModel.value));
 	const isAutoCompactForced = computed(() => isAutoCompactForcedForModel(selectedContextModel.value));
+	// 按次計費線路：每一檔一個確定價（見 canvas-model-catalog 的 variantPrice）。
+	const laneIsFlat = computed(() => isFlatPerTurn(selectItem.value));
+	const formatCredits = (n) => Number.isFinite(Number(n)) && n !== null ? new Intl.NumberFormat(stageHost.locale.get() || 'en').format(Number(n)) : '';
+	const selectedFlatCredits = computed(() => laneIsFlat.value ? variantPrice(selectItem.value, { context: formData.context }).fixed : null);
+	// 記憶整理在按次線上每次固定收檔位表裡最低的那一檔（owner 2026-11-14），不受所選檔位影響。
+	const flatCompactCredits = computed(() => laneIsFlat.value ? flatPriceFrom(selectItem.value) : null);
+	const flatTierMaxText = computed(() => {
+		const options = contextBudgetLevelOptions.value;
+		return options.length ? options[options.length - 1].text : '';
+	});
+	// 長度條與容量等比，最大一檔 27px（192K 7、256K 9、512K 18、768K 27）。
+	const FLAT_TIER_BAR_MAX_PX = 27;
+	const flatTierBarWidth = computed(() => {
+		const options = contextBudgetLevelOptions.value;
+		const max = Math.max(0, ...options.map(o => Number(o.tokens) || 0));
+		const current = options.find(o => o.value === formData.context) || options[0];
+		if (!max || !current || !current.tokens) return '0px';
+		return `${Math.max(4, Math.round((FLAT_TIER_BAR_MAX_PX * current.tokens) / max))}px`;
+	});
+	// 呼吸只在這一次打開選單裡提示一次：攤開檔位或看說明就停，收起來也不再開始。
+	// 輪數上限（6 輪）寫在 CSS 的 animation-iteration-count，動態減少時 CSS 直接關掉。
+	const flatBreathSpent = ref(false);
+	const flatChipBreathing = computed(() => laneIsFlat.value && !flatBreathSpent.value && dockOpen.value === '');
 	const selectedContextBudgetIndex = computed(() => {
 		const index = contextBudgetOptions.value.findIndex(item => item.value === formData.context);
 		return index >= 0 ? index : 0;
@@ -1241,11 +1312,10 @@ const truncationText = (completionRate: number) => {
 	// 排序選項平常收著，只露出一顆寫著目前排法的鍵；選完就收回去。
 	const sortOpen = ref(false);
 	// 設定卡上兩個 ⓘ 的說明，一次只攤開一段；再點一次收起來。
-	const openHint = ref('');
-	const toggleHint = (key) => { openHint.value = openHint.value === key ? '' : key; };
 	// 底部設定列：一次只攤開一塊（檔位／思考深度／Agent 說明），再點同一顆收起來。
 	const dockOpen = ref('');
 	const toggleDock = (key) => { dockOpen.value = dockOpen.value === key ? '' : key; };
+	watch(dockOpen, (key) => { if (key === 'context' || key === 'help') flatBreathSpent.value = true; });
 	const contextChipText = computed(() => {
 		const option = contextBudgetLevelOptions.value.find(o => o.value === formData.context);
 		return option ? option.text : t('modelSelect.contextBudgetShort');
@@ -1395,6 +1465,7 @@ const truncationText = (completionRate: number) => {
 		fresh: ['modelSelect.priceFresh', 'modelSelect.priceFreshFrom'],
 		estimate: ['modelSelect.priceCredits', 'modelSelect.priceCreditsFrom'],
 		fixed: ['modelSelect.priceCredits', 'modelSelect.priceCreditsFrom'],
+		flat: ['modelSelect.priceFlat', 'modelSelect.priceFlatFrom'],
 	};
 	const priceLabel = (meaning, amount, from = false) => {
 		if (deepPrepOn.value) return t('modelSelect.priceAgent');
@@ -1406,6 +1477,8 @@ const truncationText = (completionRate: number) => {
 		const d = familyPriceDisplay(family);
 		if (!d) return '';
 		const variants = getFilteredVariants(family) || [];
+		// 只剩按次線可顯示時，列上寫「每輪固定 N 起」：它的數字是最低檔，選了更大的檔會更貴。
+		if (variants.length && variants.every(isFlatPerTurn)) return priceLabel('flat', d.amountText, true);
 		const meaning = priceMeaning(variants.find(v => v && v.billingType === 'dynamic') || variants[0]);
 		const amount = meaning === 'estimate' ? d.amountText : d.amountText.replace('~', '');
 		return priceLabel(meaning, amount, d.from);
@@ -1446,8 +1519,13 @@ const truncationText = (completionRate: number) => {
 
 	const variantPriceText = (variant) => {
 		const meaning = priceMeaning(variant);
+		// 按次線：選中時寫選中檔位的價，沒選中一律寫最低檔加「起」（每一檔的價都不同）。
+		if (meaning === 'flat' && !(selectItem.value && selectItem.value.value === variant.value)) {
+			return priceLabel('flat', formatCredits(flatPriceFrom(variant)), true);
+		}
 		const price = getVariantPrice(variant);
-		const amount = meaning === 'next' || meaning === 'fresh' ? priceRange(price) : formatPrice(price);
+		const amount = meaning === 'next' || meaning === 'fresh' ? priceRange(price)
+			: meaning === 'flat' ? formatCredits(price.fixed) : formatPrice(price);
 		return priceLabel(meaning, amount);
 	};
 
@@ -1810,7 +1888,7 @@ const truncationText = (completionRate: number) => {
 	// 彈層不是頁面：它掛上去之後就一直在，沒有「再次顯示」這個事件。每一次被打開
 	// 都要重問一次——價格與支援度都會在別處被改掉（換了 Agent 模式、換了卡）。
 	watch(() => props.open, async (open) => {
-		if (!open) { agentClosedByLane.value = false; panelCostAccepted.value = null; ++modelCatalogRequest; ++deepPrepRequest; deepPrepCostEstimate.value = null; settleCostModal(false); return; }
+		if (!open) { agentClosedByLane.value = false; flatBreathSpent.value = false; panelCostAccepted.value = null; ++modelCatalogRequest; ++deepPrepRequest; deepPrepCostEstimate.value = null; settleCostModal(false); return; }
 		deepPrepInitialized = false;
 		agentPreferenceRetryVisible.value = false;
 		openedSelection = null;

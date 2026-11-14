@@ -2694,6 +2694,10 @@
     display: none;
   }
 
+  .mp-dock-note-slot:empty {
+    display: none;
+  }
+
   .u-popup__content .model-setting-scope .bottom .btn {
     flex: 0 0 auto;
     min-width: 0;
@@ -2728,6 +2732,158 @@
 
   .ms-dchip-agent.is-disabled .ms-chip-text {
     color: var(--lt-canvas-sheet-faint);
+  }
+
+  /* 按次線的檔位晶片：強調態（填色＋accent 框字＋3px 外圈）。攤開時回到 .is-open 的樣子。 */
+  .ms-dchip.is-flat {
+    border-color: var(--lt-canvas-accent);
+    background: var(--lt-canvas-accent-bg);
+    color: var(--lt-canvas-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lt-canvas-accent) 22%, transparent);
+  }
+
+  /* 呼吸只動外圈光暈，填色與框線不動（字不閃）；6 輪後停在靜態強調。 */
+  .ms-dchip.is-flat.is-breathing {
+    animation: ms-flat-breathe 3.2s ease-in-out 6;
+  }
+
+  @keyframes ms-flat-breathe {
+    0%, 100% {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--lt-canvas-accent) 22%, transparent);
+    }
+    50% {
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--lt-canvas-accent) 30%, transparent),
+        0 0 16px 2px color-mix(in srgb, var(--lt-canvas-accent) 32%, transparent);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ms-dchip.is-flat.is-breathing {
+      animation: none;
+    }
+  }
+
+  /* 容量長度條：只有這一條、沒有底軌，長度隨檔位（寬度由元件給）。 */
+  .ms-tier-bar {
+    flex: 0 0 auto;
+    height: 4px;
+    margin-right: 4px;
+    border-radius: 9999px;
+    background: currentColor;
+  }
+
+  /* 「?」：視覺 28px 圓，點擊區用偽元素擴到 36px。 */
+  .ms-help-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--lt-canvas-sheet-line);
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--lt-canvas-muted);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .ms-help-btn::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+  }
+
+  .ms-help-btn.is-on {
+    border-color: var(--lt-canvas-accent);
+    background: var(--lt-canvas-accent-bg);
+    color: var(--lt-canvas-accent);
+  }
+
+  .ms-help-btn:focus-visible {
+    outline: 2px solid var(--lt-canvas-accent);
+    outline-offset: 2px;
+  }
+
+  /* 說明面板的示意條：世界書／角色卡／對話三段，AI 每次回頭看的範圍。 */
+  .ms-help-bar {
+    display: flex;
+    gap: 2px;
+    overflow: hidden;
+    border-radius: 8px;
+    font-size: 11px;
+    line-height: 1.3;
+  }
+
+  .ms-help-seg {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 4px;
+    text-align: center;
+    overflow-wrap: anywhere;
+    background: color-mix(in srgb, var(--lt-canvas-fg) 8%, transparent);
+  }
+
+  .ms-help-seg.is-chat {
+    flex-grow: 2;
+    background: var(--lt-canvas-accent-bg);
+    color: var(--lt-canvas-accent);
+  }
+
+  /* 按次線選中時常駐的說明行（晶片列下方、現用模型列上方）。 */
+  .ms-flat-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--lt-canvas-fg);
+  }
+
+  .ms-flat-note .ms-layers-icon {
+    margin-top: 3px;
+  }
+
+  .ms-layers-icon {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+  }
+
+  /* 按次線的檔位面板：淡 accent 內描邊，標示這是超長上下文線。 */
+  .ms-dock-panel.is-flat {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lt-canvas-accent) 45%, transparent);
+  }
+
+  .ms-pill-priced {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.25;
+  }
+
+  .ms-pill-price {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ms-pills.is-priced > .ms-pill {
+    min-height: 40px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  /* Agent 為這條線關掉時的通知：accent 淡底。 */
+  .ms-flat-notice {
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--lt-canvas-accent-bg);
+    font-size: 12px;
+    line-height: 1.5;
   }
 
   .ms-dock-panel {
@@ -3130,34 +3286,6 @@
     height: 14px;
   }
 
-  /* 攤開面板的標題列：標題＋ⓘ */
-  .ms-set-head {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-  }
-
-  .ms-info {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    width: 24px;
-    height: 24px;
-    color: var(--lt-canvas-sheet-faint);
-    cursor: pointer;
-  }
-
-  .ms-info svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .ms-info.is-on {
-    color: var(--lt-canvas-accent);
-  }
-
   /* 面板內寬放不下五顆預設尺寸的檔位鍵，最後一顆會自己折到第二行 */
   .ms-dock-panel .ms-pills {
     gap: 6px;
@@ -3376,6 +3504,12 @@
     border-color: var(--lt-canvas-official);
     background: var(--lt-canvas-official-bg);
     color: var(--lt-canvas-official);
+  }
+
+  .ms-badge.is-long-context {
+    gap: 3px;
+    border-color: color-mix(in srgb, var(--lt-canvas-fg) 38%, transparent);
+    color: var(--lt-canvas-fg);
   }
 
   .ms-badge.is-discount {
@@ -3966,6 +4100,10 @@
 
     .mp-dock-chips-slot {
       flex: 0 1 auto;
+    }
+
+    .mp-dock-note-slot {
+      flex: 1 0 100%;
     }
 
     .mp-dock-row {
