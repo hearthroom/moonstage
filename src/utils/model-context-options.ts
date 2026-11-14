@@ -12,6 +12,8 @@ export interface ContextBudgetOption {
   quoteMin?: number
   /** 對話長到吃滿這一檔以後，每輪大約扣的點數。 */
   quoteFull?: number
+  /** 按次計費線路：這一檔每輪固定收的積分（確定值，不是估算）。 */
+  fixedCredits?: number
 }
 
 export interface ContextBudgetLevelOption extends ContextBudgetOption {
@@ -34,6 +36,7 @@ export type ThinkingControl = 'none' | 'toggleable' | 'adaptive'
 export interface ContextCapableModel {
   value?: string
   family?: string
+  flatPerTurn?: boolean
   isCacheStable?: boolean
   contextBudgetOptions?: ContextBudgetOption[]
   noLimitEligible?: boolean
@@ -122,6 +125,7 @@ const normalizeOption = (
   const quoteMin = Number(item?.quoteMin)
   const quoteMax = Number(item?.quoteMax)
   const quoteFull = Number(item?.quoteFull)
+  const fixedCredits = Number(item?.fixedCredits)
   return {
     text,
     value,
@@ -129,6 +133,7 @@ const normalizeOption = (
     ...(Number.isFinite(quoteMax) && quoteMax > 0 ? { quoteMax } : {}),
     ...(Number.isFinite(quoteMin) && quoteMin > 0 ? { quoteMin } : {}),
     ...(Number.isFinite(quoteFull) && quoteFull > 0 ? { quoteFull } : {}),
+    ...(Number.isFinite(fixedCredits) && fixedCredits > 0 ? { fixedCredits } : {}),
   }
 }
 
@@ -370,6 +375,24 @@ export const normalizeContextValue = (
     if (maxOption) return maxOption.value
   }
   return options[0]?.value || 1
+}
+
+/**
+ * 選了一條線路之後用哪一檔上下文。
+ *
+ * 按次計費線路每一檔是一個確定價（192K 400 → 768K 1,000）：從別的模型換進來時一律回到
+ * 最低檔，不沿用原本的檔位——原本的第 3 檔在這裡是 512K、每輪 750，玩家沒選過這個價。
+ * 已經在這條線上（重開選單、只調檔位）時保留他選的檔。其他模型照現行正規化。
+ */
+export const contextForSelection = (
+  value: number | string | undefined | null,
+  model: ContextCapableModel | null | undefined,
+  selectionChanged: boolean,
+): number => {
+  if (model?.flatPerTurn === true && selectionChanged) {
+    return getContextBudgetOptions(model)[0]?.value || 1
+  }
+  return normalizeContextValue(value, model)
 }
 
 /** DeepSeek V4 and later only. V3 and other model families keep their policy. */

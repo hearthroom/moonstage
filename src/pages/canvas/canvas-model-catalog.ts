@@ -12,6 +12,8 @@ export interface ContextOptionLike {
   text?: string
   value?: number
   tokens?: number
+  /** 按次計費線路：這一檔每輪固定收的積分 */
+  fixedCredits?: number
 }
 
 export interface ThinkingOptionLike {
@@ -32,6 +34,11 @@ export interface ModelVariantLike {
   maxScore?: number
   isSupportMax?: boolean
   billingType?: string
+  /**
+   * 按次計費：每一檔一個確定價（檔位上的 fixedCredits），每輪照選的檔收滿。
+   * 一般固定計價模型同樣是 billingType=fixed（costScore × 檔位），辨識只能看這一個旗標。
+   */
+  flatPerTurn?: boolean
   estMinScore?: number
   estMaxScore?: number
   contextBudgetOptions?: ContextOptionLike[]
@@ -144,6 +151,8 @@ export interface ScoreContext {
 
 export interface VariantPrice {
   isDynamic: boolean
+  /** 按次計費：fixed 就是選中那一檔每輪收的數 */
+  flat?: boolean
   /** 固定計價：這一輪的點數 */
   fixed?: number
   /** 動態計價：估算區間 */
@@ -173,7 +182,34 @@ export function fixedThinkingSurcharge(variant: ModelVariantLike, thinkingDepth?
  * 由來（2026-09-13）：輸入區左下角原本直接拿 costScore，固定計價的線路選了 128K 之後
  * 面板寫 900、左下角還是 180——同一個數字兩個地方各算各的。
  */
+export function isFlatPerTurn(variant?: ModelVariantLike | null): boolean {
+  return Boolean(variant && variant.flatPerTurn === true)
+}
+
+function flatTiers(variant: ModelVariantLike): { value: number; credits: number }[] {
+  const options = Array.isArray(variant.contextBudgetOptions) ? variant.contextBudgetOptions : []
+  return options
+    .map((o) => ({ value: Number(o && o.value), credits: Number(o && o.fixedCredits) }))
+    .filter((o) => Number.isFinite(o.value) && Number.isFinite(o.credits) && o.credits > 0)
+}
+
+/** 按次線最低一檔的價（「每輪固定 N 起」）；不是按次線回 null。 */
+export function flatPriceFrom(variant?: ModelVariantLike | null): number | null {
+  if (!variant || !isFlatPerTurn(variant)) return null
+  const tiers = flatTiers(variant)
+  if (tiers.length) return Math.min(...tiers.map((o) => o.credits))
+  const cost = Number(variant.costScore)
+  return Number.isFinite(cost) && cost >= 0 ? cost : null
+}
+
 export function variantPrice(variant: ModelVariantLike, opts: ScoreContext = {}): VariantPrice {
+  if (isFlatPerTurn(variant)) {
+    // 檔位不在表上（別的模型留下的 5 或 MAX）時寫最低檔：換到這條線時檔位會被設回第 1 檔，
+    // 這裡只是那一步之前的退路，不寫出一個表上沒有、沒有人會被收的數。
+    const hit = flatTiers(variant).find((o) => o.value === Number(opts.context))
+    const fixed = hit ? hit.credits : flatPriceFrom(variant)
+    return { isDynamic: false, flat: true, fixed: fixed === null ? NaN : fixed }
+  }
   if (variant.billingType === 'dynamic') {
     // 伺服器替每一檔都估了價（quoteMin＝這段對話下一輪約多少、quoteMax＝常見最高，
     // 都是估算）。有的話用選中那一檔的，畫面上的數字才會跟著檔位走，不必等重新抓目錄。
@@ -235,10 +271,12 @@ export function scoreParts(variant?: ModelVariantLike | null, opts: ScoreContext
  *   fresh     這張卡還沒聊過：依全站近期的用量估的第一輪（estSource=model）
  *   estimate  其他估算來源（舊目錄）：只能說是估算
  *   fixed     固定計價，數字就是每輪扣的點數
+ *   flat      按次計費：每輪照選的檔位收固定價，對話再短也一樣
  */
-export type PriceMeaning = 'next' | 'fresh' | 'estimate' | 'fixed'
+export type PriceMeaning = 'next' | 'fresh' | 'estimate' | 'fixed' | 'flat'
 
 export function priceMeaning(variant?: ModelVariantLike | null): PriceMeaning {
+  if (isFlatPerTurn(variant)) return 'flat'
   if (!variant || variant.billingType !== 'dynamic') return 'fixed'
   const source = (variant as any).estSource
   if (source === 'conversation') return 'next'
@@ -254,6 +292,10 @@ export function formatScore(variant?: ModelVariantLike | null, opts: ScoreContex
 export function balanceWarning(variant: ModelVariantLike | null | undefined, opts: ScoreContext, available: number | null | undefined, t: (key: string, params: Record<string, unknown>) => string): string {
  if (!variant || typeof available !== 'number' || !Number.isFinite(available) || available < 0) return ''
  const price = variantPrice(variant, opts)
+ // 按次線每輪都收滿選中那一檔：餘額不到這個數就一定不夠。一般固定計價照舊不提醒。
+ if (price.flat) {
+  return Number.isFinite(price.fixed) && available < price.fixed! ? t('chat.balanceBelowFlat', {have: available, need: price.fixed}) : ''
+ }
  if (!price.isDynamic || !Number.isFinite(price.min) || !Number.isFinite(price.max) || !price.max || price.max <= 0 || (price.min ?? -1) < 0 || price.min! > price.max) return ''
  return available < price.max ? t('chat.balanceBelowEstimate', {have: available}) : ''
 }

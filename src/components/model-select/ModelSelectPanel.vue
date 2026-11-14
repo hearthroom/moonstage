@@ -537,7 +537,7 @@
 		getVisibleThinkingDepthOptions,
 		isAutoCompactForcedForModel,
 		pickThinkingDepth,
-		normalizeContextValue
+		contextForSelection
 	} from '@/utils/model-context-options'
 	import { getAaAgenticIndex, getAaIntelligenceIndex, getModelHealthMetrics, getUsageRank } from '@/utils/model-health-metrics'
 	import {
@@ -567,7 +567,7 @@
 		rememberBrowsedCategory,
 	} from '@/utils/model-select-category-memory'
 	import { setShowThinkingProcess } from '@/utils/thinking-display-pref'
-	import { normalizeMultiPassPreference } from '@/utils/multi-pass'
+	import { normalizeMultiPassPreference, agentBlockedByLane, projectAgentEnabled } from '@/utils/multi-pass'
 	import { needsAgentCostConfirmation, rememberAgentCostConfirmation } from '@/utils/agent-cost-confirmation'
 	import { onStorageScopeChange } from '@/common/author-rules/storage-scope'
 	const gemIconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="#FED880" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:100%;height:100%;display:block;"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3L8 9l4 13 4-13-3-6M2 9h20"/></svg>'
@@ -722,7 +722,7 @@
 
 	const normalizeContextForSelectedModel = (keepThinkingChoice = true, selectionChanged = false) => {
 		if (!selectItem.value) return;
-		const nextContext = normalizeContextValue(formData.context, selectItem.value);
+		const nextContext = contextForSelection(formData.context, selectItem.value, selectionChanged);
 		if (nextContext !== formData.context) {
 			formData.context = nextContext;
 		}
@@ -1651,6 +1651,12 @@ const truncationText = (completionRate: number) => {
 	// 違反 HIG 第三條「看得懂自己的處境」。放在這裡，換到不支援的模型時
 	// 選項就在同一畫面消失，依賴關係結構性可見。
 	const deepPrepEnabled = ref(false);
+	// 按次計費線路不能開 Agent：由目錄旗標同步決定，不等偏好讀回（見 multi-pass 的 agentBlockedByLane）。
+	const laneBlocksAgent = computed(() => agentBlockedByLane(selectItem.value));
+	// 玩家開著 Agent 換到按次線：開關當場關掉，Agent 面板攤開一次並說明（換回別的線要自己再開）。
+	const agentClosedByLane = ref(false);
+	// 進場時偏好先讀、目錄後到：已經在按次線上而偏好還留著開啟（舊殘留），目錄一到就投影成關。
+	watch(laneBlocksAgent, (blocked) => { if (blocked) deepPrepEnabled.value = false; });
 	const deepPrepRuntimeEnabled = ref(false);
 	const deepPrepModelSupported = ref(false);
 	const deepPrepSaving = ref(false);
@@ -1705,7 +1711,7 @@ const truncationText = (completionRate: number) => {
 	// 全站關掉時它仍然是 true，只看那兩個條件的話底部欄會在功能根本沒開的情況下
 	// 變成金色。
 	const deepPrepOn = computed(() =>
-		deepPrepRuntimeEnabled.value && deepPrepEnabled.value && deepPrepModelSupported.value
+		deepPrepRuntimeEnabled.value && deepPrepEnabled.value && deepPrepModelSupported.value && !laneBlocksAgent.value
 	);
 
 
@@ -1727,7 +1733,7 @@ const truncationText = (completionRate: number) => {
 			const pref = normalizeMultiPassPreference(res);
 			// Only the initial read seeds the pending switch. Model/shape refreshes may
 			// never replace an unsaved choice with the stored preference.
-			if (!deepPrepInitialized) { deepPrepEnabled.value = pref.multiPassEnabled; deepPrepInitialized = true; }
+			if (!deepPrepInitialized) { deepPrepEnabled.value = projectAgentEnabled(pref.multiPassEnabled, selectItem.value); deepPrepInitialized = true; }
 			deepPrepRuntimeEnabled.value = pref.runtimeEnabled;
 			deepPrepModelSupported.value = pref.modelSupported;
 			deepPrepCostWarning.value = pref.costWarning;
@@ -1787,7 +1793,7 @@ const truncationText = (completionRate: number) => {
 	const onDeepPrepChange = async (nextEnabled) => {
 		if (!props.open || stageHost.capabilities?.agentMode === false || deepPrepSaving.value) return;
 		// An unsupported model can still switch a stored preference off.
-		if (nextEnabled && !deepPrepModelSupported.value) return;
+		if (nextEnabled && (!deepPrepModelSupported.value || laneBlocksAgent.value)) return;
 		deepPrepInitialized = true;
 		deepPrepEnabled.value = nextEnabled === true;
 		refreshDynamicPrices();
@@ -1804,7 +1810,7 @@ const truncationText = (completionRate: number) => {
 	// 彈層不是頁面：它掛上去之後就一直在，沒有「再次顯示」這個事件。每一次被打開
 	// 都要重問一次——價格與支援度都會在別處被改掉（換了 Agent 模式、換了卡）。
 	watch(() => props.open, async (open) => {
-		if (!open) { panelCostAccepted.value = null; ++modelCatalogRequest; ++deepPrepRequest; deepPrepCostEstimate.value = null; settleCostModal(false); return; }
+		if (!open) { agentClosedByLane.value = false; panelCostAccepted.value = null; ++modelCatalogRequest; ++deepPrepRequest; deepPrepCostEstimate.value = null; settleCostModal(false); return; }
 		deepPrepInitialized = false;
 		agentPreferenceRetryVisible.value = false;
 		openedSelection = null;
@@ -1842,7 +1848,7 @@ const truncationText = (completionRate: number) => {
 	watch(() => formData.context, () => { if (!isLoading.value) refreshDynamicPrices(); });
 
 	const modelListQueryParams = () => {
-		const data = { contextLevel: formData.context, pendingAgent: deepPrepEnabled.value };
+		const data = { contextLevel: formData.context, pendingAgent: projectAgentEnabled(deepPrepEnabled.value, selectItem.value) };
 		if (formData.roleId) {
 			data.roleId = formData.roleId;
 		}
@@ -1988,7 +1994,20 @@ const truncationText = (completionRate: number) => {
 		formData.selectModel = variant.value;
 		selectItem.value = { ...variant, family: family.family };
 		normalizeContextForSelectedModel(sameFamily, selectionChanged);
+		if (selectionChanged) closeAgentForLane();
 		activatedFamilies.value.add(family.family);
+	};
+
+	// 換到按次線：Agent 開著就當場關掉，面板攤開一次說明；換到其他線路收起說明，但不自動恢復。
+	const closeAgentForLane = () => {
+		if (!laneBlocksAgent.value) { agentClosedByLane.value = false; return; }
+		const wasOn = deepPrepRuntimeEnabled.value && deepPrepEnabled.value;
+		deepPrepEnabled.value = false;
+		deepPrepInitialized = true;
+		if (wasOn) {
+			agentClosedByLane.value = true;
+			dockOpen.value = 'agent';
+		}
 	};
 
 	const toggleExpand = (family) => {
@@ -2317,6 +2336,8 @@ function composeModelDisplayName(variant, familyName) {
 		if (isSure.value || costConfirming.value || deepPrepSaving.value) return;
 		costConfirming.value = true;
 		// An unread preference is unknown, never an instruction to turn Agent off.
+		// 按次線例外：這條線上 Agent 一定是關，不必讀偏好就能存（伺服器也拒絕對它開 Agent）。
+		if (laneBlocksAgent.value) { deepPrepEnabled.value = false; deepPrepInitialized = true; }
 		let saveAgentPreference = deepPrepInitialized;
 		let selection = pendingAgentSelection();
 		let estimate = null;

@@ -25,6 +25,22 @@ export function isMultiPassModelSupported(preference: any): boolean {
   return !!(preference && preference.modelSupported)
 }
 
+/**
+ * 這條線路因為計費方式不能開 Agent（按次計費：每輪固定價，Agent 一輪會呼叫多次模型）。
+ *
+ * 讀目錄旗標、同步判斷，不等偏好設定讀回：偏好是非同步的，等它回來之前開關、價格與
+ * 原因都會是上一條線路的樣子。它也是唯一分得出「計費方式不允許」與「模型不支援」的依據，
+ * 兩者給玩家的原因不同。
+ */
+export function agentBlockedByLane(variant: any): boolean {
+  return Boolean(variant && variant.flatPerTurn === true)
+}
+
+/** 這條線路上 Agent 實際是開還是關：按次線上一律關（伺服器也這樣投影舊殘留的開啟）。 */
+export function projectAgentEnabled(enabled: boolean, variant: any): boolean {
+  return enabled === true && !agentBlockedByLane(variant)
+}
+
 function unwrapResponseBody(raw: any): any {
   let body = raw && typeof raw === 'object' ? raw : {}
   if (body.data && typeof body.data === 'object') body = body.data
