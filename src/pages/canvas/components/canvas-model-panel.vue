@@ -104,6 +104,8 @@
              @click="onDone"
              @keydown.enter.prevent="onDone">{{ labels.done }}</div>
       </div>
+      <!-- 按次線餘額不夠選中那一檔時的提醒（模型選單算好交過來）。 -->
+      <div v-if="draft && draft.balanceHint" class="mp-balance-hint" role="status">{{ draft.balanceHint }}</div>
     </div>
   </div>
 </template>
@@ -171,7 +173,7 @@ const emit = defineEmits<{
 const picker = ref<any>(null)
 
 /** 選單裡還沒確認的選擇（模型、檔位、價格），由 ModelSelectPanel 回報。 */
-const draft = ref<{ value: string; name: string; price: string; context?: number; tier?: string; fromTier?: string } | null>(null)
+const draft = ref<{ value: string; name: string; price: string; context?: number; tier?: string; fromTier?: string; balanceHint?: string } | null>(null)
 const tierChanged = computed(() => !!draft.value && draft.value.context != null && draft.value.context !== props.contextValue)
 const switching = computed(() => {
   const d = draft.value

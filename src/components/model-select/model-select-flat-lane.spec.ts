@@ -8,7 +8,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { shallowMount, flushPromises } from '@vue/test-utils'
 import ModelSelectPanel from './ModelSelectPanel.vue'
 import { updateStorageScope } from '@/common/author-rules/storage-scope'
-import { setStageHost } from '@/host/stage-host'
+import { browserHost, setStageHost } from '@/host/stage-host'
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string, vars?: any) => vars ? `${key} ${Object.values(vars).join(' ')}` : key, locale: { value: 'en' } }) }))
 
@@ -222,6 +222,43 @@ describe('按次線：世界模式卡', () => {
     await flushPromises()
     expect(uni.showToast).toHaveBeenCalledWith({ title: 'modelSelect.flatLaneWorldReason', icon: 'none' })
     expect(w.emitted('close')).toBeUndefined()
+  })
+})
+
+describe('按次線：審查補的情境', () => {
+  it('選了按次線沒確認就關掉，再打開：一般線路上開著的 Agent 不被悄悄存成關', async () => {
+    const { w, vm, familyView, variantOf } = await setup({ agentOn: true })
+    vm.selectVariant(familyView, variantOf(FLAT))
+    await w.setProps({ open: false })
+    await w.setProps({ open: true })
+    await flushPromises()
+    expect(vm.formData.selectModel).not.toBe(FLAT)
+    expect(vm.deepPrepEnabled).toBe(true)
+  })
+
+  it('Agent 面板自動攤開時晶片照樣呼吸；只有攤開檔位或看說明才停', async () => {
+    const { w, vm, familyView, variantOf } = await setup({ agentOn: true })
+    vm.selectVariant(familyView, variantOf(FLAT))
+    await flushPromises()
+    expect(vm.dockOpen).toBe('agent')
+    expect(w.find('.ms-dchip-context').classes()).toContain('is-breathing')
+    vm.toggleDock('help')
+    await flushPromises()
+    expect(w.find('.ms-dchip-context').classes()).not.toContain('is-breathing')
+  })
+
+  it('餘額不夠選中那一檔時，交給外殼的草稿帶提醒；一般線路不帶', async () => {
+    setStageHost(browserHost({ ui: { ...browserHost().ui, availableCredits: () => 450 } } as any))
+    const { w, vm, familyView, variantOf, ordinary } = await setup()
+    vm.selectVariant(familyView, variantOf(FLAT))
+    vm.contextBudgetLevelChange(2)
+    await flushPromises()
+    const drafts = w.emitted('draft') as any[][]
+    expect(drafts[drafts.length - 1][0].balanceHint).toBe('chat.balanceBelowFlat 450 500')
+    vm.selectVariant(familyView, variantOf(ordinary))
+    await flushPromises()
+    const after = w.emitted('draft') as any[][]
+    expect(after[after.length - 1][0].balanceHint).toBe('')
   })
 })
 

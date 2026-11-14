@@ -529,7 +529,7 @@
 	// @ts-nocheck
 	import { useStageHost } from '@/host/stage-host'
 	const stageHost = useStageHost()
-	import { variantPrice, priceMeaning, isFlatPerTurn, flatPriceFrom } from '@/pages/canvas/canvas-model-catalog'
+	import { variantPrice, priceMeaning, isFlatPerTurn, flatPriceFrom, balanceWarning } from '@/pages/canvas/canvas-model-catalog'
 	import { visibleLanes, hiddenLaneCount, laneCount, laneTagOf, isDeadLane, composeModelDisplayName } from '@/pages/canvas/canvas-model-lanes'
 	import { raisesContext } from '@/pages/canvas/canvas-capacity-choice'
 	import icon_deepseek from '@/static/icon/models/deepseek.png';
@@ -755,7 +755,7 @@
 	// 呼吸只在這一次打開選單裡提示一次：攤開檔位或看說明就停，收起來也不再開始。
 	// 輪數上限（6 輪）寫在 CSS 的 animation-iteration-count，動態減少時 CSS 直接關掉。
 	const flatBreathSpent = ref(false);
-	const flatChipBreathing = computed(() => laneIsFlat.value && !flatBreathSpent.value && dockOpen.value === '');
+	const flatChipBreathing = computed(() => laneIsFlat.value && !flatBreathSpent.value && dockOpen.value !== 'context' && dockOpen.value !== 'help');
 	const selectedContextBudgetIndex = computed(() => {
 		const index = contextBudgetOptions.value.findIndex(item => item.value === formData.context);
 		return index >= 0 ? index : 0;
@@ -1815,7 +1815,14 @@ const truncationText = (completionRate: number) => {
 			const pref = normalizeMultiPassPreference(res);
 			// Only the initial read seeds the pending switch. Model/shape refreshes may
 			// never replace an unsaved choice with the stored preference.
-			if (!deepPrepInitialized) { deepPrepEnabled.value = projectAgentEnabled(pref.multiPassEnabled, selectItem.value); deepPrepInitialized = true; }
+			// 選單掛著不卸載：重新打開時偏好先讀、目錄後到，selectItem 可能還是上一次的線路。
+			// 只在它就是這次要存的模型時才投影；不是的話等目錄到了由 laneBlocksAgent 的 watch 處理，
+			// 免得拿上一次的按次線把一般線路上開著的 Agent 悄悄存成關。
+			if (!deepPrepInitialized) {
+				const current = selectItem.value && selectItem.value.value === formData.selectModel ? selectItem.value : null;
+				deepPrepEnabled.value = projectAgentEnabled(pref.multiPassEnabled, current);
+				deepPrepInitialized = true;
+			}
 			deepPrepRuntimeEnabled.value = pref.runtimeEnabled;
 			deepPrepModelSupported.value = pref.modelSupported;
 			deepPrepCostWarning.value = pref.costWarning;
@@ -2511,12 +2518,22 @@ function composeModelDisplayName(variant, familyName) {
 	*/
 	defineExpose({ sure });
 
+	// 按次線每輪收滿選中那一檔：餘額不夠時在現用模型列就提醒，不等存完回到輸入區才知道。
+	// 只管按次線；其他模型的提醒照舊只在輸入區。
+	const flatBalanceHint = () => {
+		const variant = selectItem.value;
+		if (!isFlatPerTurn(variant)) return '';
+		let available = null;
+		try { available = stageHost.ui?.availableCredits?.() ?? null; } catch { return ''; }
+		return balanceWarning(variant, { context: formData.context }, available, t);
+	};
+
 	// 把玩家還沒確認的選擇告訴外殼：頂欄要寫出「從哪個模型換到哪個、價格變成多少」。
 	watch(() => [selectItem.value && selectItem.value.value, formData.context, deepPrepOn.value, selectItem.value && selectItem.value.estMinScore], () => {
 		const variant = selectItem.value;
 		if (!variant) return;
 		// 檔位的字（64K）也一起給：只換檔位時，頂欄兩列的模型名一樣，要靠它分出前後。
 		const tierText = (value) => (contextBudgetLevelOptions.value.find(o => o.value === value) || {}).text || '';
-		emit('draft', { value: variant.value, name: composeModelDisplayName(variant, variant.family), price: variantPriceText(variant), context: formData.context, tier: tierText(formData.context), fromTier: tierText(props.context) });
+		emit('draft', { value: variant.value, name: composeModelDisplayName(variant, variant.family), price: variantPriceText(variant), context: formData.context, tier: tierText(formData.context), fromTier: tierText(props.context), balanceHint: flatBalanceHint() });
 	}, { immediate: true });
 </script>

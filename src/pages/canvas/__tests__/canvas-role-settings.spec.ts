@@ -219,3 +219,14 @@ it('手動點選同一深度仍送值與來源，重新讀回保留布林意圖'
  expect(readRoleSettings(next).thinkingDepthManual).toBe(true)
  expect(readRoleSettings({...next,thinkingDepthManual:'true'}).thinkingDepthManual).toBe(false)
 })
+
+describe('HUD 換線時的上下文檔位', () => {
+  it('換到按次線回到最低一檔；其他線路不動', async () => {
+    const { contextForHudModel } = await import('../canvas-role-settings')
+    const flat = { value: 'x-dawn-turn', flatPerTurn: true, isCacheStable: true, contextBudgetOptions: [{ value: 1, tokens: 192000, fixedCredits: 400 }, { value: 2, tokens: 256000, fixedCredits: 500 }, { value: 3, tokens: 512000, fixedCredits: 750 }] }
+    expect(contextForHudModel(flat, 3)).toBe(1)
+    expect(contextForHudModel({ value: 'x-dawn', isCacheStable: true }, 3)).toBe(3)
+    expect(contextForHudModel(null, 3)).toBe(3)
+  })
+})
+

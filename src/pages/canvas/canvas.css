@@ -2698,6 +2698,27 @@
     display: none;
   }
 
+  /* 按次線餘額不夠時的提醒：跟輸入區的餘額提醒同一種左側色條。 */
+  .mp-balance-hint {
+    padding: 4px 10px;
+    border-left: 3px solid var(--lt-canvas-accent);
+    border-radius: 8px;
+    background: var(--lt-canvas-accent-bg);
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .mp-balance-hint:lang(ko) {
+    word-break: keep-all;
+  }
+
+  @media (min-width: 769px) {
+    .mp-balance-hint {
+      flex: 1 0 100%;
+    }
+  }
+
   .u-popup__content .model-setting-scope .bottom .btn {
     flex: 0 0 auto;
     min-width: 0;

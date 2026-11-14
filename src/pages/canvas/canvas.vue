@@ -644,7 +644,7 @@ import {
 } from './canvas-context-breakdown'
 import type { MessageMenuAnchor } from './components/canvas-message.vue'
 import {
-  ROLE_SETTINGS_DEFAULTS, readRoleSettings, buildRoleSettingsSavePayload, thinkingDepthForVariant,
+  ROLE_SETTINGS_DEFAULTS, readRoleSettings, buildRoleSettingsSavePayload, thinkingDepthForVariant, contextForHudModel,
   type RoleSettings,
 } from './canvas-role-settings'
 import { asPersonaMode, conversationRoleId, settingsRoleFor } from './canvas-role-settings'
@@ -11579,6 +11579,7 @@ async function onApplyModelSettings(payload: any) {
   // 由畫布存的那條路靠這一行把它放進要送的欄位。不是數字時比較結果為 false。
   if (Number(next.context) > Number(before.context)) formData.trimConstantLore = false
   if (Number.isFinite(Number(next.context))) formData.context = Number(next.context)
+  else if (modelChanged) formData.context = contextForHudModel(variant, formData.context)
   if (typeof next.thinkingDepth === 'string') {
     formData.thinkingDepth = next.thinkingDepth
     formData.thinkingDepthManual = next.thinkingDepthManual === true

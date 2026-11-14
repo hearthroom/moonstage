@@ -140,6 +140,9 @@
 .mp-dock-row .mp-info-bar {
     padding: 0
 }
+.mp-balance-hint {
+    padding: 4px 10px
+}
 .u-popup__content .model-setting-scope .bottom .btn {
     padding: 0 24px
 }

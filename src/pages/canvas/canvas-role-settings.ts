@@ -13,7 +13,7 @@
  * 過去。所以差異比對不能拿 falsy 當「沒動」。
  */
 
-import { pickThinkingDepth, isDeepSeekV4PlusVariant } from '@/utils/model-context-options'
+import { pickThinkingDepth, isDeepSeekV4PlusVariant, contextForSelection } from '@/utils/model-context-options'
 
 /** 伺服器認得、而這一頁真的會動到的欄位。 */
 export const ROLE_SETTING_KEYS = [
@@ -216,4 +216,14 @@ export function thinkingDepthForVariant(variant: DepthVariantLike | null | undef
   const options = (Array.isArray(variant.thinkingDepthOptions) ? variant.thinkingDepthOptions : [])
     .map((o) => asText(o && o.value))
   return pickThinkingDepth(options, isDeepSeekV4PlusVariant(variant) && !manual ? null : current, variant.defaultThinkingDepth)
+}
+
+/**
+ * 只交回模型（沙盒卡的 HUD）換線時的上下文檔位。換到按次計費線路回到最低一檔，跟模型選單
+ * 同一條規則：沿用舊檔位的話，原本的第 3 檔在那條線上是 512K、每輪 750，玩家沒選過這個價。
+ * 其他線路不動。
+ */
+export function contextForHudModel(variant: any, current: number): number {
+  if (!variant || variant.flatPerTurn !== true) return current
+  return contextForSelection(current, variant, true)
 }

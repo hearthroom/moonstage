@@ -174,14 +174,6 @@ export function fixedThinkingSurcharge(variant: ModelVariantLike, thinkingDepth?
   return 0
 }
 
-/**
- * 每輪點數的唯一算法（伺服器的 getScoreByModelWithThinkingDepth 同一規則）：
- *   固定計價＝costScore × 檔位；MAX 檔且模型支援 MAX 時用 maxScore，不支援就當第 5 檔；
- *   再加思考深度的固定加價。動態計價＝伺服器估好的區間，已經是該檔位的，不再乘。
- *
- * 由來（2026-09-13）：輸入區左下角原本直接拿 costScore，固定計價的線路選了 128K 之後
- * 面板寫 900、左下角還是 180——同一個數字兩個地方各算各的。
- */
 export function isFlatPerTurn(variant?: ModelVariantLike | null): boolean {
   return Boolean(variant && variant.flatPerTurn === true)
 }
@@ -202,6 +194,15 @@ export function flatPriceFrom(variant?: ModelVariantLike | null): number | null 
   return Number.isFinite(cost) && cost >= 0 ? cost : null
 }
 
+/**
+ * 每輪點數的唯一算法（伺服器的 getScoreByModelWithThinkingDepth 同一規則）：
+ *   固定計價＝costScore × 檔位；MAX 檔且模型支援 MAX 時用 maxScore，不支援就當第 5 檔；
+ *   再加思考深度的固定加價。動態計價＝伺服器估好的區間，已經是該檔位的，不再乘。
+ *   按次計費（flatPerTurn）＝選中那一檔的 fixedCredits，不乘、不加。
+ *
+ * 由來（2026-09-13）：輸入區左下角原本直接拿 costScore，固定計價的線路選了 128K 之後
+ * 面板寫 900、左下角還是 180——同一個數字兩個地方各算各的。
+ */
 export function variantPrice(variant: ModelVariantLike, opts: ScoreContext = {}): VariantPrice {
   if (isFlatPerTurn(variant)) {
     // 檔位不在表上（別的模型留下的 5 或 MAX）時寫最低檔：換到這條線時檔位會被設回第 1 檔，

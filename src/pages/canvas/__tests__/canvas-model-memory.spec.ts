@@ -24,6 +24,13 @@ describe('換模型時深度一起存', () => {
   })
 })
 
+describe('HUD 換到按次線', () => {
+  it('只帶模型時檔位回到按次線的最低一檔，跟選單同一條規則', () => {
+    const apply = body('onApplyModelSettings')
+    expect(apply).toMatch(/else if \(modelChanged\) formData\.context = contextForHudModel\(variant, formData\.context\)/)
+  })
+})
+
 describe('進場讀回的模型不被目錄蓋掉', () => {
   it('目錄載入只寫目錄，不改玩家選的模型或深度', () => {
     const load = body('loadModelCatalog')
