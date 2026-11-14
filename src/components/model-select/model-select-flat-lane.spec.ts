@@ -7,6 +7,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { shallowMount, flushPromises } from '@vue/test-utils'
 import ModelSelectPanel from './ModelSelectPanel.vue'
+import ASwitch from './ms-switch.vue'
 import { updateStorageScope } from '@/common/author-rules/storage-scope'
 import { browserHost, setStageHost } from '@/host/stage-host'
 
@@ -69,6 +70,9 @@ describe('按次線：Agent 與檔位', () => {
     expect(vm.agentClosedByLane).toBe(true)
     expect(vm.dockOpen).toBe('agent')
     expect(vm.formData.context).toBe(1)
+    const agentSwitch = w.find('.ms-dchip-agent').findComponent(ASwitch)
+    expect(agentSwitch.props('checked')).toBe(false)
+    expect(agentSwitch.props('disabled')).toBe(true)
     await vm.sure()
     await flushPromises()
     expect(vm.costModalVisible).toBe(false)
