@@ -18,6 +18,10 @@ it('一般頁走實際 setActiveAuthorAsset：空歷史也注入，更新與清�
     let cardCssMount = null, authorScopeClosed = false;
     const activeAuthorAsset = {value:{}}, openingPage={value:''}, openingMode={value:''};
     function clearStreamCache(){}
+    // 卡片工坊：記下擴充 hash、原卡的開場網頁（這裡的卡沒有擴充）
+    const baseOpening = {openingPage:'', openingMode:'', prologue:[]};
+    function assetWorkshopHash(a){ return a && typeof a.workshopHash === 'string' ? a.workshopHash : '' }
+    function syncOpeningExtras(){ openingPage.value = baseOpening.openingPage; openingMode.value = baseOpening.openingMode }
     ${compiled}
     return {setActiveAuthorAsset, activeAuthorAsset};
   `)
