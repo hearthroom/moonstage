@@ -14,6 +14,8 @@ describe('resolveChatErrorMessage', () => {
     const type = resolveChatErrorTypeFromFailure({ statusCode: 422, data: { error: 'per_turn_world_unsupported' } })
     expect(type).toBe('per_turn_world_unsupported')
     expect(resolveChatErrorMessage(type, translate)).toBe('modelSelect.flatLaneWorldReason')
+    // 泡泡靠 finishReason 選標題與副標；落到通用的 'error' 就只剩「模型未能完成這次回覆」。
+    expect(resolveChatErrorPresentation(type, translate).finishReason).toBe('per_turn_world_unsupported')
   })
 
   it('preserves typed business failures rejected by the shared HTTP interceptor', () => {

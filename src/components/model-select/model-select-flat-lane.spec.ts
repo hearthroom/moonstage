@@ -260,5 +260,14 @@ describe('按次線：審查補的情境', () => {
     const after = w.emitted('draft') as any[][]
     expect(after[after.length - 1][0].balanceHint).toBe('')
   })
-})
 
+  it('重新打開後目錄還沒到就按確定：一般線路的 Agent 不因上一次看過的按次線被存成關', async () => {
+    const { w, vm, post, familyView, variantOf } = await setup({ agentOn: true })
+    vm.selectVariant(familyView, variantOf(FLAT))
+    await w.setProps({ open: false })
+    await w.setProps({ open: true })
+    await vm.sure()
+    await flushPromises()
+    for (const body of savedBody(post)) expect(body.multiPassEnabled).not.toBe(false)
+  })
+})

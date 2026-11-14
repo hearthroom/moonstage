@@ -458,6 +458,7 @@
 	"modelSelect.agentFlatLaneReason": "この回線は1ターン定額のため、Agent モードは使えません。Agent は1ターンにモデルを何度も呼び出します。",
 	"modelSelect.agentClosedByLane": "この回線では Agent モードをオフにしました。他の回線に戻したときは、もう一度オンにしてください。",
 	"modelSelect.flatLaneWorldReason": "このカードは複数キャラクターのワールドモードで、1ターンに複数のキャラクターが返信するため、1ターン定額の回線は使えません。",
+	"modelSelect.flatLaneWorldTitle": "このカードでは1ターン定額の回線を使えません",
 	"modelSelect.tierStatNext": "次のターン",
 	"modelSelect.tierStatFirst": "最初のターン（全体の推定）",
 	"modelSelect.tierStatFull": "{tier}いっぱいの1ターン",

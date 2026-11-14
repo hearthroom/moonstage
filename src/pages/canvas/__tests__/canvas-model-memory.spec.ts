@@ -31,6 +31,21 @@ describe('HUD 換到按次線', () => {
   })
 })
 
+describe('世界模式卡與按次線', () => {
+  it('HUD 的模型清單在世界模式卡上不列按次線', () => {
+    expect(source).toMatch(/\.filter\(\(v\) => !\(modelPanelWorldMode\.value && v\.flatPerTurn === true\)\)/)
+  })
+  it('存檔被以世界模式拒絕時講原因，不說儲存失敗', () => {
+    const persist = body('persistRoleSettings')
+    expect(persist).toMatch(/statusCode === 422/)
+    expect(persist).toMatch(/per_turn_world_unsupported[\s\S]*modelSelect\.flatLaneWorldReason/)
+  })
+  it('送出被拒的泡泡有自己的標題與原因', () => {
+    expect(source).toMatch(/'per_turn_world_unsupported': t\('modelSelect\.flatLaneWorldTitle'\)/)
+    expect(source).toMatch(/'per_turn_world_unsupported': t\('modelSelect\.flatLaneWorldReason'\)/)
+  })
+})
+
 describe('進場讀回的模型不被目錄蓋掉', () => {
   it('目錄載入只寫目錄，不改玩家選的模型或深度', () => {
     const load = body('loadModelCatalog')

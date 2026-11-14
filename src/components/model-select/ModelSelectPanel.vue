@@ -529,7 +529,7 @@
 	// @ts-nocheck
 	import { useStageHost } from '@/host/stage-host'
 	const stageHost = useStageHost()
-	import { variantPrice, priceMeaning, isFlatPerTurn, flatPriceFrom, balanceWarning } from '@/pages/canvas/canvas-model-catalog'
+	import { variantPrice, priceMeaning, isFlatPerTurn, flatPriceFrom, balanceWarning, findVariant } from '@/pages/canvas/canvas-model-catalog'
 	import { visibleLanes, hiddenLaneCount, laneCount, laneTagOf, isDeadLane, composeModelDisplayName } from '@/pages/canvas/canvas-model-lanes'
 	import { raisesContext } from '@/pages/canvas/canvas-capacity-choice'
 	import icon_deepseek from '@/static/icon/models/deepseek.png';
@@ -1737,6 +1737,9 @@ const truncationText = (completionRate: number) => {
 	const laneBlocksAgent = computed(() => agentBlockedByLane(selectItem.value));
 	// 玩家開著 Agent 換到按次線：開關當場關掉，Agent 面板攤開一次並說明（換回別的線要自己再開）。
 	const agentClosedByLane = ref(false);
+	// 這次要存的那條線路，從目錄查，不讀 selectItem：選單掛著不卸載，重新打開時 selectItem
+	// 可能還是上一次看過的線路。目錄還沒到時回 null（不知道就不投影、不強制關）。
+	const savingLane = () => findVariant(modelTabs.value, formData.selectModel);
 	// 進場時偏好先讀、目錄後到：已經在按次線上而偏好還留著開啟（舊殘留），目錄一到就投影成關。
 	watch(laneBlocksAgent, (blocked) => { if (blocked) deepPrepEnabled.value = false; });
 	const deepPrepRuntimeEnabled = ref(false);
@@ -1815,12 +1818,10 @@ const truncationText = (completionRate: number) => {
 			const pref = normalizeMultiPassPreference(res);
 			// Only the initial read seeds the pending switch. Model/shape refreshes may
 			// never replace an unsaved choice with the stored preference.
-			// 選單掛著不卸載：重新打開時偏好先讀、目錄後到，selectItem 可能還是上一次的線路。
-			// 只在它就是這次要存的模型時才投影；不是的話等目錄到了由 laneBlocksAgent 的 watch 處理，
-			// 免得拿上一次的按次線把一般線路上開著的 Agent 悄悄存成關。
+			// 按次線上讀成關。看的是這次要存的線路（savingLane），不是 selectItem：免得拿上一次看過的
+			// 按次線，把一般線路上開著的 Agent 悄悄存成關。目錄還沒到時由 laneBlocksAgent 的 watch 補上。
 			if (!deepPrepInitialized) {
-				const current = selectItem.value && selectItem.value.value === formData.selectModel ? selectItem.value : null;
-				deepPrepEnabled.value = projectAgentEnabled(pref.multiPassEnabled, current);
+				deepPrepEnabled.value = projectAgentEnabled(pref.multiPassEnabled, savingLane());
 				deepPrepInitialized = true;
 			}
 			deepPrepRuntimeEnabled.value = pref.runtimeEnabled;
@@ -2430,7 +2431,7 @@ function composeModelDisplayName(variant, familyName) {
 		costConfirming.value = true;
 		// An unread preference is unknown, never an instruction to turn Agent off.
 		// 按次線例外：這條線上 Agent 一定是關，不必讀偏好就能存（伺服器也拒絕對它開 Agent）。
-		if (laneBlocksAgent.value) { deepPrepEnabled.value = false; deepPrepInitialized = true; }
+		if (agentBlockedByLane(savingLane())) { deepPrepEnabled.value = false; deepPrepInitialized = true; }
 		let saveAgentPreference = deepPrepInitialized;
 		let selection = pendingAgentSelection();
 		let estimate = null;

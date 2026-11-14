@@ -307,6 +307,7 @@
 	"modelSelect.agentFlatLaneReason": "这条线路每轮固定收费，不提供 Agent 模式，因为 Agent 一轮会多次调用模型。",
 	"modelSelect.agentClosedByLane": "Agent 模式已在这条线路关闭；换回其他线路后需要重新打开。",
 	"modelSelect.flatLaneWorldReason": "这张卡是多角色的世界模式，一轮会由几个角色各自回复，所以不能用每轮固定收费的线路。",
+	"modelSelect.flatLaneWorldTitle": "这张卡不能用按次线路",
 	"modelSelect.tierStatNext": "下一轮",
 	"modelSelect.tierStatFirst": "第一轮（全站估算）",
 	"modelSelect.tierStatFull": "占满 {tier} 时每轮",

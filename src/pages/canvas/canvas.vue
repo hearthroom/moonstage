@@ -4101,7 +4101,8 @@ function buildHudHost(): HudHost {
           groups: groups.map((g, gi) => ({
             id: String(g.group || gi),
             label: String(g.group || ''),
-            models: ((g.families || []) as any[]).flatMap((f) => ((f.variants || []) as any[]).map((v) => ({
+            // 世界模式卡不開放按次計費線路：HUD 的清單不列，跟模型選單同一條規則。
+            models: ((g.families || []) as any[]).flatMap((f) => ((f.variants || []) as any[]).filter((v) => !(modelPanelWorldMode.value && v.flatPerTurn === true)).map((v) => ({
               id: String(v.value),
               name: String(v.name || v.value || ''),
               description: String(v.description || f.description || ''),
@@ -5497,6 +5498,7 @@ function getSystemMsgKind(finishReason) {
     'mutation_in_progress': 'model-error',
     'rewrite_target_not_latest': 'model-error',
     'rewrite_target_invalid': 'model-error',
+    'per_turn_world_unsupported': 'model-error',
   };
   return (finishReason && finishReason !== 'stop') ? (map[finishReason] || 'model-error') : '';
 }
@@ -5538,6 +5540,7 @@ function getSystemMsgLabel(finishReason, item = null) {
     'mutation_in_progress': t('chat.rollbackInProgressNotice') || '上一步操作仍在處理中',
     'rewrite_target_not_latest': t('chat.editLatestAIOnly') || '只能編輯目前最新的 AI 回覆',
     'rewrite_target_invalid': t('chat.rewriteTargetChanged') || '這則回覆已無法編輯',
+    'per_turn_world_unsupported': t('modelSelect.flatLaneWorldTitle'),
   };
   return map[finishReason] || (t('systemMsg.modelError') || '模型未能完成這次回覆');
 }
@@ -5596,6 +5599,8 @@ function getSystemMsgSub(finishReason, item = null, index = -1) {
     'compact_retryable': t('error.compactRetryable')   || '記憶整理未完成，對話已恢復，請再發送一次',
     'rewrite_target_not_latest': t('chat.rewriteTargetChangedSub') || '對話內容已變更，請重新整理後編輯最新一則 AI 回覆',
     'rewrite_target_invalid': t('chat.rewriteTargetChangedSub') || '對話內容已變更，請重新整理後編輯最新一則 AI 回覆',
+    // 世界模式卡選了按次計費線路：講原因，換一條線路就能繼續。
+    'per_turn_world_unsupported': t('modelSelect.flatLaneWorldReason'),
   };
   return map[finishReason] || '';
 }
@@ -11750,7 +11755,7 @@ async function persistRoleSettings() {
     }).catch(error => {
       // setupHttp rejects business conflicts. Feed the actual response through
       // the same recovery path as hosts that resolve non-200 responses.
-      if (error?.statusCode === 409) return error
+      if (error?.statusCode === 409 || error?.statusCode === 422) return error
       throw error
     })
     if (String(unref(settingsRoleId) || '') !== targetRole || String(unref(conversationId) || '') !== targetConversation) return false
@@ -11772,6 +11777,11 @@ async function persistRoleSettings() {
         }
         openModelSelect()
         modelCostQuoteChanged.value = true
+        return false
+      }
+      // 世界模式卡選了按次計費線路（例如沙盒 HUD 帶來的舊值）：講原因，不說「儲存失敗」。
+      if (res.statusCode === 422 && (reason === 'per_turn_world_unsupported' || res.data?.errorCode === 'per_turn_world_unsupported')) {
+        uni.showToast({ title: t('modelSelect.flatLaneWorldReason'), icon: 'none' })
         return false
       }
       uni.showToast({ title: t('main.save_failed'), icon: 'error' })

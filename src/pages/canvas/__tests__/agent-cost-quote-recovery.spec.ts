@@ -14,6 +14,8 @@ describe('Agent quote changed before admission', () => {
     expect(isDefinitivePreAdmissionRejection({ ...pending, accepted: true }, 'quote_changed')).toBe(false)
     expect(isDefinitivePreAdmissionRejection({ ...pending, operationId: 'started' }, 'quote_changed')).toBe(false)
     expect(isDefinitivePreAdmissionRejection({ ...pending, operationOutcomeCapability: 'legacy' }, 'quote_changed')).toBe(false)
+    // 世界模式卡選了按次線：伺服器在建立這一輪之前就拒絕，原因當場給玩家，不等空探測。
+    expect(isDefinitivePreAdmissionRejection(pending, 'per_turn_world_unsupported')).toBe(true)
   })
   it('restores the unsent draft and opens the model sheet with updated-cost guidance', () => {
     const pending = { userBubbleId: 1, aiBubbleId: 2, draft: 'Unsent story choice', preAdmissionErrorType: 'quote_changed' }

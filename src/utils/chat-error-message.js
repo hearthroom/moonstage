@@ -110,6 +110,7 @@ const CHAT_ERROR_FINISH_REASONS = Object.freeze({
   rewrite_target_invalid: 'rewrite_target_invalid',
   continue_target_invalid: 'conversation_stale',
   conversation_stale: 'conversation_stale',
+  per_turn_world_unsupported: 'per_turn_world_unsupported',
 })
 
 export function resolveChatErrorPresentation(errorType, translate) {

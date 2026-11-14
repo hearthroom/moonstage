@@ -458,6 +458,7 @@
 	"modelSelect.agentFlatLaneReason": "이 회선은 턴당 고정 요금이라 Agent 모드를 쓸 수 없습니다. Agent는 한 턴에 모델을 여러 번 호출합니다.",
 	"modelSelect.agentClosedByLane": "이 회선에서는 Agent 모드가 꺼졌습니다. 다른 회선으로 돌아가면 다시 켜야 합니다.",
 	"modelSelect.flatLaneWorldReason": "이 카드는 여러 캐릭터가 나오는 월드 모드라 한 턴에 여러 캐릭터가 답하므로, 턴당 고정 요금 회선은 쓸 수 없습니다.",
+	"modelSelect.flatLaneWorldTitle": "이 카드에서는 턴당 고정 회선을 쓸 수 없어요",
 	"modelSelect.tierStatNext": "다음 턴",
 	"modelSelect.tierStatFirst": "첫 턴(전체 추정)",
 	"modelSelect.tierStatFull": "{tier} 가득 찼을 때 턴당",
